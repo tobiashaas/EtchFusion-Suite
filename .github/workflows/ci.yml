@@ -105,7 +105,7 @@ jobs:
         run: mkdir -p etch-fusion-suite/node_modules
 
       - name: Setup Node.js
-        uses: actions/setup-node@5e21ff4d9bc1a8cf6de233a3057d20ec6b3fb69d
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903
         with:
           node-version: 18
           cache: 'npm'
