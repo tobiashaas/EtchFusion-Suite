@@ -134,7 +134,7 @@ install_wp() {
 		local ARCHIVE_NAME="wordpress-${WP_RESOLVED_VERSION}.tar.gz"
 		local CORE_ARCHIVE="$WORK_DIR/$ARCHIVE_NAME"
 		download https://wordpress.org/${ARCHIVE_NAME} "$CORE_ARCHIVE"
-		tar --strip-components=1 -zxmf "$CORE_ARCHIVE" -C $WP_CORE_DIR
+		tar --strip-components=1 -zxf "$CORE_ARCHIVE" -C $WP_CORE_DIR 2>/dev/null || tar --strip-components=1 -zxf "$CORE_ARCHIVE" -C $WP_CORE_DIR
 	fi
 
 	if [ ! -f $WP_CORE_DIR/wp-content/db.php ]; then
@@ -197,7 +197,11 @@ recreate_db() {
 	shopt -s nocasematch
 	if [[ $1 =~ ^(y|yes)$ ]]
 	then
+		if [ -z "$DB_PASS" ]; then
+		mysqladmin drop $DB_NAME -f --user="$DB_USER"$EXTRA
+	else
 		mysqladmin drop $DB_NAME -f --user="$DB_USER" --password="$DB_PASS"$EXTRA
+	fi
 		create_db
 		echo "Recreated the database ($DB_NAME)."
 	else
@@ -207,7 +211,11 @@ recreate_db() {
 }
 
 create_db() {
-	mysqladmin create $DB_NAME --user="$DB_USER" --password="$DB_PASS"$EXTRA
+	if [ -z "$DB_PASS" ]; then
+		mysqladmin create $DB_NAME --user="$DB_USER"$EXTRA
+	else
+		mysqladmin create $DB_NAME --user="$DB_USER" --password="$DB_PASS"$EXTRA
+	fi
 }
 
 install_db() {
@@ -233,7 +241,9 @@ install_db() {
 	fi
 
 	# create database
-	if [ $(mysql --user="$DB_USER" --password="$DB_PASS"$EXTRA --execute='show databases;' | grep ^$DB_NAME$) ]
+	local MYSQL_PWD_FLAG=""
+	[ -n "$DB_PASS" ] && MYSQL_PWD_FLAG="--password=$DB_PASS"
+	if [ $(mysql --user="$DB_USER" $MYSQL_PWD_FLAG$EXTRA --execute='show databases;' | grep ^$DB_NAME$) ]
 	then
 		echo "Reinstalling will delete the existing test database ($DB_NAME)"
 		read -p 'Are you sure you want to proceed? [y/N]: ' DELETE_EXISTING_DB
