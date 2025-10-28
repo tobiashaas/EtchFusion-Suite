@@ -38,8 +38,13 @@ class EFS_Migration_Token_Manager {
 	 * @param Migration_Repository_Interface|null $migration_repository
 	 */
 	public function __construct( Migration_Repository_Interface $migration_repository = null ) {
-		$this->error_handler        = new \Bricks2Etch\Core\EFS_Error_Handler();
-		$this->migration_repository = $migration_repository ?: new \Bricks2Etch\Repositories\EFS_WordPress_Migration_Repository();
+		$this->error_handler = new \Bricks2Etch\Core\EFS_Error_Handler();
+
+		if ( null === $migration_repository ) {
+			$migration_repository = new \Bricks2Etch\Repositories\EFS_WordPress_Migration_Repository();
+		}
+
+		$this->migration_repository = $migration_repository;
 	}
 
 	/**
@@ -59,13 +64,16 @@ class EFS_Migration_Token_Manager {
 		// Store token with expiration
 		$this->store_token( $token, $expiration_seconds );
 
+		$current_timestamp = time();
+		$expires_timestamp = $current_timestamp + $expiration_seconds;
+
 		// Return token data
 		return array(
 			'token'      => $token,
-			'expires'    => time() + $expiration_seconds,
+			'expires'    => $expires_timestamp,
 			'domain'     => home_url(),
 			'created_at' => current_time( 'mysql' ),
-			'expires_at' => date( 'Y-m-d H:i:s', time() + $expiration_seconds ),
+			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 		);
 	}
 
@@ -92,12 +100,13 @@ class EFS_Migration_Token_Manager {
 		$this->store_token( $token, $expiration_seconds );
 
 		// Build migration URL (current site as base, target domain as parameter)
-		$current_site_url = home_url();
-		$migration_url    = add_query_arg(
+		$current_site_url  = home_url();
+		$expires_timestamp = time() + $expiration_seconds;
+		$migration_url     = add_query_arg(
 			array(
 				'domain'  => $target_domain,
 				'token'   => $token,
-				'expires' => time() + $expiration_seconds,
+				'expires' => $expires_timestamp,
 			),
 			$current_site_url
 		);
@@ -126,10 +135,13 @@ class EFS_Migration_Token_Manager {
 		}
 
 		// Store simple token data
+		$current_timestamp = time();
+		$expires_timestamp = $current_timestamp + $expiration_seconds;
+
 		$token_data = array(
 			'token'      => $token,
 			'created_at' => current_time( 'mysql' ),
-			'expires_at' => date( 'Y-m-d H:i:s', time() + $expiration_seconds ),
+			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 			'domain'     => home_url(),
 		);
 
@@ -155,8 +167,8 @@ class EFS_Migration_Token_Manager {
 		error_log( 'EFS Token Validation Debug:' );
 		error_log( '- Received token: ' . substr( $token, 0, 20 ) . '...' );
 		error_log( '- Source domain: ' . $source_domain );
-		error_log( '- Expires: ' . $expires . ' (' . date( 'Y-m-d H:i:s', $expires ) . ')' );
-		error_log( '- Current time: ' . time() . ' (' . date( 'Y-m-d H:i:s' ) . ')' );
+		error_log( '- Expires: ' . $expires . ' (' . wp_date( 'Y-m-d H:i:s', $expires ) . ')' );
+		error_log( '- Current time: ' . time() . ' (' . wp_date( 'Y-m-d H:i:s' ) . ')' );
 
 		// Check expiration
 		if ( time() > $expires ) {
@@ -215,11 +227,14 @@ class EFS_Migration_Token_Manager {
 	public function generate_qr_data( $target_domain = null ) {
 		$migration_url = $this->generate_migration_url( $target_domain );
 
+		$current_timestamp = time();
+		$expires_timestamp = $current_timestamp + self::TOKEN_EXPIRATION;
+
 		return array(
 			'url'        => $migration_url,
 			'qr_data'    => $migration_url, // Can be used with QR code libraries
 			'expires_in' => self::TOKEN_EXPIRATION,
-			'expires_at' => date( 'Y-m-d H:i:s', time() + self::TOKEN_EXPIRATION ),
+			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 		);
 	}
 
@@ -253,10 +268,13 @@ class EFS_Migration_Token_Manager {
 		// Store short URL mapping
 		set_transient( 'efs_short_' . $short_url, $migration_url, self::TOKEN_EXPIRATION );
 
+		$expires_timestamp = time() + self::TOKEN_EXPIRATION;
+
 		return array(
-			'full_url'  => $migration_url,
-			'short_url' => home_url( '/migrate/' . $short_url ),
-			'qr_data'   => $migration_url,
+			'full_url'   => $migration_url,
+			'short_url'  => home_url( '/migrate/' . $short_url ),
+			'qr_data'    => $migration_url,
+			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 		);
 	}
 }

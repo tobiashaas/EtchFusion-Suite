@@ -37,22 +37,23 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 	 * Constructor.
 	 */
 	public function __construct( EFS_Error_Handler $error_handler, EFS_Input_Validator $input_validator ) {
-		$this->error_handler    = $error_handler;
-		$this->input_validator  = $input_validator;
+		$this->error_handler   = $error_handler;
+		$this->input_validator = $input_validator;
 	}
 
 	/**
 	 * {@inheritdoc}
 	 */
 	public function sanitize( DOMDocument $dom ) {
-		if ( ! $dom->documentElement instanceof DOMElement ) {
+		$root_element = $this->get_document_element( $dom );
+		if ( ! $root_element instanceof DOMElement ) {
 			$this->error_handler->log_error( 'B2E_SANITIZER_DOM_MISSING', array(), 'error' );
 			return $dom;
 		}
 
 		// Default no-op implementations expected to be overridden in specialized sanitizers.
 		$this->remove_framer_scripts( $dom );
-		$this->traverse_and_clean( $dom->documentElement );
+		$this->traverse_and_clean( $root_element );
 		$this->semanticize_elements( $dom );
 
 		$this->css_variables = $this->extract_inline_styles( $dom );
@@ -74,8 +75,9 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 		}
 
 		foreach ( $nodes as $node ) {
-			if ( isset( $node->parentNode ) && $node->parentNode instanceof \DOMNode ) {
-				$node->parentNode->removeChild( $node );
+			$parent_node = $this->get_parent_node( $node );
+			if ( $parent_node instanceof \DOMNode ) {
+				$parent_node->removeChild( $node );
 			}
 		}
 	}
@@ -91,10 +93,8 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 		$this->normalize_class_names( $element );
 		$this->remove_unnecessary_wrappers( $element );
 
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( $child instanceof DOMElement ) {
-				$this->traverse_and_clean( $child );
-			}
+		foreach ( $this->get_element_children( $element ) as $child_element ) {
+			$this->traverse_and_clean( $child_element );
 		}
 	}
 
@@ -103,25 +103,23 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 	 */
 	public function remove_unnecessary_wrappers( DOMElement $element ) {
 		// Base implementation only handles simple div wrappers.
-		if ( 'div' !== strtolower( $element->tagName ) ) {
+		if ( 'div' !== strtolower( $this->get_element_tag_name( $element ) ) ) {
 			return;
 		}
 
-		if ( 1 !== $element->childNodes->length ) {
+		$child_elements = $this->get_element_children( $element );
+		if ( 1 !== count( $child_elements ) ) {
 			return;
 		}
 
-		$child = $element->firstChild;
-		if ( ! $child instanceof DOMElement ) {
-			return;
-		}
+		$child = $child_elements[0];
 
 		if ( $element->hasAttributes() ) {
 			return;
 		}
 
-		$parent = $element->parentNode;
-		if ( $parent ) {
+		$parent = $this->get_parent_node( $element );
+		if ( $parent instanceof \DOMNode ) {
 			$parent->replaceChild( $child, $element );
 		}
 	}
@@ -166,5 +164,60 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 	 */
 	public function get_css_variables() {
 		return $this->css_variables;
+	}
+
+	/**
+	 * Retrieve the document root element, if available.
+	 *
+	 * @param DOMDocument $dom DOM document.
+	 * @return DOMElement|null
+	 */
+	private function get_document_element( DOMDocument $dom ) {
+		$root = $dom->getElementsByTagName( 'html' )->item( 0 );
+		if ( $root instanceof DOMElement ) {
+			return $root;
+		}
+
+		// Fallback to DOMDocument::documentElement when <html> tag is missing.
+		$dom_document_element = $dom->documentElement; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return $dom_document_element instanceof DOMElement ? $dom_document_element : null;
+	}
+
+	/**
+	 * Get direct child elements of a DOM element.
+	 *
+	 * @param DOMElement $element Parent element.
+	 * @return array<int,DOMElement>
+	 */
+	private function get_element_children( DOMElement $element ) {
+		$children = array();
+
+		foreach ( $element->childNodes as $child ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			if ( $child instanceof DOMElement ) {
+				$children[] = $child;
+			}
+		}
+
+		return $children;
+	}
+
+	/**
+	 * Safely retrieve an element's parent node.
+	 *
+	 * @param \DOMNode $node Child node.
+	 * @return \DOMNode|null
+	 */
+	private function get_parent_node( \DOMNode $node ) {
+		return $node->parentNode instanceof \DOMNode ? $node->parentNode : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Get the lowercase tag name for the element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	private function get_element_tag_name( DOMElement $element ) {
+		return strtolower( $element->tagName ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }

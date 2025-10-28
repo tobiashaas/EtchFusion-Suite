@@ -107,6 +107,7 @@ class EFS_Migration_Service {
 				'analyzing',
 				25,
 				sprintf(
+					/* translators: 1: Bricks post count, 2: Gutenberg post count, 3: media file count, 4: total items. */
 					__( 'Found %1$d Bricks posts, %2$d Gutenberg posts, %3$d media files (%4$d total)', 'etch-fusion-suite' ),
 					$analysis['bricks_posts'],
 					$analysis['gutenberg_posts'],
@@ -499,7 +500,15 @@ class EFS_Migration_Service {
 		foreach ( $supported_migrators as $migrator ) {
 			$progress = (int) floor( $base_percentage + ( $increment * $index ) );
 			$step_key = $this->get_migrator_step_key( $migrator );
-			$this->update_progress( $step_key, $progress, sprintf( __( 'Migrating %s...', 'etch-fusion-suite' ), $migrator->get_name() ) );
+			$this->update_progress(
+				$step_key,
+				$progress,
+				sprintf(
+					/* translators: %s: Migrator name. */
+					__( 'Migrating %s...', 'etch-fusion-suite' ),
+					$migrator->get_name()
+				)
+			);
 
 			$validation = $migrator->validate();
 			if ( isset( $validation['valid'] ) && ! $validation['valid'] ) {

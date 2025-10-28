@@ -44,25 +44,51 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Initiates template extraction.
 	 */
 	public function extract_template() {
-		$this->verify_nonce();
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You are not authorized to perform template extraction.', 'etch-fusion-suite' ), 403 );
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
 		}
 
-		$this->limit_rate( 'template_extract', 10, MINUTE_IN_SECONDS );
+		if ( ! $this->check_rate_limit( 'template_extract', 10, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
 
-		$source      = isset( $_POST['source'] ) ? wp_unslash( $_POST['source'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-		$source_type = isset( $_POST['source_type'] ) ? sanitize_key( wp_unslash( $_POST['source_type'] ) ) : 'url'; // phpcs:ignore WordPress.Security.NonceVerification
+		$source      = $this->get_post( 'source', '', 'text' );
+		$source_type = $this->get_post( 'source_type', 'url', 'key' );
 
 		$result = $this->template_controller->extract_template( $source, $source_type );
 
 		if ( is_wp_error( $result ) ) {
-			$this->audit_logger->log_event( 'template_extract_failed', array( 'message' => $result->get_error_message() ) );
-			wp_send_json_error( $result->get_error_message(), 400 );
+			$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'template_extract_failed';
+			$status     = 400;
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
+			$this->log_security_event(
+				'ajax_action',
+				'Failed to extract template: ' . $result->get_error_message(),
+				array(
+					'code'        => $error_code,
+					'source_type' => $source_type,
+				),
+				'medium'
+			);
+
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		}
 
-		$this->audit_logger->log_event( 'template_extract_success', array( 'source_type' => $source_type ) );
+		$this->log_security_event(
+			'ajax_action',
+			'Extracted template successfully.',
+			array( 'source_type' => $source_type )
+		);
 
 		wp_send_json_success( $result );
 	}
@@ -71,8 +97,13 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Returns extraction progress.
 	 */
 	public function get_extraction_progress() {
-		$this->verify_nonce();
-		$this->limit_rate( 'template_progress', 60, MINUTE_IN_SECONDS );
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'template_progress', 60, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
 
 		$result = $this->template_controller->get_extraction_progress();
 		wp_send_json_success( $result );
@@ -82,24 +113,62 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Saves template.
 	 */
 	public function save_template() {
-		$this->verify_nonce();
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You are not authorized to save templates.', 'etch-fusion-suite' ), 403 );
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
 		}
-		$this->limit_rate( 'template_save', 20, MINUTE_IN_SECONDS );
 
-		$template_data = isset( $_POST['template_data'] ) ? json_decode( wp_unslash( $_POST['template_data'] ), true ) : array(); // phpcs:ignore WordPress.Security.NonceVerification
-		$template_name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! $this->check_rate_limit( 'template_save', 20, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		$template_data_raw = $this->get_post( 'template_data', '[]', 'raw' );
+		$template_name     = $this->get_post( 'template_name', '', 'text' );
+
+		$template_data = json_decode( is_string( $template_data_raw ) ? $template_data_raw : '[]', true );
+		if ( null === $template_data && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Template data payload is invalid JSON.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_template_payload',
+				),
+				400
+			);
+			return;
+		}
+		$template_data = is_array( $template_data ) ? $this->sanitize_array( $template_data, 'template_data' ) : array();
 
 		$result = $this->template_controller->save_template( $template_data, $template_name );
 
 		if ( is_wp_error( $result ) ) {
-			$this->audit_logger->log_event( 'template_save_failed', array( 'message' => $result->get_error_message() ) );
-			wp_send_json_error( $result->get_error_message(), 400 );
+			$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'template_save_failed';
+			$status     = 400;
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
+			$this->log_security_event(
+				'ajax_action',
+				'Failed to save template: ' . $result->get_error_message(),
+				array(
+					'code' => $error_code,
+				)
+			);
+
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		}
 
-		$this->audit_logger->log_event( 'template_save_success', array( 'template_id' => $result ) );
+		$this->log_security_event(
+			'ajax_action',
+			'Saved template successfully.',
+			array( 'template_id' => $result )
+		);
 
 		wp_send_json_success( array( 'template_id' => $result ) );
 	}
@@ -108,12 +177,13 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Retrieves saved templates.
 	 */
 	public function get_saved_templates() {
-		$this->verify_nonce();
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You are not authorized to view templates.', 'etch-fusion-suite' ), 403 );
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
 		}
-		$this->limit_rate( 'template_saved_list', 60, MINUTE_IN_SECONDS );
+
+		if ( ! $this->check_rate_limit( 'template_saved_list', 60, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
 
 		$result = $this->template_controller->get_saved_templates();
 
@@ -124,24 +194,52 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Deletes template.
 	 */
 	public function delete_template() {
-		$this->verify_nonce();
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'You are not authorized to delete templates.', 'etch-fusion-suite' ), 403 );
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
 		}
 
-		$this->limit_rate( 'template_delete', 10, MINUTE_IN_SECONDS );
+		if ( ! $this->check_rate_limit( 'template_delete', 10, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
 
-		$template_id = isset( $_POST['template_id'] ) ? (int) $_POST['template_id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification
+		$template_id = $this->get_post( 'template_id', 0, 'int' );
 
 		$result = $this->template_controller->delete_template( $template_id );
 
 		if ( is_wp_error( $result ) ) {
-			$this->audit_logger->log_event( 'template_delete_failed', array( 'template_id' => $template_id, 'message' => $result->get_error_message() ) );
-			wp_send_json_error( $result->get_error_message(), 400 );
+			$this->log_security_event(
+				'ajax_action',
+				'Failed to delete template: ' . $result->get_error_message(),
+				array(
+					'template_id' => $template_id,
+				)
+			);
+
+			$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'template_delete_failed';
+			$status     = 400;
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
+			if ( 'not_found' === $error_code ) {
+				$status = 404;
+			}
+
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		}
 
-		$this->audit_logger->log_event( 'template_delete_success', array( 'template_id' => $template_id ) );
+		$this->log_security_event(
+			'ajax_action',
+			'Deleted template successfully.',
+			array( 'template_id' => $template_id )
+		);
 
 		wp_send_json_success( array( 'deleted' => true ) );
 	}

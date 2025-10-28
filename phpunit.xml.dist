@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+         bootstrap="tests/phpunit/bootstrap.php"
+         cacheDirectory="build/.phpunit-cache"
+         colors="true"
+         executionOrder="defects"
+         stopOnFailure="false">
+
+    <testsuites>
+        <testsuite name="Etch Fusion Suite">
+            <directory>tests/phpunit</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory suffix=".php">etch-fusion-suite</directory>
+        </include>
+    </source>
+
+    <php>
+        <ini name="display_errors" value="1"/>
+        <ini name="display_startup_errors" value="1"/>
+        <const name="EFS_PHPUNIT" value="1"/>
+    </php>
+</phpunit>

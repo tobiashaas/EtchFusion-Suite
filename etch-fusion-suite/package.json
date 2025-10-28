@@ -20,6 +20,9 @@
     "activate": "node scripts/activate-plugins.js",
     "test:connection": "node scripts/test-connection.js",
     "test:migration": "node scripts/test-migration.js",
+    "test:playwright": "playwright test",
+    "lint": "eslint --ext .js,.ts assets/js",
+    "typecheck": "tsc --noEmit",
     "create-test-content": "node scripts/create-test-content.js",
     "reset": "wp-env clean all && npm run dev",
     "shell:bricks": "wp-env run cli bash",
@@ -33,6 +36,17 @@
     "node": ">=18"
   },
   "devDependencies": {
-    "@wordpress/env": "^10.30.0"
+    "@playwright/test": "^1.47.2",
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "@wordpress/env": "^10.30.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^48.2.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
   }
 }

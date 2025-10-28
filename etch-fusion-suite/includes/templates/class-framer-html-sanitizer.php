@@ -23,15 +23,16 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 * {@inheritdoc}
 	 */
 	public function sanitize( DOMDocument $dom ) {
-		if ( ! $dom->documentElement instanceof DOMElement ) {
+		$root_element = $this->get_document_root( $dom );
+		if ( ! $root_element instanceof DOMElement ) {
 			return $dom;
 		}
 
 		$this->remove_framer_scripts( $dom );
-		$this->clean_dom_attributes( $dom->documentElement );
-		$this->remove_unnecessary_wrappers( $dom->documentElement );
+		$this->clean_dom_attributes( $root_element );
 		$this->semanticize_elements( $dom );
-		$this->normalize_class_names( $dom->documentElement );
+		$this->remove_unnecessary_wrappers( $root_element );
+		$this->normalize_class_names( $root_element );
 
 		$this->css_variables = $this->extract_inline_styles( $dom );
 
@@ -47,10 +48,8 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	protected function clean_dom_attributes( DOMElement $element ) {
 		$this->clean_attributes( $element );
 
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( $child instanceof DOMElement ) {
-				$this->clean_dom_attributes( $child );
-			}
+		foreach ( $this->get_element_children( $element ) as $child_element ) {
+			$this->clean_dom_attributes( $child_element );
 		}
 	}
 
@@ -58,24 +57,20 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 * {@inheritdoc}
 	 */
 	public function remove_unnecessary_wrappers( DOMElement $element ) {
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( $child instanceof DOMElement ) {
-				$this->remove_unnecessary_wrappers( $child );
-			}
+		foreach ( $this->get_element_children( $element ) as $child_element ) {
+			$this->remove_unnecessary_wrappers( $child_element );
 		}
 
-		if ( 'div' !== strtolower( $element->tagName ) ) {
+		if ( 'div' !== $this->get_element_tag_name( $element ) ) {
 			return;
 		}
 
-		if ( 1 !== $element->childNodes->length ) {
+		$child_elements = $this->get_element_children( $element );
+		if ( 1 !== count( $child_elements ) ) {
 			return;
 		}
 
-		$child = $element->firstChild;
-		if ( ! $child instanceof DOMElement ) {
-			return;
-		}
+		$child = $child_elements[0];
 
 		if ( $element->hasAttributes() ) {
 			// Ignore aria and semantic attributes that are meaningful.
@@ -89,9 +84,9 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 			}
 		}
 
-		$parent = $element->parentNode;
-		if ( $parent instanceof DOMElement ) {
-			$parent->replaceChild( $child, $element );
+		$parent_node = $this->get_parent_node( $element );
+		if ( $parent_node instanceof DOMElement || $parent_node instanceof \DOMNode ) {
+			$parent_node->replaceChild( $child, $element );
 		}
 	}
 
@@ -107,8 +102,9 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 		}
 
 		foreach ( iterator_to_array( $nodes ) as $node ) {
-			if ( null !== $node->parentNode ) {
-				$node->parentNode->removeChild( $node );
+			$parent_node = $this->get_parent_node( $node );
+			if ( null !== $parent_node ) {
+				$parent_node->removeChild( $node );
 			}
 		}
 	}
@@ -117,7 +113,7 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 * {@inheritdoc}
 	 */
 	public function clean_attributes( DOMElement $element ) {
-		$allowed_data_attributes = array( 'data-framer-component-type', 'data-framer-name' );
+		$allowed_data_attributes = array( 'data-framer-component-type', 'data-framer-name', 'data-framer-image-url' );
 
 		$classes = array();
 		if ( $element->hasAttribute( 'class' ) ) {
@@ -168,12 +164,14 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	public function semanticize_elements( DOMDocument $dom ) {
 		$xpath = new DOMXPath( $dom );
 
+		// Convert text components first, before sections change their tags
+		$this->convert_text_components( $xpath );
+
 		// Header / Nav / Footer semantics.
 		$this->convert_by_data_name( $xpath, 'Header', 'header' );
 		$this->convert_by_data_name( $xpath, 'Nav', 'nav' );
 		$this->convert_by_data_name( $xpath, 'Footer', 'footer' );
 		$this->convert_sections( $xpath );
-		$this->convert_text_components( $xpath );
 		$this->convert_media_components( $xpath );
 		$this->convert_button_components( $xpath );
 	}
@@ -211,16 +209,14 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 		if ( $element->hasAttribute( 'data-framer-name' ) ) {
 			$slug = sanitize_title( $element->getAttribute( 'data-framer-name' ) );
 			if ( $slug ) {
-				$current = $element->hasAttribute( 'class' ) ? explode( ' ', $element->getAttribute( 'class' ) ) : array();
+				$current   = $element->hasAttribute( 'class' ) ? explode( ' ', $element->getAttribute( 'class' ) ) : array();
 				$current[] = $slug;
 				$element->setAttribute( 'class', implode( ' ', array_unique( array_filter( $current ) ) ) );
 			}
 		}
 
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( $child instanceof DOMElement ) {
-				$this->normalize_class_names( $child );
-			}
+		foreach ( $this->get_element_children( $element ) as $child_element ) {
+			$this->normalize_class_names( $child_element );
 		}
 	}
 
@@ -262,7 +258,7 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 * @return void
 	 */
 	protected function convert_sections( DOMXPath $xpath ) {
-		$nodes = $xpath->query( "//div[@data-framer-name]" );
+		$nodes = $xpath->query( '//div[@data-framer-name]' );
 		if ( ! $nodes ) {
 			return;
 		}
@@ -286,7 +282,7 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 */
 	protected function convert_text_components( DOMXPath $xpath ) {
 		$nodes = $xpath->query( "//*[@data-framer-component-type='Text']" );
-		if ( ! $nodes ) {
+		if ( ! $nodes || 0 === $nodes->length ) {
 			return;
 		}
 
@@ -297,7 +293,11 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 				continue;
 			}
 
-			$text = trim( preg_replace( '/\s+/', ' ', $node->textContent ) );
+			$tag_name = $this->get_element_tag_name( $node );
+			if ( 'div' !== $tag_name ) {
+				continue;
+			}
+			$text = $this->get_normalized_text_content( $node );
 			if ( '' === $text ) {
 				continue;
 			}
@@ -343,7 +343,7 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 				continue;
 			}
 
-			$img = $node->ownerDocument->createElement( 'img' );
+			$img = $this->get_owner_document( $node )->createElement( 'img' );
 			$img->setAttribute( 'src', esc_url_raw( $src ) );
 
 			if ( $node->hasAttribute( 'data-framer-name' ) ) {
@@ -356,10 +356,9 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 				}
 			}
 
-			if ( $node->parentNode ) {
-				if ( $node->parentNode instanceof DOMElement || $node->parentNode instanceof \DOMNode ) {
-					$node->parentNode->replaceChild( $img, $node );
-				}
+			$parent_node = $this->get_parent_node( $node );
+			if ( $parent_node instanceof DOMElement || $parent_node instanceof \DOMNode ) {
+				$parent_node->replaceChild( $img, $node );
 			}
 		}
 	}
@@ -381,7 +380,7 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 				continue;
 			}
 
-			$tag = strtolower( $node->tagName );
+			$tag = $this->get_element_tag_name( $node );
 			if ( 'a' === $tag ) {
 				$node->setAttribute( 'role', 'button' );
 				continue;
@@ -400,24 +399,121 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 	 * @return void
 	 */
 	protected function rename_element( DOMElement $element, $new_tag ) {
-		if ( strtolower( $element->tagName ) === strtolower( $new_tag ) ) {
+		if ( $this->get_element_tag_name( $element ) === strtolower( $new_tag ) ) {
 			return;
 		}
 
-		$document    = $element->ownerDocument;
+		$document    = $this->get_owner_document( $element );
 		$new_element = $document->createElement( $new_tag );
 
 		foreach ( iterator_to_array( $element->attributes ) as $attribute ) {
 			$new_element->setAttribute( $attribute->name, $attribute->value );
 		}
 
-		while ( $element->firstChild ) {
-			$new_element->appendChild( $element->firstChild );
+		while ( $this->has_first_child( $element ) ) {
+			$new_element->appendChild( $this->extract_first_child( $element ) );
 		}
 
-		if ( $element->parentNode instanceof DOMElement || $element->parentNode instanceof \DOMNode ) {
-			$element->parentNode->replaceChild( $new_element, $element );
+		$parent_node = $this->get_parent_node( $element );
+		if ( $parent_node instanceof DOMElement || $parent_node instanceof \DOMNode ) {
+			$parent_node->replaceChild( $new_element, $element );
 		}
+	}
+
+	/**
+	 * Retrieve the root DOM element for a document.
+	 *
+	 * @param DOMDocument $dom DOM document.
+	 * @return DOMElement|null
+	 */
+	private function get_document_root( DOMDocument $dom ) {
+		$root_element = $dom->getElementsByTagName( 'html' )->item( 0 );
+		if ( $root_element instanceof DOMElement ) {
+			return $root_element;
+		}
+
+		$document_element = $dom->documentElement; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return $document_element instanceof DOMElement ? $document_element : null;
+	}
+
+	/**
+	 * Return the children of a DOM element.
+	 *
+	 * @param DOMElement $element Parent element.
+	 * @return array<int,DOMElement>
+	 */
+	private function get_element_children( DOMElement $element ) {
+		$children = array();
+
+		foreach ( $element->childNodes as $child ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			if ( $child instanceof DOMElement ) {
+				$children[] = $child;
+			}
+		}
+
+		return $children;
+	}
+
+	/**
+	 * Fetch the parent node for a DOM node.
+	 *
+	 * @param \DOMNode $node DOM node.
+	 * @return \DOMNode|null
+	 */
+	private function get_parent_node( \DOMNode $node ) {
+		return $node->parentNode instanceof \DOMNode ? $node->parentNode : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Get lowercase tag name for element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	private function get_element_tag_name( DOMElement $element ) {
+		return strtolower( $element->tagName ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Get the owner document for an element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return DOMDocument
+	 */
+	private function get_owner_document( DOMElement $element ) {
+		return $element->ownerDocument; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Check whether an element has a first child.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return bool
+	 */
+	private function has_first_child( DOMElement $element ) {
+		return null !== $element->firstChild; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Extract first child from an element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return \DOMNode|null
+	 */
+	private function extract_first_child( DOMElement $element ) {
+		$first_child = $element->firstChild; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return $first_child instanceof \DOMNode ? $first_child : null;
+	}
+
+	/**
+	 * Return trimmed text content for a DOM node.
+	 *
+	 * @param DOMElement $element Element to read.
+	 * @return string
+	 */
+	private function get_normalized_text_content( DOMElement $element ) {
+		$text_content = $element->textContent; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return trim( preg_replace( '/\s+/', ' ', $text_content ) );
 	}
 
 	/**

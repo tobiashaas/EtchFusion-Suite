@@ -25,7 +25,7 @@ class EFS_Migrator_Discovery {
 	 * Discovers migrators and registers them with registry.
 	 */
 	public static function discover_migrators( EFS_Migrator_Registry $registry ) {
-		$container     = efs_container();
+		$container     = etch_fusion_suite_container();
 		$error_handler = $container->has( 'error_handler' ) ? $container->get( 'error_handler' ) : null;
 
 		$builtin_keys = array(
@@ -60,15 +60,22 @@ class EFS_Migrator_Discovery {
 
 		/**
 		 * Allow third-party plugins to register migrators.
+		 *
+		 * New hook prefix: etch_fusion_suite_*.
+		 * Backwards compatibility hooks (b2e_*, efs_*) retained temporarily.
 		 */
-		do_action( 'b2e_register_migrators', $registry );
+		do_action( 'etch_fusion_suite_register_migrators', $registry );
+		do_action( 'efs_register_migrators', $registry ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- legacy compatibility.
+		do_action( 'b2e_register_migrators', $registry ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- legacy compatibility.
 
 		$discovered = $registry->get_all();
 
 		/**
 		 * Allow modifications to discovered migrators.
 		 */
-		$filtered = apply_filters( 'b2e_migrators_discovered', $discovered, $registry );
+		$filtered = apply_filters( 'etch_fusion_suite_migrators_discovered', $discovered, $registry );
+		$filtered = apply_filters( 'efs_migrators_discovered', $filtered, $registry ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- legacy compatibility.
+		$filtered = apply_filters( 'b2e_migrators_discovered', $filtered, $registry ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- legacy compatibility.
 
 		if ( $filtered !== $discovered ) {
 			$registry->clear();

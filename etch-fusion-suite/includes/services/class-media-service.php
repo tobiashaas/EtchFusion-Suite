@@ -106,4 +106,3 @@ class EFS_Media_Service {
 		return array();
 	}
 }
-

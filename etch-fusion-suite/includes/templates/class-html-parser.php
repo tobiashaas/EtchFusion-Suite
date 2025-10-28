@@ -79,7 +79,7 @@ class EFS_HTML_Parser {
 				'headers'   => array(
 					'User-Agent' => 'EtchFusionSuite/1.0 (+https://etchwp.com)',
 				),
-				'sslverify' => apply_filters( 'https_local_ssl_verify', true ),
+				'sslverify' => apply_filters( 'https_local_ssl_verify', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 			)
 		);
 
@@ -146,7 +146,8 @@ class EFS_HTML_Parser {
 	 * @return string Sanitized text content.
 	 */
 	public function extract_text_content( DOMElement $element ) {
-		$text = trim( preg_replace( '/\s+/', ' ', $element->textContent ) );
+		// textContent is a native DOMElement property (camelCase) provided by PHP.
+		$text = trim( preg_replace( '/\s+/', ' ', $element->textContent ) ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 
 		return wp_strip_all_tags( $text );
 	}

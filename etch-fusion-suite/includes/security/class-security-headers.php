@@ -64,23 +64,162 @@ class EFS_Security_Headers {
 	 * @return string CSP policy string.
 	 */
 	public function get_csp_policy() {
-		// Use relaxed policy for admin pages (WordPress admin requires inline scripts)
-		if ( $this->is_admin_page() ) {
-			return "default-src 'self'; " .
-					"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
-					"style-src 'self' 'unsafe-inline'; " .
-					"img-src 'self' data: https:; " .
-					"font-src 'self' data:; " .
-					"connect-src 'self'";
+		$context    = $this->is_admin_page() ? 'admin' : 'frontend';
+		$directives = $this->is_admin_page() ? $this->get_admin_csp_directives() : $this->get_frontend_csp_directives();
+
+		/**
+		 * Filter the CSP directives before they are compiled into a header string.
+		 *
+		 * @since 0.5.1
+		 *
+		 * @param array  $directives Directive map.
+		 * @param string $context    Either "admin" or "frontend".
+		 */
+		$directives = apply_filters( 'efs_security_headers_csp_directives', $directives, $context );
+
+		return $this->compile_csp_directives( $directives );
+	}
+
+	/**
+	 * Retrieve CSP directives for admin-facing requests.
+	 *
+	 * @return array
+	 */
+	protected function get_admin_csp_directives() {
+		return array(
+			'default-src'     => array( "'self'" ),
+			'script-src'      => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_admin_script_sources() ),
+			'style-src'       => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_admin_style_sources() ),
+			'img-src'         => array( "'self'", 'data:', 'https:' ),
+			'font-src'        => array( "'self'", 'data:' ),
+			'connect-src'     => $this->get_default_connect_sources(),
+			'frame-ancestors' => array( "'self'" ),
+			'form-action'     => array( "'self'" ),
+			'base-uri'        => array( "'self'" ),
+			'object-src'      => array( "'none'" ),
+		);
+	}
+
+	/**
+	 * Retrieve CSP directives for frontend requests.
+	 *
+	 * @return array
+	 */
+	protected function get_frontend_csp_directives() {
+		return array(
+			'default-src'     => array( "'self'" ),
+			'script-src'      => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_frontend_script_sources() ),
+			'style-src'       => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_frontend_style_sources() ),
+			'img-src'         => array( "'self'", 'data:', 'https:' ),
+			'font-src'        => array( "'self'", 'data:' ),
+			'connect-src'     => $this->get_default_connect_sources(),
+			'frame-ancestors' => array( "'self'" ),
+			'form-action'     => array( "'self'" ),
+			'base-uri'        => array( "'self'" ),
+			'object-src'      => array( "'none'" ),
+		);
+	}
+
+	/**
+	 * Get default connect-src values shared by contexts.
+	 *
+	 * @return array
+	 */
+	protected function get_default_connect_sources() {
+		/**
+		 * Filter the default connect-src hosts applied to the CSP.
+		 *
+		 * @since 0.5.1
+		 *
+		 * @param array $sources Default connect-src values.
+		 */
+		return apply_filters( 'efs_security_headers_csp_connect_src', array( "'self'" ) );
+	}
+
+	/**
+	 * Allow additional admin script sources such as WordPress dashicons or CDN endpoints.
+	 *
+	 * @return array
+	 */
+	protected function get_admin_script_sources() {
+		/**
+		 * Filter additional admin script sources.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $sources Additional script-src values.
+		 */
+		return apply_filters( 'efs_security_headers_admin_script_sources', array() );
+	}
+
+	/**
+	 * Allow additional admin style sources such as Google Fonts in dev environments.
+	 *
+	 * @return array
+	 */
+	protected function get_admin_style_sources() {
+		/**
+		 * Filter additional admin style sources.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $sources Additional style-src values.
+		 */
+		return apply_filters( 'efs_security_headers_admin_style_sources', array() );
+	}
+
+	/**
+	 * Additional frontend script sources.
+	 *
+	 * @return array
+	 */
+	protected function get_frontend_script_sources() {
+		/**
+		 * Filter additional frontend script sources.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $sources Additional script-src values.
+		 */
+		return apply_filters( 'efs_security_headers_frontend_script_sources', array() );
+	}
+
+	/**
+	 * Additional frontend style sources.
+	 *
+	 * @return array
+	 */
+	protected function get_frontend_style_sources() {
+		/**
+		 * Filter additional frontend style sources.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $sources Additional style-src values.
+		 */
+		return apply_filters( 'efs_security_headers_frontend_style_sources', array() );
+	}
+
+	/**
+	 * Compile directive map into CSP header string.
+	 *
+	 * @param array $directives Directive map.
+	 * @return string
+	 */
+	protected function compile_csp_directives( array $directives ) {
+		$segments = array();
+
+		foreach ( $directives as $directive => $values ) {
+			$values = array_filter( array_map( 'trim', (array) $values ) );
+
+			if ( empty( $values ) ) {
+				continue;
+			}
+
+			$segments[] = sprintf( '%s %s', $directive, implode( ' ', $values ) );
 		}
 
-		// Relaxed policy for frontend (WordPress themes often use inline scripts/styles)
-		return "default-src 'self'; " .
-				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
-				"style-src 'self' 'unsafe-inline'; " .
-				"img-src 'self' data: https:; " .
-				"font-src 'self' data:; " .
-				"connect-src 'self'";
+		return implode( '; ', $segments );
 	}
 
 	/**
@@ -104,7 +243,10 @@ class EFS_Security_Headers {
 		}
 
 		// Check request URI
-		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+		$request_uri = '';
+		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+			$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+		}
 		if ( strpos( $request_uri, '/wp-admin/' ) !== false ) {
 			return true;
 		}
@@ -126,7 +268,10 @@ class EFS_Security_Headers {
 		}
 
 		// Don't add headers for wp-login.php (can interfere with login)
-		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+		$request_uri = '';
+		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+			$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+		}
 		if ( strpos( $request_uri, 'wp-login.php' ) !== false ) {
 			return false;
 		}
@@ -137,7 +282,12 @@ class EFS_Security_Headers {
 		}
 
 		// Don't add headers for REST API OPTIONS requests (handled by CORS)
-		if ( $_SERVER['REQUEST_METHOD'] === 'OPTIONS' ) {
+		$request_method = '';
+		if ( isset( $_SERVER['REQUEST_METHOD'] ) ) {
+			$request_method = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) );
+		}
+
+		if ( 'OPTIONS' === $request_method ) {
 			return false;
 		}
 

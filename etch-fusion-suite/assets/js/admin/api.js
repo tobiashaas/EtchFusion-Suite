@@ -41,20 +41,51 @@ const toSearchParams = (payload) => {
     return params;
 };
 
-export const post = async (action, payload = {}) => {
+export const post = async (action, payload = {}, options = {}) => {
     const { ajaxUrl, nonce } = ensureAjaxContext();
     const params = toSearchParams(payload);
     params.set('action', action);
     params.set('nonce', nonce);
 
-    const response = await fetch(ajaxUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        },
-        body: params.toString(),
-        credentials: 'same-origin',
-    });
+    const controller = new AbortController();
+    let timeoutId = null;
+    let abortListener = null;
+
+    if (options?.signal) {
+        if (options.signal.aborted) {
+            controller.abort(options.signal.reason);
+        } else {
+            abortListener = () => controller.abort(options.signal.reason);
+            options.signal.addEventListener('abort', abortListener);
+        }
+    }
+
+    if (typeof options?.timeoutMs === 'number' && options.timeoutMs > 0) {
+        timeoutId = window.setTimeout(() => {
+            controller.abort(new Error('Request timed out.'));
+        }, options.timeoutMs);
+    }
+
+    let response;
+    try {
+        response = await fetch(ajaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            },
+            body: params.toString(),
+            credentials: 'same-origin',
+            signal: controller.signal,
+        });
+    } finally {
+        if (abortListener && options?.signal) {
+            options.signal.removeEventListener('abort', abortListener);
+        }
+
+        if (timeoutId) {
+            window.clearTimeout(timeoutId);
+        }
+    }
 
     if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
@@ -62,8 +93,23 @@ export const post = async (action, payload = {}) => {
 
     const result = await response.json();
     if (!result?.success) {
-        const errorMessage = typeof result?.data === 'string' ? result.data : 'Request failed.';
-        throw new Error(errorMessage);
+        const errorPayload = result?.data ?? {};
+        const errorMessage = typeof errorPayload === 'string'
+            ? errorPayload
+            : errorPayload?.message || 'Request failed.';
+
+        const error = new Error(errorMessage);
+
+        if (errorPayload && typeof errorPayload === 'object') {
+            if (errorPayload.code) {
+                error.code = errorPayload.code;
+            }
+            if (errorPayload.details) {
+                error.details = errorPayload.details;
+            }
+        }
+
+        throw error;
     }
 
     return result.data ?? {};
@@ -92,4 +138,60 @@ export const getInitialData = (key, defaultValue = null) => {
     return Object.prototype.hasOwnProperty.call(window.efsData, key)
         ? window.efsData[key]
         : defaultValue;
+};
+
+const humanizeFieldName = (value) => {
+    const label = String(value || '').replace(/[_-]+/g, ' ').trim();
+    if (!label) {
+        return '';
+    }
+    return label.replace(/\b\w/g, (match) => match.toUpperCase());
+};
+
+const collectContextFields = (context) => {
+    if (!context || typeof context !== 'object') {
+        return [];
+    }
+
+    const fields = new Set();
+
+    const maybeAdd = (value) => {
+        if (typeof value === 'string' && value.trim() !== '') {
+            fields.add(value.trim());
+        }
+    };
+
+    maybeAdd(context.field);
+
+    if (Array.isArray(context.fields)) {
+        context.fields.forEach(maybeAdd);
+    }
+
+    if (Array.isArray(context.missing_fields)) {
+        context.missing_fields.forEach(maybeAdd);
+    }
+
+    return Array.from(fields);
+};
+
+export const buildAjaxErrorMessage = (error, fallback = 'Request failed.') => {
+    const baseMessage = error?.message || fallback;
+    const contextFields = collectContextFields(error?.details?.context);
+
+    if (!contextFields.length) {
+        return baseMessage;
+    }
+
+    const humanizedList = contextFields
+        .map(humanizeFieldName)
+        .filter(Boolean)
+        .join(', ');
+
+    if (!humanizedList) {
+        return baseMessage;
+    }
+
+    const label = contextFields.length === 1 ? 'Field' : 'Fields';
+
+    return `${baseMessage} — ${label}: ${humanizedList}`;
 };

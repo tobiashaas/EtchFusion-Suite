@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2025-10-27 23:48  
-**Version:** 0.11.17
+**Last Updated:** 2025-10-28 12:58  
+**Version:** 0.11.20
 
 ---
 
@@ -67,12 +67,18 @@ The plugin uses a dependency injection container for service management:
 
 **Important:** All service bindings use fully qualified class names (FQCN) with correct namespaces.
 
-**Updated:** 2025-10-25 16:37 - All class names migrated from `B2E_*` to `EFS_*` prefix.  
-**Updated:** 2025-10-25 21:55 - PHPUnit bootstrap prefers `WP_PHPUNIT__DIR` when available, loads `etch-fusion-suite.php` directly, and keeps strict failure handling.
-
 ### Autoloading & Namespaces
 
-**Updated:** 2025-10-24 11:26
+**Updated:** 2025-10-28 10:48
+
+### Phase 10 PHPCS Cleanup (includes/)
+
+**Updated:** 2025-10-28 10:48
+
+- Completed Phase 10 of the PHPCS initiative across all remaining files inside `includes/`.
+- Replaced short ternaries, enforced Yoda conditions, added strict `in_array()` checks, and normalised assignment alignment across migrators, services, generators, and views.
+- Added missing `translators:` comments for progress strings and standardised container exceptions via anonymous classes to satisfy WPCS naming constraints.
+- Verified a clean `vendor/bin/phpcs includes` run to close out the phase.
 
 - Composer (`vendor/autoload.php`) wird eingebunden, sobald vorhanden.
 - Zusätzlich bleibt der WordPress-optimierte Autoloader (`includes/autoloader.php`) immer aktiv, damit Legacy-Dateinamen (`class-*.php`) weiterhin funktionieren.
@@ -797,6 +803,7 @@ docker exec -w /var/www/html/wp-content/plugins/etch-fusion-suite \
 Playwright uses storage state (saved browser sessions) to bypass login form issues. The `auth.setup.ts` project runs first and saves authenticated sessions to `.playwright-auth/`.
 
 **Run tests**:
+
 ```bash
 EFS_ADMIN_USER=admin EFS_ADMIN_PASS=password npm run test:playwright
 ```
@@ -867,7 +874,7 @@ The previous Docker Compose setup remains in `test-environment/docker-compose.ym
 
 ## Development Workflow
 
-**Updated:** 2025-10-26 23:20
+**Updated:** 2025-10-28 12:58
 
 ### Code Quality Checks
 
@@ -876,6 +883,36 @@ The plugin enforces code quality through CI workflows. All checks run automatica
 - **PHPCS (WordPress Coding Standards)** - Enforced in CI lint job
 - **PHPCompatibility** - Enforced in CI compatibility job (PHP 7.4-8.4)
 - **PHPUnit** - Enforced in CI test job with WordPress test suite
+
+### PHPCS Auto-Fixes
+
+**Updated:** 2025-10-28 12:58
+
+- Reference report: [`docs/phpcs-auto-fixes-2025-10-28.md`](etch-fusion-suite/docs/phpcs-auto-fixes-2025-10-28.md)
+- Records each PHPCBF execution (timestamps, version, sniff breakdown, diff stats)
+- Use it to validate whether further manual fixes are necessary before progressing through additional phases
+
+### Running PHPCBF
+
+**Updated:** 2025-10-28 12:58
+
+- Primary command: `./scripts/run-phpcbf.sh`
+- Optional flags:
+  - `--php-only` limits the post-run diff summary to PHP files so changes unrelated to PHPCBF stay hidden
+  - `--stash` temporarily stashes existing work, guaranteeing the reported diff only contains PHPCBF changes (stashes are restored automatically)
+- Outputs:
+  - `${LOG_DIR}/phpcbf-output-<timestamp>.log`
+  - `${LOG_DIR}/phpcs-post-cbf-<timestamp>.log`
+  - Console summary with the diff scope and stash mode used
+
+### PHPCS Violation Analysis
+
+**Updated:** 2025-10-28 12:58
+
+- Command: `./scripts/analyze-phpcs-violations.sh`
+- Generates JSON + Markdown backlog regardless of PHPCS exit code (warnings included)
+- Stdout summarises the top 10 files and sniff totals; backlog is written to [`docs/phpcs-manual-fixes-backlog.md`](etch-fusion-suite/docs/phpcs-manual-fixes-backlog.md) with the current timestamp
+- Stderr is written to `${LOG_DIR}/phpcs-analyze-<timestamp>.stderr.log`, keeping JSON output clean for `jq`
 
 ### Manual Git Hooks (Optional)
 
@@ -918,5 +955,5 @@ Make it executable: `chmod +x .git/hooks/pre-commit`
 
 ---
 
-**Last Updated:** 2025-10-26 20:20  
-**Version:** 0.11.8
+**Last Updated:** 2025-10-28 12:58  
+**Version:** 0.11.20

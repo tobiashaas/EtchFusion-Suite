@@ -418,8 +418,11 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 			return true; // No field groups to migrate
 		}
 
-		$api_client = $this->api_client ?: new EFS_API_Client( $this->error_handler );
-		$result     = $api_client->send_acf_field_groups( $target_url, $api_key, $field_groups );
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+		$result = $api_client->send_acf_field_groups( $target_url, $api_key, $field_groups );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -440,7 +443,7 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 			);
 		}
 
-		$field_groups = acf_get_field_groups();
+		$field_groups = \acf_get_field_groups();
 		$total_groups = count( $field_groups );
 		$total_fields = 0;
 		$field_types  = array();

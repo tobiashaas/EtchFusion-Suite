@@ -359,6 +359,19 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'migration_ajax',
+			function ( $c ) {
+				return new \Bricks2Etch\Ajax\Handlers\EFS_Migration_Ajax_Handler(
+					$c->get( 'migration_controller' ),
+					$c->get( 'settings_controller' ),
+					$c->get( 'rate_limiter' ),
+					$c->get( 'input_validator' ),
+					$c->get( 'audit_logger' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'content_ajax',
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\Handlers\EFS_Content_Ajax_Handler(
@@ -452,7 +465,8 @@ class EFS_Service_Provider {
 					$c->get( 'logs_ajax' ),
 					$c->get( 'connection_ajax' ),
 					$c->get( 'cleanup_ajax' ),
-					$c->get( 'template_ajax' )
+					$c->get( 'template_ajax' ),
+					$c->get( 'migration_ajax' )
 				);
 			}
 		);

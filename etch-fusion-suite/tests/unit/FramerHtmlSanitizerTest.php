@@ -20,10 +20,10 @@ class FramerHtmlSanitizerTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
-        $container = \efs_container();
+        $container = \etch_fusion_suite_container();
         $this->sanitizer = $container->get('html_sanitizer');
 
-        $fixture_path = EFS_PLUGIN_DIR . '/tests/fixtures/framer-sample.html';
+        $fixture_path = ETCH_FUSION_SUITE_DIR . '/tests/fixtures/framer-sample.html';
         $html = file_get_contents($fixture_path);
         $this->assertNotFalse($html, 'Fixture HTML must be readable.');
 
@@ -46,7 +46,14 @@ class FramerHtmlSanitizerTest extends WP_UnitTestCase {
     }
 
     public function test_semanticization_converts_sections_and_text(): void {
-        $sanitized = $this->sanitizer->sanitize($this->dom);
+        // Parse HTML again to get a fresh DOM for this test
+        $container = \etch_fusion_suite_container();
+        $parser = $container->get('html_parser');
+        $fixture_path = ETCH_FUSION_SUITE_DIR . '/tests/fixtures/framer-sample.html';
+        $html = file_get_contents($fixture_path);
+        $fresh_dom = $parser->parse_html($html);
+        
+        $sanitized = $this->sanitizer->sanitize($fresh_dom);
         $xpath = new DOMXPath($sanitized);
 
         $heroSection = $xpath->query("//section[contains(@class, 'hero') or contains(@data-framer-name, 'Hero')]");

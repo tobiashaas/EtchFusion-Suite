@@ -20,24 +20,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants
-define( 'EFS_PLUGIN_VERSION', '0.10.2' );
-define( 'EFS_PLUGIN_FILE', __FILE__ );
-define( 'EFS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'EFS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'EFS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'ETCH_FUSION_SUITE_VERSION', '0.10.2' );
+define( 'ETCH_FUSION_SUITE_FILE', __FILE__ );
+define( 'ETCH_FUSION_SUITE_DIR', plugin_dir_path( __FILE__ ) );
+define( 'ETCH_FUSION_SUITE_URL', plugin_dir_url( __FILE__ ) );
+define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
 
 
 // Load Composer autoloader when available
-if ( file_exists( EFS_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
-	require_once EFS_PLUGIN_DIR . 'vendor/autoload.php';
+if ( file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' ) ) {
+	require_once ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php';
 }
 
 // Always register manual WordPress-friendly autoloader for legacy class naming
-require_once EFS_PLUGIN_DIR . 'includes/autoloader.php';
+require_once ETCH_FUSION_SUITE_DIR . 'includes/autoloader.php';
 
 // Manually load container classes (ensure they're available before bootstrap)
-require_once EFS_PLUGIN_DIR . 'includes/container/class-service-container.php';
-require_once EFS_PLUGIN_DIR . 'includes/container/class-service-provider.php';
+require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-container.php';
+require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-provider.php';
 
 // Import namespaced classes
 use Bricks2Etch\Api\EFS_API_Endpoints;
@@ -47,24 +47,24 @@ use Bricks2Etch\Migrators\EFS_Migrator_Discovery;
 use Bricks2Etch\Migrators\EFS_Migrator_Registry;
 
 // Bootstrap service container
-global $efs_container;
+global $etch_fusion_suite_container;
 
-if ( ! isset( $efs_container ) ) {
-	$efs_container       = new EFS_Service_Container();
-	$efs_service_provider = new EFS_Service_Provider();
-	$efs_service_provider->register( $efs_container );
+if ( ! isset( $etch_fusion_suite_container ) ) {
+	$etch_fusion_suite_container        = new EFS_Service_Container();
+	$etch_fusion_suite_service_provider = new EFS_Service_Provider();
+	$etch_fusion_suite_service_provider->register( $etch_fusion_suite_container );
 }
 
-if ( ! function_exists( 'efs_container' ) ) {
-	function efs_container() {
-		global $efs_container;
+if ( ! function_exists( 'etch_fusion_suite_container' ) ) {
+	function etch_fusion_suite_container() {
+		global $etch_fusion_suite_container;
 
-		return $efs_container;
+		return $etch_fusion_suite_container;
 	}
 }
 
 // Main plugin class
-class EFS_Plugin {
+class Etch_Fusion_Suite_Plugin {
 
 	/**
 	 * Single instance of the plugin
@@ -122,7 +122,7 @@ class EFS_Plugin {
 	 */
 	public function init() {
 		// Load text domain
-		load_plugin_textdomain( 'etch-fusion-suite', false, dirname( EFS_PLUGIN_BASENAME ) . '/languages' );
+		load_plugin_textdomain( 'etch-fusion-suite', false, dirname( ETCH_FUSION_SUITE_BASENAME ) . '/languages' );
 
 		// Initialize components
 		$this->init_components();
@@ -132,7 +132,7 @@ class EFS_Plugin {
 	 * Initialize migrator discovery workflow
 	 */
 	public function init_migrators() {
-		$container = efs_container();
+		$container = etch_fusion_suite_container();
 
 		if ( $container->has( 'migrator_registry' ) ) {
 			$registry = $container->get( 'migrator_registry' );
@@ -144,7 +144,7 @@ class EFS_Plugin {
 	 * Initialize plugin components
 	 */
 	private function init_components() {
-		$container = efs_container();
+		$container = etch_fusion_suite_container();
 
 		// Initialize admin interface with menu registration
 		if ( is_admin() ) {
@@ -164,7 +164,7 @@ class EFS_Plugin {
 	 * Initialize REST API endpoints
 	 */
 	public function init_rest_api() {
-		EFS_API_Endpoints::set_container( efs_container() );
+		EFS_API_Endpoints::set_container( etch_fusion_suite_container() );
 		EFS_API_Endpoints::init();
 	}
 
@@ -172,7 +172,7 @@ class EFS_Plugin {
 	 * Initialize CORS Manager with whitelist-based policy
 	 */
 	private function init_cors_manager() {
-		$container = efs_container();
+		$container = etch_fusion_suite_container();
 
 		if ( $container->has( 'cors_manager' ) ) {
 			$cors_manager = $container->get( 'cors_manager' );
@@ -217,7 +217,7 @@ class EFS_Plugin {
 	 * Add security headers to HTTP responses
 	 */
 	public function add_security_headers() {
-		$container = efs_container();
+		$container = etch_fusion_suite_container();
 
 		if ( $container->has( 'security_headers' ) ) {
 			$security_headers = $container->get( 'security_headers' );
@@ -232,7 +232,7 @@ class EFS_Plugin {
 	 * Production environments should always use HTTPS for Application Passwords.
 	 */
 	public function enable_application_passwords( $available ) {
-		$container = efs_container();
+		$container = etch_fusion_suite_container();
 
 		if ( $container->has( 'environment_detector' ) ) {
 			$environment_detector = $container->get( 'environment_detector' );
@@ -342,7 +342,7 @@ class EFS_Plugin {
  * @param mixed  $data    Optional data to log
  * @param string $context Context identifier (default: EFS_DEBUG)
  */
-function efs_debug_log( $message, $data = null, $context = 'EFS_DEBUG' ) {
+function etch_fusion_suite_debug_log( $message, $data = null, $context = 'ETCH_FUSION_SUITE_DEBUG' ) {
 	if ( ! WP_DEBUG || ! WP_DEBUG_LOG ) {
 		return;
 	}
@@ -363,12 +363,12 @@ function efs_debug_log( $message, $data = null, $context = 'EFS_DEBUG' ) {
 
 // Initialize the plugin (new name)
 function etch_fusion_suite() {
-	return EFS_Plugin::get_instance();
+	return Etch_Fusion_Suite_Plugin::get_instance();
 }
 
 // Start the plugin
 etch_fusion_suite();
 
 // Plugin activation/deactivation hooks
-register_activation_hook( __FILE__, array( 'EFS_Plugin', 'activate' ) );
-register_deactivation_hook( __FILE__, array( 'EFS_Plugin', 'deactivate' ) );
+register_activation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'activate' ) );
+register_deactivation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'deactivate' ) );

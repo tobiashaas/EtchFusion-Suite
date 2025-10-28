@@ -96,7 +96,7 @@ class EFS_Plugin_Detector {
 
 		// Check for Bricks content
 		$bricks_posts = $this->get_bricks_posts_count();
-		if ( $bricks_posts === 0 ) {
+		if ( 0 === $bricks_posts ) {
 			$validation_results['warnings'][] = 'No Bricks content found. Nothing to migrate.';
 		} else {
 			$validation_results['bricks_posts_count'] = $bricks_posts;

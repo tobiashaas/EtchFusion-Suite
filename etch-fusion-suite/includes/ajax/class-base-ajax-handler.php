@@ -61,9 +61,9 @@ abstract class EFS_Base_Ajax_Handler {
 		$this->audit_logger    = $audit_logger;
 
 		// Try to resolve from container if not provided
-		if ( function_exists( 'efs_container' ) ) {
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
 			try {
-				$container = efs_container();
+				$container = etch_fusion_suite_container();
 
 				if ( ! $this->rate_limiter && $container->has( 'rate_limiter' ) ) {
 					$this->rate_limiter = $container->get( 'rate_limiter' );
@@ -119,24 +119,35 @@ abstract class EFS_Base_Ajax_Handler {
 		$user_id = get_current_user_id();
 
 		if ( ! $this->verify_nonce() ) {
-			// Log authentication failure
 			if ( $this->audit_logger ) {
 				$this->audit_logger->log_authentication_attempt( false, 'user_' . $user_id, 'nonce' );
 			}
-			wp_send_json_error( 'Invalid nonce' );
+
+			wp_send_json_error(
+				array(
+					'message' => __( 'The request could not be authenticated. Please refresh the page and try again.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_nonce',
+				),
+				401
+			);
 			return false;
 		}
 
 		if ( ! $this->check_capability( $capability ) ) {
-			// Log authorization failure
 			if ( $this->audit_logger ) {
-				$this->audit_logger->log_authorization_failure( $user_id, 'ajax_request', $_REQUEST['action'] ?? 'unknown' );
+				$this->audit_logger->log_authorization_failure( $user_id, 'ajax_request', $this->get_request_action() );
 			}
-			wp_send_json_error( 'Insufficient permissions' );
+
+			wp_send_json_error(
+				array(
+					'message' => __( 'You do not have permission to perform this action.', 'etch-fusion-suite' ),
+					'code'    => 'forbidden',
+				),
+				403
+			);
 			return false;
 		}
 
-		// Log successful authentication
 		if ( $this->audit_logger ) {
 			$this->audit_logger->log_authentication_attempt( true, 'user_' . $user_id, 'nonce' );
 		}
@@ -148,11 +159,57 @@ abstract class EFS_Base_Ajax_Handler {
 	 * Get POST parameter
 	 *
 	 * @param string $key Parameter key
-	 * @param mixed $default Default value
+	 * @param mixed  $default_value Default value
 	 * @return mixed
 	 */
-	protected function get_post( $key, $default = null ) {
-		return isset( $_POST[ $key ] ) ? $_POST[ $key ] : $default;
+	protected function get_post( $key, $default_value = null, $sanitize = 'text' ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Concrete handlers call verify_request() (check_ajax_referer) before accessing POST data.
+		if ( ! isset( $_POST[ $key ] ) ) {
+			return $default_value;
+		}
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Value is sanitized below after verify_request() has enforced nonce checks.
+		$value = wp_unslash( $_POST[ $key ] );
+
+		if ( 'array' === $sanitize ) {
+			return is_array( $value ) ? $this->sanitize_array( $value ) : $default_value;
+		}
+
+		if ( is_array( $value ) ) {
+			// Unexpected array for scalar sanitizers.
+			return $default_value;
+		}
+
+		switch ( $sanitize ) {
+			case 'raw':
+				return $value;
+			case 'key':
+				return sanitize_key( $value );
+			case 'url':
+				return esc_url_raw( $value );
+			case 'int':
+				return (int) $value;
+			case 'float':
+				return (float) $value;
+			case 'bool':
+				return filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
+			case 'text':
+			default:
+				return sanitize_text_field( (string) $value );
+		}
+	}
+
+	/**
+	 * Safely retrieve the current AJAX action name.
+	 *
+	 * @return string
+	 */
+	protected function get_request_action() {
+		if ( ! isset( $_REQUEST['action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return 'unknown';
+		}
+
+		return sanitize_key( wp_unslash( $_REQUEST['action'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	}
 
 	/**
@@ -176,11 +233,14 @@ abstract class EFS_Base_Ajax_Handler {
 				$this->audit_logger->log_rate_limit_exceeded( $identifier, $action );
 			}
 
+			header( 'Retry-After: ' . absint( $window ) );
+
 			wp_send_json_error(
 				array(
-					'message' => 'Rate limit exceeded. Please try again later.',
+					'message' => __( 'Rate limit exceeded. Please try again later.', 'etch-fusion-suite' ),
 					'code'    => 'rate_limit_exceeded',
-				)
+				),
+				429
 			);
 			return false;
 		}
@@ -206,27 +266,135 @@ abstract class EFS_Base_Ajax_Handler {
 		try {
 			return \Bricks2Etch\Security\EFS_Input_Validator::validate_request_data( $data, $rules );
 		} catch ( \InvalidArgumentException $e ) {
-			// Log invalid input
+			$details           = \Bricks2Etch\Security\EFS_Input_Validator::get_last_error_details();
+			$error_code        = isset( $details['code'] ) ? sanitize_key( (string) $details['code'] ) : 'invalid_input';
+			$user_message      = \Bricks2Etch\Security\EFS_Input_Validator::get_user_error_message( $details );
+			$sanitized_details = array(
+				'code'    => $details['code'] ?? null,
+				'context' => $details['context'] ?? array(),
+			);
+
+			// Log invalid input with contextual details.
 			if ( $this->audit_logger ) {
 				$this->audit_logger->log_security_event(
 					'invalid_input',
 					'medium',
-					$e->getMessage(),
+					$user_message,
 					array(
-						'data'  => $data,
-						'rules' => $rules,
+						'data'    => $this->mask_sensitive_values( $data ),
+						'rules'   => $this->mask_sensitive_values( $rules ),
+						'details' => $sanitized_details,
 					)
 				);
 			}
 
 			wp_send_json_error(
 				array(
-					'message' => 'Invalid input: ' . $e->getMessage(),
-					'code'    => 'invalid_input',
-				)
+					'message' => $user_message,
+					'code'    => $error_code,
+					'details' => $sanitized_details,
+				),
+				400
 			);
 			return array();
 		}
+	}
+
+	/**
+	 * Sanitize array recursively.
+	 *
+	 * @param array $input Array to sanitize.
+	 * @return array Sanitized array.
+	 */
+	protected function sanitize_array( $input, $path = '' ) {
+		if ( $this->input_validator ) {
+			return $this->input_validator->sanitize_array_recursive( $input, $path, $this->audit_logger );
+		}
+
+		if ( ! is_array( $input ) ) {
+			return array();
+		}
+
+		foreach ( $input as $key => $value ) {
+			$current_path = '' === $path ? (string) $key : $path . '.' . $key;
+
+			if ( is_array( $value ) ) {
+				$input[ $key ] = $this->sanitize_array( $value, $current_path );
+			} elseif ( is_object( $value ) ) {
+				$converted     = $this->convert_object_to_array( $value, $current_path );
+				$input[ $key ] = $this->sanitize_array( $converted, $current_path );
+			} elseif ( is_string( $value ) ) {
+				$input[ $key ] = sanitize_text_field( $value );
+			} elseif ( is_scalar( $value ) ) {
+				$input[ $key ] = $value;
+			} else {
+				$input[ $key ] = null;
+			}
+		}
+
+		return $input;
+	}
+
+	/**
+	 * Convert objects within payloads to arrays and log the occurrence.
+	 *
+	 * @param object $value Object to convert.
+	 * @param string $path  Dot-notation path to the value.
+	 * @return array
+	 */
+	protected function convert_object_to_array( $value, $path ) {
+		$converted = json_decode( wp_json_encode( $value ), true );
+
+		if ( null === $converted ) {
+			$converted = (array) $value;
+		}
+
+		if ( $this->audit_logger ) {
+			$this->audit_logger->log_security_event(
+				'payload_object_normalized',
+				'low',
+				'Detected object payload converted to array during sanitization.',
+				array(
+					'path' => $path,
+					'type' => is_object( $value ) ? get_class( $value ) : gettype( $value ),
+				)
+			);
+		}
+
+		return is_array( $converted ) ? $converted : array();
+	}
+
+	/**
+	 * Mask sensitive values before logging or returning data.
+	 *
+	 * @param mixed $data Data to inspect.
+	 * @return mixed
+	 */
+	protected function mask_sensitive_values( $data ) {
+		$sensitive_keys = array( 'api_key', 'token', 'authorization', 'password', 'secret' );
+
+		if ( is_array( $data ) ) {
+			$masked = array();
+			foreach ( $data as $key => $value ) {
+				if ( in_array( strtolower( (string) $key ), $sensitive_keys, true ) ) {
+					$masked[ $key ] = '***redacted***';
+					continue;
+				}
+
+				$masked[ $key ] = $this->mask_sensitive_values( $value );
+			}
+			return $masked;
+		}
+
+		if ( is_object( $data ) ) {
+			return $this->mask_sensitive_values( (array) $data );
+		}
+
+		if ( is_string( $data ) ) {
+			return $data;
+		}
+
+		return $data;
 	}
 
 	/**
@@ -240,7 +408,7 @@ abstract class EFS_Base_Ajax_Handler {
 	protected function log_security_event( $type, $message, $context = array(), $severity_override = null ) {
 		if ( $this->audit_logger ) {
 			// Use override if provided, otherwise determine based on event type
-			if ( $severity_override !== null ) {
+			if ( null !== $severity_override ) {
 				$severity = $severity_override;
 			} else {
 				$severity = 'low';
@@ -256,31 +424,6 @@ abstract class EFS_Base_Ajax_Handler {
 	}
 
 	/**
-	 * Sanitize array recursively
-	 *
-	 * @param array $array Array to sanitize.
-	 * @return array Sanitized array.
-	 */
-	protected function sanitize_array( $array ) {
-		if ( $this->input_validator ) {
-			return $this->input_validator->sanitize_array_recursive( $array );
-		}
-
-		// Fallback sanitization
-		foreach ( $array as $key => $value ) {
-			if ( is_array( $value ) ) {
-				$array[ $key ] = $this->sanitize_array( $value );
-			} elseif ( is_string( $value ) ) {
-				$array[ $key ] = sanitize_text_field( $value );
-			}
-		}
-		return $array;
-	}
-
-	/**
-	 * Validate integer
-	 *
-	 * @param mixed $value Value to validate.
 	 * @param int|null $min Minimum value (optional).
 	 * @param int|null $max Maximum value (optional).
 	 * @return int|null Validated integer or null.
@@ -301,11 +444,11 @@ abstract class EFS_Base_Ajax_Handler {
 
 		$value = intval( $value );
 
-		if ( $min !== null && $value < $min ) {
+		if ( null !== $min && $min > $value ) {
 			return null;
 		}
 
-		if ( $max !== null && $value > $max ) {
+		if ( null !== $max && $max < $value ) {
 			return null;
 		}
 
@@ -350,10 +493,10 @@ abstract class EFS_Base_Ajax_Handler {
 
 		foreach ( $headers as $header ) {
 			if ( ! empty( $_SERVER[ $header ] ) ) {
-				$ip = $_SERVER[ $header ];
+				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) );
 
 				// X-Forwarded-For can contain multiple IPs
-				if ( strpos( $ip, ',' ) !== false ) {
+				if ( false !== strpos( $ip, ',' ) ) {
 					$ips = explode( ',', $ip );
 					$ip  = trim( $ips[0] );
 				}

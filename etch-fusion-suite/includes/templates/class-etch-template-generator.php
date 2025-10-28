@@ -56,11 +56,11 @@ class EFS_Etch_Template_Generator {
 		$styles   = $this->generate_style_definitions( $css_variables );
 		$metadata = $this->get_template_metadata( $analysis );
 		$stats    = array(
-			'generated_at'      => current_time( 'mysql' ),
-			'block_count'       => count( $blocks ),
-			'complexity_score'  => isset( $analysis['complexity_score'] ) ? (int) $analysis['complexity_score'] : 0,
-			'section_count'     => count( $analysis['sections'] ),
-			'media_count'       => isset( $analysis['media'] ) ? count( $analysis['media'] ) : 0,
+			'generated_at'     => current_time( 'mysql' ),
+			'block_count'      => count( $blocks ),
+			'complexity_score' => isset( $analysis['complexity_score'] ) ? (int) $analysis['complexity_score'] : 0,
+			'section_count'    => count( $analysis['sections'] ),
+			'media_count'      => isset( $analysis['media'] ) ? count( $analysis['media'] ) : 0,
 		);
 
 		$validation = $this->validate_generated_template( $blocks );
@@ -118,21 +118,8 @@ class EFS_Etch_Template_Generator {
 	 * @return string
 	 */
 	public function build_etch_block( DOMElement $element, $block_type, array $attributes, array $children ) {
-		$metadata = array(
-			'metadata' => array(
-				'name'     => $attributes['label'] ?? $element->getAttribute( 'data-framer-name' ) ?: ucfirst( $block_type ),
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $attributes['label'] ?? $element->getAttribute( 'data-framer-name' ) ?: ucfirst( $block_type ),
-					'styles'     => $attributes['styles'] ?? array(),
-					'attributes' => $attributes['attributes'] ?? array(),
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => $attributes['tag'] ?? 'div',
-					),
-				),
-			),
-		);
+		$styles   = isset( $attributes['styles'] ) && is_array( $attributes['styles'] ) ? $attributes['styles'] : array();
+		$metadata = $this->converter->build_block_metadata( $element, $block_type, $attributes, $styles );
 
 		$attrs_json = wp_json_encode( $metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 		$child_html = '';
@@ -158,19 +145,16 @@ class EFS_Etch_Template_Generator {
 	 * @return array<int,array<string,mixed>>
 	 */
 	protected function convert_children( DOMElement $element ) {
-		$children = array();
+		$children       = array();
+		$child_elements = $this->converter->get_element_children( $element );
 
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( ! $child instanceof DOMElement ) {
-				continue;
-			}
-
+		foreach ( $child_elements as $child ) {
 			$converted = $this->converter->convert_element( $child, array() );
 
 			if ( empty( $converted ) ) {
 				$converted = array(
 					'type'    => 'html',
-					'content' => $child->ownerDocument->saveHTML( $child ),
+					'content' => $this->save_node_html( $child ),
 				);
 			}
 
@@ -189,17 +173,22 @@ class EFS_Etch_Template_Generator {
 	 * @return string
 	 */
 	protected function render_child_block( DOMElement $element, array $data ) {
-		$type = $data['type'] ?? 'html';
+		$type = isset( $data['type'] ) ? $data['type'] : 'html';
 
 		switch ( $type ) {
 			case 'text':
-				return sprintf( '<!-- wp:paragraph --><p>%s</p><!-- /wp:paragraph -->', $data['content'] ?? '' );
+				$content = isset( $data['content'] ) ? $data['content'] : '';
+				return sprintf( '<!-- wp:paragraph --><p>%s</p><!-- /wp:paragraph -->', $content );
 			case 'image':
-				return sprintf( '<!-- wp:image --><figure class="wp-block-image"><img src="%s" alt="%s"/></figure><!-- /wp:image -->', esc_url( $data['src'] ?? '' ), esc_attr( $data['alt'] ?? '' ) );
+				$src = isset( $data['src'] ) ? esc_url( $data['src'] ) : '';
+				$alt = isset( $data['alt'] ) ? esc_attr( $data['alt'] ) : '';
+				return sprintf( '<!-- wp:image --><figure class="wp-block-image"><img src="%s" alt="%s"/></figure><!-- /wp:image -->', $src, $alt );
 			case 'button':
-				return sprintf( '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link" href="%s">%s</a></div><!-- /wp:button -->', esc_url( $data['href'] ?? '#' ), esc_html( $data['label'] ?? '' ) );
+				$href  = isset( $data['href'] ) ? esc_url( $data['href'] ) : '#';
+				$label = isset( $data['label'] ) ? esc_html( $data['label'] ) : '';
+				return sprintf( '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link" href="%s">%s</a></div><!-- /wp:button -->', $href, $label );
 			default:
-				return '<!-- wp:html -->' . $element->ownerDocument->saveHTML( $element ) . '<!-- /wp:html -->';
+				return '<!-- wp:html -->' . $this->save_node_html( $element ) . '<!-- /wp:html -->';
 		}
 	}
 
@@ -242,6 +231,7 @@ class EFS_Etch_Template_Generator {
 
 		foreach ( $blocks as $index => $block ) {
 			if ( false === strpos( $block, '<!-- wp:' ) ) {
+				/* translators: %d: Block index in the generated template. */
 				$errors[] = sprintf( __( 'Block %d is missing Gutenberg block comment wrappers.', 'etch-fusion-suite' ), $index );
 			}
 		}
@@ -259,15 +249,29 @@ class EFS_Etch_Template_Generator {
 	 * @return array<string,mixed>
 	 */
 	public function get_template_metadata( array $analysis ) {
-		$sections = $analysis['sections'] ?? array();
-		$title    = ! empty( $sections[0]['name'] ) ? sanitize_text_field( $sections[0]['name'] ) : __( 'Imported Template', 'etch-fusion-suite' );
+		$sections = isset( $analysis['sections'] ) && is_array( $analysis['sections'] ) ? $analysis['sections'] : array();
+		$title    = __( 'Imported Template', 'etch-fusion-suite' );
+		if ( ! empty( $sections ) && ! empty( $sections[0]['name'] ) ) {
+			$title = sanitize_text_field( $sections[0]['name'] );
+		}
 
 		return array(
-			'title'             => $title,
-			'description'       => __( 'Template generated from Framer HTML import.', 'etch-fusion-suite' ),
-			'complexity_score'  => isset( $analysis['complexity_score'] ) ? (int) $analysis['complexity_score'] : 0,
-			'section_overview'  => wp_list_pluck( $sections, 'type' ),
-			'warnings'          => $analysis['warnings'] ?? array(),
+			'title'            => $title,
+			'description'      => __( 'Template generated from Framer HTML import.', 'etch-fusion-suite' ),
+			'complexity_score' => isset( $analysis['complexity_score'] ) ? (int) $analysis['complexity_score'] : 0,
+			'section_overview' => wp_list_pluck( $sections, 'type' ),
+			'warnings'         => isset( $analysis['warnings'] ) && is_array( $analysis['warnings'] ) ? $analysis['warnings'] : array(),
 		);
+	}
+
+	/**
+	 * Render DOM node HTML safely.
+	 *
+	 * @param DOMElement $node DOM element to export.
+	 * @return string
+	 */
+	private function save_node_html( DOMElement $node ) {
+		$owner_document = $node->ownerDocument; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return $owner_document instanceof DOMDocument ? $owner_document->saveHTML( $node ) : '';
 	}
 }

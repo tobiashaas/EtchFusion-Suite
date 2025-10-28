@@ -1,4 +1,4 @@
-import { post } from './api.js';
+import { post, buildAjaxErrorMessage } from './api.js';
 import { showToast, setLoading } from './ui.js';
 
 const ACTION_VALIDATE_API_KEY = 'efs_validate_api_key';
@@ -35,7 +35,7 @@ const handleValidateApiKey = async (event) => {
         showToast('API key validated successfully.', 'success');
     } catch (error) {
         console.error('API key validation failed', error);
-        showToast(error.message, 'error');
+        showToast(buildAjaxErrorMessage(error, 'API key validation failed.'), 'error');
     } finally {
         setLoading(button, false);
     }
@@ -60,7 +60,7 @@ const handleValidateToken = async (event) => {
         showToast('Migration token validated.', 'success');
     } catch (error) {
         console.error('Migration token validation failed', error);
-        showToast(error.message, 'error');
+        showToast(buildAjaxErrorMessage(error, 'Migration token validation failed.'), 'error');
     } finally {
         setLoading(button, false);
     }

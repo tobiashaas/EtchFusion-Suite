@@ -84,7 +84,7 @@ class EFS_Element_Factory {
 		);
 
 		// Skip elements silently
-		if ( in_array( $element_type, $skip_elements ) ) {
+		if ( in_array( $element_type, $skip_elements, true ) ) {
 			return null;
 		}
 

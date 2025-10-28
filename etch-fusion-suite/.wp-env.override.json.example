@@ -1,4 +1,5 @@
 {
+  "core": "../test-environment/wordpress.zip",
   "port": 9888,
   "testsPort": 9889,
   "phpVersion": "8.2",

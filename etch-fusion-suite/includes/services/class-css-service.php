@@ -145,4 +145,3 @@ class EFS_CSS_Service {
 		return $this->css_converter->validate_css_syntax( $css );
 	}
 }
-

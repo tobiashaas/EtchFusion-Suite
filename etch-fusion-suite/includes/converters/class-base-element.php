@@ -106,11 +106,11 @@ abstract class EFS_Base_Element {
 	 * Get element tag
 	 *
 	 * @param array $element Bricks element
-	 * @param string $default Default tag
+	 * @param string $fallback_tag Default tag
 	 * @return string HTML tag
 	 */
-	protected function get_tag( $element, $default = 'div' ) {
-		return $element['settings']['tag'] ?? $default;
+	protected function get_tag( $element, $fallback_tag = 'div' ) {
+		return $element['settings']['tag'] ?? $fallback_tag;
 	}
 
 	/**
@@ -140,7 +140,7 @@ abstract class EFS_Base_Element {
 		);
 
 		// Add tagName for Gutenberg if not div
-		if ( $tag !== 'div' ) {
+		if ( 'div' !== $tag ) {
 			$attrs['tagName'] = $tag;
 		}
 
@@ -166,4 +166,3 @@ abstract class EFS_Base_Element {
 		return $children_html;
 	}
 }
-

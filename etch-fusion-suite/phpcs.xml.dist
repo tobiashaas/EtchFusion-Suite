@@ -60,8 +60,12 @@
         <properties>
             <property name="prefixes" type="array">
                 <element value="efs"/>
+                <element value="efs_security_headers"/>
+                <element value="efs_cors"/>
+                <element value="etch_fusion_suite"/>
                 <element value="EFS"/>
                 <element value="EtchFusion"/>
+                <element value="EtchFusionSuite"/>
                 <element value="b2e"/>
                 <element value="B2E"/>
                 <element value="Bricks2Etch"/>

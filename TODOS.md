@@ -2,11 +2,11 @@
 
 ## Completed ✅
 
+- [✅] PHPCS tooling refinements (scripts, backlog, documentation)
+  - **Added:** 2025-10-28 11:45
+  - **Completed:** 2025-10-28 12:58
 - [✅] Core EFS rebrand implementation (Services, Repositories, API, Security)
   - **Completed:** 2025-10-25 16:37
-
-## In Progress 🔄
-
 - [✅] Oct 26 review – Comment 1 (Polling backoff safeguards)
   - **Added:** 2025-10-26 23:04
   - **Completed:** 2025-10-26 23:20
@@ -16,11 +16,9 @@
 - [✅] Oct 26 review – Comment 3 (Restore critical unit coverage)
   - **Added:** 2025-10-26 23:04
   - **Completed:** 2025-10-26 23:20
-
 - [✅] Address Oct 26 review – Sanitizer & validator fixes
   - **Added:** 2025-10-26 22:57
   - **Completed:** 2025-10-26 23:05
-
 - [✅] Complete remaining rebrand tasks
   - **Completed:** 2025-10-25 21:26
   - [✅] Migrator classes (ACF, CPT, MetaBox, Media)
@@ -29,8 +27,7 @@
     - **Completed:** 2025-10-25 16:37
   - [✅] JS/CSS assets (`b2eData`, `data-b2e-*` attributes)
     - **Completed:** 2025-10-25 17:10
-  - [✅] Test files updated (test-ajax-handlers.php,
-    test-element-converters.php)
+  - [✅] Test files updated (test-ajax-handlers.php, test-element-converters.php)
     - **Completed:** 2025-10-25 17:40
   - [✅] Local AJAX/CSS test suite run (LocalWP)
     - **Completed:** 2025-10-25 18:23
@@ -88,36 +85,38 @@
     - **Completed:** 2025-10-26 13:35
   - [✅] Comment 6 – Admin CSS header & spacing follow-up
     - **Completed:** 2025-10-26 13:35
-
-## Pending
-
-- [ ] Fix CodeQL config paths for Etch Fusion Suite
+- [✅] Fix CodeQL config paths for Etch Fusion Suite
   - **Added:** 2025-10-28 00:24
+  - **Completed:** 2025-10-28 00:29
+- [✅] Handle dependency-review workflow configuration when Advanced Security is unavailable
+  - **Added:** 2025-10-28 00:36
+  - **Completed:** 2025-10-28 00:37
+- [✅] Fix npm cache dependency paths in CI workflow
+  - **Added:** 2025-10-28 00:56
+  - **Completed:** 2025-10-28 01:49
 - [✅] Oct 27 review – Implement CI/test/doc updates from comments
   - **Added:** 2025-10-27 23:48
   - **Completed:** 2025-10-27 23:58
+- [✅] Phase 10: Verbleibende Dateien in includes/
+  - **Added:** 2025-10-28 09:57
+  - **Completed:** 2025-10-28 10:48
+- [✅] Phase 11: Finale PHPCS-Validierung und CI-Check
+  - **Added:** 2025-10-28 10:52
+  - **Completed:** 2025-10-28 11:02
 - [✅] Address Oct 26 review – Comment 1 (wp-env portability)
   - **Added:** 2025-10-26 21:42
   - **Completed:** 2025-10-26 21:52
-- [✅] WordPress Test Suite setup for PHPUnit tests (requires macOS/Linux
-  environment)
+- [✅] WordPress Test Suite setup for PHPUnit tests (requires macOS/Linux environment)
   - **Added:** 2025-10-25 17:40
   - **Completed:** 2025-10-26 15:58
 - [✅] Restore CI workflows to match README badges
   - **Added:** 2025-10-26 16:25
   - **Completed:** 2025-10-26 16:30
-- [ ] Docker environment setup and container naming (b2e-bricks →
-  efs-bricks)
-  - **Added:** 2025-10-25 17:40
-- [ ] Create migration script for existing installations (`b2e_* → efs_*`
-  options)
-  - **Added:** 2025-10-25 16:37
-- [ ] Harden PHPCS compliance after rebrand (globals, security, naming)
-  - **Added:** 2025-10-26 16:58
 - [✅] Document Composer fallback & CI port guidance
   - **Added:** 2025-10-26 22:38
   - **Completed:** 2025-10-26 22:41
-- [✅] Update DOCUMENTATION.md with rebrand details - **Completed:** 2025-10-25 21:26
+- [✅] Update DOCUMENTATION.md with rebrand details
+  - **Completed:** 2025-10-25 21:26
 - [✅] Document LocalWP test workflow in DOCUMENTATION.md
   - **Completed:** 2025-10-25 21:26
 - [✅] Surface validator errors in admin UI
@@ -126,3 +125,39 @@
 - [✅] Document WordPress suite limitations in DOCUMENTATION.md
   - **Added:** 2025-10-27 20:52
   - **Completed:** 2025-10-27 20:52
+
+## In Progress 🔄
+
+- [ ] Docker environment setup and container naming (b2e-bricks → efs-bricks)
+  - **Added:** 2025-10-25 17:40
+- [ ] Create migration script for existing installations (`b2e_* → efs_*` options)
+  - **Added:** 2025-10-25 16:37
+- [ ] Harden PHPCS compliance after rebrand (globals, security, naming)
+  - **Added:** 2025-10-26 16:58
+  - **Documentation:** [`etch-fusion-suite/docs/phpcs-auto-fixes-2025-10-28.md`](etch-fusion-suite/docs/phpcs-auto-fixes-2025-10-28.md), [`etch-fusion-suite/docs/phpcs-manual-fixes-backlog.md`](etch-fusion-suite/docs/phpcs-manual-fixes-backlog.md)
+  - **Phased Approach:**
+    - [✅] Phase 1: Run PHPCBF for automatic fixes (completed: 2025-10-28)
+    - [✅] Phase 2: Security-kritische Fixes (EscapeOutput, ValidatedSanitizedInput, NonceVerification)
+      - **Completed:** 2025-10-28 07:55
+    - [✅] Phase 3: Nonce-Verification in AJAX-Handlern
+      - **Completed:** 2025-10-28 08:15
+    - [✅] Phase 4: Strict Comparisons (in_array mit drittem Parameter)
+      - **Completed:** 2025-10-28 08:32
+    - [✅] Phase 5: Yoda Conditions
+      - **Completed:** 2025-10-28 08:40
+    - [✅] Phase 6: Hook-Prefixing (globale Funktionen und Hooks)
+      - **Completed:** 2025-10-28 09:18
+    - [✅] Phase 7: Zeitfunktionen (date() durch gmdate() ersetzen)
+      - **Completed:** 2025-10-28 09:34
+    - [✅] Phase 8: CSS Converter PHPCS-Compliance
+      - **Completed:** 2025-10-28 09:41
+    - [✅] Phase 9: Kleinere Core-Dateien (admin_interface, error_handler, audit_logger)
+      - **Completed:** 2025-10-28 09:52
+    - [ ] Phase 10: Verbleibende Dateien in includes/
+    - [ ] Phase 11: Finale PHPCS-Validierung und CI-Integration
+    - [✅] Phase 12: Review und Code-Qualität
+      - **Completed:** 2025-10-28 11:06
+  - **Completion Criteria:**
+    - CI lint job passes without errors
+    - All security violations resolved
+    - All WordPress Coding Standards violations resolved

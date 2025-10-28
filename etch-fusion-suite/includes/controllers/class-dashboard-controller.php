@@ -52,17 +52,17 @@ class EFS_Dashboard_Controller {
 		$progress_context = $this->get_progress();
 
 		return array(
-			'is_bricks_site'   => $env['is_bricks_site'],
-			'is_etch_site'     => $env['is_etch_site'],
-			'site_url'         => $env['site_url'],
-			'is_https'         => $env['is_https'],
-			'logs'             => $this->get_logs(),
-			'progress_data'    => $progress_context['progress'],
-			'progress_steps'   => $progress_context['steps'],
-			'migrationId'      => $progress_context['migrationId'],
-			'settings'         => $this->get_settings(),
-			'nonce'            => wp_create_nonce( 'efs_nonce' ),
-			'saved_templates'  => $this->get_saved_templates(),
+			'is_bricks_site'  => $env['is_bricks_site'],
+			'is_etch_site'    => $env['is_etch_site'],
+			'site_url'        => $env['site_url'],
+			'is_https'        => $env['is_https'],
+			'logs'            => $this->get_logs(),
+			'progress_data'   => $progress_context['progress'],
+			'progress_steps'  => $progress_context['steps'],
+			'migration_id'    => $progress_context['migration_id'],
+			'settings'        => $this->get_settings(),
+			'nonce'           => wp_create_nonce( 'efs_nonce' ),
+			'saved_templates' => $this->get_saved_templates(),
 		);
 	}
 
@@ -75,16 +75,34 @@ class EFS_Dashboard_Controller {
 
 		if ( ! is_array( $progress ) ) {
 			return array(
-				'progress'    => array(),
+				'progress'    => $this->get_default_progress(),
 				'steps'       => array(),
 				'migrationId' => '',
+				'completed'   => false,
 			);
 		}
 
+		$progress_data = isset( $progress['progress'] ) && is_array( $progress['progress'] ) ? $progress['progress'] : $this->get_default_progress();
+		$steps_data    = isset( $progress['steps'] ) && is_array( $progress['steps'] ) ? $progress['steps'] : array();
+		$migration_id  = isset( $progress['migrationId'] ) ? sanitize_text_field( $progress['migrationId'] ) : '';
+		$completed     = isset( $progress['completed'] ) ? (bool) $progress['completed'] : false;
+
 		return array(
-			'progress'    => isset( $progress['progress'] ) && is_array( $progress['progress'] ) ? $progress['progress'] : array(),
-			'steps'       => isset( $progress['steps'] ) && is_array( $progress['steps'] ) ? $progress['steps'] : array(),
-			'migrationId' => isset( $progress['migrationId'] ) ? sanitize_text_field( $progress['migrationId'] ) : '',
+			'progress'    => $progress_data,
+			'steps'       => $steps_data,
+			'migrationId' => $migration_id,
+			'completed'   => $completed,
+		);
+	}
+
+	private function get_default_progress() {
+		return array(
+			'percentage'   => 0,
+			'status'       => '',
+			'current_step' => '',
+			'message'      => '',
+			'started_at'   => null,
+			'completed_at' => null,
 		);
 	}
 
@@ -98,8 +116,131 @@ class EFS_Dashboard_Controller {
 		if ( ! $path || ! file_exists( $path ) ) {
 			return;
 		}
-		extract( $data, EXTR_SKIP );
-		include $path;
+
+		switch ( $template ) {
+			case 'dashboard':
+				$view_args = $this->prepare_dashboard_view_args( $data );
+				break;
+			case 'logs':
+				$view_args = $this->prepare_logs_view_args( $data );
+				break;
+			case 'migration-progress':
+				$view_args = $this->prepare_migration_progress_view_args( $data );
+				break;
+			case 'template-extractor':
+				$view_args = $this->prepare_template_extractor_view_args( $data );
+				break;
+			case 'bricks-setup':
+				$view_args = $this->prepare_bricks_setup_view_args( $data );
+				break;
+			case 'etch-setup':
+				$view_args = $this->prepare_etch_setup_view_args( $data );
+				break;
+			default:
+				$view_args = $data;
+		}
+
+		$render = static function ( $template_path, array $template_args ) {
+			foreach ( $template_args as $template_key => $template_value ) {
+				${$template_key} = $template_value;
+			}
+
+			unset( $template_key, $template_value );
+			include $template_path;
+		};
+
+		$render( $path, $view_args );
+	}
+
+	/**
+	 * Prepare dashboard view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_dashboard_view_args( array $data ) {
+		return array(
+			'is_bricks_site'  => isset( $data['is_bricks_site'] ) ? (bool) $data['is_bricks_site'] : false,
+			'is_etch_site'    => isset( $data['is_etch_site'] ) ? (bool) $data['is_etch_site'] : false,
+			'site_url'        => isset( $data['site_url'] ) ? esc_url( $data['site_url'] ) : home_url(),
+			'is_https'        => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
+			'logs'            => isset( $data['logs'] ) && is_array( $data['logs'] ) ? $data['logs'] : array(),
+			'progress_data'   => isset( $data['progress_data'] ) && is_array( $data['progress_data'] ) ? $data['progress_data'] : $this->get_default_progress(),
+			'progress_steps'  => isset( $data['progress_steps'] ) && is_array( $data['progress_steps'] ) ? $data['progress_steps'] : array(),
+			'migration_id'    => isset( $data['migration_id'] ) ? sanitize_text_field( $data['migration_id'] ) : '',
+			'settings'        => isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array(),
+			'nonce'           => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'saved_templates' => isset( $data['saved_templates'] ) && is_array( $data['saved_templates'] ) ? $data['saved_templates'] : array(),
+		);
+	}
+
+	/**
+	 * Prepare logs view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_logs_view_args( array $data ) {
+		return array(
+			'logs' => isset( $data['logs'] ) && is_array( $data['logs'] ) ? $data['logs'] : array(),
+		);
+	}
+
+	/**
+	 * Prepare migration progress view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_migration_progress_view_args( array $data ) {
+		return array(
+			'progress_data'  => isset( $data['progress_data'] ) && is_array( $data['progress_data'] ) ? $data['progress_data'] : $this->get_default_progress(),
+			'progress_steps' => isset( $data['progress_steps'] ) && is_array( $data['progress_steps'] ) ? $data['progress_steps'] : array(),
+			'migration_id'   => isset( $data['migration_id'] ) ? sanitize_text_field( $data['migration_id'] ) : '',
+			'completed'      => isset( $data['completed'] ) ? (bool) $data['completed'] : false,
+		);
+	}
+
+	/**
+	 * Prepare template extractor view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_template_extractor_view_args( array $data ) {
+		return array(
+			'saved_templates' => isset( $data['saved_templates'] ) && is_array( $data['saved_templates'] ) ? $data['saved_templates'] : array(),
+			'nonce'           => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+		);
+	}
+
+	/**
+	 * Prepare Bricks setup view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_bricks_setup_view_args( array $data ) {
+		$settings = isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array();
+
+		return array(
+			'settings' => $settings,
+			'nonce'    => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+		);
+	}
+
+	/**
+	 * Prepare Etch setup view arguments.
+	 *
+	 * @param array $data Context data.
+	 * @return array
+	 */
+	private function prepare_etch_setup_view_args( array $data ) {
+		return array(
+			'nonce'    => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'is_https' => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
+			'site_url' => isset( $data['site_url'] ) ? esc_url( $data['site_url'] ) : home_url(),
+		);
 	}
 
 	private function get_saved_templates() {
@@ -110,4 +251,3 @@ class EFS_Dashboard_Controller {
 		return $this->template_controller->get_saved_templates();
 	}
 }
-

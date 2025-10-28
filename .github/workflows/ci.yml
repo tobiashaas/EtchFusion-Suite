@@ -111,7 +111,9 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
-          cache-dependency-path: etch-fusion-suite/package-lock.json
+          cache-dependency-path: |
+            etch-fusion-suite/package-lock.json
+            package-lock.json
 
       - name: Install Node dependencies
         run: npm ci

@@ -87,12 +87,12 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 		EFS_Input_Validator $input_validator,
 		EFS_WordPress_Migration_Repository $migration_repository
 	) {
-		$this->html_parser         = $html_parser;
-		$this->html_sanitizer      = $html_sanitizer;
-		$this->template_analyzer   = $template_analyzer;
-		$this->template_generator  = $template_generator;
-		$this->error_handler       = $error_handler;
-		$this->input_validator     = $input_validator;
+		$this->html_parser          = $html_parser;
+		$this->html_sanitizer       = $html_sanitizer;
+		$this->template_analyzer    = $template_analyzer;
+		$this->template_generator   = $template_generator;
+		$this->error_handler        = $error_handler;
+		$this->input_validator      = $input_validator;
 		$this->migration_repository = $migration_repository;
 	}
 
@@ -182,7 +182,7 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 			array(
 				'timeout'   => 30,
 				'headers'   => array( 'User-Agent' => 'EtchFusionSuite/1.0 (+https://etchwp.com)' ),
-				'sslverify' => apply_filters( 'https_local_ssl_verify', true ),
+				'sslverify' => apply_filters( 'etch_fusion_suite_https_local_ssl_verify', true ),
 			)
 		);
 
@@ -217,7 +217,10 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 	 * {@inheritdoc}
 	 */
 	public function validate_template( array $template ) {
-		$blocks = isset( $template['blocks'] ) && is_array( $template['blocks'] ) ? $template['blocks'] : array();
+		$blocks = array();
+		if ( isset( $template['blocks'] ) && is_array( $template['blocks'] ) ) {
+			$blocks = $template['blocks'];
+		}
 
 		return $this->template_generator->validate_generated_template( $blocks );
 	}
@@ -253,12 +256,22 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 	 * @return int|WP_Error Post ID on success.
 	 */
 	public function save_template( array $template, $name ) {
+		$sanitized_name = sanitize_text_field( $name );
+		if ( '' === $sanitized_name ) {
+			$sanitized_name = __( 'Imported Framer Template', 'etch-fusion-suite' );
+		}
+
+		$post_blocks = array();
+		if ( isset( $template['blocks'] ) && is_array( $template['blocks'] ) ) {
+			$post_blocks = $template['blocks'];
+		}
+
 		$post_id = wp_insert_post(
 			array(
 				'post_type'    => 'etch_template',
-				'post_title'   => sanitize_text_field( $name ) ?: __( 'Imported Framer Template', 'etch-fusion-suite' ),
+				'post_title'   => $sanitized_name,
 				'post_status'  => 'draft',
-				'post_content' => maybe_serialize( $template['blocks'] ?? array() ),
+				'post_content' => maybe_serialize( $post_blocks ),
 			)
 		);
 

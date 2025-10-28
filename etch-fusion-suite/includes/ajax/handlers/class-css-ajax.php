@@ -38,9 +38,9 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	public function __construct( $css_service = null, $rate_limiter = null, $input_validator = null, $audit_logger = null ) {
 		if ( $css_service ) {
 			$this->css_service = $css_service;
-		} elseif ( function_exists( 'efs_container' ) ) {
+		} elseif ( function_exists( 'etch_fusion_suite_container' ) ) {
 			try {
-				$this->css_service = efs_container()->get( 'css_service' );
+				$this->css_service = etch_fusion_suite_container()->get( 'css_service' );
 			} catch ( \Exception $exception ) {
 				$this->css_service = null;
 			}
@@ -62,19 +62,12 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * AJAX handler to migrate CSS
 	 */
 	public function convert_css() {
-		$this->log( '========================================' );
-		$this->log( '🎨 CSS Migration: AJAX handler called - START' );
-		$this->log( '🎨 CSS Migration: POST data: ' . wp_json_encode( $_POST ) );
-		$this->log( '========================================' );
-
-		// Check rate limit (30 requests per minute)
-		if ( ! $this->check_rate_limit( 'convert_css', 30, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		// Verify nonce
-		if ( ! $this->verify_nonce() ) {
-			wp_send_json_error( __( 'Invalid request.', 'etch-fusion-suite' ) );
+		// Check rate limit (30 requests per minute)
+		if ( ! $this->check_rate_limit( 'css_convert', 30, 60 ) ) {
 			return;
 		}
 
@@ -104,8 +97,6 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$target_url = $validated['target_url'];
 		$api_key    = $validated['api_key'];
 
-		$this->log( '🎨 CSS Migration: target_url=' . $target_url . ', api_key=' . substr( $api_key, 0, 20 ) . '...' );
-
 		// Convert localhost:8081 to efs-etch for Docker internal communication
 		$internal_url = $this->convert_to_internal_url( $target_url );
 
@@ -122,16 +113,40 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		// Migrate CSS
 		try {
 			if ( ! $this->css_service || ! $this->css_service instanceof EFS_CSS_Service ) {
-				wp_send_json_error( __( 'CSS service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ) );
+				$this->log_security_event( 'ajax_action', 'CSS migration aborted: CSS service unavailable.' );
+				wp_send_json_error(
+					array(
+						'message' => __( 'CSS service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+						'code'    => 'service_unavailable',
+					),
+					503
+				);
 				return;
 			}
 
-			$this->log( '🎨 CSS Migration: Starting service-driven conversion...' );
 			$result = $this->css_service->migrate_css_classes( $internal_url, $api_key );
 
 			if ( is_wp_error( $result ) ) {
-				$this->log( '❌ CSS Migration: Service returned error: ' . $result->get_error_message() );
-				wp_send_json_error( $result->get_error_message() );
+				$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'css_migration_failed';
+				$status     = 400;
+				$error_data = $result->get_error_data();
+				if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+					$status = (int) $error_data['status'];
+				}
+
+				$this->log_security_event(
+					'ajax_action',
+					'CSS migration failed: ' . $result->get_error_message(),
+					array( 'code' => $error_code )
+				);
+
+				wp_send_json_error(
+					array(
+						'message' => $result->get_error_message(),
+						'code'    => $error_code,
+					),
+					$status
+				);
 				return;
 			}
 
@@ -140,7 +155,6 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 			if ( isset( $api_response['style_map'] ) && is_array( $api_response['style_map'] ) ) {
 				update_option( 'efs_style_map', $api_response['style_map'] );
-				$this->log( '✅ CSS Migration: Saved style map with ' . count( $api_response['style_map'] ) . ' entries' );
 			}
 
 			$this->log_security_event(
@@ -160,20 +174,47 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			$this->log( '❌ CSS Migration: Exception: ' . $e->getMessage() );
-
 			// Log CSS migration failure
-			$this->log_security_event( 'ajax_action', 'CSS migration exception: ' . $e->getMessage() );
+			$this->log_security_event( 'ajax_action', 'CSS migration exception: ' . $e->getMessage(), array(), 'high' );
 
-			wp_send_json_error( 'Exception: ' . $e->getMessage() );
+			wp_send_json_error(
+				array(
+					'message' => sprintf( 'Exception: %s', $e->getMessage() ),
+					'code'    => 'css_migration_exception',
+				),
+				500
+			);
 		}
 	}
 
 	public function get_global_styles() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'css_global_styles', 60, 60 ) ) {
+			return;
+		}
+
 		$styles = $this->css_service->get_global_styles();
 
 		if ( is_wp_error( $styles ) ) {
-			wp_send_json_error( $styles->get_error_message() );
+			$error_code = $styles->get_error_code() ? sanitize_key( $styles->get_error_code() ) : 'css_styles_unavailable';
+			$status     = 400;
+			$error_data = $styles->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
+			$this->log_security_event( 'ajax_action', 'Failed to retrieve global styles: ' . $styles->get_error_message(), array( 'code' => $error_code ) );
+
+			wp_send_json_error(
+				array(
+					'message' => $styles->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		} else {
 			wp_send_json_success( $styles );
 		}

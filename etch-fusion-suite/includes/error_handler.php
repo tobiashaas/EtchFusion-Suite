@@ -317,7 +317,7 @@ class EFS_Error_Handler {
 	public function get_log( $type = 'all' ) {
 		$log = get_option( 'efs_migration_log', array() );
 
-		if ( $type !== 'all' ) {
+		if ( 'all' !== $type ) {
 			$log = array_filter(
 				$log,
 				function ( $entry ) use ( $type ) {
@@ -403,7 +403,7 @@ class EFS_Error_Handler {
 			$message
 		);
 
-		if ( $data !== null ) {
+		if ( null !== $data ) {
 			$log_message .= ' | Data: ' . wp_json_encode( $data );
 		}
 

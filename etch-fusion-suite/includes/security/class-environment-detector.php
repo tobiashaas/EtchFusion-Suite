@@ -42,20 +42,23 @@ class EFS_Environment_Detector {
 		// Check WP_ENVIRONMENT_TYPE constant first (WordPress 5.5+)
 		if ( function_exists( 'wp_get_environment_type' ) ) {
 			$env_type = wp_get_environment_type();
-			if ( $env_type === 'local' ) {
+			if ( 'local' === $env_type ) {
 				return true;
 			}
 		}
 
 		// Check WP_LOCAL_DEV constant
-		if ( defined( 'WP_LOCAL_DEV' ) && WP_LOCAL_DEV ) {
+		if ( defined( 'WP_LOCAL_DEV' ) && constant( 'WP_LOCAL_DEV' ) ) {
 			return true;
 		}
 
 		// Check domain/host
-		$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
-		if ( empty( $host ) && isset( $_SERVER['SERVER_NAME'] ) ) {
-			$host = $_SERVER['SERVER_NAME'];
+		$host = '';
+		if ( isset( $_SERVER['HTTP_HOST'] ) ) {
+			$host = sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) );
+		}
+		if ( '' === $host && isset( $_SERVER['SERVER_NAME'] ) ) {
+			$host = sanitize_text_field( wp_unslash( $_SERVER['SERVER_NAME'] ) );
 		}
 
 		// Check against local domains
@@ -66,7 +69,10 @@ class EFS_Environment_Detector {
 		}
 
 		// Check IP address
-		$server_addr = isset( $_SERVER['SERVER_ADDR'] ) ? $_SERVER['SERVER_ADDR'] : '';
+		$server_addr = '';
+		if ( isset( $_SERVER['SERVER_ADDR'] ) ) {
+			$server_addr = sanitize_text_field( wp_unslash( $_SERVER['SERVER_ADDR'] ) );
+		}
 		if ( in_array( $server_addr, array( '127.0.0.1', '::1' ), true ) ) {
 			return true;
 		}
@@ -115,7 +121,7 @@ class EFS_Environment_Detector {
 		// Check WP_ENVIRONMENT_TYPE
 		if ( function_exists( 'wp_get_environment_type' ) ) {
 			$env_type = wp_get_environment_type();
-			if ( $env_type === 'production' ) {
+			if ( 'production' === $env_type ) {
 				return true;
 			}
 		}
@@ -160,7 +166,10 @@ class EFS_Environment_Detector {
 		}
 
 		// Check for staging indicators
-		$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+		$host = '';
+		if ( isset( $_SERVER['HTTP_HOST'] ) ) {
+			$host = sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) );
+		}
 		if ( strpos( $host, 'staging' ) !== false || strpos( $host, 'stage' ) !== false ) {
 			return 'staging';
 		}
@@ -235,7 +244,7 @@ class EFS_Environment_Detector {
 			'is_docker'      => $this->is_docker_environment(),
 			'require_https'  => $this->should_require_https(),
 			'wp_debug'       => defined( 'WP_DEBUG' ) && WP_DEBUG,
-			'host'           => isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '',
+			'host'           => isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '',
 		);
 	}
 }

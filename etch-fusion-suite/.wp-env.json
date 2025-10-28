@@ -1,5 +1,5 @@
 {
-  "core": "C:\\Users\\haast\\Downloads\\wordpress-6.8.3.zip",
+  "core": "https://wordpress.org/wordpress-6.8.zip",
   "phpVersion": "8.1",
   "plugins": [
     "."
@@ -7,12 +7,6 @@
   "themes": [],
   "port": 8888,
   "testsPort": 8889,
-  "mappings": {
-    "wp-content/plugins/automaticcss-plugin": "./src/plugin-src",
-    "wp-content/plugins/frames-plugin": "../frames/src/client-src",
-    "wp-content/plugins/etch": "../etch/src/plugin-src",
-    "wp-content/themes/etch-theme": "../etch/src/theme-src"
-  },
   "config": {
     "WP_DEBUG": true,
     "WP_DEBUG_LOG": true,

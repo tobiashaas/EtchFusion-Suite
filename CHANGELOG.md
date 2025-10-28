@@ -2,6 +2,39 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
+## [0.11.20] - 2025-10-28 (12:58)
+
+### 🛠 Technical Changes
+
+- Stabilised `scripts/analyze-phpcs-violations.sh` by eliminating command substitutions inside the backlog heredoc, separating stdout/stderr cleanly, and adding deterministic file hotspot generation for the PHPCS backlog.
+- Enhanced `scripts/run-phpcbf.sh` with `--php-only` and `--stash` options, automatic stash restoration, and clearer run summaries (including diff scope, stash mode, and PHPCBF artefact locations).
+- Removed stale PHPCS stderr artefacts produced by the previous analyze script failure to keep `docs/` tidy.
+
+### 📚 Documentation
+
+- Expanded the "Development Workflow" section in `DOCUMENTATION.md` with dedicated PHPCS Auto-Fixes, Running PHPCBF, and PHPCS Violation Analysis subsections, including timestamps and references to the updated scripts.
+- Refreshed documentation metadata to version 0.11.20 with the current timestamp.
+
+---
+
+## [0.11.19] - 2025-10-28 (10:48)
+
+### 🛠 Technical Changes
+
+- Completed Phase 10 of the PHPCS cleanup by refactoring the remaining files under `includes/` (migrators, services, converters, views) to remove short ternaries, enforce Yoda conditions, and apply strict `in_array()` checks.
+- Standardised container exception handling with anonymous classes to satisfy WPCS naming constraints and kept binding helpers aligned with the DI container.
+- Normalised assignment/double-arrow alignment across migration token manager, AJAX views, and service helpers.
+
+### 🧪 Testing
+
+- Confirmed `vendor/bin/phpcs includes` passes with no warnings after the Phase 10 fixes.
+
+### 📚 Documentation
+
+- Updated `DOCUMENTATION.md` and TODOs with Phase 10 completion details and refreshed timestamps.
+
+---
+
 ## [0.11.15] - 2025-10-27 (23:48)
 
 ### 🛠 Technical Changes

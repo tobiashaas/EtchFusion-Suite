@@ -39,6 +39,22 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Backwards-compatible wrapper to satisfy legacy integrations.
+	 *
+	 * @param array<string,mixed> $legacy_styles Optional payload.
+	 * @return array<string,mixed>
+	 */
+	public function convert( array $legacy_styles = array() ) {
+		$conversion = $this->convert_bricks_classes_to_etch();
+
+		if ( ! empty( $legacy_styles ) ) {
+			$conversion['legacy_styles'] = $legacy_styles;
+		}
+
+		return $conversion;
+	}
+
+	/**
 	 * Convert Bricks breakpoint name to Etch media query
 	 * Uses modern range syntax and to-rem() function
 	 * Desktop-first approach: styles cascade down unless overridden
@@ -82,11 +98,11 @@ class EFS_CSS_Converter {
 	/**
 	 * Check if class should be excluded from migration
 	 *
-	 * @param array $class Bricks class
+	 * @param array $class_data Bricks class
 	 * @return bool True if should be excluded
 	 */
-	private function should_exclude_class( $class ) {
-		$class_name = ! empty( $class['name'] ) ? $class['name'] : '';
+	private function should_exclude_class( $class_data ) {
+		$class_name = ! empty( $class_data['name'] ) ? $class_data['name'] : '';
 
 		// Skip if no name
 		if ( empty( $class_name ) ) {
@@ -110,7 +126,7 @@ class EFS_CSS_Converter {
 		);
 
 		foreach ( $excluded_prefixes as $prefix ) {
-			if ( strpos( $class_name, $prefix ) === 0 ) {
+			if ( 0 === strpos( $class_name, $prefix ) ) {
 				error_log( '🎨 CSS Converter: Excluding class: ' . $class_name . ' (prefix: ' . $prefix . ')' );
 				return true;
 			}
@@ -164,7 +180,7 @@ class EFS_CSS_Converter {
 			// Collect breakpoint-specific custom CSS (store separately!)
 			// Bricks stores these as _cssCustom:breakpoint_name
 			foreach ( $class['settings'] as $key => $value ) {
-				if ( strpos( $key, '_cssCustom:' ) === 0 && ! empty( $value ) ) {
+				if ( 0 === strpos( $key, '_cssCustom:' ) && ! empty( $value ) ) {
 					$breakpoint = str_replace( '_cssCustom:', '', $key );
 
 					// Convert Bricks breakpoint names to media queries
@@ -302,7 +318,7 @@ class EFS_CSS_Converter {
 		error_log( '🎨 CSS Converter: Returning ' . $total_styles . ' total styles' );
 		error_log( '🎨 CSS Converter: Style map has ' . count( $style_map ) . ' entries' );
 
-		if ( $total_styles === 0 ) {
+		if ( 0 === $total_styles ) {
 			error_log( '⚠️ CSS Converter: WARNING - No styles generated!' );
 		}
 
@@ -366,7 +382,7 @@ class EFS_CSS_Converter {
 
 			// Extract all properties for this breakpoint
 			foreach ( $settings as $key => $value ) {
-				if ( strpos( $key, ':' . $breakpoint ) !== false ) {
+				if ( 0 === strpos( $key, ':' . $breakpoint ) ) {
 					// Remove breakpoint suffix to get base property name
 					$base_key                         = str_replace( ':' . $breakpoint, '', $key );
 					$breakpoint_settings[ $base_key ] = $value;
@@ -523,7 +539,7 @@ class EFS_CSS_Converter {
 		$gradient_type = $gradient['type'] ?? 'linear';
 		$angle         = $gradient['angle'] ?? '180deg';
 
-		if ( $gradient_type === 'radial' ) {
+		if ( 'radial' === $gradient_type ) {
 			return 'background-image: radial-gradient(' . implode( ', ', $color_stops ) . ');';
 		} else {
 			// Linear gradient (default)
@@ -1003,19 +1019,19 @@ class EFS_CSS_Converter {
 
 		// Convert to logical properties (inset-*)
 		// Use isset() instead of !empty() to allow "0" values
-		if ( isset( $settings['_top'] ) && $settings['_top'] !== '' ) {
+		if ( isset( $settings['_top'] ) && '' !== $settings['_top'] ) {
 			$css[] = 'inset-block-start: ' . $settings['_top'] . ';';
 		}
 
-		if ( isset( $settings['_right'] ) && $settings['_right'] !== '' ) {
+		if ( isset( $settings['_right'] ) && '' !== $settings['_right'] ) {
 			$css[] = 'inset-inline-end: ' . $settings['_right'] . ';';
 		}
 
-		if ( isset( $settings['_bottom'] ) && $settings['_bottom'] !== '' ) {
+		if ( isset( $settings['_bottom'] ) && '' !== $settings['_bottom'] ) {
 			$css[] = 'inset-block-end: ' . $settings['_bottom'] . ';';
 		}
 
-		if ( isset( $settings['_left'] ) && $settings['_left'] !== '' ) {
+		if ( isset( $settings['_left'] ) && '' !== $settings['_left'] ) {
 			$css[] = 'inset-inline-start: ' . $settings['_left'] . ';';
 		}
 
@@ -1133,12 +1149,12 @@ class EFS_CSS_Converter {
 				if ( ! empty( $settings['_boxShadow']['color'] ) ) {
 					$color = is_array( $settings['_boxShadow']['color'] ) ? ( $settings['_boxShadow']['color']['raw'] ?? '' ) : $settings['_boxShadow']['color'];
 				}
-				$inset   = ! empty( $settings['_boxShadow']['inset'] ) ? 'inset ' : '';
-				$offsetX = $shadow['offsetX'] ?? '0';
-				$offsetY = $shadow['offsetY'] ?? '0';
-				$blur    = $shadow['blur'] ?? '0';
-				$spread  = $shadow['spread'] ?? '0';
-				$css[]   = 'box-shadow: ' . $inset . $offsetX . 'px ' . $offsetY . 'px ' . $blur . 'px ' . $spread . 'px ' . $color . ';';
+				$inset    = ! empty( $settings['_boxShadow']['inset'] ) ? 'inset ' : '';
+				$offset_x = isset( $shadow['offsetX'] ) ? $shadow['offsetX'] : '0';
+				$offset_y = isset( $shadow['offsetY'] ) ? $shadow['offsetY'] : '0';
+				$blur     = isset( $shadow['blur'] ) ? $shadow['blur'] : '0';
+				$spread   = isset( $shadow['spread'] ) ? $shadow['spread'] : '0';
+				$css[]    = 'box-shadow: ' . $inset . $offset_x . 'px ' . $offset_y . 'px ' . $blur . 'px ' . $spread . 'px ' . $color . ';';
 			}
 		}
 
@@ -1229,10 +1245,10 @@ class EFS_CSS_Converter {
 
 		// Extract media queries
 		$css = preg_replace_callback(
-			'/@media[^{]+\{[^}]*\}/s',
-			function ( $match ) use ( &$media_queries, &$placeholder_count, $placeholder_prefix ) {
+			'/@media[^{}]+\{[^}]*\}/s',
+			function ( $match_data ) use ( &$media_queries, &$placeholder_count, $placeholder_prefix ) {
 				$placeholder                   = $placeholder_prefix . $placeholder_count . '___';
-				$media_queries[ $placeholder ] = $match[0];
+				$media_queries[ $placeholder ] = $match_data[0];
 				$placeholder_count++;
 				return $placeholder;
 			},
@@ -1360,7 +1376,7 @@ class EFS_CSS_Converter {
 			foreach ( $style_map as $bricks_id => $style_data ) {
 				$selector = is_array( $style_data ) ? $style_data['selector'] : '';
 				// Match selector (with or without leading dot)
-				if ( $selector === '.' . $class_name || $selector === $class_name ) {
+				if ( '.' . $class_name === $selector || $class_name === $selector ) {
 					$style_id = is_array( $style_data ) ? $style_data['id'] : $style_data;
 					error_log( 'B2E CSS: Found existing style ID ' . $style_id . ' for custom CSS class ' . $class_name );
 					break;
@@ -1430,7 +1446,7 @@ class EFS_CSS_Converter {
 				}
 
 				// Media query ended
-				if ( $brace_count <= 0 ) {
+				if ( 0 === $brace_count ) {
 					// Check if media query contains our class
 					if ( preg_match( '/\.' . $escaped_class . '/', $media_content ) ) {
 						$css_parts[] = $current_media . " {\n" . trim( $media_content ) . "\n}";
@@ -1443,7 +1459,7 @@ class EFS_CSS_Converter {
 			}
 
 			// Not in media query - check for direct class rules
-			if ( preg_match( '/\.' . $escaped_class . '([^{]*)\{/', $line ) ) {
+			if ( preg_match( '/\.' . $escaped_class . '([^{]*?)\{/', $line ) ) {
 				// Start of a rule for our class
 				$rule        = $line . "\n";
 				$brace_count = substr_count( $line, '{' ) - substr_count( $line, '}' );
@@ -1579,13 +1595,13 @@ class EFS_CSS_Converter {
 		while ( $pos < $length ) {
 			// Find next @media
 			$media_pos = strpos( $css, '@media', $pos );
-			if ( $media_pos === false ) {
+			if ( false === $media_pos ) {
 				break;
 			}
 
 			// Find opening brace
 			$open_brace = strpos( $css, '{', $media_pos );
-			if ( $open_brace === false ) {
+			if ( false === $open_brace ) {
 				break;
 			}
 
@@ -1598,15 +1614,15 @@ class EFS_CSS_Converter {
 			$content_start = $i;
 
 			while ( $i < $length && $brace_count > 0 ) {
-				if ( $css[ $i ] === '{' ) {
+				if ( '{' === $css[ $i ] ) {
 					++$brace_count;
-				} elseif ( $css[ $i ] === '}' ) {
+				} elseif ( '}' === $css[ $i ] ) {
 					--$brace_count;
 				}
 				++$i;
 			}
 
-			if ( $brace_count === 0 ) {
+			if ( 0 === $brace_count ) {
 				// Extract content (without outer braces)
 				$media_content = substr( $css, $content_start, $i - $content_start - 1 );
 
@@ -1766,62 +1782,6 @@ class EFS_CSS_Converter {
 
 			return true;
 
-		} elseif ( class_exists( 'Etch\RestApi\Routes\StylesRoutes' ) ) {
-			try {
-				$routes = new \Etch\RestApi\Routes\StylesRoutes();
-
-				// Create proper REST request with JSON body
-				$request = new \WP_REST_Request( 'POST', '/etch-api/styles' );
-				$request->set_header( 'Content-Type', 'application/json' );
-				$json_body = wp_json_encode( $merged_styles, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-				$request->set_body( $json_body );
-
-				// DEBUG: Check if JSON encoding breaks selectors
-				$decoded_test = json_decode( $json_body, true );
-				$test_keys    = array_keys( $decoded_test );
-				if ( count( $test_keys ) > 3 ) {
-					error_log( 'B2E CSS JSON TEST: ' . $test_keys[3] . ' selector after json_encode/decode: ' . ( $decoded_test[ $test_keys[3] ]['selector'] ?? 'NULL' ) );
-				}
-
-				error_log( 'B2E: Calling Etch API with ' . count( $merged_styles ) . ' styles' );
-
-				// DEBUG: Log first 3 styles BEFORE API call
-				$style_keys = array_keys( $merged_styles );
-				for ( $i = 0; $i < min( 3, count( $style_keys ) ); $i++ ) {
-					$key   = $style_keys[ $i ];
-					$style = $merged_styles[ $key ];
-					error_log( 'B2E CSS BEFORE API: ' . $key . ' selector: ' . ( $style['selector'] ?? 'NULL' ) );
-				}
-
-				$response = $routes->update_styles( $request );
-
-				// DEBUG: Log first 3 styles AFTER API call (from DB)
-				$saved_styles = $this->style_repository->get_etch_styles();
-				for ( $i = 0; $i < min( 3, count( $style_keys ) ); $i++ ) {
-					$key         = $style_keys[ $i ];
-					$saved_style = $saved_styles[ $key ] ?? null;
-					if ( $saved_style ) {
-						error_log( 'B2E CSS AFTER API: ' . $key . ' selector: ' . ( $saved_style['selector'] ?? 'NULL' ) );
-					}
-				}
-
-				if ( is_wp_error( $response ) ) {
-					error_log( 'B2E: Etch API error: ' . $response->get_error_message() );
-					return new \WP_Error( 'api_failed', 'Etch API error: ' . $response->get_error_message() );
-				}
-
-				error_log( 'B2E: Etch API success - styles saved and processed' );
-
-				// Trigger Etch CSS rebuild
-				$this->trigger_etch_css_rebuild();
-
-				// API call successful - Etch handles everything internally
-				return true;
-
-			} catch ( Exception $e ) {
-				error_log( 'B2E: Etch API exception: ' . $e->getMessage() );
-				return new \WP_Error( 'api_exception', 'Exception calling Etch API: ' . $e->getMessage() );
-			}
 		} else {
 			// Fallback to direct DB access if Etch API not available
 			error_log( 'B2E: WARNING - Etch API not available, using fallback (styles may not render correctly)' );
@@ -1860,8 +1820,8 @@ class EFS_CSS_Converter {
 		error_log( 'B2E: Cleared Etch caches' );
 
 		// Method 3: Trigger WordPress actions that Etch might listen to
-		do_action( 'etch_styles_updated' );
-		do_action( 'etch_rebuild_css' );
+		do_action( 'etch_fusion_suite_styles_updated' );
+		do_action( 'etch_fusion_suite_rebuild_css' );
 		error_log( 'B2E: Triggered Etch action hooks' );
 
 		// Note: We don't call Etch's internal classes directly because:
@@ -1890,7 +1850,7 @@ class EFS_CSS_Converter {
 
 		foreach ( $etch_styles as $style_id => $style ) {
 			// Skip element styles (they're built-in)
-			if ( isset( $style['type'] ) && $style['type'] === 'element' ) {
+			if ( isset( $style['type'] ) && 'element' === $style['type'] ) {
 				continue;
 			}
 
@@ -1904,7 +1864,7 @@ class EFS_CSS_Converter {
 			}
 
 			// Wrap CSS with selector if not already wrapped
-			if ( ! empty( $stylesheet_name ) && strpos( $stylesheet_css, $stylesheet_name ) === false ) {
+			if ( ! empty( $stylesheet_name ) && false === strpos( $stylesheet_css, $stylesheet_name ) ) {
 				$wrapped_css = $stylesheet_name . ' { ' . $stylesheet_css . ' }';
 			} else {
 				$wrapped_css = $stylesheet_css;
@@ -1953,11 +1913,11 @@ class EFS_CSS_Converter {
 		$single_quotes = substr_count( $css, "'" );
 		$double_quotes = substr_count( $css, '"' );
 
-		if ( $single_quotes % 2 !== 0 ) {
+		if ( 0 !== $single_quotes % 2 ) {
 			$errors[] = 'Unclosed single quotes';
 		}
 
-		if ( $double_quotes % 2 !== 0 ) {
+		if ( 0 !== $double_quotes % 2 ) {
 			$errors[] = 'Unclosed double quotes';
 		}
 
@@ -2014,8 +1974,8 @@ class EFS_CSS_Converter {
 
 		// Find all .class-name { ... } blocks
 		if ( preg_match_all( $pattern, $custom_css, $matches, PREG_SET_ORDER ) ) {
-			foreach ( $matches as $match ) {
-				$content = trim( $match[1] );
+			foreach ( $matches as $clean_match ) {
+				$content = trim( $clean_match[1] );
 
 				// Check if content contains media queries or other nested rules
 				if ( preg_match( '/@media|@supports|@container/', $content ) ) {

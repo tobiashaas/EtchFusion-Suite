@@ -35,17 +35,23 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	public function clear_logs() {
-		// Check rate limit (10 requests per minute - sensitive operation)
-		if ( ! $this->check_rate_limit( 'clear_logs', 10, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( ! $this->verify_request() ) {
+		// Check rate limit (10 requests per minute - sensitive operation)
+		if ( ! $this->check_rate_limit( 'logs_clear', 10, 60 ) ) {
 			return;
 		}
 
 		if ( ! $this->audit_logger ) {
-			wp_send_json_error( __( 'Audit logger service unavailable.', 'etch-fusion-suite' ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Audit logger service unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
 			return;
 		}
 
@@ -54,7 +60,13 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$result = $this->audit_logger->clear_security_logs();
 
 		if ( ! $result ) {
-			wp_send_json_error( __( 'Failed to clear audit logs.', 'etch-fusion-suite' ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Failed to clear audit logs.', 'etch-fusion-suite' ),
+					'code'    => 'clear_failed',
+				),
+				500
+			);
 			return;
 		}
 
@@ -66,17 +78,23 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	public function get_logs() {
-		// Check rate limit (60 requests per minute)
-		if ( ! $this->check_rate_limit( 'get_logs', 60, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( ! $this->verify_request() ) {
+		// Check rate limit (60 requests per minute)
+		if ( ! $this->check_rate_limit( 'logs_fetch', 60, 60 ) ) {
 			return;
 		}
 
 		if ( ! $this->audit_logger ) {
-			wp_send_json_error( __( 'Audit logger service unavailable.', 'etch-fusion-suite' ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Audit logger service unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
 			return;
 		}
 

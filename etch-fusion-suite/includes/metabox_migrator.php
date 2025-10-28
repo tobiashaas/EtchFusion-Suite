@@ -130,7 +130,7 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 
 		foreach ( $meta_data as $meta_key => $meta_values ) {
 			// Skip WordPress core meta
-			if ( in_array( $meta_key, array( '_edit_lock', '_edit_last' ) ) ) {
+			if ( in_array( $meta_key, array( '_edit_lock', '_edit_last' ), true ) ) {
 				continue;
 			}
 
@@ -271,8 +271,11 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 			return true; // No configurations to migrate
 		}
 
-		$api_client = $this->api_client ?: new EFS_API_Client( $this->error_handler );
-		$result     = $api_client->send_metabox_configs( $target_url, $api_key, $configs );
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+		$result = $api_client->send_metabox_configs( $target_url, $api_key, $configs );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -309,7 +312,7 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 			$meta_data = get_post_meta( $config->ID );
 
 			foreach ( $meta_data as $meta_key => $meta_values ) {
-				if ( strpos( $meta_key, '_field_' ) === 0 ) {
+				if ( 0 === strpos( $meta_key, '_field_' ) ) {
 					++$total_fields;
 
 					$field_data = maybe_unserialize( $meta_values[0] );

@@ -1,0 +1,273 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=e4] [cursor=pointer]:
+      - /url: "#wp-toolbar"
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: index.php
+          - generic [ref=e10]: 
+          - generic [ref=e11]: Dashboard
+        - list [ref=e12]:
+          - listitem [ref=e13]:
+            - link "Home" [ref=e14] [cursor=pointer]:
+              - /url: index.php
+          - listitem [ref=e15]:
+            - link "Updates" [ref=e16] [cursor=pointer]:
+              - /url: update-core.php
+      - listitem [ref=e17]
+      - listitem [ref=e19]:
+        - link "Posts" [ref=e20] [cursor=pointer]:
+          - /url: edit.php
+          - generic [ref=e21]: 
+          - generic [ref=e22]: Posts
+        - list [ref=e23]:
+          - listitem [ref=e24]:
+            - link "All Posts" [ref=e25] [cursor=pointer]:
+              - /url: edit.php
+          - listitem [ref=e26]:
+            - link "Add Post" [ref=e27] [cursor=pointer]:
+              - /url: post-new.php
+          - listitem [ref=e28]:
+            - link "Categories" [ref=e29] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=category
+          - listitem [ref=e30]:
+            - link "Tags" [ref=e31] [cursor=pointer]:
+              - /url: edit-tags.php?taxonomy=post_tag
+      - listitem [ref=e32]:
+        - link "Media" [ref=e33] [cursor=pointer]:
+          - /url: upload.php
+          - generic [ref=e34]: 
+          - generic [ref=e35]: Media
+        - list [ref=e36]:
+          - listitem [ref=e37]:
+            - link "Library" [ref=e38] [cursor=pointer]:
+              - /url: upload.php
+          - listitem [ref=e39]:
+            - link "Add Media File" [ref=e40] [cursor=pointer]:
+              - /url: media-new.php
+      - listitem [ref=e41]:
+        - link "Pages" [ref=e42] [cursor=pointer]:
+          - /url: edit.php?post_type=page
+          - generic [ref=e43]: 
+          - generic [ref=e44]: Pages
+        - list [ref=e45]:
+          - listitem [ref=e46]:
+            - link "All Pages" [ref=e47] [cursor=pointer]:
+              - /url: edit.php?post_type=page
+          - listitem [ref=e48]:
+            - link "Add Page" [ref=e49] [cursor=pointer]:
+              - /url: post-new.php?post_type=page
+      - listitem [ref=e50]:
+        - link "Comments" [ref=e51] [cursor=pointer]:
+          - /url: edit-comments.php
+          - generic [ref=e52]: 
+          - generic [ref=e53]: Comments
+      - listitem [ref=e54]:
+        - link "Etch Fusion" [ref=e55] [cursor=pointer]:
+          - /url: admin.php?page=etch-fusion-suite
+          - generic [ref=e56]: 
+          - generic [ref=e57]: Etch Fusion
+      - listitem [ref=e58]
+      - listitem [ref=e60]:
+        - link "Appearance" [ref=e61] [cursor=pointer]:
+          - /url: themes.php
+          - generic [ref=e62]: 
+          - generic [ref=e63]: Appearance
+        - list [ref=e64]:
+          - listitem [ref=e65]:
+            - link "Themes" [ref=e66] [cursor=pointer]:
+              - /url: themes.php
+          - listitem [ref=e67]:
+            - link "Editor" [ref=e68] [cursor=pointer]:
+              - /url: site-editor.php
+      - listitem [ref=e69]:
+        - link "Plugins" [ref=e70] [cursor=pointer]:
+          - /url: plugins.php
+          - generic [ref=e71]: 
+          - generic [ref=e72]: Plugins
+        - list [ref=e73]:
+          - listitem [ref=e74]:
+            - link "Installed Plugins" [ref=e75] [cursor=pointer]:
+              - /url: plugins.php
+          - listitem [ref=e76]:
+            - link "Add Plugin" [ref=e77] [cursor=pointer]:
+              - /url: plugin-install.php
+      - listitem [ref=e78]:
+        - link "Users" [ref=e79] [cursor=pointer]:
+          - /url: users.php
+          - generic [ref=e80]: 
+          - generic [ref=e81]: Users
+        - list [ref=e82]:
+          - listitem [ref=e83]:
+            - link "All Users" [ref=e84] [cursor=pointer]:
+              - /url: users.php
+          - listitem [ref=e85]:
+            - link "Add User" [ref=e86] [cursor=pointer]:
+              - /url: user-new.php
+          - listitem [ref=e87]:
+            - link "Profile" [ref=e88] [cursor=pointer]:
+              - /url: profile.php
+      - listitem [ref=e89]:
+        - link "Tools" [ref=e90] [cursor=pointer]:
+          - /url: tools.php
+          - generic [ref=e91]: 
+          - generic [ref=e92]: Tools
+        - list [ref=e93]:
+          - listitem [ref=e94]:
+            - link "Available Tools" [ref=e95] [cursor=pointer]:
+              - /url: tools.php
+          - listitem [ref=e96]:
+            - link "Import" [ref=e97] [cursor=pointer]:
+              - /url: import.php
+          - listitem [ref=e98]:
+            - link "Export" [ref=e99] [cursor=pointer]:
+              - /url: export.php
+          - listitem [ref=e100]:
+            - link "Site Health" [ref=e101] [cursor=pointer]:
+              - /url: site-health.php
+          - listitem [ref=e102]:
+            - link "Export Personal Data" [ref=e103] [cursor=pointer]:
+              - /url: export-personal-data.php
+          - listitem [ref=e104]:
+            - link "Erase Personal Data" [ref=e105] [cursor=pointer]:
+              - /url: erase-personal-data.php
+          - listitem [ref=e106]:
+            - link "Theme File Editor" [ref=e107] [cursor=pointer]:
+              - /url: theme-editor.php
+          - listitem [ref=e108]:
+            - link "Plugin File Editor" [ref=e109] [cursor=pointer]:
+              - /url: plugin-editor.php
+      - listitem [ref=e110]:
+        - link "Settings" [ref=e111] [cursor=pointer]:
+          - /url: options-general.php
+          - generic [ref=e112]: 
+          - generic [ref=e113]: Settings
+        - list [ref=e114]:
+          - listitem [ref=e115]:
+            - link "General" [ref=e116] [cursor=pointer]:
+              - /url: options-general.php
+          - listitem [ref=e117]:
+            - link "Writing" [ref=e118] [cursor=pointer]:
+              - /url: options-writing.php
+          - listitem [ref=e119]:
+            - link "Reading" [ref=e120] [cursor=pointer]:
+              - /url: options-reading.php
+          - listitem [ref=e121]:
+            - link "Discussion" [ref=e122] [cursor=pointer]:
+              - /url: options-discussion.php
+          - listitem [ref=e123]:
+            - link "Media" [ref=e124] [cursor=pointer]:
+              - /url: options-media.php
+          - listitem [ref=e125]:
+            - link "Permalinks" [ref=e126] [cursor=pointer]:
+              - /url: options-permalink.php
+          - listitem [ref=e127]:
+            - link "Privacy" [ref=e128] [cursor=pointer]:
+              - /url: options-privacy.php
+      - listitem [ref=e129]:
+        - link "Automatic CSS" [ref=e130] [cursor=pointer]:
+          - /url: admin.php?page=automatic-css
+          - generic [ref=e132]: Automatic CSS
+      - listitem [ref=e133]
+      - listitem [ref=e135]:
+        - link "Etch" [ref=e136] [cursor=pointer]:
+          - /url: admin.php?page=etch
+          - generic [ref=e138]: Etch
+      - listitem [ref=e139]:
+        - button "Collapse Main menu" [expanded] [ref=e140] [cursor=pointer]:
+          - generic [ref=e141]: 
+          - generic [ref=e142]: Collapse Menu
+  - generic [ref=e143]:
+    - generic [ref=e144]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=e145]:
+            - menuitem "About WordPress" [ref=e146] [cursor=pointer]:
+              - generic [ref=e147]: 
+              - generic [ref=e148]: About WordPress
+          - group [ref=e149]:
+            - menuitem " Etch Etch Etch" [ref=e150] [cursor=pointer]
+          - group [ref=e151]:
+            - menuitem "0 Comments in moderation" [ref=e152] [cursor=pointer]:
+              - generic [ref=e153]: 
+              - generic [ref=e154]: "0"
+              - generic [ref=e155]: 0 Comments in moderation
+          - group [ref=e156]:
+            - menuitem "New" [ref=e157] [cursor=pointer]:
+              - generic [ref=e158]: 
+              - generic [ref=e159]: New
+          - group [ref=e160]:
+            - menuitem "Automatic.css" [ref=e161] [cursor=pointer]
+        - menu [ref=e162]:
+          - group [ref=e163]:
+            - menuitem "Howdy, admin" [ref=e164] [cursor=pointer]
+    - main [ref=e165]:
+      - generic [ref=e167]:
+        - heading "Etch Fusion Suite" [level=1] [ref=e168]
+        - generic [ref=e169]:
+          - heading "HTTPS Recommended" [level=3] [ref=e170]
+          - paragraph [ref=e171]: Application Passwords work best over HTTPS. For production environments, ensure HTTPS is enabled.
+        - generic [ref=e172]:
+          - heading "Environment Summary" [level=2] [ref=e173]
+          - list [ref=e174]:
+            - listitem [ref=e175]: Bricks Builder Not detected
+            - listitem [ref=e176]: Etch PageBuilder Detected
+            - listitem [ref=e177]: Site URL http://localhost:8889
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - heading "Etch Target Site Setup" [level=2] [ref=e181]
+            - paragraph [ref=e182]: Prepare this site to receive content from your Bricks source site.
+          - generic [ref=e183]:
+            - heading "Create an Application Password" [level=3] [ref=e184]
+            - list [ref=e185]:
+              - listitem [ref=e186]: Navigate to Users → Profile in this WordPress dashboard.
+              - listitem [ref=e187]: Scroll to Application Passwords and add a new password.
+              - listitem [ref=e188]: Name the password “Etch Fusion Suite” for easy identification.
+              - listitem [ref=e189]: Copy the generated password and use it on your Bricks site.
+            - paragraph [ref=e190]:
+              - link "Open Application Passwords" [ref=e191] [cursor=pointer]:
+                - /url: http://localhost:8889/wp-admin/profile.php#application-passwords-section
+          - generic [ref=e192]:
+            - heading "Share This Site URL" [level=3] [ref=e193]
+            - paragraph [ref=e194]: Provide this URL to the Bricks site during migration setup.
+            - generic [ref=e195]:
+              - text: Site URL
+              - textbox "Site URL" [ref=e196]: http://localhost:8889
+            - button "Copy URL" [ref=e198] [cursor=pointer]
+          - generic [ref=e199]:
+            - heading "Generate Migration Key" [level=3] [ref=e200]
+            - paragraph [ref=e201]: Generate a migration key to share with the Bricks source site.
+            - button "Generate Key" [ref=e203] [cursor=pointer]
+            - generic [ref=e204]:
+              - text: Latest Generated Key
+              - textbox "Latest Generated Key" [ref=e205]
+            - button "Copy Key" [ref=e207] [cursor=pointer]
+        - generic [ref=e208]:
+          - tablist [ref=e209]:
+            - tab "Migration Progress" [selected] [ref=e210] [cursor=pointer]
+            - tab "Recent Logs" [ref=e211] [cursor=pointer]
+            - tab "Template Extractor" [active] [ref=e212] [cursor=pointer]
+          - tabpanel [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - heading "Migration Progress" [level=2] [ref=e217]
+                - paragraph [ref=e218]: idle
+              - progressbar [ref=e219]
+              - list
+              - button "Cancel Migration" [ref=e221] [cursor=pointer]
+  - contentinfo [ref=e222]:
+    - paragraph [ref=e223]:
+      - generic [ref=e224]:
+        - text: Thank you for creating with
+        - link "WordPress" [ref=e225] [cursor=pointer]:
+          - /url: https://wordpress.org/
+        - text: .
+    - paragraph [ref=e226]: Version 6.8.3
+  - text: 
+```

@@ -1,4 +1,4 @@
-import { post, serializeForm, getInitialData } from './api.js';
+import { post, serializeForm, getInitialData, buildAjaxErrorMessage } from './api.js';
 import { showToast, setLoading } from './ui.js';
 
 const ACTION_SAVE_SETTINGS = 'efs_save_settings';
@@ -30,7 +30,7 @@ const handleSaveSettings = async (event) => {
         showToast(data?.message || 'Settings saved.', 'success');
     } catch (error) {
         console.error('Save settings failed', error);
-        showToast(error.message, 'error');
+        showToast(buildAjaxErrorMessage(error, 'Settings save failed.'), 'error');
     } finally {
         setLoading(submitButton, false);
     }
@@ -53,7 +53,7 @@ const handleTestConnection = async (event) => {
         showToast(data?.message || 'Connection successful.', 'success');
     } catch (error) {
         console.error('Test connection failed', error);
-        showToast(error.message, 'error');
+        showToast(buildAjaxErrorMessage(error, 'Connection test failed.'), 'error');
     } finally {
         setLoading(button, false);
     }
@@ -74,7 +74,7 @@ const handleGenerateKey = async (event) => {
         showToast(data?.message || 'Migration key generated.', 'success');
     } catch (error) {
         console.error('Generate key failed', error);
-        showToast(error.message, 'error');
+        showToast(buildAjaxErrorMessage(error, 'Migration key generation failed.'), 'error');
     } finally {
         setLoading(button, false);
     }

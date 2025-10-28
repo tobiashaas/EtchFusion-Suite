@@ -41,6 +41,10 @@
     "scripts": {
         "lint": "phpcs",
         "lint:fix": "phpcbf",
+        "phpcs": "vendor/bin/phpcs --standard=phpcs.xml.dist",
+        "phpcbf": "vendor/bin/phpcbf --standard=phpcs.xml.dist",
+        "phpcs:report": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary",
+        "phpcs:full": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=full",
         "test": [
             "@php -r \"if (!is_dir('build/logs')) { mkdir('build/logs', 0777, true); }\"",
             "@php -r \"if (!is_dir('build/coverage/html')) { mkdir('build/coverage/html', 0777, true); }\"",

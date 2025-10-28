@@ -2,6 +2,9 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+$etch_fusion_suite_extractor_nonce = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
+$etch_fusion_suite_saved_templates = isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array();
 ?>
 <div class="wrap efs-typography efs-admin-wrap">
 	<h1><?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?></h1>
@@ -49,19 +52,38 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php endif; ?>
 		</div>
 
-		<section class="efs-dashboard-panels">
-			<?php require __DIR__ . '/migration-progress.php'; ?>
-			<?php require __DIR__ . '/logs.php'; ?>
-		</section>
+		<section class="efs-dashboard-tabs" data-efs-tabs>
+			<nav class="efs-tabs__nav" role="tablist">
+				<button class="efs-tab is-active" data-efs-tab="progress" role="tab" aria-selected="true" aria-controls="efs-tab-progress">
+					<?php esc_html_e( 'Migration Progress', 'etch-fusion-suite' ); ?>
+				</button>
+				<button class="efs-tab" data-efs-tab="logs" role="tab" aria-selected="false" aria-controls="efs-tab-logs">
+					<?php esc_html_e( 'Recent Logs', 'etch-fusion-suite' ); ?>
+				</button>
+				<?php if ( $is_etch_site ) : ?>
+					<button class="efs-tab" data-efs-tab="templates" role="tab" aria-selected="false" aria-controls="efs-tab-templates">
+						<?php esc_html_e( 'Template Extractor', 'etch-fusion-suite' ); ?>
+					</button>
+				<?php endif; ?>
+			</nav>
 
-		<?php if ( $is_etch_site ) : ?>
-			<section class="efs-dashboard-template-extractor">
-				<?php
-				$extractor_nonce   = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
-				$saved_templates    = isset( $saved_templates ) ? $saved_templates : array();
-				require __DIR__ . '/template-extractor.php';
-				?>
-			</section>
-		<?php endif; ?>
+			<div class="efs-tabs__panels">
+				<div id="efs-tab-progress" class="efs-tab__panel is-active" role="tabpanel">
+					<?php require __DIR__ . '/migration-progress.php'; ?>
+				</div>
+				<div id="efs-tab-logs" class="efs-tab__panel" role="tabpanel" hidden>
+					<?php require __DIR__ . '/logs.php'; ?>
+				</div>
+				<?php if ( $is_etch_site ) : ?>
+					<div id="efs-tab-templates" class="efs-tab__panel" role="tabpanel" hidden data-efs-tab-panel="templates">
+						<?php
+						$etch_fusion_suite_extractor_nonce = isset( $etch_fusion_suite_extractor_nonce ) ? $etch_fusion_suite_extractor_nonce : wp_create_nonce( 'efs_nonce' );
+						$etch_fusion_suite_saved_templates = isset( $etch_fusion_suite_saved_templates ) ? $etch_fusion_suite_saved_templates : array();
+						require __DIR__ . '/template-extractor.php';
+						?>
+					</div>
+				<?php endif; ?>
+			</div>
+		</section>
 	<?php endif; ?>
 </div>

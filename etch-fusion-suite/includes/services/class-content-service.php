@@ -134,6 +134,7 @@ class EFS_Content_Service {
 
 		$post = get_post( $post_id );
 		if ( ! $post ) {
+			/* translators: %d is the numeric post ID. */
 			return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
 		}
 

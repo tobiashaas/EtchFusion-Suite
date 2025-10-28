@@ -19,7 +19,7 @@ class AdminUITest extends WP_UnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->container = \efs_container();
+		$this->container = \etch_fusion_suite_container();
 
 		wp_set_current_user( $this->factory->user->create( array( 'role' => 'administrator' ) ) );
 	}
@@ -91,7 +91,7 @@ class AdminUITest extends WP_UnitTestCase {
 		$sources = $extractor->get_supported_sources();
 		$this->assertContains( 'framer_html', $sources, 'Extractor should expose supported sources.' );
 
-		$fixture = file_get_contents( EFS_PLUGIN_DIR . '/tests/fixtures/framer-sample.html' );
+		$fixture = file_get_contents( ETCH_FUSION_SUITE_DIR . '/tests/fixtures/framer-sample.html' );
 		$this->assertNotFalse( $fixture, 'Fixture must be readable.' );
 
 		$payload = $extractor->extract_from_html( $fixture );

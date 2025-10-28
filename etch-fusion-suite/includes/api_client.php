@@ -192,7 +192,7 @@ class EFS_API_Client {
 	/**
 	 * Send post
 	 */
-	public function send_post( $url, $api_key, $post, $etch_content ) {
+	public function send_post( $url, $api_key, $post, $etch_content = null ) {
 		$post_data = array(
 			'post'         => array(
 				'ID'          => $post->ID,
@@ -356,7 +356,7 @@ class EFS_API_Client {
 	 */
 	public function is_api_key_valid( $url, $api_key ) {
 		$result = $this->validate_connection( $url, $api_key );
-		return ! is_wp_error( $result ) && $result === true;
+		return ! is_wp_error( $result ) && true === $result;
 	}
 
 	/**

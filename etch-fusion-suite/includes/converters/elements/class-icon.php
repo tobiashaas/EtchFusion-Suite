@@ -52,9 +52,11 @@ class EFS_Icon_Converter extends EFS_Base_Element {
 		error_log( '⚠️ B2E Icon: Icon conversion not yet implemented - ' . $icon_library . ':' . $icon_value );
 
 		// Placeholder: Return empty paragraph
+		$icon_name = ! empty( $label ) ? $label : 'Icon (TODO)';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Icon (TODO)',
+				'name'     => $icon_name,
 				'etchData' => array(
 					'origin' => 'etch',
 					'block'  => array(

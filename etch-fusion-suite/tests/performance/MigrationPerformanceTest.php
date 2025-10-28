@@ -21,7 +21,7 @@ class MigrationPerformanceTest extends WP_UnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->container          = \efs_container();
+		$this->container          = \etch_fusion_suite_container();
 		$this->content_service     = $this->container->get( 'content_service' );
 		$this->template_extractor  = $this->container->get( 'template_extractor_service' );
 
@@ -78,7 +78,7 @@ class MigrationPerformanceTest extends WP_UnitTestCase {
 	}
 
 	public function test_template_extraction_stays_within_timing_budget(): void {
-		$fixture = file_get_contents( EFS_PLUGIN_DIR . '/tests/fixtures/framer-sample.html' );
+		$fixture = file_get_contents( ETCH_FUSION_SUITE_DIR . '/tests/fixtures/framer-sample.html' );
 		$this->assertNotFalse( $fixture, 'Fixture must be readable for performance test.' );
 
 		$startTime = microtime(true);

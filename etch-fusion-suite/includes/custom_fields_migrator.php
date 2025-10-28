@@ -79,8 +79,11 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 			return true; // No meta data to migrate
 		}
 
-		$api_client = $this->api_client ?: new EFS_API_Client( $this->error_handler );
-		$result     = $api_client->send_post_meta( $target_url, $api_key, $target_post_id, $meta_data );
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+		$result = $api_client->send_post_meta( $target_url, $api_key, $target_post_id, $meta_data );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -107,7 +110,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 
 		foreach ( $meta_data as $meta ) {
 			// Skip Bricks-specific meta keys
-			if ( strpos( $meta->meta_key, '_bricks_' ) === 0 ) {
+			if ( 0 === strpos( $meta->meta_key, '_bricks_' ) ) {
 				continue;
 			}
 
@@ -119,7 +122,8 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 					'_edit_last',
 					'_wp_old_slug',
 					'_wp_old_date',
-				)
+				),
+				true
 			) ) {
 				continue;
 			}
@@ -146,22 +150,17 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 		);
 
 		foreach ( $meta_data as $meta_key => $meta_value ) {
-			// ACF fields (field_key pattern)
-			if ( strpos( $meta_key, 'field_' ) === 0 ) {
-				$custom_fields['acf'][] = $meta_key;
+			$field_group = 'other';
+
+			if ( 0 === strpos( $meta_key, 'field_' ) ) {
+				$field_group = 'acf';
+			} elseif ( 0 === strpos( $meta_key, 'mb_' ) ) {
+				$field_group = 'metabox';
+			} elseif ( 0 === strpos( $meta_key, 'jet_' ) ) {
+				$field_group = 'jetengine';
 			}
-			// MetaBox fields (mb_ prefix)
-			elseif ( strpos( $meta_key, 'mb_' ) === 0 ) {
-				$custom_fields['metabox'][] = $meta_key;
-			}
-			// JetEngine fields (jet_ prefix)
-			elseif ( strpos( $meta_key, 'jet_' ) === 0 ) {
-				$custom_fields['jetengine'][] = $meta_key;
-			}
-			// Other custom fields
-			else {
-				$custom_fields['other'][] = $meta_key;
-			}
+
+			$custom_fields[ $field_group ][] = $meta_key;
 		}
 
 		return $custom_fields;
@@ -175,7 +174,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 			return array();
 		}
 
-		return acf_get_field_groups();
+		return \acf_get_field_groups();
 	}
 
 	/**
@@ -413,7 +412,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 
 		// Count ACF field groups
 		if ( function_exists( 'acf_get_field_groups' ) ) {
-			$acf_groups                = acf_get_field_groups();
+			$acf_groups                = \acf_get_field_groups();
 			$stats['acf_field_groups'] = count( $acf_groups );
 		}
 

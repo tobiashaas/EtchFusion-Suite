@@ -100,8 +100,16 @@ class EFS_API_Endpoints {
 		$params = self::validate_request_data(
 			$request->get_json_params(),
 			array(
-				'source'      => array( 'type' => 'text', 'required' => true, 'max_length' => 2048 ),
-				'source_type' => array( 'type' => 'text', 'required' => true, 'max_length' => 10 ),
+				'source'      => array(
+					'type'       => 'text',
+					'required'   => true,
+					'max_length' => 2048,
+				),
+				'source_type' => array(
+					'type'       => 'text',
+					'required'   => true,
+					'max_length' => 10,
+				),
 			)
 		);
 
@@ -220,8 +228,15 @@ class EFS_API_Endpoints {
 		$params = self::validate_request_data(
 			$request->get_json_params(),
 			array(
-				'payload' => array( 'type' => 'array', 'required' => true ),
-				'name'    => array( 'type' => 'text', 'required' => false, 'max_length' => 255 ),
+				'payload' => array(
+					'type'     => 'array',
+					'required' => true,
+				),
+				'name'    => array(
+					'type'       => 'text',
+					'required'   => false,
+					'max_length' => 255,
+				),
 			)
 		);
 
@@ -312,7 +327,10 @@ class EFS_API_Endpoints {
 			return true; // No CORS check if manager not available
 		}
 
-		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '';
+		$origin = '';
+		if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+			$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+		}
 
 		if ( ! self::$cors_manager->is_origin_allowed( $origin ) ) {
 			// Log CORS violation
@@ -363,7 +381,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $cors_check ) ) {
 			// Log the violation with route information
 			if ( self::$audit_logger ) {
-				$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '';
+				$origin = '';
+				if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+					$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+				}
 				self::$audit_logger->log_security_event(
 					'cors_violation',
 					'medium',
@@ -495,7 +516,7 @@ class EFS_API_Endpoints {
 					'token'         => $token_data['token'],
 					'domain'        => home_url(),
 					'expires'       => $token_data['expires'],
-					'expires_at'    => date( 'Y-m-d H:i:s', $token_data['expires'] ),
+					'expires_at'    => wp_date( 'Y-m-d H:i:s', $token_data['expires'] ),
 					'valid_for'     => '24 hours',
 					'generated_at'  => current_time( 'mysql' ),
 				),
@@ -573,4 +594,3 @@ class EFS_API_Endpoints {
 		}
 	}
 }
-

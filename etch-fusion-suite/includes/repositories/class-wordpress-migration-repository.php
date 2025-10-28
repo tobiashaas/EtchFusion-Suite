@@ -45,9 +45,17 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			return $cached;
 		}
 
-		$progress = get_option( self::OPTION_PROGRESS, array() );
-		if ( is_array( $progress ) ) {
-			$progress['migrationId'] = get_option( self::OPTION_CURRENT_ID, '' );
+		$progress   = get_option( self::OPTION_PROGRESS, array() );
+		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
+
+		if ( ! is_array( $progress ) || empty( $progress ) ) {
+			if ( '' === $current_id ) {
+				$progress = array();
+			} else {
+				$progress = array( 'migrationId' => $current_id );
+			}
+		} else {
+			$progress['migrationId'] = $current_id;
 		}
 		set_transient( $cache_key, $progress, self::CACHE_EXPIRATION_SHORT );
 

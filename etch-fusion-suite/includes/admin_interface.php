@@ -37,14 +37,8 @@ class EFS_Admin_Interface {
 
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 
-		add_action( 'wp_ajax_efs_start_migration', array( $this, 'start_migration' ) );
-		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
-		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
-		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
-		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
-		add_action( 'wp_ajax_efs_save_settings', array( $this, 'save_settings' ) );
-		add_action( 'wp_ajax_efs_test_connection', array( $this, 'test_connection' ) );
-		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
+		add_action( 'wp_ajax_efs_save_settings', array( $this, 'delegate_settings_request' ) );
+		add_action( 'wp_ajax_efs_test_connection', array( $this, 'delegate_validation_request' ) );
 	}
 
 	public function add_admin_menu() {
@@ -68,122 +62,140 @@ class EFS_Admin_Interface {
 			return;
 		}
 
-		wp_enqueue_style(
-			'efs-admin-css',
-			EFS_PLUGIN_URL . 'assets/css/admin.css',
-			array(),
-			EFS_PLUGIN_VERSION
+		// Enqueue admin CSS
+		$css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin.css';
+		if ( file_exists( $css_path ) ) {
+			wp_enqueue_style(
+				'efs-admin-css',
+				ETCH_FUSION_SUITE_URL . 'assets/css/admin.css',
+				array(),
+				ETCH_FUSION_SUITE_VERSION
+			);
+		}
+
+		// Enqueue admin JavaScript (ES6 module)
+		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
+		if ( file_exists( $js_path ) ) {
+			wp_enqueue_script(
+				'efs-admin-main',
+				ETCH_FUSION_SUITE_URL . 'assets/js/admin/main.js',
+				array(),
+				ETCH_FUSION_SUITE_VERSION,
+				true
+			);
+
+			wp_script_add_data( 'efs-admin-main', 'type', 'module' );
+
+			// Localize script data
+			$context            = $this->dashboard_controller->get_dashboard_context();
+			$context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
+			$context['nonce']   = wp_create_nonce( 'efs_nonce' );
+
+			wp_localize_script( 'efs-admin-main', 'efsData', $context );
+		} else {
+			// Log missing asset for debugging
+			error_log( sprintf( '[EFS] Admin script not found: %s', $js_path ) );
+		}
+	}
+
+	public function delegate_settings_request() {
+		$this->get_request_payload();
+		$handler = $this->resolve_ajax_handler( 'validation_ajax' );
+		if ( $handler ) {
+			$handler->validate_api_key();
+			return;
+		}
+
+		wp_send_json_error(
+			array(
+				'message' => __( 'Settings handler unavailable.', 'etch-fusion-suite' ),
+				'code'    => 'handler_unavailable',
+			),
+			503
 		);
+	}
 
-		wp_enqueue_script(
-			'efs-admin-main',
-			EFS_PLUGIN_URL . 'assets/js/admin/main.js',
-			array(),
-			EFS_PLUGIN_VERSION,
-			true
+	public function delegate_validation_request() {
+		$this->get_request_payload();
+		$handler = $this->resolve_ajax_handler( 'validation_ajax' );
+		if ( $handler ) {
+			$handler->validate_api_key();
+			return;
+		}
+
+		wp_send_json_error(
+			array(
+				'message' => __( 'Validation handler unavailable.', 'etch-fusion-suite' ),
+				'code'    => 'handler_unavailable',
+			),
+			503
 		);
-
-		wp_script_add_data( 'efs-admin-main', 'type', 'module' );
-
-		$context            = $this->dashboard_controller->get_dashboard_context();
-		$context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
-		$context['nonce']   = wp_create_nonce( 'efs_nonce' );
-
-		wp_localize_script( 'efs-admin-main', 'efsData', $context );
 	}
 
-	public function start_migration() {
-		if ( ! $this->verify_request() ) {
-			return;
+	/**
+	 * Retrieve sanitized POST payload.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function get_request_payload() {
+		$nonce_valid = check_ajax_referer( 'efs_nonce', 'nonce', false );
+
+		if ( false === $nonce_valid ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Security check failed. Please refresh and try again.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_nonce',
+				),
+				403
+			);
+		}
+		if ( empty( $_POST ) || ! is_array( $_POST ) ) {
+			return array();
 		}
 
-		$result = $this->migration_controller->start_migration( $_POST );
-		$this->send_response( $result );
+		$payload = $this->sanitize_payload_recursively( wp_unslash( $_POST ) );
+
+		if ( isset( $payload['nonce'] ) ) {
+			unset( $payload['nonce'] );
+		}
+
+		return $payload;
 	}
 
-	public function get_progress() {
-		if ( ! $this->verify_request() ) {
-			return;
+	/**
+	 * Recursively sanitize payload values.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return mixed
+	 */
+	private function sanitize_payload_recursively( $value ) {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $key => $item ) {
+				$value[ $key ] = $this->sanitize_payload_recursively( $item );
+			}
+
+			return $value;
 		}
 
-		$result = $this->migration_controller->get_progress( $_POST );
-		$this->send_response( $result );
+		if ( is_scalar( $value ) ) {
+			return sanitize_text_field( (string) $value );
+		}
+
+		return $value;
 	}
 
-	public function process_batch() {
-		if ( ! $this->verify_request() ) {
-			return;
+	private function resolve_ajax_handler( $service_id ) {
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			try {
+				$container = etch_fusion_suite_container();
+				if ( $container->has( $service_id ) ) {
+					return $container->get( $service_id );
+				}
+			} catch ( \Exception $exception ) {
+				error_log( sprintf( '[EFS] Failed to resolve AJAX handler "%s": %s', $service_id, $exception->getMessage() ) );
+			}
 		}
 
-		$result = $this->migration_controller->process_batch( $_POST );
-		$this->send_response( $result );
-	}
-
-	public function cancel_migration() {
-		if ( ! $this->verify_request() ) {
-			return;
-		}
-
-		$result = $this->migration_controller->cancel_migration( $_POST );
-		$this->send_response( $result );
-	}
-
-	public function generate_report() {
-		if ( ! $this->verify_request() ) {
-			return;
-		}
-
-		$result = $this->migration_controller->generate_report();
-		$this->send_response( $result );
-	}
-
-	public function save_settings() {
-		if ( ! $this->verify_request() ) {
-			return;
-		}
-
-		$result = $this->settings_controller->save_settings( $_POST );
-		$this->send_response( $result );
-	}
-
-	public function test_connection() {
-		if ( ! $this->verify_request() ) {
-			return;
-		}
-
-		$result = $this->settings_controller->test_connection( $_POST );
-		$this->send_response( $result );
-	}
-
-	public function generate_migration_key() {
-		if ( ! $this->verify_request() ) {
-			return;
-		}
-
-		$result = $this->settings_controller->generate_migration_key( $_POST );
-		$this->send_response( $result );
-	}
-
-	private function verify_request() {
-		if ( ! check_ajax_referer( 'efs_nonce', 'nonce', false ) ) {
-			wp_send_json_error( __( 'Invalid request.', 'etch-fusion-suite' ) );
-			return false;
-		}
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Insufficient permissions.', 'etch-fusion-suite' ) );
-			return false;
-		}
-
-		return true;
-	}
-
-	private function send_response( $result ) {
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( $result->get_error_message() );
-			return;
-		}
-
-		wp_send_json_success( $result );
+		return null;
 	}
 }

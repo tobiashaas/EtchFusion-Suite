@@ -60,7 +60,7 @@ class EFS_Migrator_Registry {
 		}
 
 		if ( isset( $this->migrators[ $type ] ) ) {
-			throw new RuntimeException( sprintf( 'Migrator type "%s" is already registered.', $type ) );
+			throw new RuntimeException( sprintf( 'Migrator type "%s" is already registered.', \esc_html( (string) $type ) ) );
 		}
 
 		$this->migrators[ $type ] = $migrator;

@@ -35,12 +35,12 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	public function cleanup_etch() {
-		// Check rate limit (5 requests per minute - very sensitive operation)
-		if ( ! $this->check_rate_limit( 'cleanup_etch', 5, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( ! $this->verify_request() ) {
+		// Check rate limit (5 requests per minute - very sensitive operation)
+		if ( ! $this->check_rate_limit( 'cleanup_execute', 5, 60 ) ) {
 			return;
 		}
 
@@ -74,14 +74,34 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$target_url = $validated['target_url'];
 		$api_key    = $validated['api_key'];
 		$confirm    = $validated['confirm'] ?? false;
+		$confirmed  = is_string( $confirm ) ? filter_var( $confirm, FILTER_VALIDATE_BOOLEAN ) : (bool) $confirm;
 
 		// Require confirmation for destructive operation
-		if ( $confirm !== 'true' && $confirm !== true ) {
-			wp_send_json_error( __( 'Cleanup requires confirmation. Please confirm this destructive operation.', 'etch-fusion-suite' ) );
+		if ( ! $confirmed ) {
+			$this->log_security_event( 'cleanup_denied', 'Cleanup operation rejected due to missing confirmation.', array( 'target_url' => $target_url ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Cleanup requires confirmation. Please confirm this destructive operation.', 'etch-fusion-suite' ),
+					'code'    => 'cleanup_confirmation_required',
+				),
+				400
+			);
 			return;
 		}
 
-		$client   = new EFS_API_Client();
+		$client = $this->api_client;
+		if ( ! $client || ! $client instanceof EFS_API_Client ) {
+			$this->log_security_event( 'cleanup_unavailable', 'Cleanup operation aborted: API client unavailable.', array( 'target_url' => $target_url ), 'high' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Cleanup service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
 		$commands = array(
 			'wp post delete $(wp post list --post_type=post,page,attachment --format=ids) --force',
 			'wp option delete etch_styles',

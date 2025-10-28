@@ -38,9 +38,9 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	public function __construct( $media_service = null, $rate_limiter = null, $input_validator = null, $audit_logger = null ) {
 		if ( $media_service ) {
 			$this->media_service = $media_service;
-		} elseif ( function_exists( 'efs_container' ) ) {
+		} elseif ( function_exists( 'etch_fusion_suite_container' ) ) {
 			try {
-				$this->media_service = efs_container()->get( 'media_service' );
+				$this->media_service = etch_fusion_suite_container()->get( 'media_service' );
 			} catch ( \Exception $exception ) {
 				$this->media_service = null;
 			}
@@ -60,17 +60,13 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * AJAX handler to migrate media files
 	 */
 	public function migrate_media() {
-		$this->log( '🎬 Media Migration: AJAX handler called' );
-
-		// Check rate limit (30 requests per minute)
-		if ( ! $this->check_rate_limit( 'migrate_media', 30, 60 ) ) {
+		// Verify request (nonce + capability)
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		// Verify nonce
-		if ( ! $this->verify_nonce() ) {
-			$this->log( '❌ Media Migration: Invalid nonce' );
-			wp_send_json_error( __( 'Invalid request.', 'etch-fusion-suite' ) );
+		// Check rate limit (30 requests per minute)
+		if ( ! $this->check_rate_limit( 'media_migrate', 30, 60 ) ) {
 			return;
 		}
 
@@ -100,8 +96,6 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$target_url = $validated['target_url'];
 		$api_key    = $validated['api_key'];
 
-		$this->log( '🎬 Media Migration: target_url=' . $target_url . ', api_key=' . substr( $api_key, 0, 20 ) . '...' );
-
 		// Convert to internal URL
 		$internal_url = $this->convert_to_internal_url( $target_url );
 
@@ -118,15 +112,43 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		// Migrate media
 		try {
 			if ( ! $this->media_service || ! $this->media_service instanceof EFS_Media_Service ) {
-				wp_send_json_error( __( 'Media service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ) );
+				$this->log_security_event( 'ajax_action', 'Media migration aborted: media service unavailable.' );
+				wp_send_json_error(
+					array(
+						'message' => __( 'Media service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+						'code'    => 'service_unavailable',
+					),
+					503
+				);
 				return;
 			}
 
 			$result = $this->media_service->migrate_media( $internal_url, $api_key );
 
 			if ( is_wp_error( $result ) ) {
-				$this->log_security_event( 'ajax_action', 'Media migration failed: ' . $result->get_error_message() );
-				wp_send_json_error( $result->get_error_message() );
+				$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'media_migration_failed';
+				$status     = 400;
+				$error_data = $result->get_error_data();
+				if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+					$status = (int) $error_data['status'];
+				}
+
+				$this->log_security_event(
+					'ajax_action',
+					'Media migration failed: ' . $result->get_error_message(),
+					array(
+						'code'    => $error_code,
+						'post_id' => $result->get_error_data()['post_id'] ?? null,
+					)
+				);
+
+				wp_send_json_error(
+					array(
+						'message' => $result->get_error_message(),
+						'code'    => $error_code,
+					),
+					$status
+				);
 				return;
 			}
 
@@ -134,7 +156,7 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 			$this->log_security_event(
 				'ajax_action',
-				'Media migrated successfully',
+				'ਕਾਰ Media migrated successfully',
 				array(
 					'migrated' => $summary['migrated_media'] ?? 0,
 					'failed'   => $summary['failed_media'] ?? 0,
@@ -149,9 +171,14 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			$this->log( '❌ Media Migration: Exception: ' . $e->getMessage() );
-			$this->log_security_event( 'ajax_action', 'Media migration exception: ' . $e->getMessage() );
-			wp_send_json_error( 'Exception: ' . $e->getMessage() );
+			$this->log_security_event( 'ajax_action', 'Media migration exception: ' . $e->getMessage(), array(), 'high' );
+			wp_send_json_error(
+				array(
+					'message' => sprintf( 'Exception: %s', $e->getMessage() ),
+					'code'    => 'media_migration_exception',
+				),
+				500
+			);
 		}
 	}
 

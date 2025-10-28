@@ -105,22 +105,27 @@ class EFS_CORS_Manager {
 	 * @return void
 	 */
 	public function add_cors_headers() {
-		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? $_SERVER['HTTP_ORIGIN'] : '';
+		$origin = '';
+
+		if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+			$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+		}
 
 		// Check if origin is allowed
 		if ( ! $this->is_origin_allowed( $origin ) ) {
 			// Log CORS violation if audit logger is available
-			if ( function_exists( 'efs_container' ) ) {
+			if ( function_exists( 'etch_fusion_suite_container' ) ) {
 				try {
-					$container = efs_container();
+					$container = etch_fusion_suite_container();
 					if ( $container->has( 'audit_logger' ) ) {
-						$audit_logger = $container->get( 'audit_logger' );
-						$audit_logger->log_security_event(
-							'cors_violation',
-							'medium',
-							'CORS request from unauthorized origin',
-							array( 'origin' => $origin )
-						);
+						$container
+							->get( 'audit_logger' )
+							->log_security_event(
+								'cors_violation',
+								'medium',
+								'CORS request from unauthorized origin',
+								array( 'origin' => $origin )
+							);
 					}
 				} catch ( \Exception $e ) {
 					// Silently fail if container not available
@@ -131,12 +136,20 @@ class EFS_CORS_Manager {
 			return;
 		}
 
+		$methods = implode( ', ', $this->get_allowed_methods() );
+		$headers = implode( ', ', $this->get_allowed_headers() );
+
 		// Set CORS headers for allowed origin
 		header( 'Access-Control-Allow-Origin: ' . $origin );
-		header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
-		header( 'Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key' );
+		header( 'Access-Control-Allow-Methods: ' . $methods );
+		header( 'Access-Control-Allow-Headers: ' . $headers );
 		header( 'Access-Control-Allow-Credentials: true' );
 		header( 'Vary: Origin' );
+
+		$max_age = $this->get_max_age();
+		if ( $max_age > 0 ) {
+			header( 'Access-Control-Max-Age: ' . absint( $max_age ) );
+		}
 	}
 
 	/**
@@ -147,9 +160,85 @@ class EFS_CORS_Manager {
 	 * @return void
 	 */
 	public function handle_preflight_request() {
-		if ( $_SERVER['REQUEST_METHOD'] === 'OPTIONS' ) {
+		$method = '';
+		if ( isset( $_SERVER['REQUEST_METHOD'] ) ) {
+			$method = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) );
+		}
+
+		if ( 'OPTIONS' === $method ) {
 			$this->add_cors_headers();
+			if ( ! headers_sent() ) {
+				status_header( 204 );
+				header( 'Content-Length: 0' );
+			}
 			exit;
 		}
+	}
+
+	/**
+	 * Retrieve allowed HTTP methods for CORS.
+	 *
+	 * @return array
+	 */
+	protected function get_allowed_methods() {
+		/**
+		 * Filter the allowed HTTP methods for CORS responses.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $methods Allowed HTTP methods.
+		 */
+		$methods = apply_filters( 'etch_fusion_suite_cors_allowed_methods', array( 'GET', 'POST', 'OPTIONS' ) );
+
+		return $this->normalise_header_values( $methods );
+	}
+
+	/**
+	 * Retrieve allowed request headers for CORS.
+	 *
+	 * @return array
+	 */
+	protected function get_allowed_headers() {
+		/**
+		 * Filter the allowed request headers for CORS responses.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param array $headers Allowed request headers.
+		 */
+		$headers = apply_filters( 'efs_cors_allowed_headers', array( 'Content-Type', 'Authorization', 'X-WP-Nonce' ) );
+
+		return $this->normalise_header_values( $headers );
+	}
+
+	/**
+	 * Retrieve the Access-Control-Max-Age value.
+	 *
+	 * @return int Max age in seconds.
+	 */
+	protected function get_max_age() {
+		/**
+		 * Filter the CORS max-age value in seconds.
+		 *
+		 * @since 0.5.2
+		 *
+		 * @param int $max_age Access-Control-Max-Age value.
+		 */
+		$max_age = apply_filters( 'etch_fusion_suite_cors_max_age', 600 );
+
+		return max( 0, (int) $max_age );
+	}
+
+	/**
+\t * Normalise header values by trimming whitespace and removing empties.
+	 *
+	 * @param array $values Raw header values.
+	 * @return array
+	 */
+	protected function normalise_header_values( array $values ) {
+		$values = array_map( 'trim', $values );
+		$values = array_filter( $values, 'strlen' );
+
+		return array_values( $values );
 	}
 }

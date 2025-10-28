@@ -62,11 +62,16 @@ class EFS_Media_Migrator {
 		$batch_size = 5; // Process 5 media files at a time
 		$batches    = array_chunk( $media_files, $batch_size );
 
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+
 		foreach ( $batches as $batch_index => $batch ) {
 			foreach ( $batch as $media_id => $media_data ) {
 				// Check if media was already migrated (deduplication)
 				$existing_mapping = $this->get_media_mapping( $media_id );
-				if ( $existing_mapping ) {
+				if ( null !== $existing_mapping ) {
 					error_log( 'B2E Media Migration - SKIPPED media ID: ' . $media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
 					++$skipped_media;
 					continue;
@@ -176,7 +181,7 @@ class EFS_Media_Migrator {
 
 		$file_content = file_get_contents( $file_path );
 
-		if ( $file_content === false ) {
+		if ( false === $file_content ) {
 			return new \WP_Error( 'read_failed', 'Failed to read media file: ' . $file_path );
 		}
 
@@ -195,8 +200,11 @@ class EFS_Media_Migrator {
 		);
 
 		// Send to target site via API
-		$api_client = $this->api_client ?: new EFS_API_Client( $this->error_handler );
-		$result     = $api_client->send_media_data( $target_url, $api_key, $media_data );
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+		$result = $api_client->send_media_data( $target_url, $api_key, $media_data );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -225,7 +233,7 @@ class EFS_Media_Migrator {
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
-		if ( $response_code !== 200 ) {
+		if ( 200 !== $response_code ) {
 			return new \WP_Error( 'download_failed', 'Failed to download file: HTTP ' . $response_code );
 		}
 

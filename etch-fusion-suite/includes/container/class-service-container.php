@@ -8,6 +8,8 @@ use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 use ReflectionClass;
 use ReflectionException;
+use function esc_html;
+use function sanitize_text_field;
 
 class EFS_Service_Container implements ContainerInterface {
 
@@ -69,13 +71,13 @@ class EFS_Service_Container implements ContainerInterface {
 	/**
 	 * Bind an abstract service to a concrete implementation.
 	 *
-	 * @param string          $abstract
+	 * @param string          $abstract_id
 	 * @param string|Closure  $concrete
 	 *
 	 * @return $this
 	 */
-	public function bind( $abstract, $concrete ) {
-		$this->bindings[ $abstract ] = $concrete;
+	public function bind( $abstract_id, $concrete ) {
+		$this->bindings[ $abstract_id ] = $concrete;
 
 		return $this;
 	}
@@ -96,7 +98,8 @@ class EFS_Service_Container implements ContainerInterface {
 			if ( class_exists( $id ) ) {
 				$this->services[ $id ] = $id;
 			} else {
-				throw new EFS_Service_Not_Found_Exception( sprintf( 'Service "%s" is not registered in the container.', $id ) );
+				throw new class( sprintf( 'Service "%s" is not registered in the container.', esc_html( (string) $id ) ) ) extends Exception implements NotFoundExceptionInterface {
+				};
 			}
 		}
 
@@ -145,7 +148,8 @@ class EFS_Service_Container implements ContainerInterface {
 		}
 
 		if ( ! is_string( $concrete ) ) {
-			throw new EFS_Service_Container_Exception( 'Container cannot resolve the given service definition.' );
+			throw new class( 'Container cannot resolve the given service definition.' ) extends Exception implements ContainerExceptionInterface {
+			};
 		}
 
 		if ( isset( $this->bindings[ $concrete ] ) ) {
@@ -153,17 +157,21 @@ class EFS_Service_Container implements ContainerInterface {
 		}
 
 		if ( ! class_exists( $concrete ) ) {
-			throw new EFS_Service_Container_Exception( sprintf( 'Class "%s" does not exist.', $concrete ) );
+			throw new class( sprintf( 'Class "%s" does not exist.', esc_html( (string) $concrete ) ) ) extends Exception implements ContainerExceptionInterface {
+			};
 		}
 
 		try {
 			$reflection = new ReflectionClass( $concrete );
 		} catch ( ReflectionException $exception ) {
-			throw new EFS_Service_Container_Exception( $exception->getMessage(), 0, $exception );
+			error_log( sprintf( '[EFS] Service container failed to reflect "%s": %s', $concrete, sanitize_text_field( $exception->getMessage() ) ) );
+			throw new class( esc_html__( 'Unable to resolve service definition.', 'etch-fusion-suite' ) ) extends Exception implements ContainerExceptionInterface {
+			};
 		}
 
 		if ( ! $reflection->isInstantiable() ) {
-			throw new EFS_Service_Container_Exception( sprintf( 'Class "%s" is not instantiable.', $concrete ) );
+			throw new class( sprintf( 'Class "%s" is not instantiable.', esc_html( (string) $concrete ) ) ) extends Exception implements ContainerExceptionInterface {
+			};
 		}
 
 		$constructor = $reflection->getConstructor();
@@ -183,7 +191,8 @@ class EFS_Service_Container implements ContainerInterface {
 					continue;
 				}
 
-				throw new EFS_Service_Container_Exception( sprintf( 'Unable to resolve dependency "%s" in class "%s".', $parameter->getName(), $concrete ) );
+				throw new class( sprintf( 'Unable to resolve dependency "%s" in class "%s".', esc_html( $parameter->getName() ), esc_html( (string) $concrete ) ) ) extends Exception implements ContainerExceptionInterface {
+				};
 			}
 
 			if ( $type->isBuiltin() ) {
@@ -192,21 +201,14 @@ class EFS_Service_Container implements ContainerInterface {
 					continue;
 				}
 
-				throw new EFS_Service_Container_Exception( sprintf( 'Cannot resolve built-in dependency "%s" for class "%s".', $parameter->getName(), $concrete ) );
+				throw new class( sprintf( 'Cannot resolve built-in dependency "%s" for class "%s".', esc_html( $parameter->getName() ), esc_html( (string) $concrete ) ) ) extends Exception implements ContainerExceptionInterface {
+				};
 			}
 
-			$dependencyClass = $type->getName();
-			$dependencies[]  = $this->get( $dependencyClass );
+			$dependency_class = $type->getName();
+			$dependencies[]   = $this->get( $dependency_class );
 		}
 
 		return $reflection->newInstanceArgs( $dependencies );
 	}
-}
-
-class EFS_Service_Not_Found_Exception extends Exception implements NotFoundExceptionInterface {
-
-}
-
-class EFS_Service_Container_Exception extends Exception implements ContainerExceptionInterface {
-
 }

@@ -51,7 +51,7 @@ class EFS_Content_Parser {
 			$bricks_content = get_post_meta( $post_id, '_bricks_page_content', true );
 		}
 
-		if ( empty( $bricks_content ) || $bricks_content === '[]' || $bricks_content === array() ) {
+		if ( empty( $bricks_content ) || '[]' === $bricks_content || array() === $bricks_content ) {
 			// No Bricks content found - this is a normal WordPress post
 			// Return false so the migration uses the original post_content
 			return false;
@@ -418,7 +418,7 @@ class EFS_Content_Parser {
 			// Include if:
 			// 1. No editor mode set (like bricks_template) OR
 			// 2. Editor mode is 'bricks'
-			if ( empty( $editor_mode ) || $editor_mode === 'bricks' ) {
+			if ( empty( $editor_mode ) || 'bricks' === $editor_mode ) {
 				$filtered_posts[] = $post;
 			}
 		}
@@ -864,7 +864,7 @@ class EFS_Content_Parser {
 			if ( ! empty( $placeholder ) ) {
 				$comment .= "     Placeholder: {$placeholder}\n";
 			}
-			if ( $type === 'checkbox' && ! empty( $field['options'] ) ) {
+			if ( 'checkbox' === $type && ! empty( $field['options'] ) ) {
 				$comment .= '     Options: ' . strip_tags( $field['options'] ) . "\n";
 			}
 		}

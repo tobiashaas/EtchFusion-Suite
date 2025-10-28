@@ -36,12 +36,12 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	public function test_export_connection() {
-		// Check rate limit (10 requests per minute)
-		if ( ! $this->check_rate_limit( 'test_export_connection', 10, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( ! $this->verify_request() ) {
+		// Check rate limit (10 requests per minute)
+		if ( ! $this->check_rate_limit( 'connection_test_export', 10, 60 ) ) {
 			return;
 		}
 
@@ -70,7 +70,19 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$target_url = $validated['target_url'];
 		$api_key    = $validated['api_key'];
 
-		$client = new EFS_API_Client();
+		$client = $this->api_client;
+		if ( ! $client || ! $client instanceof EFS_API_Client ) {
+			$this->log_security_event( 'connection_unavailable', 'Export connection test aborted: API client unavailable.', array( 'target_url' => $target_url ), 'high' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Connection service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
 		$result = $client->test_connection( $this->convert_to_internal_url( $target_url ), $api_key );
 
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
@@ -90,25 +102,39 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			);
 		}
 
-		// Log failed connection test
-		$errors = isset( $result['errors'] ) && is_array( $result['errors'] ) ? implode( ', ', $result['errors'] ) : __( 'Connection failed.', 'etch-fusion-suite' );
+		$error_messages = array();
+		if ( isset( $result['errors'] ) && is_array( $result['errors'] ) ) {
+			foreach ( $result['errors'] as $error ) {
+				$error_messages[] = is_scalar( $error ) ? (string) $error : wp_json_encode( $this->mask_sensitive_values( $error ) );
+			}
+		}
+		$errors     = $error_messages ? implode( ', ', $error_messages ) : __( 'Connection failed.', 'etch-fusion-suite' );
+		$error_code = $result['code'] ?? 'connection_failed';
+		$status     = isset( $result['status'] ) ? (int) $result['status'] : 400;
 		$this->log_security_event(
 			'ajax_action',
 			'Export connection test failed: ' . $errors,
 			array(
 				'target_url' => $target_url,
+				'code'       => $error_code,
 			)
 		);
-		wp_send_json_error( $errors );
+		wp_send_json_error(
+			array(
+				'message' => $errors,
+				'code'    => sanitize_key( (string) $error_code ),
+			),
+			$status
+		);
 	}
 
 	public function test_import_connection() {
-		// Check rate limit (10 requests per minute)
-		if ( ! $this->check_rate_limit( 'test_import_connection', 10, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( ! $this->verify_request() ) {
+		// Check rate limit (10 requests per minute)
+		if ( ! $this->check_rate_limit( 'connection_test_import', 10, 60 ) ) {
 			return;
 		}
 
@@ -137,7 +163,19 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$source_url = $validated['source_url'];
 		$api_key    = $validated['api_key'];
 
-		$client = new EFS_API_Client();
+		$client = $this->api_client;
+		if ( ! $client || ! $client instanceof EFS_API_Client ) {
+			$this->log_security_event( 'connection_unavailable', 'Import connection test aborted: API client unavailable.', array( 'source_url' => $source_url ), 'high' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Connection service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
 		$result = $client->test_connection( $this->convert_to_internal_url( $source_url ), $api_key );
 
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
@@ -157,16 +195,30 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			);
 		}
 
-		// Log failed connection test
-		$errors = isset( $result['errors'] ) && is_array( $result['errors'] ) ? implode( ', ', $result['errors'] ) : __( 'Connection failed.', 'etch-fusion-suite' );
+		$error_messages = array();
+		if ( isset( $result['errors'] ) && is_array( $result['errors'] ) ) {
+			foreach ( $result['errors'] as $error ) {
+				$error_messages[] = is_scalar( $error ) ? (string) $error : wp_json_encode( $this->mask_sensitive_values( $error ) );
+			}
+		}
+		$errors     = $error_messages ? implode( ', ', $error_messages ) : __( 'Connection failed.', 'etch-fusion-suite' );
+		$error_code = $result['code'] ?? 'connection_failed';
+		$status     = isset( $result['status'] ) ? (int) $result['status'] : 400;
 		$this->log_security_event(
 			'ajax_action',
 			'Import connection test failed: ' . $errors,
 			array(
 				'source_url' => $source_url,
+				'code'       => $error_code,
 			)
 		);
-		wp_send_json_error( $errors );
+		wp_send_json_error(
+			array(
+				'message' => $errors,
+				'code'    => sanitize_key( (string) $error_code ),
+			),
+			$status
+		);
 	}
 
 	private function convert_to_internal_url( $url ) {

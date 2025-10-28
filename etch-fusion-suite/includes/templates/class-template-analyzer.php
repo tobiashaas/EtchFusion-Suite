@@ -41,10 +41,10 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 	 * {@inheritdoc}
 	 */
 	public function analyze( DOMDocument $dom ) {
-		$sections  = $this->identify_sections( $dom );
-		$layout    = $this->extract_layout_structure( $dom );
+		$sections   = $this->identify_sections( $dom );
+		$layout     = $this->extract_layout_structure( $dom );
 		$typography = $this->analyze_typography( $dom );
-		$media     = $this->detect_media_elements( $dom );
+		$media      = $this->detect_media_elements( $dom );
 
 		$components = array();
 		foreach ( $sections as $section ) {
@@ -83,7 +83,7 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 	public function detect_components( DOMElement $element ) {
 		return array(
 			'counts' => array(),
-			'nodes'  => array(),
+			'label'  => $element->getAttribute( 'data-framer-name' ),
 		);
 	}
 
@@ -91,11 +91,20 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 	 * {@inheritdoc}
 	 */
 	public function extract_layout_structure( DOMDocument $dom ) {
+		$xpath = $this->html_parser->get_xpath( $dom );
+
+		$grid_count = $xpath->query( "//*[@style[contains(., 'display:grid')]]" )->length;
+		$flex_count = $xpath->query( "//*[@style[contains(., 'display:flex')]]" )->length;
+
+		$root_element = $this->get_document_root( $dom );
+		$depth        = $this->calculate_dom_depth( $root_element );
+		$hierarchy    = $root_element instanceof DOMElement ? $this->build_hierarchy( $root_element, 0, 3 ) : array();
+
 		return array(
-			'depth'        => $this->calculate_dom_depth( $dom->documentElement ),
-			'grid_count'   => 0,
-			'flex_count'   => 0,
-			'hierarchy'    => array(),
+			'depth'      => $depth,
+			'grid_count' => $grid_count,
+			'flex_count' => $flex_count,
+			'hierarchy'  => $hierarchy,
 		);
 	}
 
@@ -107,12 +116,12 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 
 		$headings = array();
 		for ( $level = 1; $level <= 6; $level++ ) {
-			$query = sprintf( '//h%d', $level );
-			$nodes = $xpath->query( $query );
+			$query                    = sprintf( '//h%d', $level );
+			$nodes                    = $xpath->query( $query );
 			$headings[ 'h' . $level ] = $nodes ? $nodes->length : 0;
 		}
 
-		$paragraphs = $xpath->query( '//p' );
+		$paragraphs      = $xpath->query( '//p' );
 		$paragraph_count = $paragraphs ? $paragraphs->length : 0;
 
 		return array(
@@ -167,10 +176,8 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 		}
 
 		$max_depth = 0;
-		foreach ( iterator_to_array( $element->childNodes ) as $child ) {
-			if ( $child instanceof DOMElement ) {
-				$max_depth = max( $max_depth, $this->calculate_dom_depth( $child ) );
-			}
+		foreach ( $this->get_element_children( $element ) as $child ) {
+			$max_depth = max( $max_depth, $this->calculate_dom_depth( $child ) );
 		}
 
 		return $max_depth + 1;
@@ -192,7 +199,7 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 		foreach ( $components as $component_data ) {
 			if ( ! empty( $component_data['counts'] ) && is_array( $component_data['counts'] ) ) {
 				$component_count += array_sum( $component_data['counts'] );
-				$component_divisor++;
+				++$component_divisor;
 			}
 		}
 
@@ -201,5 +208,70 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 		$media_score     = min( count( $media ) * 4, 20 );
 
 		return (int) min( 100, $depth_score + $component_score + $layout_score + $media_score + 10 );
+	}
+
+	/**
+	 * Retrieve the root DOM element for the provided document.
+	 *
+	 * @param DOMDocument $dom DOM document instance.
+	 * @return DOMElement|null
+	 */
+	protected function get_document_root( DOMDocument $dom ) {
+		$root_element = $dom->getElementsByTagName( 'html' )->item( 0 );
+		if ( $root_element instanceof DOMElement ) {
+			return $root_element;
+		}
+
+		$document_element = $dom->documentElement; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return $document_element instanceof DOMElement ? $document_element : null;
+	}
+
+	/**
+	 * Return the child elements of a DOM element.
+	 *
+	 * @param DOMElement $element Parent element.
+	 * @return array<int,DOMElement>
+	 */
+	protected function get_element_children( DOMElement $element ) {
+		$children = array();
+
+		foreach ( $element->childNodes as $child ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			if ( $child instanceof DOMElement ) {
+				$children[] = $child;
+			}
+		}
+
+		return $children;
+	}
+
+	/**
+	 * Retrieve the lowercase tag name for the element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	protected function get_element_tag_name( DOMElement $element ) {
+		return strtolower( $element->tagName ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Retrieve normalized text content from the element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	protected function get_normalized_text_content( DOMElement $element ) {
+		$text_content = $element->textContent; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return trim( preg_replace( '/\s+/', ' ', $text_content ) );
+	}
+
+	/**
+	 * Retrieve owner document for an element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return DOMDocument|null
+	 */
+	protected function get_owner_document( DOMElement $element ) {
+		return $element->ownerDocument instanceof DOMDocument ? $element->ownerDocument : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }

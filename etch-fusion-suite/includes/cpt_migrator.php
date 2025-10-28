@@ -246,12 +246,12 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 		// Only include non-null values
 		foreach ( $cpt_data as $key => $value ) {
 			// Skip the 'name' key as it's not a valid argument
-			if ( $key === 'name' ) {
+			if ( 'name' === $key ) {
 				continue;
 			}
 
 			// Skip null values
-			if ( $value === null ) {
+			if ( null === $value ) {
 				continue;
 			}
 
@@ -306,8 +306,11 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 			return true; // No CPTs to migrate
 		}
 
-		$api_client = $this->api_client ?: new EFS_API_Client( $this->error_handler );
-		$result     = $api_client->send_custom_post_types( $target_url, $api_key, $cpts );
+		$api_client = $this->api_client;
+		if ( null === $api_client ) {
+			$api_client = new EFS_API_Client( $this->error_handler );
+		}
+		$result = $api_client->send_custom_post_types( $target_url, $api_key, $cpts );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -412,7 +415,7 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 				'jet-engine-meta',
 			);
 
-			if ( in_array( $post_type_name, $reserved_names ) ) {
+			if ( in_array( $post_type_name, $reserved_names, true ) ) {
 				$errors[] = 'Post type name is reserved';
 			}
 		}

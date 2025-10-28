@@ -1,0 +1,66 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:import/recommended",
+    "plugin:jsdoc/recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "plugins": [],
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".ts", ".jsx", ".tsx"]
+      }
+    }
+  },
+  "rules": {
+    "jsdoc/require-jsdoc": "off",
+    "jsdoc/require-param": "off",
+    "jsdoc/require-returns": "off",
+    "import/no-unresolved": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "sourceType": "module"
+      },
+      "extends": [
+        "plugin:@typescript-eslint/recommended",
+        "plugin:import/typescript"
+      ],
+      "plugins": [
+        "@typescript-eslint"
+      ],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          {
+            "argsIgnorePattern": "^_",
+            "varsIgnorePattern": "^_"
+          }
+        ]
+      }
+    },
+    {
+      "files": ["tests/playwright/**/*.ts"],
+      "env": {
+        "browser": false,
+        "node": true
+      },
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ]
+}

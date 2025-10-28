@@ -11,6 +11,8 @@
 
 **Note:** The development environment uses PHP 8.1 by default. You can override this in `.wp-env.override.json` if needed.
 
+**WordPress Core:** The shared `.wp-env.json` pulls the official `WordPress/WordPress#6.8` release directly from the wp-env registry. To use a custom archive (for example, a locally patched ZIP stored in `test-environment/wordpress.zip`), copy `.wp-env.override.json.example` to `.wp-env.override.json` and adjust the `core` path there.
+
 ### Quick Start
 
 ```bash
@@ -20,8 +22,8 @@ npm run dev
 
 `npm run dev` provisions two WordPress instances via `@wordpress/env`:
 
-- **Bricks (Source)** – http://localhost:8888/wp-admin (admin / password)
-- **Etch (Target)** – http://localhost:8889/wp-admin (admin / password)
+- **Bricks (Source)** – <http://localhost:8888/wp-admin> (admin / password)
+- **Etch (Target)** – <http://localhost:8889/wp-admin> (admin / password)
 
 The command:
 
@@ -33,9 +35,9 @@ The command:
 
 ### Required Plugin & Theme Archives
 
-Place the provided ZIP archives in the test environment so that wp-env can install them automatically:
+Place the provided ZIP archives in the test environment so that wp-env can install them automatically. The configuration no longer mounts local development folders via `mappings`, ensuring clean clones remain portable:
 
-```
+```text
 test-environment/
   plugins/
     bricks.2.1.2.zip
@@ -48,7 +50,7 @@ test-environment/
     etch-theme-0.0.2.zip
 ```
 
-The base plugin directory is mounted automatically (`"."` in `.wp-env.json`).
+The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), while all additional dependencies are installed from the ZIP archives listed above.
 
 ### Common npm Scripts
 
@@ -72,6 +74,8 @@ The `npm run dev` script automatically checks for Composer availability:
 - If not available in the container, the script falls back to using Composer on the host machine
 - You can manually run `npm run composer:install` at any time to refresh vendor files (requires Composer in container)
 
+If neither option is present, install Composer locally before running the setup. In CI, provision Composer explicitly (e.g. via `shivammathur/setup-php` with `tools: composer`) so the fallback succeeds.
+
 If you encounter Composer-related errors, ensure Composer is installed either locally or bootstrap it inside the container.
 
 ### Local Overrides
@@ -80,11 +84,112 @@ Copy `.wp-env.override.json.example` to `.wp-env.override.json` to customize por
 
 **PHP Version:** The default PHP version is 8.1. You can override this in `.wp-env.override.json` if you need a different version (e.g., `"phpVersion": "8.2"`).
 
+**Parallel CI:** When wp-env runs in parallel jobs, use the override file to assign unique `port`/`testsPort` values or serialize the job to avoid port collisions.
+
 ### Production Installation
 
 1. Ensure `npm run composer:install` has populated the `vendor/` directory (or run `composer install --no-dev` in your CI pipeline).
 2. Bundle the plugin code together with the generated `vendor/` directory.
 3. Upload and activate on the production site.
+
+## Code Quality
+
+### WordPress Coding Standards
+
+The plugin enforces [WordPress Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/) via PHPCS. The configuration is defined in [`phpcs.xml.dist`](phpcs.xml.dist) and enforced automatically in the CI workflow (`.github/workflows/ci.yml`).
+
+### Running PHPCS
+
+Check for coding standards violations:
+
+```bash
+composer phpcs
+# or
+vendor/bin/phpcs --standard=phpcs.xml.dist
+```
+
+### Auto-Fixing Violations
+
+PHPCBF can automatically fix many formatting issues:
+
+```bash
+composer phpcbf
+# or
+vendor/bin/phpcbf --standard=phpcs.xml.dist
+```
+
+**What PHPCBF can fix:**
+
+- Indentation and spacing
+- Array syntax standardization
+- Line ending normalization
+- Trailing whitespace
+- Control structure formatting
+
+**What requires manual fixes:**
+
+- Security violations (escaping, sanitization, nonce verification)
+- Yoda conditions
+- Strict comparisons
+- Date function replacements
+- Hook prefixing
+- I18n issues
+
+**Important:** Always review changes before committing and run tests after auto-fixes.
+
+### Helper Scripts
+
+Use the provided scripts for comprehensive PHPCS workflows:
+
+**Run PHPCBF with detailed reporting:**
+
+```bash
+./scripts/run-phpcbf.sh
+```
+
+This script:
+
+- Creates a backup branch
+- Runs pre/post PHPCS checks
+- Generates diff statistics
+- Saves detailed logs to `docs/`
+
+**Analyze remaining violations:**
+
+```bash
+./scripts/analyze-phpcs-violations.sh
+```
+
+This generates:
+
+- Violation counts by category
+- Top 10 files by violation count
+- Updated backlog at `docs/phpcs-manual-fixes-backlog.md`
+
+### PHPCS Cleanup Initiative
+
+The project follows a phased approach to achieve full PHPCS compliance:
+
+- **Phase 1:** PHPCBF Auto-Fixes ✅ (completed)
+- **Phase 2-12:** Manual fixes for security, Yoda conditions, strict comparisons, etc.
+
+**Documentation:**
+- [Auto-fixes Report](docs/phpcs-auto-fixes-2025-10-28.md)
+- [Manual Fixes Backlog](docs/phpcs-manual-fixes-backlog.md)
+- [TODOS.md](../TODOS.md) – Detailed phase tracking
+
+### Composer Scripts
+
+| Script | Description |
+| --- | --- |
+| `composer phpcs` | Check for coding standards violations |
+| `composer phpcbf` | Auto-fix violations |
+| `composer phpcs:report` | Generate summary report |
+| `composer phpcs:full` | Generate detailed report with all violations |
+
+### CI Enforcement
+
+The CI workflow automatically runs PHPCS on all pull requests and pushes. The lint job must pass before merging.
 
 ## 🎯 Features
 

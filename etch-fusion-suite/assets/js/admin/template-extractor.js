@@ -16,6 +16,7 @@ const DEFAULT_PROGRESS_STEPS = ['fetching', 'sanitizing', 'analyzing', 'generati
 export const extractFromUrl = async (url) => {
 	try {
 		showProgressStart('fetching');
+		startProgressPolling();
 		const data = await post(ACTION_EXTRACT_TEMPLATE, {
 			source: url,
 			source_type: 'url',
@@ -34,6 +35,7 @@ export const extractFromUrl = async (url) => {
 export const extractFromHtml = async (html) => {
 	try {
 		showProgressStart('fetching');
+		startProgressPolling();
 		const data = await post(ACTION_EXTRACT_TEMPLATE, {
 			source: html,
 			source_type: 'html',

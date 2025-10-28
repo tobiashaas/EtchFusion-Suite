@@ -38,9 +38,11 @@ Each site is fully isolated, auto-installs WordPress core, and mounts the plugin
 
 `npm run dev` performs the entire setup: starts wp-env, installs Composer dependencies inside the container, activates all required plugins/themes, and provisions an application password for the Etch instance.
 
+By default, `.wp-env.json` uses the shared `WordPress/6.8` release from the wp-env registry so clean clones work without local archives. If you maintain a custom WordPress ZIP (for example in `test-environment/wordpress.zip`), copy `.wp-env.override.json.example` to `.wp-env.override.json` inside `etch-fusion-suite/` and adjust the `core` path there.
+
 ## Required Archives
 
-Download and place the provided plugin and theme packages before running `npm run dev`:
+Download and place the provided plugin and theme packages before running `npm run dev`. The shared configuration no longer uses local filesystem mappings—wp-env installs these archives directly so that clean clones remain portable:
 
 ```
 test-environment/
@@ -55,7 +57,7 @@ test-environment/
     etch-theme-0.0.2.zip
 ```
 
-wp-env extracts these archives automatically for the relevant environment.
+wp-env extracts these archives automatically for the relevant environment while mounting the checked-out plugin directory (`"."`).
 
 ## Credentials & Access
 

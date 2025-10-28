@@ -11,8 +11,8 @@ if ( ! defined( 'EFS_TESTS_DIR' ) ) {
 	define( 'EFS_TESTS_DIR', __DIR__ );
 }
 
-if ( ! defined( 'EFS_PLUGIN_DIR' ) ) {
-	define( 'EFS_PLUGIN_DIR', rtrim( dirname( __DIR__ ), '/\\' ) . '/' );
+if ( ! defined( 'ETCH_FUSION_SUITE_DIR' ) ) {
+	define( 'ETCH_FUSION_SUITE_DIR', rtrim( dirname( __DIR__ ), '/\\' ) . '/' );
 }
 
 $_tests_dir = getenv( 'WP_TESTS_DIR' );
@@ -37,18 +37,18 @@ if ( ! file_exists( $_tests_dir . '/includes/functions.php' ) ) {
 	exit( 1 );
 }
 
-if ( file_exists( EFS_PLUGIN_DIR . '/vendor/autoload.php' ) ) {
-	require_once EFS_PLUGIN_DIR . '/vendor/autoload.php';
+if ( file_exists( ETCH_FUSION_SUITE_DIR . '/vendor/autoload.php' ) ) {
+	require_once ETCH_FUSION_SUITE_DIR . '/vendor/autoload.php';
 }
 
 require_once $_tests_dir . '/includes/functions.php';
 
-if ( ! function_exists( '_efs_manually_load_plugin' ) ) {
-	function _efs_manually_load_plugin(): void {
-		require_once EFS_PLUGIN_DIR . '/etch-fusion-suite.php';
+if ( ! function_exists( '_etch_fusion_suite_manually_load_plugin' ) ) {
+	function _etch_fusion_suite_manually_load_plugin(): void {
+		require_once ETCH_FUSION_SUITE_DIR . '/etch-fusion-suite.php';
 	}
 }
 
-tests_add_filter( 'muplugins_loaded', '_efs_manually_load_plugin' );
+tests_add_filter( 'muplugins_loaded', '_etch_fusion_suite_manually_load_plugin' );
 
 require $_tests_dir . '/includes/bootstrap.php';

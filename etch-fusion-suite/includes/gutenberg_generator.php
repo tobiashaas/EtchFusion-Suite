@@ -73,13 +73,13 @@ class EFS_Gutenberg_Generator {
 		$root_elements = array();
 		foreach ( $bricks_elements as $element ) {
 			$parent = $element['parent'] ?? '0';
-			if ( $parent === 0 || $parent === '0' || $parent === '' ) {
+			if ( 0 === $parent || '0' === $parent || '' === $parent ) {
 				$root_elements[] = $element;
 			}
 		}
 
 		// Generate HTML for each top-level element
-		$timestamp = date( 'Y-m-d H:i:s' ); // Get current timestamp
+		$timestamp = wp_date( 'Y-m-d H:i:s' ); // Get current timestamp using site settings
 		$html      = $timestamp . "\n"; // Add timestamp at the beginning
 		foreach ( $root_elements as $element ) {
 			$block_html = $this->convert_single_bricks_element( $element, $element_map );
@@ -194,12 +194,14 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Build attributes JSON with FULL Etch structure
+		$section_name = ! empty( $label ) ? $label : 'Section';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Section',
+				'name'     => $section_name,
 				'etchData' => array(
 					'origin'     => 'etch',
-					'name'       => $label ?: 'Section',
+					'name'       => $section_name,
 					'styles'     => $style_ids,
 					'attributes' => $etch_attributes,
 					'block'      => array(
@@ -264,12 +266,14 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Build attributes JSON with FULL Etch structure
+		$container_name = ! empty( $label ) ? $label : 'Container';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Container',
+				'name'     => $container_name,
 				'etchData' => array(
 					'origin'     => 'etch',
-					'name'       => $label ?: 'Container',
+					'name'       => $container_name,
 					'styles'     => $style_ids,
 					'attributes' => $etch_attributes,
 					'block'      => array(
@@ -281,7 +285,7 @@ class EFS_Gutenberg_Generator {
 		);
 
 		// Add tagName for Gutenberg if not div
-		if ( $tag !== 'div' ) {
+		if ( 'div' !== $tag ) {
 			$attrs['tagName'] = $tag;
 		}
 
@@ -329,12 +333,14 @@ class EFS_Gutenberg_Generator {
 		array_unshift( $style_ids, 'etch-flex-div-style' );
 
 		// Build attributes JSON with FULL Etch structure
+		$flex_name = ! empty( $label ) ? $label : 'Flex Div';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Flex Div',
+				'name'     => $flex_name,
 				'etchData' => array(
 					'origin'     => 'etch',
-					'name'       => $label ?: 'Flex Div',
+					'name'       => $flex_name,
 					'styles'     => $style_ids,
 					'attributes' => $etch_attributes,
 					'block'      => array(
@@ -378,12 +384,14 @@ class EFS_Gutenberg_Generator {
 		$style_ids = $this->get_element_style_ids( $element );
 
 		// Build attributes JSON - simple div WITHOUT flex-div
+		$div_name = ! empty( $label ) ? $label : 'Div';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Div',
+				'name'     => $div_name,
 				'etchData' => array(
 					'origin'     => 'etch',
-					'name'       => $label ?: 'Div',
+					'name'       => $div_name,
 					'styles'     => $style_ids,
 					'attributes' => array(), // No special attributes for simple div
 					'block'      => array(
@@ -428,10 +436,12 @@ class EFS_Gutenberg_Generator {
 		$attrs = array();
 
 		// Add etchData with styles
+		$text_name = ! empty( $label ) ? $label : 'Text';
+
 		if ( ! empty( $style_ids ) || ! empty( $classes ) ) {
 			$etch_data = array(
 				'origin'     => 'etch',
-				'name'       => $label ?: 'Text',
+				'name'       => $text_name,
 				'styles'     => $style_ids,
 				'attributes' => array(),
 				'block'      => array(
@@ -441,7 +451,7 @@ class EFS_Gutenberg_Generator {
 			);
 
 			$attrs['metadata'] = array(
-				'name'     => $label ?: 'Text',
+				'name'     => $text_name,
 				'etchData' => $etch_data,
 			);
 		}
@@ -480,10 +490,12 @@ class EFS_Gutenberg_Generator {
 		$attrs = array();
 
 		// Add etchData with styles
+		$heading_name = ! empty( $label ) ? $label : 'Heading';
+
 		if ( ! empty( $style_ids ) || ! empty( $classes ) ) {
 			$etch_data = array(
 				'origin'     => 'etch',
-				'name'       => $label ?: 'Heading',
+				'name'       => $heading_name,
 				'styles'     => $style_ids,
 				'attributes' => array(),
 				'block'      => array(
@@ -493,7 +505,7 @@ class EFS_Gutenberg_Generator {
 			);
 
 			$attrs['metadata'] = array(
-				'name'     => $label ?: 'Heading',
+				'name'     => $heading_name,
 				'etchData' => $etch_data,
 			);
 		}
@@ -530,9 +542,11 @@ class EFS_Gutenberg_Generator {
 		$style_ids = $this->get_element_style_ids( $element );
 
 		// Build attributes with Etch nestedData structure for img classes
+		$image_name = ! empty( $label ) ? $label : 'Image';
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Image',
+				'name'     => $image_name,
 				'etchData' => array(
 					'removeWrapper' => true,
 					'block'         => array(
@@ -540,11 +554,11 @@ class EFS_Gutenberg_Generator {
 						'tag'  => 'figure',
 					),
 					'origin'        => 'etch',
-					'name'          => $label ?: 'Image',
+					'name'          => $image_name,
 					'nestedData'    => array(
 						'img' => array(
 							'origin'     => 'etch',
-							'name'       => $label ?: 'Image',
+							'name'       => $image_name,
 							'styles'     => $style_ids,
 							'attributes' => array(
 								'src'   => $image_url,
@@ -587,15 +601,22 @@ class EFS_Gutenberg_Generator {
 		// Check if it's an SVG or FontAwesome icon
 		if ( ! empty( $svg_code ) || strpos( $icon_library, 'svg' ) !== false ) {
 			// SVG Icon - use Etch SVG element
+			$svg_name = '';
+			if ( ! empty( $label ) ) {
+				$svg_name = $label;
+			} else {
+				$svg_name = 'SVG';
+			}
+
 			$attrs = array(
 				'metadata' => array(
-					'name'     => $label ?: 'SVG',
+					'name'     => $svg_name,
 					'etchData' => array(
 						'origin'     => 'etch',
-						'name'       => $label ?: 'SVG',
+						'name'       => $svg_name,
 						'styles'     => $style_ids,
 						'attributes' => array(
-							'src'         => $svg_code ?: '', // SVG code or URL
+							'src'         => ! empty( $svg_code ) ? $svg_code : '', // SVG code or URL
 							'stripColors' => 'true',
 						),
 						'block'      => array(
@@ -616,12 +637,19 @@ class EFS_Gutenberg_Generator {
 					'<!-- /wp:group -->';
 		} else {
 			// FontAwesome or other icon font - use HTML block with <i>
+			$icon_name = '';
+			if ( ! empty( $label ) ) {
+				$icon_name = $label;
+			} else {
+				$icon_name = 'Icon';
+			}
+
 			$attrs = array(
 				'metadata' => array(
-					'name'     => $label ?: 'Icon',
+					'name'     => $icon_name,
 					'etchData' => array(
 						'origin'     => 'etch',
-						'name'       => $label ?: 'Icon',
+						'name'       => $icon_name,
 						'styles'     => $style_ids,
 						'attributes' => array(
 							'class' => $icon_value,
@@ -683,9 +711,16 @@ class EFS_Gutenberg_Generator {
 			$link_attrs['class'] = implode( ' ', $classes );
 		}
 
+		$anchor_name = '';
+		if ( ! empty( $label ) ) {
+			$anchor_name = $label;
+		} else {
+			$anchor_name = 'Anchor';
+		}
+
 		$attrs = array(
 			'metadata' => array(
-				'name'     => $label ?: 'Anchor',
+				'name'     => $anchor_name,
 				'etchData' => array(
 					'removeWrapper' => true,
 					'block'         => array(
@@ -693,11 +728,11 @@ class EFS_Gutenberg_Generator {
 						'tag'  => 'p',
 					),
 					'origin'        => 'etch',
-					'name'          => $label ?: 'Anchor',
+					'name'          => $anchor_name,
 					'nestedData'    => array(
 						$ref_id => array(
 							'origin'     => 'etch',
-							'name'       => $label ?: 'Anchor',
+							'name'       => $anchor_name,
 							'styles'     => $style_ids,
 							'attributes' => $link_attrs,
 							'block'      => array(
@@ -809,7 +844,7 @@ class EFS_Gutenberg_Generator {
 			error_log( 'B2E: Processing ' . count( $classes ) . ' classes: ' . implode( ', ', $classes ) );
 
 			foreach ( $classes as $class_name ) {
-				if ( in_array( $class_name, $bricks_class_names ) ) {
+				if ( in_array( $class_name, $bricks_class_names, true ) ) {
 					// Find the Bricks ID for this class name
 					$bricks_id = null;
 					foreach ( $bricks_classes as $bricks_class ) {
@@ -825,7 +860,7 @@ class EFS_Gutenberg_Generator {
 					if ( $bricks_id && isset( $style_map[ $bricks_id ] ) ) {
 						$etch_id     = is_array( $style_map[ $bricks_id ] ) ? $style_map[ $bricks_id ]['id'] : $style_map[ $bricks_id ];
 						$style_ids[] = $etch_id;
-						error_log( 'B2E: Found Global Class: ' . $class_name . ' (Bricks ID: ' . $bricks_id . ') → Etch ID: ' . $etch_id );
+						error_log( 'B2E: Found Global Class: ' . $class_name . ' (Bricks ID: ' . $bricks_id . ') → Etch ID ' . $etch_id );
 					} else {
 						error_log( 'B2E: Global Class found but no style_map entry: ' . $class_name );
 					}
@@ -860,7 +895,7 @@ class EFS_Gutenberg_Generator {
 
 		foreach ( $style_ids as $style_id ) {
 			// Skip Etch internal styles (they don't have selectors in our map)
-			if ( in_array( $style_id, array( 'etch-section-style', 'etch-container-style', 'etch-block-style' ) ) ) {
+			if ( in_array( $style_id, array( 'etch-section-style', 'etch-container-style', 'etch-block-style' ), true ) ) {
 				error_log( 'B2E CSS Classes: Skipping Etch internal style: ' . $style_id );
 				continue;
 			}
@@ -902,8 +937,9 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Add timestamp comment to verify new content is generated
-		$timestamp = '<!-- B2E Generated: ' . date( 'Y-m-d H:i:s' ) . ' | v0.5.0: Modular Element Converters -->';
-		error_log( 'B2E: Generating blocks at ' . date( 'Y-m-d H:i:s' ) . ' with v0.5.0 Modular Converters' );
+		$generation_timestamp = wp_date( 'Y-m-d H:i:s' );
+		$timestamp            = '<!-- B2E Generated: ' . $generation_timestamp . ' | v0.5.0: Modular Element Converters -->';
+		error_log( 'B2E: Generating blocks at ' . $generation_timestamp . ' with v0.5.0 Modular Converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
 		$style_map             = get_option( 'b2e_style_map', array() );
@@ -920,7 +956,7 @@ class EFS_Gutenberg_Generator {
 		$top_level_elements = array();
 		foreach ( $bricks_elements as $element ) {
 			$parent_id = $element['parent'] ?? 0;
-			if ( $parent_id === 0 || $parent_id === '0' || ! isset( $element_map[ $parent_id ] ) ) {
+			if ( 0 === $parent_id || '0' === $parent_id || ! isset( $element_map[ $parent_id ] ) ) {
 				$top_level_elements[] = $element;
 			}
 		}
@@ -950,7 +986,7 @@ class EFS_Gutenberg_Generator {
 		// If it's a JSON string, decode it
 		if ( is_string( $bricks_content ) ) {
 			$decoded = json_decode( $bricks_content, true );
-			if ( json_last_error() === JSON_ERROR_NONE ) {
+			if ( JSON_ERROR_NONE === json_last_error() ) {
 				$bricks_content = $decoded;
 			}
 		}
@@ -1031,7 +1067,7 @@ class EFS_Gutenberg_Generator {
 
 		// Convert bricks_template to page
 		$target_post_type = $post->post_type;
-		if ( $target_post_type === 'bricks_template' ) {
+		if ( 'bricks_template' === $target_post_type ) {
 			$target_post_type = 'page';
 			error_log( 'B2E: Converting bricks_template to page: ' . $post->post_title );
 		}
@@ -1090,7 +1126,7 @@ class EFS_Gutenberg_Generator {
 
 		// Check response
 		$response_code = wp_remote_retrieve_response_code( $response );
-		if ( $response_code !== 200 ) {
+		if ( 200 !== $response_code ) {
 			$response_body = wp_remote_retrieve_body( $response );
 			$this->error_handler->log_error(
 				'I024',
@@ -1159,7 +1195,7 @@ class EFS_Gutenberg_Generator {
 		$etch_type = $element['etch_type'] ?? 'generic';
 
 		// Skip elements marked for skipping (e.g., code blocks)
-		if ( $etch_type === 'skip' ) {
+		if ( 'skip' === $etch_type ) {
 			return '';
 		}
 
@@ -1185,7 +1221,7 @@ class EFS_Gutenberg_Generator {
 			'a',
 		);
 
-		if ( in_array( $etch_type, $group_block_types ) ) {
+		if ( in_array( $etch_type, $group_block_types, true ) ) {
 			return $this->generate_etch_group_block( $element, $element_map );
 		}
 
@@ -1252,7 +1288,7 @@ class EFS_Gutenberg_Generator {
 
 		// Add tagName for non-div elements (section, article, etc.)
 		$html_tag = $this->get_html_tag( $element['etch_type'] );
-		if ( $html_tag !== 'div' ) {
+		if ( 'div' !== $html_tag ) {
 			$block_attrs['tagName'] = $html_tag;
 		}
 
@@ -1526,7 +1562,7 @@ class EFS_Gutenberg_Generator {
 			'a',
 		);
 
-		if ( in_array( $etch_type, $semantic_tags ) ) {
+		if ( in_array( $etch_type, $semantic_tags, true ) ) {
 			return $etch_type;
 		}
 
@@ -1655,7 +1691,7 @@ class EFS_Gutenberg_Generator {
 			'a',                         // Links
 		);
 
-		if ( in_array( $tag, $semantic_tags ) ) {
+		if ( in_array( $tag, $semantic_tags, true ) ) {
 			// Keep semantic HTML element
 			$element['etch_type'] = $tag;
 			$element['etch_data'] = array(

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Bricks2Etch\Tests\WordPress\PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" tests="6" assertions="13" errors="0" warnings="0" failures="0" skipped="1" time="0.014683">
+    <testcase name="test_plugin_is_loaded" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="22" assertions="3" time="0.007323"/>
+    <testcase name="test_service_container_is_available" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="31" assertions="2" time="0.000865"/>
+    <testcase name="test_core_services_are_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="41" assertions="3" time="0.000325"/>
+    <testcase name="test_admin_menu_is_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="52" assertions="1" time="0.003629"/>
+    <testcase name="test_rest_api_endpoints_are_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="70" assertions="0" time="0.001584">
+      <skipped/>
+    </testcase>
+    <testcase name="test_plugin_detector" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="77" assertions="4" time="0.000957"/>
+  </testsuite>
+</testsuites>

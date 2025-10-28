@@ -52,14 +52,12 @@ class EFS_Validation_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * AJAX handler for validating API key
 	 */
 	public function validate_api_key() {
-		// Check rate limit (10 requests per minute for auth endpoints)
-		if ( ! $this->check_rate_limit( 'validate_api_key', 10, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		// Verify nonce
-		if ( ! $this->verify_nonce() ) {
-			wp_send_json_error( 'Invalid nonce' );
+		// Check rate limit (10 requests per minute for auth endpoints)
+		if ( ! $this->check_rate_limit( 'validation_api_key', 10, 60 ) ) {
 			return;
 		}
 
@@ -95,15 +93,29 @@ class EFS_Validation_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$result = $this->api_client->validate_api_key( $internal_url, $api_key );
 
 		if ( is_wp_error( $result ) ) {
+			$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'api_key_validation_failed';
+			$status     = 400;
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
 			// Log failed authentication
 			$this->log_security_event(
 				'auth_failure',
 				'API key validation failed: ' . $result->get_error_message(),
 				array(
 					'target_url' => $target_url,
+					'code'       => $error_code,
 				)
 			);
-			wp_send_json_error( $result->get_error_message() );
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		} else {
 			// Log successful authentication
 			$this->log_security_event(
@@ -121,14 +133,12 @@ class EFS_Validation_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * AJAX handler for validating migration token
 	 */
 	public function validate_migration_token() {
-		// Check rate limit (10 requests per minute for auth endpoints)
-		if ( ! $this->check_rate_limit( 'validate_migration_token', 10, 60 ) ) {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
 
-		// Verify nonce
-		if ( ! $this->verify_nonce() ) {
-			wp_send_json_error( 'Invalid nonce' );
+		// Check rate limit (10 requests per minute for auth endpoints)
+		if ( ! $this->check_rate_limit( 'validation_migration_token', 10, 60 ) ) {
 			return;
 		}
 
@@ -171,15 +181,29 @@ class EFS_Validation_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$result = $this->api_client->validate_migration_token( $internal_url, $token, $expires );
 
 		if ( is_wp_error( $result ) ) {
+			$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'token_validation_failed';
+			$status     = 401;
+			$error_data = $result->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) ) {
+				$status = (int) $error_data['status'];
+			}
+
 			// Log failed token validation
 			$this->log_security_event(
 				'auth_failure',
-				'Migration token validation failed: ' . $result->get_error_message(),
+				' Migration token validation failed: ' . $result->get_error_message(),
 				array(
 					'target_url' => $target_url,
+					'code'       => $error_code,
 				)
 			);
-			wp_send_json_error( $result->get_error_message() );
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $error_code,
+				),
+				$status
+			);
 		} else {
 			// Log successful token validation
 			$this->log_security_event(

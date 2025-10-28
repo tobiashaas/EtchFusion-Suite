@@ -1,0 +1,55 @@
+{
+  "cookies": [
+    {
+      "name": "wordpress_cd9b744c619529c4988e0e94344eaf12",
+      "value": "admin%7C1762814804%7CT3WPUnxmH8cmAbumG4Yy6SXhoLIJqCJfbU394I7gV3V%7C7dede555510768689f75f9a134898bff77cafb1318a33cbbb9b49b5007e72e10",
+      "domain": "localhost",
+      "path": "/wp-content/plugins",
+      "expires": 1762858004.67,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_cd9b744c619529c4988e0e94344eaf12",
+      "value": "admin%7C1762814804%7CT3WPUnxmH8cmAbumG4Yy6SXhoLIJqCJfbU394I7gV3V%7C7dede555510768689f75f9a134898bff77cafb1318a33cbbb9b49b5007e72e10",
+      "domain": "localhost",
+      "path": "/wp-admin",
+      "expires": 1762858004.67,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_test_cookie",
+      "value": "WP%20Cookie%20check",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wordpress_logged_in_cd9b744c619529c4988e0e94344eaf12",
+      "value": "admin%7C1762814804%7CT3WPUnxmH8cmAbumG4Yy6SXhoLIJqCJfbU394I7gV3V%7C300c5bb2a66a3b86a22a9a6e597e034ae8627dcc0bbb90377221da0b3311e323",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1762858004.67,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wp-settings-time-1",
+      "value": "1761605204",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1793141204.864203,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

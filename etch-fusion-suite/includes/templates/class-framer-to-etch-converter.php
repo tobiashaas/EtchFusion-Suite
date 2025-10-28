@@ -33,9 +33,9 @@ class EFS_Framer_To_Etch_Converter {
 	 * Constructor.
 	 */
 	public function __construct( EFS_Error_Handler $error_handler, EFS_Element_Factory $element_factory, Style_Repository_Interface $style_repository ) {
-		$this->error_handler     = $error_handler;
-		$this->element_factory   = $element_factory;
-		$this->style_repository  = $style_repository;
+		$this->error_handler    = $error_handler;
+		$this->element_factory  = $element_factory;
+		$this->style_repository = $style_repository;
 	}
 
 	/**
@@ -57,12 +57,17 @@ class EFS_Framer_To_Etch_Converter {
 				case 'button':
 					return $this->convert_button_component( $element );
 				default:
-					$tag = strtolower( $element->tagName );
+					$tag              = $this->get_element_tag_name( $element );
+					$context_children = isset( $analysis_context['children'] ) && is_array( $analysis_context['children'] )
+						? $analysis_context['children']
+						: array();
+
 					if ( 'section' === $tag ) {
-						return $this->convert_section( $element, $analysis_context['children'] ?? array() );
+						return $this->convert_section( $element, $context_children );
 					}
+
 					if ( in_array( $tag, array( 'div', 'header', 'nav', 'footer' ), true ) ) {
-						return $this->convert_container( $element, $analysis_context['children'] ?? array() );
+						return $this->convert_container( $element, $context_children );
 					}
 			}
 		} catch ( \Throwable $exception ) {
@@ -70,7 +75,7 @@ class EFS_Framer_To_Etch_Converter {
 				'B2E_FRAMER_CONVERTER',
 				array(
 					'message' => $exception->getMessage(),
-					'tag'     => $element->tagName,
+					'tag'     => $this->get_element_tag_name( $element ),
 					'type'    => $type,
 				),
 				'error'
@@ -87,22 +92,25 @@ class EFS_Framer_To_Etch_Converter {
 	 * @return array
 	 */
 	public function convert_text_component( DOMElement $element ) {
-		$text = trim( preg_replace( '/\s+/', ' ', $element->textContent ) );
+		$text = $this->get_normalized_text_content( $element );
 		if ( '' === $text ) {
 			return array();
 		}
 
-		$tag = strtolower( $element->tagName );
+		$tag = $this->get_element_tag_name( $element );
 		if ( ! in_array( $tag, array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ), true ) ) {
 			$tag = 'p';
 		}
+
+		$attributes = $this->extract_etch_attributes( $element );
+		$styles     = $this->map_framer_classes_to_etch( $element );
 
 		return array(
 			'type'       => 'text',
 			'tag'        => $tag,
 			'content'    => wp_kses_post( $text ),
-			'attributes' => $this->extract_etch_attributes( $element ),
-			'styles'     => $this->map_framer_classes_to_etch( $element ),
+			'attributes' => $attributes,
+			'styles'     => $styles,
 		);
 	}
 
@@ -119,12 +127,20 @@ class EFS_Framer_To_Etch_Converter {
 			$src    = $nested instanceof DOMElement ? $nested->getAttribute( 'src' ) : '';
 		}
 
+		$alt = $element->getAttribute( 'alt' );
+		if ( '' === $alt ) {
+			$alt = $element->getAttribute( 'data-framer-name' );
+		}
+
+		$attributes = $this->extract_etch_attributes( $element );
+		$styles     = $this->map_framer_classes_to_etch( $element );
+
 		return array(
 			'type'       => 'image',
 			'src'        => esc_url_raw( $src ),
-			'alt'        => $element->getAttribute( 'alt' ) ?: $element->getAttribute( 'data-framer-name' ),
-			'attributes' => $this->extract_etch_attributes( $element ),
-			'styles'     => $this->map_framer_classes_to_etch( $element ),
+			'alt'        => $alt,
+			'attributes' => $attributes,
+			'styles'     => $styles,
 		);
 	}
 
@@ -135,17 +151,21 @@ class EFS_Framer_To_Etch_Converter {
 	 * @return array
 	 */
 	public function convert_button_component( DOMElement $element ) {
-		$href = '#';
-		if ( 'a' === strtolower( $element->tagName ) ) {
-			$href = $element->getAttribute( 'href' ) ?: '#';
+		$href = $element->getAttribute( 'href' );
+		if ( '' === $href || 'a' !== $this->get_element_tag_name( $element ) ) {
+			$href = '#';
 		}
+
+		$label      = $this->get_normalized_text_content( $element );
+		$attributes = $this->extract_etch_attributes( $element );
+		$styles     = $this->map_framer_classes_to_etch( $element );
 
 		return array(
 			'type'       => 'button',
-			'label'      => trim( $element->textContent ),
+			'label'      => $label,
 			'href'       => esc_url_raw( $href ),
-			'attributes' => $this->extract_etch_attributes( $element ),
-			'styles'     => $this->map_framer_classes_to_etch( $element ),
+			'attributes' => $attributes,
+			'styles'     => $styles,
 		);
 	}
 
@@ -157,12 +177,20 @@ class EFS_Framer_To_Etch_Converter {
 	 * @return array
 	 */
 	public function convert_section( DOMElement $element, array $children ) {
+		$label = $element->getAttribute( 'data-framer-name' );
+		if ( '' === $label ) {
+			$label = 'Section';
+		}
+
+		$attributes = $this->extract_etch_attributes( $element );
+		$styles     = $this->map_framer_classes_to_etch( $element );
+
 		return array(
 			'type'       => 'section',
-			'label'      => $element->getAttribute( 'data-framer-name' ) ?: 'Section',
+			'label'      => $label,
 			'children'   => $children,
-			'attributes' => $this->extract_etch_attributes( $element ),
-			'styles'     => $this->map_framer_classes_to_etch( $element ),
+			'attributes' => $attributes,
+			'styles'     => $styles,
 			'tag'        => 'section',
 		);
 	}
@@ -175,13 +203,21 @@ class EFS_Framer_To_Etch_Converter {
 	 * @return array
 	 */
 	public function convert_container( DOMElement $element, array $children ) {
+		$label = $element->getAttribute( 'data-framer-name' );
+		if ( '' === $label ) {
+			$label = ucfirst( $this->get_element_tag_name( $element ) );
+		}
+
+		$attributes = $this->extract_etch_attributes( $element );
+		$styles     = $this->map_framer_classes_to_etch( $element );
+
 		return array(
 			'type'       => 'container',
-			'label'      => $element->getAttribute( 'data-framer-name' ) ?: ucfirst( strtolower( $element->tagName ) ),
+			'label'      => $label,
 			'children'   => $children,
-			'attributes' => $this->extract_etch_attributes( $element ),
-			'styles'     => $this->map_framer_classes_to_etch( $element ),
-			'tag'        => strtolower( $element->tagName ),
+			'attributes' => $attributes,
+			'styles'     => $styles,
+			'tag'        => $this->get_element_tag_name( $element ),
 		);
 	}
 
@@ -232,5 +268,94 @@ class EFS_Framer_To_Etch_Converter {
 		}
 
 		return $attributes;
+	}
+
+	/**
+	 * Build block metadata structure for Etch.
+	 *
+	 * @param DOMElement $element      Source element.
+	 * @param string     $block_type   Gutenberg block type.
+	 * @param array      $attributes   Block attributes.
+	 * @param array      $styles       Style definitions.
+	 * @return array<string,mixed>
+	 */
+	public function build_block_metadata( DOMElement $element, $block_type, array $attributes, array $styles ) {
+		$label = '';
+		if ( isset( $attributes['label'] ) && '' !== $attributes['label'] ) {
+			$label = $attributes['label'];
+		} else {
+			$label = $element->getAttribute( 'data-framer-name' );
+			if ( '' === $label ) {
+				$label = ucfirst( $block_type );
+			}
+		}
+
+		$block_tag        = isset( $attributes['tag'] ) && '' !== $attributes['tag'] ? $attributes['tag'] : 'div';
+		$block_attributes = isset( $attributes['attributes'] ) && is_array( $attributes['attributes'] ) ? $attributes['attributes'] : array();
+
+		return array(
+			'metadata' => array(
+				'name'     => $label,
+				'etchData' => array(
+					'origin'     => 'etch',
+					'name'       => $label,
+					'styles'     => $styles,
+					'attributes' => $block_attributes,
+					'block'      => array(
+						'type' => 'html',
+						'tag'  => $block_tag,
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Return the direct child elements of the provided element.
+	 *
+	 * @param DOMElement $element Parent element.
+	 * @return array<int,DOMElement>
+	 */
+	public function get_element_children( DOMElement $element ) {
+		$children = array();
+
+		foreach ( $element->childNodes as $child ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			if ( $child instanceof DOMElement ) {
+				$children[] = $child;
+			}
+		}
+
+		return $children;
+	}
+
+	/**
+	 * Get a normalized text content string from a DOM element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	private function get_normalized_text_content( DOMElement $element ) {
+		$text_content = $element->textContent; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		return trim( preg_replace( '/\s+/', ' ', $text_content ) );
+	}
+
+	/**
+	 * Get the lowercase tag name for the element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return string
+	 */
+	private function get_element_tag_name( DOMElement $element ) {
+		return strtolower( $element->tagName ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Get the owner document for the element.
+	 *
+	 * @param DOMElement $element Element instance.
+	 * @return DOMDocument
+	 */
+	private function get_owner_document( DOMElement $element ) {
+		return $element->ownerDocument; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }
