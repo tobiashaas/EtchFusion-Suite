@@ -88,12 +88,12 @@ class EFS_API_Client {
 			return $validation;
 		}
 
-		$response = is_array( $validation ) ? $validation : array();
-		$response['token']       = $token;
-		$response['expires']     = $expires;
-		$response['domain']      = $domain;
-		$response['target_url']  = $normalized_url;
-		$response['api_key']     = isset( $response['api_key'] ) ? sanitize_text_field( $response['api_key'] ) : '';
+		$response               = is_array( $validation ) ? $validation : array();
+		$response['token']      = $token;
+		$response['expires']    = $expires;
+		$response['domain']     = $domain;
+		$response['target_url'] = $normalized_url;
+		$response['api_key']    = isset( $response['api_key'] ) ? sanitize_text_field( $response['api_key'] ) : '';
 
 		return $response;
 	}
@@ -322,8 +322,8 @@ class EFS_API_Client {
 			return new \WP_Error( 'invalid_response', 'Target site returned an unexpected response while generating migration key.' );
 		}
 
-		$key          = isset( $response['migration_key'] ) ? (string) $response['migration_key'] : '';
-		$message      = isset( $response['message'] ) ? (string) $response['message'] : __( 'Migration key generated.', 'etch-fusion-suite' );
+		$key           = isset( $response['migration_key'] ) ? (string) $response['migration_key'] : '';
+		$message       = isset( $response['message'] ) ? (string) $response['message'] : __( 'Migration key generated.', 'etch-fusion-suite' );
 		$extra_payload = array_diff_key( $response, array_flip( array( 'migration_key', 'message' ) ) );
 
 		return array_merge(

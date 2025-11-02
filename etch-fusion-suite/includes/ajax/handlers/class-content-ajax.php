@@ -342,5 +342,4 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			)
 		);
 	}
-
 }

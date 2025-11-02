@@ -126,11 +126,11 @@ interface Settings_Repository_Interface {
 	/**
 	 * Retrieve a specific feature flag.
 	 *
-	 * @param string $flag_name Feature identifier.
-	 * @param bool   $default   Default value if undefined.
+	 * @param string $flag_name      Feature identifier.
+	 * @param bool   $default_value Default value if undefined.
 	 * @return bool
 	 */
-	public function get_feature_flag( string $flag_name, bool $default = false ): bool;
+	public function get_feature_flag( string $flag_name, bool $default_value = false ): bool;
 
 	/**
 	 * Persist a single feature flag.

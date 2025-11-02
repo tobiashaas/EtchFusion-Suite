@@ -24,11 +24,11 @@ class EFS_Migration_Controller {
 	}
 
 	public function start_migration( array $data ) {
-		$token = isset( $data['migration_token'] ) ? sanitize_text_field( $data['migration_token'] ) : '';
+		$token         = isset( $data['migration_token'] ) ? sanitize_text_field( $data['migration_token'] ) : '';
 		$migration_key = isset( $data['migration_key'] ) ? sanitize_textarea_field( $data['migration_key'] ) : '';
-		$target_url = isset( $data['target_url'] ) ? esc_url_raw( $data['target_url'] ) : '';
-		$api_key = isset( $data['api_key'] ) ? sanitize_text_field( $data['api_key'] ) : '';
-		$token_data = array();
+		$target_url    = isset( $data['target_url'] ) ? esc_url_raw( $data['target_url'] ) : '';
+		$api_key       = isset( $data['api_key'] ) ? sanitize_text_field( $data['api_key'] ) : '';
+		$token_data    = array();
 
 		if ( ! $token && $migration_key ) {
 			$token_data = $this->api_client->validate_migration_key_on_target( $target_url, $migration_key );

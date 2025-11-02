@@ -561,9 +561,14 @@ abstract class EFS_Base_Ajax_Handler {
 			)
 		);
 
+		$default_internal = 'http://efs-etch';
+		if ( $etch_internal ) {
+			$default_internal = $etch_internal;
+		}
+
 		$replacements = array(
-			'https://localhost:8081' => $etch_internal ?: 'http://efs-etch',
-			'http://localhost:8081'  => $etch_internal ?: 'http://efs-etch',
+			'https://localhost:8081' => $default_internal,
+			'http://localhost:8081'  => $default_internal,
 			'https://localhost:8888' => $this->get_docker_host_fallback( 8888 ),
 			'http://localhost:8888'  => $this->get_docker_host_fallback( 8888 ),
 		);
@@ -572,7 +577,7 @@ abstract class EFS_Base_Ajax_Handler {
 			$replacements['https://localhost:8889'] = $etch_internal;
 			$replacements['http://localhost:8889']  = $etch_internal;
 		} else {
-			$fallback_8889                           = $this->get_docker_host_fallback( 8889 );
+			$fallback_8889                          = $this->get_docker_host_fallback( 8889 );
 			$replacements['https://localhost:8889'] = $fallback_8889;
 			$replacements['http://localhost:8889']  = $fallback_8889;
 		}
@@ -607,7 +612,13 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return string|null HTTP base URL for internal service.
 	 */
 	private function resolve_internal_service_host( array $candidates ) {
-		$candidates = apply_filters( 'efs_internal_service_host_candidates', $candidates );
+		$candidates = apply_filters( 'etch_fusion_suite_internal_service_host_candidates', $candidates );
+		$candidates = apply_filters_deprecated(
+			'efs_internal_service_host_candidates',
+			array( $candidates ),
+			'0.11.27',
+			'etch_fusion_suite_internal_service_host_candidates'
+		);
 
 		foreach ( $candidates as $candidate ) {
 			if ( ! is_string( $candidate ) || '' === trim( $candidate ) ) {
@@ -666,7 +677,13 @@ abstract class EFS_Base_Ajax_Handler {
 		 * @param string[] $hosts Candidate hosts to test.
 		 * @param int      $port  Target port number.
 		 */
-		$hosts = apply_filters( 'efs_docker_host_candidates', array_unique( $hosts ), $port );
+		$hosts = apply_filters( 'etch_fusion_suite_docker_host_candidates', array_unique( $hosts ), $port );
+		$hosts = apply_filters_deprecated(
+			'efs_docker_host_candidates',
+			array( $hosts, $port ),
+			'0.11.27',
+			'etch_fusion_suite_docker_host_candidates'
+		);
 
 		foreach ( $hosts as $host ) {
 			if ( ! is_string( $host ) || '' === trim( $host ) ) {

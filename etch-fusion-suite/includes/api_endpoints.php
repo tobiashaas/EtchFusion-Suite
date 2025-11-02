@@ -760,7 +760,7 @@ class EFS_API_Endpoints {
 
 		// Simple validation: check if api_key is provided
 		$api_key = isset( $params['api_key'] ) ? sanitize_text_field( $params['api_key'] ) : '';
-		
+
 		if ( empty( $api_key ) ) {
 			return new \WP_Error(
 				'missing_api_key',

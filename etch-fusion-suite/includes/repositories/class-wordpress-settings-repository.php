@@ -191,7 +191,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		// Sanitize flags: sanitize keys and cast values to boolean
 		$sanitized_flags = array();
 		foreach ( $flags as $key => $value ) {
-			$sanitized_key                    = sanitize_key( $key );
+			$sanitized_key                     = sanitize_key( $key );
 			$sanitized_flags[ $sanitized_key ] = (bool) $value;
 		}
 
@@ -203,14 +203,14 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	/**
 	 * Get a specific feature flag value.
 	 *
-	 * @param string $flag_name Feature flag identifier.
-	 * @param bool   $default   Default value if flag not set.
+	 * @param string $flag_name      Feature flag identifier.
+	 * @param bool   $default_value Default value if flag not set.
 	 * @return bool Flag state.
 	 */
-	public function get_feature_flag( string $flag_name, bool $default = false ): bool {
+	public function get_feature_flag( string $flag_name, bool $default_value = false ): bool {
 		$flags = $this->get_feature_flags();
 
-		return isset( $flags[ $flag_name ] ) ? (bool) $flags[ $flag_name ] : $default;
+		return isset( $flags[ $flag_name ] ) ? (bool) $flags[ $flag_name ] : $default_value;
 	}
 
 	/**

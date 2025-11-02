@@ -63,7 +63,11 @@ class EFS_Admin_Interface {
 		// Enqueue admin CSS
 		$css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin.css';
 		if ( file_exists( $css_path ) ) {
-			$css_version = filemtime( $css_path ) ?: ETCH_FUSION_SUITE_VERSION;
+			$css_version = ETCH_FUSION_SUITE_VERSION;
+			$css_mtime   = filemtime( $css_path );
+			if ( false !== $css_mtime ) {
+				$css_version = $css_mtime;
+			}
 			wp_enqueue_style(
 				'efs-admin-css',
 				ETCH_FUSION_SUITE_URL . 'assets/css/admin.css',
@@ -75,7 +79,11 @@ class EFS_Admin_Interface {
 		// Enqueue admin JavaScript (ES6 module)
 		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
 		if ( file_exists( $js_path ) ) {
-			$js_version = filemtime( $js_path ) ?: ETCH_FUSION_SUITE_VERSION;
+			$js_version = ETCH_FUSION_SUITE_VERSION;
+			$js_mtime   = filemtime( $js_path );
+			if ( false !== $js_mtime ) {
+				$js_version = $js_mtime;
+			}
 			wp_enqueue_script(
 				'efs-admin-main',
 				ETCH_FUSION_SUITE_URL . 'assets/js/admin/main.js',
@@ -119,5 +127,4 @@ class EFS_Admin_Interface {
 
 		return $tag;
 	}
-
 }

@@ -219,5 +219,4 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			wp_send_json_success( $styles );
 		}
 	}
-
 }

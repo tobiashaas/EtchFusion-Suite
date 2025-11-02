@@ -61,8 +61,8 @@ class EFS_Settings_Controller {
 	}
 
 	public function generate_migration_key( array $data ) {
-		$url    = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
-		$key    = isset( $data['api_key'] ) ? $this->sanitize_text( $data['api_key'] ) : '';
+		$url = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
+		$key = isset( $data['api_key'] ) ? $this->sanitize_text( $data['api_key'] ) : '';
 
 		if ( empty( $url ) ) {
 			$url = home_url();

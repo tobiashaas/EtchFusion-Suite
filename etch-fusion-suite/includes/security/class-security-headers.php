@@ -254,17 +254,20 @@ class EFS_Security_Headers {
 			return true;
 		}
 
-		$bricks_action = null;
+		$bricks_action = filter_input( INPUT_GET, 'bricks', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
 
-		if ( isset( $_GET['bricks'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only detection.
-			$bricks_action = sanitize_text_field( wp_unslash( $_GET['bricks'] ) );
-		} elseif ( isset( $_POST['bricks'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Read-only detection.
-			$bricks_action = sanitize_text_field( wp_unslash( $_POST['bricks'] ) );
+		if ( null === $bricks_action || '' === trim( (string) $bricks_action ) ) {
+			$bricks_post = filter_input( INPUT_POST, 'bricks', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
+			if ( null !== $bricks_post && '' !== trim( (string) $bricks_post ) ) {
+				$bricks_action = $bricks_post;
+			}
 		}
 
-		if ( null === $bricks_action ) {
+		if ( null === $bricks_action || '' === trim( (string) $bricks_action ) ) {
 			return false;
 		}
+
+		$bricks_action = sanitize_text_field( (string) $bricks_action );
 
 		$builder_actions = array( 'run', 'preview', 'iframe' );
 

@@ -158,6 +158,11 @@
 
 ## In Progress 🔄
 
+- [✅] Address Nov 2 PHPCS regressions (feature flags & admin UI)
+  - **Added:** 2025-11-02 10:45
+  - **Completed:** 2025-11-02 12:13
+  - **Scope:** Restore zero-violation PHPCS summary after recent UI merge
+
 - [ ] Implement Oct 31 verification comments (CI + Playwright hardening)
   - **Added:** 2025-10-31 07:55
   - **Scope:** Populate tests workflow, update Playwright suites, refresh TESTING.md

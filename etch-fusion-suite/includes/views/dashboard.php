@@ -3,10 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$etch_fusion_suite_extractor_nonce          = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
-$etch_fusion_suite_saved_templates          = isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array();
+$etch_fusion_suite_extractor_nonce            = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
+$etch_fusion_suite_saved_templates            = isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array();
 $etch_fusion_suite_template_extractor_enabled = isset( $template_extractor_enabled ) ? (bool) $template_extractor_enabled : false;
-$etch_fusion_suite_feature_flags_section_id = isset( $feature_flags_section_id ) ? sanitize_key( $feature_flags_section_id ) : 'efs-accordion-feature-flags';
+$etch_fusion_suite_feature_flags_section_id   = isset( $feature_flags_section_id ) ? sanitize_key( $feature_flags_section_id ) : 'efs-accordion-feature-flags';
 ?>
 <div class="wrap efs-typography efs-admin-wrap">
 	<h1><?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?></h1>
@@ -63,20 +63,20 @@ $etch_fusion_suite_feature_flags_section_id = isset( $feature_flags_section_id )
 					<?php esc_html_e( 'Recent Logs', 'etch-fusion-suite' ); ?>
 				</button>
 				<?php if ( $is_etch_site ) : ?>
-					<?php $template_tab_disabled = ! $etch_fusion_suite_template_extractor_enabled; ?>
+					<?php $etch_fusion_suite_template_tab_disabled = ! $etch_fusion_suite_template_extractor_enabled; ?>
 					<button
-						class="efs-tab<?php echo $template_tab_disabled ? ' is-disabled' : ''; ?>"
+						class="efs-tab<?php echo $etch_fusion_suite_template_tab_disabled ? ' is-disabled' : ''; ?>"
 						data-efs-tab="templates"
 						role="tab"
 						aria-selected="false"
 						aria-controls="efs-tab-templates"
-						<?php if ( $template_tab_disabled ) : ?>
+						<?php if ( $etch_fusion_suite_template_tab_disabled ) : ?>
 							data-efs-feature-disabled="true"
 							aria-disabled="true"
 						<?php endif; ?>
 					>
 						<?php esc_html_e( 'Template Extractor', 'etch-fusion-suite' ); ?>
-						<?php if ( $template_tab_disabled ) : ?>
+						<?php if ( $etch_fusion_suite_template_tab_disabled ) : ?>
 							<span class="efs-tab__lock" aria-hidden="true"></span>
 						<?php endif; ?>
 					</button>

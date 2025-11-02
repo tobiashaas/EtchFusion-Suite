@@ -395,36 +395,51 @@ function etch_fusion_suite_debug_log( $message, $data = null, $context = 'ETCH_F
  *
  * ```php
  * // Programmatically enable template extractor
- * add_filter( 'efs_feature_enabled_template_extractor', '__return_true' );
+ * add_filter( 'etch_fusion_suite_feature_enabled_template_extractor', '__return_true' );
  *
  * // Disable all features in staging
  * add_filter(
- * 	'efs_feature_enabled',
- * 	function ( $enabled, $feature ) {
- * 		return wp_get_environment_type() === 'staging' ? false : $enabled;
- * 	},
- * 	10,
- * 	2
+ *  'etch_fusion_suite_feature_enabled',
+ *  function ( $enabled, $feature ) {
+ *      return wp_get_environment_type() === 'staging' ? false : $enabled;
+ *  },
+ *  10,
+ *  2
  * );
  * ```
  *
  * Filters:
- * - `efs_feature_enabled`            (bool $enabled, string $feature_name)
- * - `efs_feature_enabled_{$feature}` (bool $enabled)
+ * - `etch_fusion_suite_feature_enabled`            (bool $enabled, string $feature_name, bool $default_value)
+ * - `etch_fusion_suite_feature_enabled_{$feature}` (bool $enabled, string $feature_key, bool $default_value)
+ * - Legacy: `efs_feature_enabled`                  (bool $enabled, string $feature_name, bool $default_value)
+ * - Legacy: `efs_feature_enabled_{$feature}`       (bool $enabled, string $feature_key, bool $default_value)
  *
  * @param string $feature_name Feature identifier.
- * @param bool   $default      Default state if not configured.
+ * @param bool   $default_value Default state if not configured.
  * @return bool Whether the feature is enabled.
  */
-function efs_feature_enabled( string $feature_name, bool $default = false ): bool {
+function etch_fusion_suite_feature_enabled( string $feature_name, bool $default_value = false ): bool {
 	$container   = etch_fusion_suite_container();
 	$repository  = $container->get( 'settings_repository' );
-	$enabled     = (bool) $repository->get_feature_flag( $feature_name, $default );
-	$enabled     = apply_filters( 'efs_feature_enabled', $enabled, $feature_name );
+	$enabled     = (bool) $repository->get_feature_flag( $feature_name, $default_value );
+	$enabled     = apply_filters( 'etch_fusion_suite_feature_enabled', $enabled, $feature_name, $default_value );
 	$feature_key = sanitize_key( $feature_name );
-	$enabled     = apply_filters( "efs_feature_enabled_{$feature_key}", $enabled );
+	$enabled     = apply_filters( "etch_fusion_suite_feature_enabled_{$feature_key}", $enabled, $feature_key, $default_value );
 
 	return (bool) $enabled;
+}
+
+if ( ! function_exists( 'efs_feature_enabled' ) ) {
+	/**
+	 * Legacy wrapper for backwards compatibility.
+	 *
+	 * @deprecated 0.11.27 Use etch_fusion_suite_feature_enabled().
+	 */
+	function efs_feature_enabled( string $feature_name, bool $default_value = false ): bool {
+		_deprecated_function( __FUNCTION__, '0.11.27', 'etch_fusion_suite_feature_enabled' );
+
+		return etch_fusion_suite_feature_enabled( $feature_name, $default_value );
+	}
 }
 
 // Initialize the plugin (new name)

@@ -52,10 +52,10 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$raw_api_key         = $this->get_post( 'api_key', '' );
-		$normalized_api_key  = $this->normalize_api_key( $raw_api_key );
+		$raw_api_key        = $this->get_post( 'api_key', '' );
+		$normalized_api_key = $this->normalize_api_key( $raw_api_key );
 
-		$raw_target_url     = $this->get_post( 'target_url', '', 'url' );
+		$raw_target_url      = $this->get_post( 'target_url', '', 'url' );
 		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
 
 		try {
@@ -182,7 +182,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				continue;
 			}
 
-			$sanitized_value = \rest_sanitize_boolean( $value );
+			$sanitized_value                    = \rest_sanitize_boolean( $value );
 			$validated_flags[ $sanitized_name ] = (bool) $sanitized_value;
 		}
 
@@ -236,7 +236,10 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			$this->log_security_event(
 				'ajax_action',
 				'Feature flag save failed.',
-				array( 'action' => 'efs_save_feature_flags', 'flags' => $this->mask_sensitive_values( $validated_flags ) ),
+				array(
+					'action' => 'efs_save_feature_flags',
+					'flags'  => $this->mask_sensitive_values( $validated_flags ),
+				),
 				'medium'
 			);
 			wp_send_json_error(
@@ -252,7 +255,10 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$this->log_security_event(
 			'ajax_action',
 			'Feature flags updated successfully.',
-			array( 'action' => 'efs_save_feature_flags', 'flags' => $this->mask_sensitive_values( $validated_flags ) ),
+			array(
+				'action' => 'efs_save_feature_flags',
+				'flags'  => $this->mask_sensitive_values( $validated_flags ),
+			),
 			'low'
 		);
 
@@ -269,7 +275,15 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @return array<string>
 	 */
 	private function get_allowed_feature_flags(): array {
-		return apply_filters( 'efs_allowed_feature_flags', array( 'template_extractor' ) );
+		$flags = apply_filters( 'etch_fusion_suite_allowed_feature_flags', array( 'template_extractor' ) );
+		$flags = apply_filters_deprecated(
+			'efs_allowed_feature_flags',
+			array( $flags ),
+			'0.11.27',
+			'etch_fusion_suite_allowed_feature_flags'
+		);
+
+		return is_array( $flags ) ? array_values( array_unique( $flags ) ) : array( 'template_extractor' );
 	}
 
 	/**
@@ -325,7 +339,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$raw_api_key        = $this->get_post( 'api_key', '' );
 		$normalized_api_key = $this->normalize_api_key( $raw_api_key );
 
-		$raw_target_url     = $this->get_post( 'target_url', '', 'url' );
+		$raw_target_url      = $this->get_post( 'target_url', '', 'url' );
 		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
 
 		try {
@@ -660,5 +674,4 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			$status
 		);
 	}
-
 }

@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2025-10-31 10:15  
-**Version:** 0.11.26
+**Last Updated:** 2025-11-02 12:15  
+**Version:** 0.11.27
 
 ---
 
@@ -95,12 +95,17 @@ The plugin uses a dependency injection container for service management:
 
 ### Phase 10 PHPCS Cleanup (includes/)
 
-**Updated:** 2025-10-28 10:48
+**Updated:** 2025-11-02 12:15
 
 - Completed Phase 10 of the PHPCS initiative across all remaining files inside `includes/`.
 - Replaced short ternaries, enforced Yoda conditions, added strict `in_array()` checks, and normalised assignment alignment across migrators, services, generators, and views.
 - Added missing `translators:` comments for progress strings and standardised container exceptions via anonymous classes to satisfy WPCS naming constraints.
 - Verified a clean `vendor/bin/phpcs includes` run to close out the phase.
+- Phase 11 follow-up (2025-11-02): Retired legacy `efs_*` hooks/functions in favour of the `etch_fusion_suite_*` prefix, added deprecated wrappers where needed, and hardened view templates by wrapping inline variables inside prefixed namespaces to satisfy `PrefixAllGlobals` sniffs.
+- Updated the GitHub updater filters to the new prefix and introduced `apply_filters_deprecated()` bridges to avoid fatal breakage for existing integrations.
+- Refactored AJAX handlers and repositories to eliminate short ternaries, replacing `?:` usage with explicit conditionals.
+- Normalised nonce lookups in `class-security-headers.php` using `filter_input()` to reduce direct superglobal access and quiet nonce verification warnings.
+- Confirmed zero PHPCS violations via `vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary` after changes.
 
 - Composer (`vendor/autoload.php`) wird eingebunden, sobald vorhanden.
 - Zusätzlich bleibt der WordPress-optimierte Autoloader (`includes/autoloader.php`) immer aktiv, damit Legacy-Dateinamen (`class-*.php`) weiterhin funktionieren.

@@ -5,24 +5,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 $etch_fusion_suite_nonce    = isset( $nonce ) ? $nonce : '';
 $etch_fusion_suite_is_https = isset( $is_https ) ? (bool) $is_https : is_ssl();
 $etch_fusion_suite_site_url = isset( $site_url ) ? $site_url : home_url();
-$efs_sections               = array(
+$etch_fusion_suite_sections = array(
 	'application_password' => array(
 		'id'      => 'efs-accordion-application-password',
 		'title'   => __( 'Create an Application Password', 'etch-fusion-suite' ),
 		'content' => 'application_password',
 		'open'    => true,
 	),
-	'site_url' => array(
+	'site_url'             => array(
 		'id'      => 'efs-accordion-site-url',
 		'title'   => __( 'Share This Site URL', 'etch-fusion-suite' ),
 		'content' => 'site_url',
 	),
-	'migration_key' => array(
+	'migration_key'        => array(
 		'id'      => 'efs-accordion-generate-key',
 		'title'   => __( 'Generate Migration Key', 'etch-fusion-suite' ),
 		'content' => 'migration_key',
 	),
-	'feature_flags' => array(
+	'feature_flags'        => array(
 		'id'      => 'efs-accordion-feature-flags',
 		'title'   => __( 'Feature Flags', 'etch-fusion-suite' ),
 		'content' => 'feature_flags',
@@ -35,32 +35,32 @@ $efs_sections               = array(
 		<p><?php esc_html_e( 'Prepare this site to receive content from your Bricks source site.', 'etch-fusion-suite' ); ?></p>
 	</header>
 
-	<?php foreach ( $efs_sections as $section_key => $section_config ) : ?>
+	<?php foreach ( $etch_fusion_suite_sections as $etch_fusion_suite_section_key => $etch_fusion_suite_section_config ) : ?>
 		<?php
-		$section_id       = $section_config['id'];
-		$section_open     = isset( $section_config['open'] ) ? (bool) $section_config['open'] : false;
-		$section_controls = $section_id . '-region';
+		$etch_fusion_suite_section_id       = $etch_fusion_suite_section_config['id'];
+		$etch_fusion_suite_section_open     = isset( $etch_fusion_suite_section_config['open'] ) ? (bool) $etch_fusion_suite_section_config['open'] : false;
+		$etch_fusion_suite_section_controls = $etch_fusion_suite_section_id . '-region';
 		?>
-		<section class="efs-accordion__section<?php echo $section_open ? ' is-expanded' : ''; ?>" data-efs-accordion-section data-section="<?php echo esc_attr( $section_key ); ?>">
+		<section class="efs-accordion__section<?php echo $etch_fusion_suite_section_open ? ' is-expanded' : ''; ?>" data-efs-accordion-section data-section="<?php echo esc_attr( $etch_fusion_suite_section_key ); ?>">
 			<button
 				class="efs-accordion__header"
 				type="button"
-				id="<?php echo esc_attr( $section_id ); ?>"
+				id="<?php echo esc_attr( $etch_fusion_suite_section_id ); ?>"
 				data-efs-accordion-header
-				aria-expanded="<?php echo $section_open ? 'true' : 'false'; ?>"
-				aria-controls="<?php echo esc_attr( $section_controls ); ?>"
+				aria-expanded="<?php echo $etch_fusion_suite_section_open ? 'true' : 'false'; ?>"
+				aria-controls="<?php echo esc_attr( $etch_fusion_suite_section_controls ); ?>"
 			>
-				<span class="efs-accordion__title"><?php echo esc_html( $section_config['title'] ); ?></span>
+				<span class="efs-accordion__title"><?php echo esc_html( $etch_fusion_suite_section_config['title'] ); ?></span>
 			</button>
 			<div
 				class="efs-accordion__content"
-				id="<?php echo esc_attr( $section_controls ); ?>"
+				id="<?php echo esc_attr( $etch_fusion_suite_section_controls ); ?>"
 				data-efs-accordion-content
 				role="region"
-				aria-labelledby="<?php echo esc_attr( $section_id ); ?>"
-				<?php echo $section_open ? '' : ' hidden'; ?>
+				aria-labelledby="<?php echo esc_attr( $etch_fusion_suite_section_id ); ?>"
+				<?php echo $etch_fusion_suite_section_open ? '' : ' hidden'; ?>
 			>
-				<?php if ( 'application_password' === $section_config['content'] ) : ?>
+				<?php if ( 'application_password' === $etch_fusion_suite_section_config['content'] ) : ?>
 					<div class="efs-card__section efs-card__section--borderless">
 						<?php if ( ! $etch_fusion_suite_is_https ) : ?>
 							<div class="notice notice-warning efs-notice">
@@ -80,7 +80,7 @@ $efs_sections               = array(
 							</a>
 						</p>
 					</div>
-				<?php elseif ( 'site_url' === $section_config['content'] ) : ?>
+				<?php elseif ( 'site_url' === $etch_fusion_suite_section_config['content'] ) : ?>
 					<div class="efs-card__section efs-card__section--borderless">
 						<p><?php esc_html_e( 'Provide this URL to the Bricks site during migration setup.', 'etch-fusion-suite' ); ?></p>
 						<div class="efs-field" data-efs-field>
@@ -93,33 +93,33 @@ $efs_sections               = array(
 							</button>
 						</div>
 					</div>
-				<?php elseif ( 'migration_key' === $section_config['content'] ) : ?>
+				<?php elseif ( 'migration_key' === $etch_fusion_suite_section_config['content'] ) : ?>
 					<?php
-					$component_defaults = array(
+					$etch_fusion_suite_component_defaults = array(
 						'nonce'    => $etch_fusion_suite_nonce,
 						'context'  => 'etch',
 						'settings' => array(
 							'target_url' => $etch_fusion_suite_site_url,
 						),
 					);
-					$component_config = isset( $migration_key_args ) && is_array( $migration_key_args )
-						? wp_parse_args( $migration_key_args, $component_defaults )
-						: $component_defaults;
-					(function ( $component_args ) {
+					$etch_fusion_suite_component_config   = isset( $migration_key_args ) && is_array( $migration_key_args )
+						? wp_parse_args( $migration_key_args, $etch_fusion_suite_component_defaults )
+						: $etch_fusion_suite_component_defaults;
+					( function ( $etch_fusion_suite_component_args ) {
 						$component_args = wp_parse_args(
-							$component_args,
+							$etch_fusion_suite_component_args,
 							array(
 								'nonce'    => '',
 								'context'  => '',
 								'settings' => array(),
 							)
 						);
-						$nonce    = $component_args['nonce'];
-						$context  = $component_args['context'];
-						$settings = is_array( $component_args['settings'] ) ? $component_args['settings'] : array();
+						$nonce          = $component_args['nonce'];
+						$context        = $component_args['context'];
+						$settings       = is_array( $component_args['settings'] ) ? $component_args['settings'] : array();
 						require __DIR__ . '/migration-key-component.php';
-					})( $component_config );
-					unset( $component_defaults, $component_config );
+					} )( $etch_fusion_suite_component_config );
+					unset( $etch_fusion_suite_component_defaults, $etch_fusion_suite_component_config );
 					?>
 					<div class="efs-field" data-efs-field>
 						<label for="efs-generated-key"><?php esc_html_e( 'Latest Generated Key', 'etch-fusion-suite' ); ?></label>
@@ -130,7 +130,7 @@ $efs_sections               = array(
 							<?php esc_html_e( 'Copy Key', 'etch-fusion-suite' ); ?>
 						</button>
 					</div>
-				<?php elseif ( 'feature_flags' === $section_config['content'] ) : ?>
+				<?php elseif ( 'feature_flags' === $etch_fusion_suite_section_config['content'] ) : ?>
 					<form method="post" class="efs-feature-flags-form" data-efs-feature-flags>
 						<input type="hidden" name="nonce" value="<?php echo esc_attr( $etch_fusion_suite_nonce ); ?>" />
 						<div class="efs-field efs-field--checkbox">

@@ -102,12 +102,31 @@ class EFS_GitHub_Updater {
 		$this->plugin_slug     = dirname( $this->plugin_basename );
 
 		// Default GitHub repository settings.
-		$this->github_repo_owner = apply_filters( 'efs_github_updater_repo_owner', 'tobiashaas' );
-		$this->github_repo_name  = apply_filters( 'efs_github_updater_repo_name', 'EtchFusion-Suite' );
+		$this->github_repo_owner = apply_filters( 'etch_fusion_suite_github_updater_repo_owner', 'tobiashaas' );
+		$this->github_repo_owner = apply_filters_deprecated(
+			'efs_github_updater_repo_owner',
+			array( $this->github_repo_owner ),
+			'0.11.27',
+			'etch_fusion_suite_github_updater_repo_owner'
+		);
+
+		$this->github_repo_name = apply_filters( 'etch_fusion_suite_github_updater_repo_name', 'EtchFusion-Suite' );
+		$this->github_repo_name = apply_filters_deprecated(
+			'efs_github_updater_repo_name',
+			array( $this->github_repo_name ),
+			'0.11.27',
+			'etch_fusion_suite_github_updater_repo_name'
+		);
 
 		// Cache settings.
 		$this->cache_key        = 'efs_github_update_data';
-		$this->cache_expiration = apply_filters( 'efs_github_updater_cache_expiration', 43200 ); // 12 hours.
+		$this->cache_expiration = apply_filters( 'etch_fusion_suite_github_updater_cache_expiration', 43200 ); // 12 hours.
+		$this->cache_expiration = apply_filters_deprecated(
+			'efs_github_updater_cache_expiration',
+			array( $this->cache_expiration ),
+			'0.11.27',
+			'etch_fusion_suite_github_updater_cache_expiration'
+		);
 
 		// Read plugin headers for version requirements.
 		$this->plugin_headers = $this->read_plugin_headers();
@@ -165,18 +184,18 @@ class EFS_GitHub_Updater {
 		// Compare versions.
 		if ( version_compare( $installed_version, $remote_data['version'], '<' ) ) {
 			// Update available - create update object.
-			$update                = new stdClass();
-			$update->slug          = $this->plugin_slug;
-			$update->plugin        = $this->plugin_basename;
-			$update->new_version   = $remote_data['version'];
-			$update->url           = 'https://github.com/' . $this->github_repo_owner . '/' . $this->github_repo_name;
-			$update->package       = $remote_data['download_url'];
-			$update->tested        = $this->plugin_headers['tested'];
-			$update->requires      = $this->plugin_headers['requires'];
-			$update->icons         = array(
+			$update              = new stdClass();
+			$update->slug        = $this->plugin_slug;
+			$update->plugin      = $this->plugin_basename;
+			$update->new_version = $remote_data['version'];
+			$update->url         = 'https://github.com/' . $this->github_repo_owner . '/' . $this->github_repo_name;
+			$update->package     = $remote_data['download_url'];
+			$update->tested      = $this->plugin_headers['tested'];
+			$update->requires    = $this->plugin_headers['requires'];
+			$update->icons       = array(
 				'default' => 'https://raw.githubusercontent.com/' . $this->github_repo_owner . '/' . $this->github_repo_name . '/main/assets/icon-256x256.png',
 			);
-			$update->banners       = array(
+			$update->banners     = array(
 				'low'  => 'https://raw.githubusercontent.com/' . $this->github_repo_owner . '/' . $this->github_repo_name . '/main/assets/banner-772x250.png',
 				'high' => 'https://raw.githubusercontent.com/' . $this->github_repo_owner . '/' . $this->github_repo_name . '/main/assets/banner-1544x500.png',
 			);
@@ -185,15 +204,15 @@ class EFS_GitHub_Updater {
 			$transient->response[ $this->plugin_basename ] = $update;
 		} else {
 			// No update available - optionally set no_update for clarity.
-			$no_update                = new stdClass();
-			$no_update->slug          = $this->plugin_slug;
-			$no_update->plugin        = $this->plugin_basename;
-			$no_update->new_version   = $remote_data['version'];
-			$no_update->url           = 'https://github.com/' . $this->github_repo_owner . '/' . $this->github_repo_name;
-			$no_update->package       = $remote_data['download_url'];
-			$no_update->tested        = $this->plugin_headers['tested'];
-			$no_update->requires      = $this->plugin_headers['requires'];
-			$no_update->icons         = array(
+			$no_update              = new stdClass();
+			$no_update->slug        = $this->plugin_slug;
+			$no_update->plugin      = $this->plugin_basename;
+			$no_update->new_version = $remote_data['version'];
+			$no_update->url         = 'https://github.com/' . $this->github_repo_owner . '/' . $this->github_repo_name;
+			$no_update->package     = $remote_data['download_url'];
+			$no_update->tested      = $this->plugin_headers['tested'];
+			$no_update->requires    = $this->plugin_headers['requires'];
+			$no_update->icons       = array(
 				'default' => 'https://raw.githubusercontent.com/' . $this->github_repo_owner . '/' . $this->github_repo_name . '/main/assets/icon-256x256.png',
 			);
 
@@ -445,7 +464,15 @@ class EFS_GitHub_Updater {
 		}
 
 		// Apply filter for extensibility.
-		return apply_filters( 'efs_github_updater_download_url', $url, $release_data );
+		$url = apply_filters( 'etch_fusion_suite_github_updater_download_url', $url, $release_data );
+		$url = apply_filters_deprecated(
+			'efs_github_updater_download_url',
+			array( $url, $release_data ),
+			'0.11.27',
+			'etch_fusion_suite_github_updater_download_url'
+		);
+
+		return $url;
 	}
 
 	/**
@@ -566,7 +593,13 @@ class EFS_GitHub_Updater {
 		$args['headers']['User-Agent'] = 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url( '/' ) . '; EtchFusionSuite/' . ETCH_FUSION_SUITE_VERSION;
 
 		// Add authorization header if token is configured.
-		$github_token = apply_filters( 'efs_github_updater_token', '' );
+		$github_token = apply_filters( 'etch_fusion_suite_github_updater_token', '' );
+		$github_token = apply_filters_deprecated(
+			'efs_github_updater_token',
+			array( $github_token ),
+			'0.11.27',
+			'etch_fusion_suite_github_updater_token'
+		);
 		if ( ! empty( $github_token ) ) {
 			$args['headers']['Authorization'] = 'token ' . $github_token;
 		}

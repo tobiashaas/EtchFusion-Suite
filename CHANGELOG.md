@@ -95,6 +95,14 @@
 - Added `scripts/verify-strict-comparison.sh` with Composer `verify-strict` alias for ongoing automation.
 - (2025-10-29 09:26) **Phase 9 Core Files Documentation:** Added `docs/phase9-core-files-compliance.md` detailing PHPCS fixes, rationale for intentional `error_log()` usage in infrastructure files, security verification results, and testing guidance. Updated `DOCUMENTATION.md` and `TODOS.md` with Phase 9 completion notes and timestamps.
 
+## [0.11.27] - 2025-11-02 (12:15)
+
+### 🧹 Maintenance
+- Completed PHPCS remediation across feature flags, AJAX handlers, security headers, view templates, and the GitHub updater.
+- Prefixed legacy `efs_*` hooks/functions with the `etch_fusion_suite_*` namespace, introducing deprecated wrappers to maintain third-party compatibility.
+- Replaced short ternary fallbacks with explicit conditionals and wrapped view-level data in prefixed variables to satisfy `PrefixAllGlobals` sniffs.
+- Normalised nonce detection in security headers via `filter_input()` and confirmed a clean `vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary` run.
+
 ## [0.11.21] - 2025-10-28 (13:31)
 
 ### 🛡️ Security & Hardening

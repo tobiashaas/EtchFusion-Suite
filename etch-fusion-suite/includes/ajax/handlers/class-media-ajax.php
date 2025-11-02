@@ -181,5 +181,4 @@ class EFS_Media_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			);
 		}
 	}
-
 }
