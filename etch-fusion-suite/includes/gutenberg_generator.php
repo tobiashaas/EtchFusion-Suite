@@ -253,7 +253,7 @@ class EFS_Gutenberg_Generator {
 		// Get custom tag from element (e.g., ul, ol)
 		$tag = $element['etch_data']['tag'] ?? 'div';
 
-		error_log( "🎯 B2E convert_etch_container: Element ID {$element['id']}, Tag from etch_data: {$tag}" );
+		$this->error_handler->log_info( 'Gutenberg Generator: convert_etch_container element ID ' . $element['id'] . ' using tag ' . $tag );
 
 		// Build Etch-compatible attributes
 		$etch_attributes = array(
@@ -800,27 +800,27 @@ class EFS_Gutenberg_Generator {
 		$style_ids = array();
 
 		$element_name = $element['name'] ?? 'unknown';
-		error_log( 'B2E: get_element_style_ids called for element: ' . $element_name );
+		$this->error_handler->log_info( 'Gutenberg Generator: get_element_style_ids called for element ' . $element_name );
 
 		// Method 1: Get Bricks global class IDs (if available)
 		if ( isset( $element['settings']['_cssGlobalClasses'] ) && is_array( $element['settings']['_cssGlobalClasses'] ) ) {
 			// Get style map (Bricks ID => Etch ID)
 			$style_map = get_option( 'b2e_style_map', array() );
 
-			error_log( 'B2E: Element ' . $element_name . ' has ' . count( $element['settings']['_cssGlobalClasses'] ) . ' global classes' );
+			$this->error_handler->log_info( 'Gutenberg Generator: Element ' . $element_name . ' has ' . count( $element['settings']['_cssGlobalClasses'] ) . ' global classes' );
 
 			foreach ( $element['settings']['_cssGlobalClasses'] as $bricks_class_id ) {
 				// Convert Bricks ID to Etch ID (handle both old and new format)
 				if ( isset( $style_map[ $bricks_class_id ] ) ) {
 					$etch_id     = is_array( $style_map[ $bricks_class_id ] ) ? $style_map[ $bricks_class_id ]['id'] : $style_map[ $bricks_class_id ];
 					$style_ids[] = $etch_id;
-					error_log( 'B2E: Mapped Bricks ID ' . $bricks_class_id . ' → Etch ID ' . $etch_id );
+					$this->error_handler->log_info( 'Gutenberg Generator: Mapped Bricks ID ' . $bricks_class_id . ' to Etch ID ' . $etch_id );
 				} else {
-					error_log( 'B2E: WARNING - Bricks ID ' . $bricks_class_id . ' not found in style_map!' );
+					$this->error_handler->log_info( 'Gutenberg Generator: Bricks ID ' . $bricks_class_id . ' not found in style_map' );
 				}
 			}
 		} else {
-			error_log( 'B2E: Element ' . $element_name . ' has NO _cssGlobalClasses in settings' );
+			$this->error_handler->log_info( 'Gutenberg Generator: Element ' . $element_name . ' has no _cssGlobalClasses in settings' );
 		}
 
 		// Method 2: Get regular CSS classes and map them to style IDs
@@ -840,8 +840,8 @@ class EFS_Gutenberg_Generator {
 			// Only generate IDs for classes that exist in Bricks Global Classes
 			// We need to find the Bricks ID for this class name, then lookup in style_map
 			$style_map = get_option( 'b2e_style_map', array() );
-			error_log( 'B2E: Style map has ' . count( $style_map ) . ' entries' );
-			error_log( 'B2E: Processing ' . count( $classes ) . ' classes: ' . implode( ', ', $classes ) );
+			$this->error_handler->log_info( 'Gutenberg Generator: Style map has ' . count( $style_map ) . ' entries' );
+			$this->error_handler->log_info( 'Gutenberg Generator: Processing ' . count( $classes ) . ' classes: ' . implode( ', ', $classes ) );
 
 			foreach ( $classes as $class_name ) {
 				if ( in_array( $class_name, $bricks_class_names, true ) ) {
@@ -850,7 +850,7 @@ class EFS_Gutenberg_Generator {
 					foreach ( $bricks_classes as $bricks_class ) {
 						$bricks_class_name = ! empty( $bricks_class['name'] ) ? $bricks_class['name'] : $bricks_class['id'];
 						$bricks_class_name = preg_replace( '/^acss_import_/', '', $bricks_class_name );
-						if ( $bricks_class_name === $class_name ) {
+						if ( $class_name === $bricks_class_name ) {
 							$bricks_id = $bricks_class['id'];
 							break;
 						}
@@ -860,19 +860,18 @@ class EFS_Gutenberg_Generator {
 					if ( $bricks_id && isset( $style_map[ $bricks_id ] ) ) {
 						$etch_id     = is_array( $style_map[ $bricks_id ] ) ? $style_map[ $bricks_id ]['id'] : $style_map[ $bricks_id ];
 						$style_ids[] = $etch_id;
-						error_log( 'B2E: Found Global Class: ' . $class_name . ' (Bricks ID: ' . $bricks_id . ') → Etch ID ' . $etch_id );
+						$this->error_handler->log_info( 'Gutenberg Generator: Found global class ' . $class_name . ' (Bricks ID ' . $bricks_id . ') mapped to Etch ID ' . $etch_id );
 					} else {
-						error_log( 'B2E: Global Class found but no style_map entry: ' . $class_name );
+						$this->error_handler->log_info( 'Gutenberg Generator: Global class ' . $class_name . ' missing style_map entry' );
 					}
 				} else {
-					error_log( 'B2E: Skipping non-Global Class: ' . $class_name );
+					$this->error_handler->log_info( 'Gutenberg Generator: Skipping non-global class ' . $class_name );
 				}
 			}
 		}
 
 		return array_unique( $style_ids );
 	}
-
 
 	/**
 	 * Convert style IDs to CSS class names for etchData.attributes.class
@@ -882,21 +881,21 @@ class EFS_Gutenberg_Generator {
 	 */
 	private function get_css_classes_from_style_ids( $style_ids ) {
 		if ( empty( $style_ids ) ) {
-			error_log( 'B2E CSS Classes: No style IDs provided' );
+			$this->error_handler->log_info( 'Gutenberg Generator: No style IDs provided' );
 			return '';
 		}
 
 		// Get style map which now contains selectors
 		$style_map = get_option( 'b2e_style_map', array() );
-		error_log( 'B2E CSS Classes: Style map has ' . count( $style_map ) . ' entries' );
-		error_log( 'B2E CSS Classes: Looking for IDs: ' . implode( ', ', $style_ids ) );
+		$this->error_handler->log_info( 'Gutenberg Generator: Style map has ' . count( $style_map ) . ' entries' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Looking for style IDs: ' . implode( ', ', $style_ids ) );
 
 		$class_names = array();
 
 		foreach ( $style_ids as $style_id ) {
 			// Skip Etch internal styles (they don't have selectors in our map)
 			if ( in_array( $style_id, array( 'etch-section-style', 'etch-container-style', 'etch-block-style' ), true ) ) {
-				error_log( 'B2E CSS Classes: Skipping Etch internal style: ' . $style_id );
+				$this->error_handler->log_info( 'Gutenberg Generator: Skipping internal style ID ' . $style_id );
 				continue;
 			}
 
@@ -905,7 +904,7 @@ class EFS_Gutenberg_Generator {
 				// Handle both old format (string) and new format (array)
 				$etch_id = is_array( $style_data ) ? $style_data['id'] : $style_data;
 
-				if ( $etch_id === $style_id ) {
+				if ( $style_id === $etch_id ) {
 					// New format: get selector from style_data
 					if ( is_array( $style_data ) && ! empty( $style_data['selector'] ) ) {
 						$selector = $style_data['selector'];
@@ -913,18 +912,20 @@ class EFS_Gutenberg_Generator {
 						$class_name = ltrim( $selector, '.' );
 						// Remove pseudo-selectors and attribute selectors
 						$class_name = preg_replace( '/[\[\]:].+$/', '', $class_name );
+
 						if ( ! empty( $class_name ) ) {
 							$class_names[] = $class_name;
-							error_log( 'B2E CSS Classes: Found ' . $style_id . ' → ' . $class_name );
+							$this->error_handler->log_info( 'Gutenberg Generator: Resolved style ID ' . $style_id . ' to class ' . $class_name );
 						}
 					}
+
 					break;
 				}
 			}
 		}
 
 		$result = ! empty( $class_names ) ? implode( ' ', array_unique( $class_names ) ) : '';
-		error_log( 'B2E CSS Classes: Result: "' . $result . '"' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Resolved CSS classes string: "' . $result . '"' );
 		return $result;
 	}
 
@@ -939,12 +940,12 @@ class EFS_Gutenberg_Generator {
 		// Add timestamp comment to verify new content is generated
 		$generation_timestamp = wp_date( 'Y-m-d H:i:s' );
 		$timestamp            = '<!-- B2E Generated: ' . $generation_timestamp . ' | v0.5.0: Modular Element Converters -->';
-		error_log( 'B2E: Generating blocks at ' . $generation_timestamp . ' with v0.5.0 Modular Converters' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks at ' . $generation_timestamp . ' with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
 		$style_map             = get_option( 'b2e_style_map', array() );
 		$this->element_factory = new EFS_Element_Factory( $style_map );
-		error_log( 'B2E: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
 
 		// Build element lookup map (id => element)
 		$element_map = array();
@@ -978,7 +979,7 @@ class EFS_Gutenberg_Generator {
 	 * Convert Bricks to Gutenberg and save to database (FOR ECH PROCESSING!)
 	 */
 	public function convert_bricks_to_gutenberg( $post ) {
-		error_log( 'B2E: convert_bricks_to_gutenberg called for post ' . $post->ID );
+		$this->error_handler->log_info( 'Gutenberg Generator: convert_bricks_to_gutenberg called for post ' . $post->ID );
 
 		// Check for Bricks content first
 		$bricks_content = get_post_meta( $post->ID, '_bricks_page_content_2', true );
@@ -1003,12 +1004,12 @@ class EFS_Gutenberg_Generator {
 			return false;
 		}
 
-		error_log( 'B2E: Found ' . count( $bricks_content ) . ' Bricks elements' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Found ' . count( $bricks_content ) . ' Bricks elements' );
 
 		// Convert Bricks elements directly to Gutenberg HTML (SIMPLE APPROACH)
 		$gutenberg_html = $this->convert_bricks_to_gutenberg_html( $bricks_content, $post );
 
-		error_log( 'B2E: Generated HTML length: ' . strlen( $gutenberg_html ) );
+		$this->error_handler->log_info( 'Gutenberg Generator: Generated HTML length ' . strlen( $gutenberg_html ) );
 
 		if ( empty( $gutenberg_html ) ) {
 			$this->error_handler->log_error(
@@ -1069,7 +1070,7 @@ class EFS_Gutenberg_Generator {
 		$target_post_type = $post->post_type;
 		if ( 'bricks_template' === $target_post_type ) {
 			$target_post_type = 'page';
-			error_log( 'B2E: Converting bricks_template to page: ' . $post->post_title );
+			$this->error_handler->log_info( 'Gutenberg Generator: Converting bricks_template to page for post ' . $post->post_title );
 		}
 
 		// Prepare payload in format expected by /import/post endpoint
@@ -1087,10 +1088,10 @@ class EFS_Gutenberg_Generator {
 		);
 
 		// Debug log
-		error_log( 'B2E: Sending blocks to: ' . $endpoint_url );
-		error_log( 'B2E: Post title: ' . $post->post_title );
-		error_log( 'B2E: Blocks count: ' . count( $gutenberg_blocks ) );
-		error_log( 'B2E: API Key: ' . substr( $api_key, 0, 10 ) . '...' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Sending blocks to endpoint ' . $endpoint_url );
+		$this->error_handler->log_info( 'Gutenberg Generator: Post title ' . $post->post_title );
+		$this->error_handler->log_info( 'Gutenberg Generator: Blocks count ' . count( $gutenberg_blocks ) );
+		$this->error_handler->log_info( 'Gutenberg Generator: API key prefix ' . substr( $api_key, 0, 10 ) . '...' );
 
 		$response = wp_remote_post(
 			$endpoint_url,
@@ -1106,10 +1107,10 @@ class EFS_Gutenberg_Generator {
 
 		// Debug log response
 		if ( is_wp_error( $response ) ) {
-			error_log( 'B2E: WP_Error: ' . $response->get_error_message() );
+			$this->error_handler->log_info( 'Gutenberg Generator: API request error - ' . $response->get_error_message() );
 		} else {
-			error_log( 'B2E: Response code: ' . wp_remote_retrieve_response_code( $response ) );
-			error_log( 'B2E: Response body: ' . wp_remote_retrieve_body( $response ) );
+			$this->error_handler->log_info( 'Gutenberg Generator: Response code ' . wp_remote_retrieve_response_code( $response ) );
+			$this->error_handler->log_info( 'Gutenberg Generator: Response body ' . wp_remote_retrieve_body( $response ) );
 		}
 
 		if ( is_wp_error( $response ) ) {
@@ -1188,7 +1189,7 @@ class EFS_Gutenberg_Generator {
 			}
 
 			// Fallback to old method if factory doesn't support this element
-			error_log( '⚠️ B2E: Factory returned null for element type: ' . ( $element['name'] ?? 'unknown' ) );
+			$this->error_handler->log_info( 'Gutenberg Generator: Element factory returned null for element type ' . ( $element['name'] ?? 'unknown' ) );
 		}
 
 		// OLD METHOD (Fallback)
@@ -1653,7 +1654,7 @@ class EFS_Gutenberg_Generator {
 		// Check if container has a custom tag (e.g., ul, ol)
 		$tag = $element['settings']['tag'] ?? 'div';
 
-		error_log( "🔧 B2E Container: Element ID {$element['id']}, Tag: {$tag}, Settings: " . wp_json_encode( $element['settings'] ) );
+		$this->error_handler->log_info( 'Gutenberg Generator: Container element ' . $element['id'] . ' using tag ' . $tag . ' with settings ' . wp_json_encode( $element['settings'] ) );
 
 		$element['etch_type'] = 'container';
 		$element['etch_data'] = array(

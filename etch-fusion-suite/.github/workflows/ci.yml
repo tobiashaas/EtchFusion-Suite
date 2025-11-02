@@ -26,6 +26,14 @@ jobs:
           tools: composer:v2
 
       - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: etch-fusion-suite/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('etch-fusion-suite/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache/files
@@ -37,8 +45,24 @@ jobs:
         run: composer install --prefer-dist --no-progress --no-suggest
         working-directory: etch-fusion-suite
 
-      - name: Run WordPress Coding Standards
-        run: composer lint
+      - name: Run PHP_CodeSniffer
+        run: |
+          echo "Running PHPCS with WordPress-Core ruleset..."
+          vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary
+          echo "✓ PHPCS passed with zero violations"
+        working-directory: etch-fusion-suite
+
+      - name: Run PHPCS Verification Scripts
+        run: |
+          echo "Running strict comparison verification..."
+          ./scripts/verify-strict-comparison.sh
+          echo "Running Yoda conditions verification..."
+          ./scripts/verify-yoda-conditions.sh
+          echo "Running hook prefixing verification..."
+          ./scripts/verify-hook-prefixing.sh
+          echo "Running date/time functions verification..."
+          ./scripts/verify-datetime-functions.sh
+          echo "✓ All verification scripts passed"
         working-directory: etch-fusion-suite
 
   compatibility:

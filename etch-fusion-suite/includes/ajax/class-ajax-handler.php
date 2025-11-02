@@ -13,6 +13,7 @@ namespace Bricks2Etch\Ajax;
 use Bricks2Etch\Ajax\Handlers\EFS_CSS_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Content_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Media_Ajax_Handler;
+use Bricks2Etch\Ajax\Handlers\EFS_Migration_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Validation_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Logs_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Connection_Ajax_Handler;
@@ -41,7 +42,8 @@ class EFS_Ajax_Handler {
 		EFS_Logs_Ajax_Handler $logs_handler,
 		EFS_Connection_Ajax_Handler $connection_handler,
 		EFS_Cleanup_Ajax_Handler $cleanup_handler,
-		EFS_Template_Ajax_Handler $template_handler
+		EFS_Template_Ajax_Handler $template_handler,
+		EFS_Migration_Ajax_Handler $migration_handler
 	) {
 		$this->init_handlers(
 			$css_handler,
@@ -51,7 +53,8 @@ class EFS_Ajax_Handler {
 			$logs_handler,
 			$connection_handler,
 			$cleanup_handler,
-			$template_handler
+			$template_handler,
+			$migration_handler
 		);
 	}
 
@@ -66,7 +69,8 @@ class EFS_Ajax_Handler {
 		EFS_Logs_Ajax_Handler $logs_handler,
 		EFS_Connection_Ajax_Handler $connection_handler,
 		EFS_Cleanup_Ajax_Handler $cleanup_handler,
-		EFS_Template_Ajax_Handler $template_handler
+		EFS_Template_Ajax_Handler $template_handler,
+		EFS_Migration_Ajax_Handler $migration_handler
 	) {
 		$this->handlers['css']        = $css_handler;
 		$this->handlers['content']    = $content_handler;
@@ -76,6 +80,7 @@ class EFS_Ajax_Handler {
 		$this->handlers['connection'] = $connection_handler;
 		$this->handlers['cleanup']    = $cleanup_handler;
 		$this->handlers['template']   = $template_handler;
+		$this->handlers['migration']  = $migration_handler;
 	}
 
 	/**

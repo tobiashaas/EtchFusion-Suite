@@ -250,6 +250,7 @@ class EFS_Error_Handler {
 		$this->add_to_log( $log_entry );
 
 		// Also log to WordPress error log
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: mirrors errors to WordPress debug.log for system-level debugging
 		error_log(
 			sprintf(
 				'[Etch Fusion Suite] %s: %s - %s',
@@ -292,6 +293,39 @@ class EFS_Error_Handler {
 	}
 
 	/**
+	 * Log an informational message for diagnostics.
+	 *
+	 * @param string $message Informational message to record.
+	 * @param array  $context Optional context data for downstream debugging.
+	 */
+	public function log_info( $message, $context = array() ) {
+		$log_entry = array(
+			'timestamp' => current_time( 'mysql' ),
+			'type'      => 'info',
+			'message'   => $message,
+			'context'   => $context,
+		);
+
+		$this->add_to_log( $log_entry );
+
+		// Mirror to debug log when enabled for parity with debug_log helper.
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
+			$log_message = sprintf(
+				'[EFS_INFO] %s: %s',
+				current_time( 'Y-m-d H:i:s' ),
+				$message
+			);
+
+			if ( ! empty( $context ) ) {
+				$log_message .= ' | Context: ' . wp_json_encode( $context );
+			}
+
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: mirrors info logs to WordPress debug.log when WP_DEBUG is enabled
+			error_log( $log_message );
+		}
+	}
+
+	/**
 	 * Add entry to migration log
 	 *
 	 * @param array $log_entry Log entry data
@@ -321,7 +355,7 @@ class EFS_Error_Handler {
 			$log = array_filter(
 				$log,
 				function ( $entry ) use ( $type ) {
-					return $entry['type'] === $type;
+					return $type === $entry['type'];
 				}
 			);
 		}
@@ -407,6 +441,7 @@ class EFS_Error_Handler {
 			$log_message .= ' | Data: ' . wp_json_encode( $data );
 		}
 
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: development debug helper mirroring to WordPress debug.log when WP_DEBUG is enabled
 		error_log( $log_message );
 	}
 }

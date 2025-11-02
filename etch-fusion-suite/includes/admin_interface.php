@@ -36,9 +36,7 @@ class EFS_Admin_Interface {
 		}
 
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
-
-		add_action( 'wp_ajax_efs_save_settings', array( $this, 'delegate_settings_request' ) );
-		add_action( 'wp_ajax_efs_test_connection', array( $this, 'delegate_validation_request' ) );
+		add_filter( 'script_loader_tag', array( $this, 'add_module_type_attribute' ), 10, 3 );
 	}
 
 	public function add_admin_menu() {
@@ -58,29 +56,31 @@ class EFS_Admin_Interface {
 	}
 
 	public function enqueue_admin_assets( $hook ) {
-		if ( strpos( $hook, 'etch-fusion-suite' ) === false ) {
+		if ( false === strpos( $hook, 'etch-fusion-suite' ) ) {
 			return;
 		}
 
 		// Enqueue admin CSS
 		$css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin.css';
 		if ( file_exists( $css_path ) ) {
+			$css_version = filemtime( $css_path ) ?: ETCH_FUSION_SUITE_VERSION;
 			wp_enqueue_style(
 				'efs-admin-css',
 				ETCH_FUSION_SUITE_URL . 'assets/css/admin.css',
 				array(),
-				ETCH_FUSION_SUITE_VERSION
+				$css_version
 			);
 		}
 
 		// Enqueue admin JavaScript (ES6 module)
 		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
 		if ( file_exists( $js_path ) ) {
+			$js_version = filemtime( $js_path ) ?: ETCH_FUSION_SUITE_VERSION;
 			wp_enqueue_script(
 				'efs-admin-main',
 				ETCH_FUSION_SUITE_URL . 'assets/js/admin/main.js',
 				array(),
-				ETCH_FUSION_SUITE_VERSION,
+				$js_version,
 				true
 			);
 
@@ -89,113 +89,35 @@ class EFS_Admin_Interface {
 			// Localize script data
 			$context            = $this->dashboard_controller->get_dashboard_context();
 			$context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
-			$context['nonce']   = wp_create_nonce( 'efs_nonce' );
+			// Nonce is generated here and consumed by verify_request() in all AJAX handlers (nonce action matches $nonce_action).
+			$context['nonce'] = wp_create_nonce( 'efs_nonce' );
 
+			// wp_localize_script() escapes all values, making it safe to pass controller context directly.
 			wp_localize_script( 'efs-admin-main', 'efsData', $context );
 		} else {
 			// Log missing asset for debugging
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs missing admin asset for debugging when WP_DEBUG is enabled
 			error_log( sprintf( '[EFS] Admin script not found: %s', $js_path ) );
 		}
 	}
 
-	public function delegate_settings_request() {
-		$this->get_request_payload();
-		$handler = $this->resolve_ajax_handler( 'validation_ajax' );
-		if ( $handler ) {
-			$handler->validate_api_key();
-			return;
-		}
-
-		wp_send_json_error(
-			array(
-				'message' => __( 'Settings handler unavailable.', 'etch-fusion-suite' ),
-				'code'    => 'handler_unavailable',
-			),
-			503
-		);
-	}
-
-	public function delegate_validation_request() {
-		$this->get_request_payload();
-		$handler = $this->resolve_ajax_handler( 'validation_ajax' );
-		if ( $handler ) {
-			$handler->validate_api_key();
-			return;
-		}
-
-		wp_send_json_error(
-			array(
-				'message' => __( 'Validation handler unavailable.', 'etch-fusion-suite' ),
-				'code'    => 'handler_unavailable',
-			),
-			503
-		);
-	}
-
 	/**
-	 * Retrieve sanitized POST payload.
+	 * Add type="module" attribute to admin script tag.
 	 *
-	 * @return array<string,mixed>
+	 * @param string $tag    The script tag HTML.
+	 * @param string $handle The script handle.
+	 * @param string $src    The script source URL.
+	 * @return string Modified script tag.
 	 */
-	private function get_request_payload() {
-		$nonce_valid = check_ajax_referer( 'efs_nonce', 'nonce', false );
-
-		if ( false === $nonce_valid ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Security check failed. Please refresh and try again.', 'etch-fusion-suite' ),
-					'code'    => 'invalid_nonce',
-				),
-				403
-			);
-		}
-		if ( empty( $_POST ) || ! is_array( $_POST ) ) {
-			return array();
+	public function add_module_type_attribute( $tag, $handle, $src ) {
+		if ( 'efs-admin-main' !== $handle ) {
+			return $tag;
 		}
 
-		$payload = $this->sanitize_payload_recursively( wp_unslash( $_POST ) );
+		// Replace the opening script tag to include type="module"
+		$tag = str_replace( '<script ', '<script type="module" ', $tag );
 
-		if ( isset( $payload['nonce'] ) ) {
-			unset( $payload['nonce'] );
-		}
-
-		return $payload;
+		return $tag;
 	}
 
-	/**
-	 * Recursively sanitize payload values.
-	 *
-	 * @param mixed $value Raw value.
-	 * @return mixed
-	 */
-	private function sanitize_payload_recursively( $value ) {
-		if ( is_array( $value ) ) {
-			foreach ( $value as $key => $item ) {
-				$value[ $key ] = $this->sanitize_payload_recursively( $item );
-			}
-
-			return $value;
-		}
-
-		if ( is_scalar( $value ) ) {
-			return sanitize_text_field( (string) $value );
-		}
-
-		return $value;
-	}
-
-	private function resolve_ajax_handler( $service_id ) {
-		if ( function_exists( 'etch_fusion_suite_container' ) ) {
-			try {
-				$container = etch_fusion_suite_container();
-				if ( $container->has( $service_id ) ) {
-					return $container->get( $service_id );
-				}
-			} catch ( \Exception $exception ) {
-				error_log( sprintf( '[EFS] Failed to resolve AJAX handler "%s": %s', $service_id, $exception->getMessage() ) );
-			}
-		}
-
-		return null;
-	}
 }

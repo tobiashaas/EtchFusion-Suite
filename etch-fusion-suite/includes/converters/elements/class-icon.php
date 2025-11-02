@@ -49,6 +49,7 @@ class EFS_Icon_Converter extends EFS_Base_Element {
 
 		// TODO: Implement icon conversion
 		// For now, return a placeholder paragraph
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: tracks unimplemented icon conversion during development
 		error_log( '⚠️ B2E Icon: Icon conversion not yet implemented - ' . $icon_library . ':' . $icon_value );
 
 		// Placeholder: Return empty paragraph

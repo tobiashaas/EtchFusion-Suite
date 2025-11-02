@@ -149,6 +149,7 @@ h1 {
 /* Cards - Etch Dark Theme */
 .efs-card {
     display: flex;
+    inline-size: 100%;
     gap: var(--e-content-gap);
     flex-direction: column;
     background: var(--e-base);
@@ -268,6 +269,44 @@ h1 {
 	opacity: 0;
 }
 
+.efs-tab.is-disabled,
+.efs-tab[aria-disabled='true'],
+.efs-tab[data-efs-feature-disabled="true"] {
+	opacity: 0.6;
+	cursor: not-allowed;
+	position: relative;
+}
+
+.efs-tab__lock {
+	display: inline-flex;
+	inline-size: 16px;
+	block-size: 16px;
+	margin-inline-start: var(--e-space-xs);
+	background: currentColor;
+	mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Crect x="3" y="11" width="18" height="10" rx="2" ry="2"/%3E%3Cpath d="M7 11V7a5 5 0 0110 0v4"/%3E%3C/svg%3E') center / contain no-repeat;
+}
+
+.efs-tab__panel[data-efs-feature-disabled="true"] {
+	background: color-mix(in srgb, var(--e-base) 92%, white 8%);
+	border-style: dashed;
+	opacity: 1;
+}
+
+.efs-empty-state {
+	display: grid;
+	gap: var(--e-space-m);
+	text-align: center;
+}
+
+.efs-empty-state h3 {
+	margin: 0;
+}
+
+.efs-empty-state p {
+	margin: 0;
+	color: var(--e-foreground-color-muted);
+}
+
 /* Progress Text */
 [data-efs-current-step] {
 	color: var(--e-foreground-color-muted);
@@ -324,12 +363,14 @@ h1 {
 }
 
 .efs-log-entry {
-	padding: var(--e-space-m);
-	border-radius: var(--e-border-radius);
-	background: var(--e-base-dark);
-	border: var(--e-border-width) solid var(--e-border-color-muted);
 	display: grid;
 	gap: var(--e-space-s);
+	padding: var(--e-space-m);
+	margin-bottom: var(--e-space-s);
+	border-radius: var(--e-border-radius);
+	background: var(--e-base-dark);
+	border: var(--e-border-width) var(--e-border-style) var(--e-border-color-ultra-light);
+	color: var(--e-light);
 }
 
 .efs-log-entry__header {
@@ -396,6 +437,164 @@ h1 {
 	grid-template-columns: minmax(120px, auto) 1fr;
 	gap: var(--e-space-xs);
 	align-items: baseline;
+}
+
+.efs-log-entry .efs-log-level {
+	font-size: 10px;
+	text-transform: uppercase;
+	font-weight: 500;
+}
+
+.efs-log-entry .efs-log-timestamp {
+	color: var(--e-base-light);
+	font-size: 11px;
+	font-family: monospace;
+}
+
+.efs-log-entry .efs-log-code {
+	color: var(--e-primary);
+	font-size: 11px;
+	font-family: monospace;
+	margin-bottom: var(--e-space-xs);
+}
+
+.efs-log-entry .efs-log-message {
+	color: var(--e-light);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+/* Accordion */
+.efs-accordion {
+	display: grid;
+	gap: var(--e-accordion-gap);
+}
+
+.efs-accordion__section {
+	border: var(--e-border);
+	border-radius: var(--e-border-radius);
+	background: var(--e-base-dark);
+	overflow: hidden;
+}
+
+.efs-accordion__section.is-expanded {
+	border-color: var(--e-primary);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--e-primary) 65%, transparent);
+}
+
+.efs-accordion__header {
+	inline-size: 100%;
+	background: none;
+	border: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	padding: var(--e-space-m) var(--e-space-l);
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	cursor: pointer;
+	position: relative;
+}
+
+.efs-accordion__header::after {
+	content: '';
+	inline-size: 12px;
+	block-size: 12px;
+	transform: rotate(0deg);
+	transition: transform 0.2s ease;
+	background: currentColor;
+	mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="6 9 12 15 18 9"/%3E%3C/svg%3E') center/contain no-repeat;
+}
+
+.efs-accordion__section.is-expanded .efs-accordion__header::after {
+	transform: rotate(180deg);
+}
+
+.efs-accordion__header:focus-visible {
+	outline: 2px solid var(--e-primary);
+	outline-offset: 2px;
+}
+
+.efs-accordion__content {
+	padding: 0 var(--e-space-l) var(--e-space-l);
+	background: var(--e-base);
+	max-height: var(--efs-accordion-content-height, 0);
+	overflow: hidden;
+	transition: max-height 0.3s ease;
+}
+
+.efs-card__section--borderless {
+	border: none;
+	padding: 0;
+	background: transparent;
+}
+
+/* Actions */
+.efs-actions {
+	display: flex;
+	gap: var(--e-space-s);
+}
+
+.efs-actions--inline {
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.efs-actions--stacked {
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.efs-actions .button {
+	margin: 0;
+}
+
+/* Migration key component */
+.efs-migration-key {
+	display: grid;
+	gap: var(--e-space-m);
+	margin-block-end: var(--e-space-m);
+}
+
+.efs-migration-key__intro {
+	display: grid;
+	gap: var(--e-space-xs);
+}
+
+.efs-migration-key__title {
+	margin: 0;
+}
+
+.efs-migration-key__description {
+	margin: 0;
+	color: var(--e-foreground-color-muted);
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+	.efs-dashboard {
+		flex-direction: column;
+	}
+
+	.efs-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.efs-actions .button {
+		inline-size: 100%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.efs-accordion__header::after,
+	.efs-tab__panel,
+	.efs-progress-fill,
+	.efs-migration-step,
+	.efs-accordion__content {
+		transition: none !important;
+	}
 }
 
 .efs-log-entry__context-item dt {
@@ -538,6 +737,21 @@ h1 {
     .form-table th {
         border-bottom: none;
     }
+    
+    .efs-pin-input-wrapper {
+        justify-content: center;
+        gap: var(--e-space-m);
+    }
+
+    .efs-pin-input-block {
+        gap: var(--e-space-xs);
+    }
+
+    .efs-pin-input-box {
+        width: 1.5rem;
+        height: 2rem;
+        font-size: 1rem;
+    }
 }
 
 /* Loading States */
@@ -599,34 +813,38 @@ h1 {
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.5; }
-    100% { opacity: 1; }
 }
 
 /* WordPress Admin Integration */
 #wpwrap {
-    background-color: var(--e-base);
+	background-color: var(--e-base);
 }
 
 .wrap {
-    color: var(--e-light);
+	color: var(--e-light);
 }
 
 .wrap h1 {
-    font-size: 23px;
-    font-weight: 400;
-    margin: 0;
-    padding: 9px 0 4px;
-    line-height: 1.3;
-    font-family: 'Inter', monospace;
-    color: var(--e-light);
-    font-weight: 300 !important;
+	font-size: 23px;
+	font-weight: 400;
+	margin: 0;
+	padding: 9px 0 4px;
+	line-height: 1.3;
+	font-family: 'Inter', monospace;
+	color: var(--e-light);
+	font-weight: 300;
 }
 
-/* Ensure all text is white */
 .efs-card *,
 .efs-migration-container *,
 .wrap * {
-    color: var(--e-light);
+	color: var(--e-light);
+}
+
+
+.efs-logs-container {
+	max-height: 400px;
+	overflow-y: auto;
 }
 
 /* Override any remaining white backgrounds */
@@ -635,69 +853,27 @@ h1 {
 .efs-key-display,
 .efs-log-entry,
 .efs-migration-container,
-.efs-migration-container * {
-    background: transparent;
-    color: var(--e-light);
-    border-color: var(--e-border-color-ultra-light);
+.efs-migration-container *,
+input.readonly,
+input[readonly],
+textarea.readonly,
+textarea[readonly] {
+	background: transparent;
+	color: var(--e-light);
+	border-color: var(--e-border-color-ultra-light);
 }
 
 /* Specific overrides for form elements */
 .efs-form-group input:focus,
 .efs-form-group textarea:focus {
-    border-color: var(--e-primary);
-    background: var(--e-base-dark);
+	border-color: var(--e-primary);
+	background: var(--e-base-dark);
 }
 
 /* Key display should have subtle background */
 .efs-key-display {
-    background: var(--e-base-dark);
-    border: 1px solid var(--e-border-color-ultra-light);
-}
-
-/* Log entries should have subtle background */
-.efs-log-entry {
-    background: var(--e-base-dark);
-    border: 1px solid var(--e-border-color-ultra-light);
-}
-
-/* Log Entries */
-.efs-logs-container {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.efs-log-entry {
-    background: var(--e-base-dark);
-    border: 1px solid var(--e-border-color-ultra-light);
-    border-radius: var(--e-border-radius);
-    padding: var(--e-space-m);
-    margin-bottom: var(--e-space-s);
-    color: var(--e-light);
-}
-
-.efs-log-entry .efs-log-level {
-    font-size: 10px;
-    text-transform: uppercase;
-    font-weight: 500;
-}
-
-.efs-log-entry .efs-log-timestamp {
-    color: var(--e-base-light);
-    font-size: 11px;
-    font-family: monospace;
-}
-
-.efs-log-entry .efs-log-code {
-    color: var(--e-primary);
-    font-size: 11px;
-    font-family: monospace;
-    margin-bottom: var(--e-space-xs);
-}
-
-.efs-log-entry .efs-log-message {
-    color: var(--e-light);
-    font-size: 13px;
-    line-height: 1.4;
+	background: var(--e-base-dark);
+	border: 1px solid var(--e-border-color-ultra-light);
 }
 
 /* Admin Wrap & Header */
@@ -754,7 +930,7 @@ input[type="password"],
 textarea {
     background-color: transparent;
     color: var(--e-light);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: var(--e-border-radius);
     padding: 10px;
     font-family: 'Inter', sans-serif;
@@ -767,6 +943,104 @@ textarea {
 .efs-form-group select:focus {
     outline: none;
     border-color: var(--e-primary);
+}
+
+/* PIN Input */
+.efs-field-description {
+    font-size: 13px;
+    color: var(--e-foreground-color-muted);
+    margin: var(--e-space-s) 0;
+    font-style: italic;
+}
+
+.efs-pin-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--e-space-m);
+    margin: var(--e-space-m) 0;
+}
+
+.efs-pin-input-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--e-space-l);
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.efs-pin-input-block {
+    display: flex;
+    gap: calc(var(--e-space-s)/2);
+    align-items: center;
+}
+
+.efs-pin-input-box {
+    width: 1.75rem;
+    height: 2.25rem;
+    text-align: center;
+    font-size: 1.125rem;
+    font-family: 'MonoLisa', monospace;
+    font-weight: 500;
+    background: var(--e-base);
+    color: var(--e-light);
+    border: var(--e-border);
+    border-radius: var(--e-border-radius);
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
+    padding: 0;
+    outline: none;
+    line-height: 1;
+    cursor: text;
+}
+
+.efs-pin-input-box.has-value {
+    background: var(--e-base);
+    border-color: var(--e-border-color-ultra-light);
+}
+
+.efs-pin-input-box:is(:focus, .is-focused) {
+    border-color: var(--e-primary);
+    background: var(--e-base);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--e-primary) 20%, transparent);
+    transform: scale(1.05);
+    z-index: 1;
+}
+
+.efs-pin-input-box.is-invalid {
+    border-color: var(--e-danger);
+    background: var(--e-danger-ultra-light);
+}
+
+.efs-pin-input-wrapper.shake {
+    animation: efs-pin-shake 0.3s ease;
+}
+
+.efs-pin-paste-button {
+    margin-top: var(--e-space-s);
+    font-size: 13px;
+    padding: var(--e-space-s) var(--e-space-m);
+}
+
+@keyframes efs-pin-shake {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-4px);
+    }
+    75% {
+        transform: translateX(4px);
+    }
+}
+
+@media (prefers-contrast: high) {
+    .efs-pin-input-box {
+        border-width: 2px;
+    }
+
+    .efs-pin-input-box:is(:focus, .is-focused) {
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--e-primary) 35%, transparent);
+    }
 }
 
 /* Secondary Button */
@@ -885,59 +1159,6 @@ textarea {
 .efs-status.warning {
     background: color-mix(in srgb, var(--e-warning) 35%, transparent);
     color: var(--e-warning);
-}
-
-.wrap {
-    color: var(--e-light);
-}
-
-.wrap h1 {
-    font-size: 23px;
-    font-weight: 400;
-    margin: 0;
-    padding: 9px 0 4px;
-    line-height: 1.3;
-    font-family: 'Inter', monospace;
-    color: var(--e-light);
-    font-weight: 300 !important;
-}
-
-/* Ensure all text is white */
-.efs-card *,
-.efs-migration-container *,
-.wrap * {
-    color: var(--e-light);
-}
-
-/* Override any remaining white backgrounds */
-.efs-form-group input,
-.efs-form-group textarea,
-.efs-key-display,
-.efs-log-entry,
-.efs-migration-container,
-.efs-migration-container * {
-    background: transparent;
-    color: var(--e-light);
-    border-color: var(--e-border-color-ultra-light);
-}
-
-/* Specific overrides for form elements */
-.efs-form-group input:focus,
-.efs-form-group textarea:focus {
-    border-color: var(--e-primary);
-    background: var(--e-base-dark);
-}
-
-/* Key display should have subtle background */
-.efs-key-display {
-    background: var(--e-base-dark);
-    border: 1px solid var(--e-border-color-ultra-light);
-}
-
-/* Log entries should have subtle background */
-.efs-log-entry {
-    background: var(--e-base-dark);
-    border: 1px solid var(--e-border-color-ultra-light);
 }
 
 /* Override WordPress default styles */

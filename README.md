@@ -6,6 +6,7 @@
 
 **Version:** 0.8.0-beta  
 **Status:** ✅ Production Ready
+**Release Automation:** ✅ GitHub Actions & build script
 
 End-to-end migration and orchestration toolkit for transforming Bricks Builder sites into fully native Etch experiences. Automates content conversion, Gutenberg block generation, style remapping, asset handling, and API provisioning—backed by security logging, rate limiting, and deep WordPress integration.
 
@@ -106,6 +107,37 @@ npm run dev
 - **[DOCUMENTATION.md](DOCUMENTATION.md)** - Technical documentation
 - **[docs/MIGRATOR-API.md](etch-fusion-suite/docs/MIGRATOR-API.md)** - Developer guide for the migrator system
 - **[docs/FRAMER-EXTRACTION.md](etch-fusion-suite/docs/FRAMER-EXTRACTION.md)** - Framer template extraction pipeline
+
+---
+
+## Release Process
+
+**Updated:** 2025-10-30 08:37
+
+1. **Update Version** – Edit `etch-fusion-suite/etch-fusion-suite.php` and synchronise the plugin header `Version:` line with the `ETCH_FUSION_SUITE_VERSION` constant.
+2. **Document Changes** – Update `CHANGELOG.md` with release notes and ensure `DOCUMENTATION.md` / `TODOS.md` entries include timestamps.
+3. **Commit & Tag** – Commit the changes (`git commit -am "Bump version to X.Y.Z"`) and create a tag (`git tag vX.Y.Z`). Push commit and tag (`git push && git push --tags`).
+4. **Automated Build** – GitHub Actions workflow (`.github/workflows/release.yml`) runs on any `v*` tag. It verifies the tag version against the plugin file, executes `scripts/build-release.sh`, and packages artefacts into `dist/`.
+5. **Release Assets** – The workflow publishes the ZIP and its SHA-256 checksum to the GitHub Release alongside a generated changelog based on recent commits.
+6. **Pre-release Testing** – For beta/RC builds tag with suffixes (e.g., `v0.10.3-beta.1`); the workflow marks the GitHub Release as a pre-release automatically.
+7. **Manual Validation** – Download the uploaded ZIP, install on a test site, and confirm migrations succeed before notifying users.
+
+### Manual Build (Optional)
+
+To build locally without tagging:
+
+```bash
+chmod +x scripts/build-release.sh
+./scripts/build-release.sh 0.10.3
+```
+
+The ZIP and checksum will be in the `dist/` directory.
+
+### Troubleshooting
+
+- Workflow failures due to version mismatch: ensure header/constant values equal the tag version.
+- Re-run after fixing: delete the tag locally and remotely (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`), then retag.
+- Inspect logs via the GitHub Actions “Release Plugin” workflow run for detailed errors.
 
 ---
 

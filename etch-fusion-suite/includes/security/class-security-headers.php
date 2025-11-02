@@ -76,6 +76,7 @@ class EFS_Security_Headers {
 		 * @param string $context    Either "admin" or "frontend".
 		 */
 		$directives = apply_filters( 'efs_security_headers_csp_directives', $directives, $context );
+		$directives = $this->apply_bricks_builder_overrides( $directives );
 
 		return $this->compile_csp_directives( $directives );
 	}
@@ -198,6 +199,76 @@ class EFS_Security_Headers {
 		 * @param array $sources Additional style-src values.
 		 */
 		return apply_filters( 'efs_security_headers_frontend_style_sources', array() );
+	}
+
+	/**
+	 * Apply CSP overrides required by the Bricks visual builder.
+	 *
+	 * Bricks loads parts of its builder UI on the frontend (e.g. ?bricks=run) and relies on
+	 * eval-based helpers plus CDN-hosted font assets. Without explicitly allowing these
+	 * sources the builder fails to boot and throws repeated CSP violations.
+	 *
+	 * @param array $directives Current directive map.
+	 * @return array Directive map including Bricks adjustments when applicable.
+	 */
+	protected function apply_bricks_builder_overrides( array $directives ) {
+		if ( ! $this->is_bricks_builder_request() ) {
+			return $directives;
+		}
+
+		$directives = $this->ensure_csp_values( $directives, 'script-src', array( "'unsafe-eval'" ) );
+		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
+
+		return $directives;
+	}
+
+	/**
+	 * Append unique values to a CSP directive.
+	 *
+	 * @param array  $directives Directive map.
+	 * @param string $directive  Directive key (e.g. script-src).
+	 * @param array  $values     Values to ensure.
+	 * @return array Updated directives map.
+	 */
+	private function ensure_csp_values( array $directives, $directive, array $values ) {
+		if ( ! isset( $directives[ $directive ] ) ) {
+			$directives[ $directive ] = array();
+		}
+
+		$directives[ $directive ] = array_values(
+			array_unique(
+				array_merge( $directives[ $directive ], $values )
+			)
+		);
+
+		return $directives;
+	}
+
+	/**
+	 * Determine whether the current request is loading a Bricks builder surface.
+	 *
+	 * @return bool
+	 */
+	private function is_bricks_builder_request() {
+		if ( function_exists( '\\bricks_is_builder' ) && \call_user_func( '\\bricks_is_builder' ) ) {
+			return true;
+		}
+
+		$bricks_action = null;
+
+		if ( isset( $_GET['bricks'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only detection.
+			$bricks_action = sanitize_text_field( wp_unslash( $_GET['bricks'] ) );
+		} elseif ( isset( $_POST['bricks'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Read-only detection.
+			$bricks_action = sanitize_text_field( wp_unslash( $_POST['bricks'] ) );
+		}
+
+		if ( null === $bricks_action ) {
+			return false;
+		}
+
+		$builder_actions = array( 'run', 'preview', 'iframe' );
+
+		return in_array( $bricks_action, $builder_actions, true );
 	}
 
 	/**

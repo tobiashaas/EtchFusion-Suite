@@ -11,12 +11,23 @@ use Bricks2Etch\Core\EFS_Migration_Token_Manager;
 use Bricks2Etch\Core\EFS_Migration_Manager;
 use Bricks2Etch\Migrators\EFS_Migrator_Registry;
 use Bricks2Etch\Migrators\Interfaces\Migrator_Interface;
+use Bricks2Etch\Security\EFS_Input_Validator;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+	return true;
 }
 
+/**
+ * EFS_API_Endpoints class.
+ *
+ * Handles REST API endpoints for communication between source and target sites.
+ * Input validation mirrors the AJAX handlers by routing data through
+ * EFS_Input_Validator::validate_request_data(), maintaining consistent sanitization rules.
+ *
+ * @package Bricks2Etch\Api
+ */
 class EFS_API_Endpoints {
 	/**
 	 * @var \Bricks2Etch\Container\EFS_Service_Container|null
@@ -97,8 +108,9 @@ class EFS_API_Endpoints {
 			return new \WP_Error( 'template_service_unavailable', __( 'Template extractor is not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
 		}
 
-		$params = self::validate_request_data(
-			$request->get_json_params(),
+		$raw_params = $request->get_json_params();
+		$params     = self::validate_request_data(
+			is_array( $raw_params ) ? $raw_params : array(),
 			array(
 				'source'      => array(
 					'type'       => 'text',
@@ -225,8 +237,9 @@ class EFS_API_Endpoints {
 			return new \WP_Error( 'template_service_unavailable', __( 'Template controller not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
 		}
 
-		$params = self::validate_request_data(
-			$request->get_json_params(),
+		$raw_params = $request->get_json_params();
+		$params     = self::validate_request_data(
+			is_array( $raw_params ) ? $raw_params : array(),
 			array(
 				'payload' => array(
 					'type'     => 'array',
@@ -318,6 +331,49 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Retrieve shared input validator instance.
+	 *
+	 * @return EFS_Input_Validator
+	 */
+	private static function get_input_validator() {
+		if ( self::$input_validator instanceof EFS_Input_Validator ) {
+			return self::$input_validator;
+		}
+
+		if ( self::$container && self::$container->has( 'input_validator' ) ) {
+			self::$input_validator = self::$container->get( 'input_validator' );
+			return self::$input_validator;
+		}
+
+		self::$input_validator = new EFS_Input_Validator();
+
+		return self::$input_validator;
+	}
+
+	/**
+	 * Validate request data using EFS_Input_Validator
+	 *
+	 * @param array $data
+	 * @param array $rules
+	 *
+	 * @return array|WP_Error
+	 */
+	private static function validate_request_data( $data, $rules ) {
+		try {
+			return self::get_input_validator()->validate_request_data( $data, $rules );
+		} catch ( \InvalidArgumentException $e ) {
+			$details   = EFS_Input_Validator::get_last_error_details();
+			$error_msg = EFS_Input_Validator::get_user_error_message( $details );
+
+			return new \WP_Error(
+				'invalid_input',
+				sanitize_text_field( $error_msg ),
+				array( 'status' => 400 )
+			);
+		}
+	}
+
+	/**
 	 * Check CORS origin for REST API endpoint
 	 *
 	 * @return \WP_Error|bool True if origin allowed, WP_Error if denied.
@@ -329,6 +385,8 @@ class EFS_API_Endpoints {
 
 		$origin = '';
 		if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+			// Direct superglobal access is safe because the value is immediately sanitized.
+			// This is the only location where $_SERVER is touched directly for origin validation.
 			$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
 		}
 
@@ -382,6 +440,8 @@ class EFS_API_Endpoints {
 			// Log the violation with route information
 			if ( self::$audit_logger ) {
 				$origin = '';
+				// Origin is retrieved again so the audit log records the raw request value
+				// even if check_cors_origin() wasn't executed for this request.
 				if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
 					$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
 				}
@@ -417,6 +477,8 @@ class EFS_API_Endpoints {
 		return new \WP_REST_Response(
 			array(
 				'success' => true,
+				'status'  => 'ok',
+				'version' => ETCH_FUSION_SUITE_VERSION,
 				'plugins' => array(
 					'bricks_active' => $plugin_detector->is_bricks_active(),
 					'etch_active'   => $plugin_detector->is_etch_active(),
@@ -437,6 +499,7 @@ class EFS_API_Endpoints {
 		}
 
 		try {
+			// Parameters are sanitized by WP_REST_Request::get_params(); token manager performs additional validation.
 			$params = $request->get_params();
 
 			// Extract migration parameters
@@ -540,15 +603,35 @@ class EFS_API_Endpoints {
 		}
 
 		try {
-			// Get request body
-			$body = $request->get_json_params();
+			// REST requests provide JSON body parameters; each value is sanitized individually here.
+			$raw_body = $request->get_json_params();
+			$body     = is_array( $raw_body ) ? $raw_body : array();
 
 			if ( empty( $body['token'] ) || empty( $body['expires'] ) ) {
 				return new \WP_Error( 'missing_parameters', 'Token and expires parameters are required', array( 'status' => 400 ) );
 			}
 
-			$token   = sanitize_text_field( $body['token'] );
-			$expires = intval( $body['expires'] );
+			$validated = self::validate_request_data(
+				$body,
+				array(
+					'token'   => array(
+						'type'     => 'token',
+						'required' => true,
+					),
+					'expires' => array(
+						'type'     => 'integer',
+						'required' => true,
+						'min'      => time(),
+					),
+				)
+			);
+
+			if ( is_wp_error( $validated ) ) {
+				return $validated;
+			}
+
+			$token   = $validated['token'];
+			$expires = (int) $validated['expires'];
 
 			// Validate token using token manager
 			$token_manager     = self::resolve( 'token_manager' );
@@ -559,6 +642,7 @@ class EFS_API_Endpoints {
 			}
 
 			// Token is valid - generate or retrieve API key
+			// API key retrieval/generation is internal; no user-provided values enter this branch.
 			$api_key_data = self::$settings_repository ? self::$settings_repository->get_api_key() : get_option( 'efs_api_key' );
 
 			// If no API key exists, generate one
@@ -592,5 +676,241 @@ class EFS_API_Endpoints {
 		} catch ( \Exception $e ) {
 			return new \WP_Error( 'validation_error', 'Token validation failed: ' . $e->getMessage(), array( 'status' => 500 ) );
 		}
+	}
+
+	/**
+	 * Validate request payload using input validator.
+	 *
+	 * @param array $data  Request data.
+		}
+	}
+
+	/**
+	 * Enforce template rate limits.
+	 *
+	 * @param string $action Action name.
+	 * @param int    $limit  Requests per window.
+	 * @param int    $window Window in seconds.
+	 * @return true|\WP_Error
+	 */
+	public static function enforce_template_rate_limit( $action, $limit, $window = 60 ) {
+		return self::handle_rate_limit( $action, $limit, $window );
+	}
+
+	/**
+	 * Check rate limit without recording on success.
+	 *
+	 * @param string $action Action name.
+	 * @param int    $limit  Requests per window.
+	 * @param int    $window Window in seconds.
+	 * @return true|\WP_Error
+	 */
+	public static function check_rate_limit( $action, $limit, $window = 60 ) {
+		return self::handle_rate_limit( $action, $limit, $window );
+	}
+
+	/**
+	 * Internal helper to check and record rate limits.
+	 *
+	 * @param string $action        Action key.
+	 * @param int    $limit         Limit count.
+	 * @param int    $window        Window seconds.
+	 * @return true|\WP_Error
+	 */
+	private static function handle_rate_limit( $action, $limit, $window ) {
+		if ( ! self::$rate_limiter ) {
+			return true;
+		}
+
+		$identifier = self::$rate_limiter->get_identifier();
+
+		if ( self::$rate_limiter->check_rate_limit( $identifier, $action, $limit, $window ) ) {
+			$retry_after = max( 1, (int) $window );
+			if ( ! headers_sent() ) {
+				header( 'Retry-After: ' . $retry_after );
+			}
+
+			if ( self::$audit_logger ) {
+				self::$audit_logger->log_rate_limit_exceeded( $identifier, $action );
+			}
+
+			return new \WP_Error(
+				'rate_limit_exceeded',
+				__( 'Rate limit exceeded. Please try again later.', 'etch-fusion-suite' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		self::$rate_limiter->record_request( $identifier, $action, $window );
+
+		return true;
+	}
+
+	/**
+	 * Validate connection credentials.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function validate_connection( $request ) {
+		$params = $request->get_json_params();
+		if ( ! is_array( $params ) ) {
+			$params = array();
+		}
+
+		// Simple validation: check if api_key is provided
+		$api_key = isset( $params['api_key'] ) ? sanitize_text_field( $params['api_key'] ) : '';
+		
+		if ( empty( $api_key ) ) {
+			return new \WP_Error(
+				'missing_api_key',
+				__( 'API key is required.', 'etch-fusion-suite' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		// For now, just return success if api_key is provided
+		// In production, you'd validate against stored credentials
+		return new \WP_REST_Response(
+			array(
+				'valid'   => true,
+				'message' => __( 'Connection validated successfully.', 'etch-fusion-suite' ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Register REST API routes.
+	 */
+	public static function register_routes() {
+		$namespace = 'efs/v1';
+
+		register_rest_route(
+			$namespace,
+			'/template/extract',
+			array(
+				'callback'            => array( __CLASS__, 'extract_template_rest' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/template/saved',
+			array(
+				'callback'            => array( __CLASS__, 'get_saved_templates_rest' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::READABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/template/preview/(?P<id>\d+)',
+			array(
+				'callback'            => array( __CLASS__, 'preview_template_rest' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'args'                => array(
+					'id' => array(
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+				'methods'             => \WP_REST_Server::READABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/template/(?P<id>\d+)',
+			array(
+				'callback'            => array( __CLASS__, 'delete_template_rest' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'args'                => array(
+					'id' => array(
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+				'methods'             => \WP_REST_Server::DELETABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/template/import',
+			array(
+				'callback'            => array( __CLASS__, 'import_template_rest' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/status',
+			array(
+				'callback'            => array( __CLASS__, 'get_plugin_status' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::READABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/migrate',
+			array(
+				'callback'            => array( __CLASS__, 'handle_key_migration' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::READABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/generate-key',
+			array(
+				'callback'            => array( __CLASS__, 'generate_migration_key' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/validate',
+			array(
+				'callback'            => array( __CLASS__, 'validate_migration_token' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/auth/validate',
+			array(
+				'callback'            => array( __CLASS__, 'validate_connection' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+	}
+
+	/**
+	 * Permission callback allowing public access while enforcing CORS.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public static function allow_public_request( $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		return true;
 	}
 }

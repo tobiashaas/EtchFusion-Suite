@@ -89,6 +89,8 @@ export default defineConfig({
   metadata: {
     bricksUrl,
     etchUrl,
+    bricksAuthFile,
+    etchAuthFile,
   },
   projects: [
     {
@@ -102,6 +104,38 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        storageState: bricksAuthFile,
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        storageState: bricksAuthFile,
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        storageState: bricksAuthFile,
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'mobile-chrome',
+      use: {
+        ...devices['Pixel 5'],
+        storageState: bricksAuthFile,
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'mobile-safari',
+      use: {
+        ...devices['iPhone 12'],
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],

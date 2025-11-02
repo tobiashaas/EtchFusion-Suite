@@ -50,6 +50,12 @@ class EFS_Dashboard_Controller {
 		$env = $this->detect_environment();
 
 		$progress_context = $this->get_progress();
+		$template_extractor_enabled = \efs_feature_enabled( 'template_extractor' );
+		$saved_templates             = array();
+
+		if ( $env['is_etch_site'] && $template_extractor_enabled ) {
+			$saved_templates = $this->get_saved_templates();
+		}
 
 		return array(
 			'is_bricks_site'  => $env['is_bricks_site'],
@@ -59,10 +65,11 @@ class EFS_Dashboard_Controller {
 			'logs'            => $this->get_logs(),
 			'progress_data'   => $progress_context['progress'],
 			'progress_steps'  => $progress_context['steps'],
-			'migration_id'    => $progress_context['migration_id'],
+			'migration_id'    => isset( $progress_context['migrationId'] ) ? $progress_context['migrationId'] : '',
 			'settings'        => $this->get_settings(),
 			'nonce'           => wp_create_nonce( 'efs_nonce' ),
-			'saved_templates' => $this->get_saved_templates(),
+			'saved_templates' => $saved_templates,
+			'template_extractor_enabled' => $template_extractor_enabled,
 		);
 	}
 
@@ -171,6 +178,8 @@ class EFS_Dashboard_Controller {
 			'settings'        => isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array(),
 			'nonce'           => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
 			'saved_templates' => isset( $data['saved_templates'] ) && is_array( $data['saved_templates'] ) ? $data['saved_templates'] : array(),
+			'template_extractor_enabled' => isset( $data['template_extractor_enabled'] ) ? (bool) $data['template_extractor_enabled'] : false,
+			'feature_flags_section_id'   => 'efs-accordion-feature-flags',
 		);
 	}
 
@@ -222,10 +231,21 @@ class EFS_Dashboard_Controller {
 	 */
 	private function prepare_bricks_setup_view_args( array $data ) {
 		$settings = isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array();
+		$migration_key_defaults = array(
+			'context'  => 'bricks',
+			'settings' => array(
+				'target_url' => isset( $settings['target_url'] ) ? $settings['target_url'] : '',
+				'api_key'    => isset( $settings['api_key'] ) ? $settings['api_key'] : '',
+			),
+		);
 
 		return array(
-			'settings' => $settings,
-			'nonce'    => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'settings'           => $settings,
+			'nonce'              => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'key_context'        => 'bricks',
+			'migration_key_args' => isset( $data['migration_key_args'] ) && is_array( $data['migration_key_args'] )
+				? wp_parse_args( $data['migration_key_args'], $migration_key_defaults )
+				: $migration_key_defaults,
 		);
 	}
 
@@ -236,10 +256,18 @@ class EFS_Dashboard_Controller {
 	 * @return array
 	 */
 	private function prepare_etch_setup_view_args( array $data ) {
+		$site_url = isset( $data['site_url'] ) ? esc_url_raw( $data['site_url'] ) : home_url();
 		return array(
-			'nonce'    => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
-			'is_https' => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
-			'site_url' => isset( $data['site_url'] ) ? esc_url( $data['site_url'] ) : home_url(),
+			'nonce'              => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'is_https'           => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
+			'site_url'           => esc_url( $site_url ),
+			'key_context'        => 'etch',
+			'migration_key_args' => array(
+				'context'  => 'etch',
+				'settings' => array(
+					'target_url' => $site_url,
+				),
+			),
 		);
 	}
 

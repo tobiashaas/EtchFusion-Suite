@@ -87,16 +87,41 @@ export const post = async (action, payload = {}, options = {}) => {
         }
     }
 
-    if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
+    let result;
+    let responseText;
+    
+    // Clone response before reading to preserve body for error handling
+    const clonedResponse = response.clone();
+    
+    try {
+        result = await response.json();
+    } catch (parseError) {
+        try {
+            responseText = await clonedResponse.text();
+        } catch {
+            responseText = 'Unable to read response text';
+        }
+        console.error('[EFS API] Failed to parse JSON response', {
+            status: response.status,
+            action,
+            parseError: parseError.message,
+            responseText: responseText.substring(0, 500) // First 500 chars
+        });
+        throw new Error(`Server returned invalid JSON (status ${response.status})`);
     }
-
-    const result = await response.json();
-    if (!result?.success) {
+    
+    if (!response.ok || !result?.success) {
         const errorPayload = result?.data ?? {};
         const errorMessage = typeof errorPayload === 'string'
             ? errorPayload
-            : errorPayload?.message || 'Request failed.';
+            : errorPayload?.message || `Request failed with status ${response.status}`;
+
+        console.error('[EFS API Error]', {
+            status: response.status,
+            action,
+            payload: errorPayload,
+            fullResult: result
+        });
 
         const error = new Error(errorMessage);
 

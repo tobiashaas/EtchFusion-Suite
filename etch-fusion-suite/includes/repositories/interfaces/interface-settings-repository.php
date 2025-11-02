@@ -107,4 +107,37 @@ interface Settings_Repository_Interface {
 	 * @return bool True on success, false on failure.
 	 */
 	public function save_security_settings( array $settings ): bool;
+
+	/**
+	 * Get feature flags.
+	 *
+	 * @return array<string, bool>
+	 */
+	public function get_feature_flags(): array;
+
+	/**
+	 * Save feature flags.
+	 *
+	 * @param array<string, bool> $flags Feature flag data.
+	 * @return bool
+	 */
+	public function save_feature_flags( array $flags ): bool;
+
+	/**
+	 * Retrieve a specific feature flag.
+	 *
+	 * @param string $flag_name Feature identifier.
+	 * @param bool   $default   Default value if undefined.
+	 * @return bool
+	 */
+	public function get_feature_flag( string $flag_name, bool $default = false ): bool;
+
+	/**
+	 * Persist a single feature flag.
+	 *
+	 * @param string $flag_name Feature identifier.
+	 * @param bool   $enabled   Desired state.
+	 * @return bool
+	 */
+	public function set_feature_flag( string $flag_name, bool $enabled ): bool;
 }

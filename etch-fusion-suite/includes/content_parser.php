@@ -734,8 +734,8 @@ class EFS_Content_Parser {
 			return false;
 		}
 
-		error_log( 'B2E Image: Converting image with src: ' . $src );
-		error_log( 'B2E Image: Element has label: ' . ( isset( $element['label'] ) ? $element['label'] : 'NO' ) );
+		$this->error_handler->log_info( 'Image: Converting image with src: ' . $src );
+		$this->error_handler->log_info( 'Image: Element has label: ' . ( isset( $element['label'] ) ? $element['label'] : 'NO' ) );
 
 		// Get Bricks classes from _cssGlobalClasses
 		$bricks_classes = array();
@@ -745,14 +745,14 @@ class EFS_Content_Parser {
 			$bricks_classes = is_array( $element['classes'] ) ? $element['classes'] : array( $element['classes'] );
 		}
 
-		error_log( 'B2E Image: Found ' . count( $bricks_classes ) . ' Bricks classes' );
+		$this->error_handler->log_info( 'Image: Found ' . count( $bricks_classes ) . ' Bricks classes' );
 
 		// Convert Bricks class IDs to Etch class names
 		$etch_classes = array();
 		foreach ( $bricks_classes as $class_id ) {
 			if ( isset( $this->style_map[ $class_id ] ) ) {
 				$etch_classes[] = $this->style_map[ $class_id ];
-				error_log( 'B2E Image: Mapped class ' . $class_id . ' → ' . $this->style_map[ $class_id ] );
+				$this->error_handler->log_info( 'Image: Mapped class ' . $class_id . ' → ' . $this->style_map[ $class_id ] );
 			}
 		}
 
@@ -767,9 +767,9 @@ class EFS_Content_Parser {
 		$caption_html = '';
 		if ( ! empty( $label ) ) {
 			$caption_html = '<figcaption class="wp-element-caption">' . wp_kses_post( $label ) . '</figcaption>';
-			error_log( 'B2E Image: Added caption: ' . $label );
+			$this->error_handler->log_info( 'Image: Added caption: ' . $label );
 		} else {
-			error_log( 'B2E Image: NO CAPTION - element.label=' . ( isset( $element['label'] ) ? $element['label'] : 'NOT SET' ) . ', settings.label=' . ( isset( $settings['label'] ) ? $settings['label'] : 'NOT SET' ) );
+			$this->error_handler->log_info( 'Image: NO CAPTION - element.label=' . ( isset( $element['label'] ) ? $element['label'] : 'NOT SET' ) . ', settings.label=' . ( isset( $settings['label'] ) ? $settings['label'] : 'NOT SET' ) );
 		}
 
 		// Build HTML with classes on img tag

@@ -163,36 +163,75 @@ class EFS_Migration_Token_Manager {
 	 * @return bool|\WP_Error
 	 */
 	public function validate_migration_token( $token, $source_domain, $expires ) {
-		// Debug logging
-		error_log( 'EFS Token Validation Debug:' );
-		error_log( '- Received token: ' . substr( $token, 0, 20 ) . '...' );
-		error_log( '- Source domain: ' . $source_domain );
-		error_log( '- Expires: ' . $expires . ' (' . wp_date( 'Y-m-d H:i:s', $expires ) . ')' );
-		error_log( '- Current time: ' . time() . ' (' . wp_date( 'Y-m-d H:i:s' ) . ')' );
+		// Debug logging via structured handler
+		$this->error_handler->log_info(
+			'Migration token validation started',
+			array(
+				'token_prefix'  => substr( $token, 0, 20 ),
+				'source_domain' => $source_domain,
+				'expires'       => $expires,
+				'expires_human' => wp_date( 'Y-m-d H:i:s', $expires ),
+			)
+		);
+		$current_timestamp = time();
+		$this->error_handler->log_info(
+			'Current timestamp captured for token validation',
+			array(
+				'current_timestamp' => $current_timestamp,
+				'current_human'     => wp_date( 'Y-m-d H:i:s', $current_timestamp ),
+			)
+		);
 
 		// Check expiration
-		if ( time() > $expires ) {
-			error_log( '- Token expired!' );
+		if ( $current_timestamp > (int) $expires ) {
+			$this->error_handler->log_error(
+				'token_expired',
+				array(
+					'current_timestamp' => $current_timestamp,
+					'expires'           => (int) $expires,
+				)
+			);
 			return new \WP_Error( 'token_expired', 'Migration token has expired' );
 		}
 
 		// Get stored token value
 		$stored_token = $this->migration_repository->get_token_value();
-		error_log( '- Stored token: ' . ( $stored_token ? substr( $stored_token, 0, 20 ) . '...' : 'NOT_FOUND' ) );
+		$this->error_handler->log_info(
+			'Migration token retrieved from repository',
+			array(
+				'stored_token_prefix' => $stored_token ? substr( $stored_token, 0, 20 ) : null,
+			)
+		);
 
 		if ( empty( $stored_token ) ) {
-			error_log( '- No stored token found!' );
+			$this->error_handler->log_error(
+				'invalid_token',
+				array(
+					'reason' => 'Token missing from repository',
+				)
+			);
 			return new \WP_Error( 'invalid_token', 'No migration token found. Please generate a new key.' );
 		}
 
 		if ( $stored_token !== $token ) {
-			error_log( '- Token mismatch!' );
-			error_log( '- Expected: ' . substr( $stored_token, 0, 20 ) . '...' );
-			error_log( '- Received: ' . substr( $token, 0, 20 ) . '...' );
+			$this->error_handler->log_error(
+				'invalid_token',
+				array(
+					'reason'          => 'Token mismatch',
+					'expected_prefix' => substr( $stored_token, 0, 20 ),
+					'received_prefix' => substr( $token, 0, 20 ),
+					'source_domain'   => $source_domain,
+				)
+			);
 			return new \WP_Error( 'invalid_token', 'Invalid migration token. Tokens do not match.' );
 		}
 
-		error_log( '- Token validation successful!' );
+		$this->error_handler->log_info(
+			'Migration token validated successfully',
+			array(
+				'source_domain' => $source_domain,
+			)
+		);
 		return true;
 	}
 

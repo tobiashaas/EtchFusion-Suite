@@ -25,6 +25,11 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	const CACHE_EXPIRATION = 300;
 
 	/**
+	 * Cache key for feature flags.
+	 */
+	const FEATURE_FLAGS_CACHE_KEY = 'efs_cache_feature_flags';
+
+	/**
 	 * Get all plugin settings.
 	 *
 	 * @return array Plugin settings array.
@@ -135,6 +140,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		$this->invalidate_cache( 'efs_cache_settings_migration' );
 		$this->invalidate_cache( 'efs_cache_cors_origins' );
 		$this->invalidate_cache( 'efs_cache_security_settings' );
+		$this->invalidate_cache( self::FEATURE_FLAGS_CACHE_KEY );
 
 		$result = true;
 		$result = delete_option( 'efs_settings' ) && $result;
@@ -142,8 +148,83 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		$result = delete_option( 'efs_migration_settings' ) && $result;
 		$result = delete_option( 'efs_cors_allowed_origins' ) && $result;
 		$result = delete_option( 'efs_security_settings' ) && $result;
+		$result = delete_option( 'efs_feature_flags' ) && $result;
 
 		return $result;
+	}
+
+	/**
+	 * Get feature flags.
+	 *
+	 * @return array<string, bool> Array of feature flags.
+	 */
+	public function get_feature_flags(): array {
+		$cached = get_transient( self::FEATURE_FLAGS_CACHE_KEY );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$defaults = array(
+			'template_extractor' => false,
+		);
+
+		$flags = get_option( 'efs_feature_flags', $defaults );
+		$flags = wp_parse_args( $flags, $defaults );
+
+		set_transient( self::FEATURE_FLAGS_CACHE_KEY, $flags, self::CACHE_EXPIRATION );
+
+		return $flags;
+	}
+
+	/**
+	 * Save feature flags.
+	 *
+	 * @param array<string, bool> $flags Feature flags to persist.
+	 * @return bool True on success, false on failure.
+	 */
+	public function save_feature_flags( array $flags ): bool {
+		if ( ! is_array( $flags ) ) {
+			return false;
+		}
+
+		// Sanitize flags: sanitize keys and cast values to boolean
+		$sanitized_flags = array();
+		foreach ( $flags as $key => $value ) {
+			$sanitized_key                    = sanitize_key( $key );
+			$sanitized_flags[ $sanitized_key ] = (bool) $value;
+		}
+
+		$this->invalidate_cache( self::FEATURE_FLAGS_CACHE_KEY );
+
+		return update_option( 'efs_feature_flags', $sanitized_flags );
+	}
+
+	/**
+	 * Get a specific feature flag value.
+	 *
+	 * @param string $flag_name Feature flag identifier.
+	 * @param bool   $default   Default value if flag not set.
+	 * @return bool Flag state.
+	 */
+	public function get_feature_flag( string $flag_name, bool $default = false ): bool {
+		$flags = $this->get_feature_flags();
+
+		return isset( $flags[ $flag_name ] ) ? (bool) $flags[ $flag_name ] : $default;
+	}
+
+	/**
+	 * Persist a single feature flag.
+	 *
+	 * @param string $flag_name Feature flag identifier.
+	 * @param bool   $enabled   Desired state.
+	 * @return bool True on success, false on failure.
+	 */
+	public function set_feature_flag( string $flag_name, bool $enabled ): bool {
+		$flags               = $this->get_feature_flags();
+		$flags[ $flag_name ] = $enabled;
+
+		return $this->save_feature_flags( $flags );
 	}
 
 	/**

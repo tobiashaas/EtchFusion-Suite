@@ -92,6 +92,7 @@ class EFS_Element_Factory {
 		$converter_class = self::TYPE_MAP[ $element_type ] ?? null;
 
 		if ( ! $converter_class ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs missing converter for unsupported element types during development
 			error_log( "🚨 EFS Factory: No converter found for element type: {$element_type}" );
 			return null;
 		}
@@ -115,6 +116,7 @@ class EFS_Element_Factory {
 		$element_type = $element['name'] ?? '';
 
 		if ( empty( $element_type ) ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs element validation issues without error handler dependency
 			error_log( '⚠️ EFS Factory: Element has no type' );
 			return null;
 		}
@@ -122,6 +124,7 @@ class EFS_Element_Factory {
 		$converter = $this->get_converter( $element_type );
 
 		if ( ! $converter ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: highlights unsupported element types for converter coverage gaps
 			error_log( "⚠️ EFS Factory: Unsupported element type: {$element_type}" );
 			return null;
 		}

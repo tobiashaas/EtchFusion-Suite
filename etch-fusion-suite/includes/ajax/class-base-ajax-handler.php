@@ -96,6 +96,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return bool
 	 */
 	protected function verify_nonce() {
+		// Uses check_ajax_referer() with $die = false so callers can handle failures and log events.
 		return check_ajax_referer( $this->nonce_action, $this->nonce_field, false );
 	}
 
@@ -116,6 +117,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return bool
 	 */
 	protected function verify_request( $capability = 'manage_options' ) {
+		// Primary security gate: nonce verification, capability check, and audit logging for every AJAX request.
 		$user_id = get_current_user_id();
 
 		if ( ! $this->verify_nonce() ) {
@@ -160,7 +162,15 @@ abstract class EFS_Base_Ajax_Handler {
 	 *
 	 * @param string $key Parameter key
 	 * @param mixed  $default_value Default value
+	 * @param string $sanitize Sanitization strategy (text, url, key, int, float, bool, array, raw).
 	 * @return mixed
+	 *
+	 * @example
+	 * // Always call verify_request() before reading POST data.
+	 * if ( ! $this->verify_request() ) {
+	 *     return;
+	 * }
+	 * $target_url = $this->get_post( 'target_url', '', 'url' );
 	 */
 	protected function get_post( $key, $default_value = null, $sanitize = 'text' ) {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Concrete handlers call verify_request() (check_ajax_referer) before accessing POST data.
@@ -168,7 +178,7 @@ abstract class EFS_Base_Ajax_Handler {
 			return $default_value;
 		}
 
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Value is sanitized below after verify_request() has enforced nonce checks.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- This is the sole location for $_POST access and values are sanitized immediately after nonce verification.
 		$value = wp_unslash( $_POST[ $key ] );
 
 		if ( 'array' === $sanitize ) {
@@ -221,6 +231,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return bool True if within limit, false if exceeded.
 	 */
 	protected function check_rate_limit( $action, $limit = 60, $window = 60 ) {
+		// Executed after verify_request() but before input validation to block abusive requests early.
 		if ( ! $this->rate_limiter ) {
 			return true; // No rate limiting if service not available
 		}
@@ -264,6 +275,7 @@ abstract class EFS_Base_Ajax_Handler {
 		}
 
 		try {
+			// Delegates to central validator so all handlers share identical sanitization rules.
 			return \Bricks2Etch\Security\EFS_Input_Validator::validate_request_data( $data, $rules );
 		} catch ( \InvalidArgumentException $e ) {
 			$details           = \Bricks2Etch\Security\EFS_Input_Validator::get_last_error_details();
@@ -274,7 +286,7 @@ abstract class EFS_Base_Ajax_Handler {
 				'context' => $details['context'] ?? array(),
 			);
 
-			// Log invalid input with contextual details.
+			// Log invalid input with contextual details while masking sensitive values before persistence.
 			if ( $this->audit_logger ) {
 				$this->audit_logger->log_security_event(
 					'invalid_input',
@@ -307,6 +319,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return array Sanitized array.
 	 */
 	protected function sanitize_array( $input, $path = '' ) {
+		// Recursive sanitization supports complex payloads (e.g. template data) and logs object normalization for auditing.
 		if ( $this->input_validator ) {
 			return $this->input_validator->sanitize_array_recursive( $input, $path, $this->audit_logger );
 		}
@@ -481,6 +494,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return string Client IP address.
 	 */
 	protected function get_client_ip() {
+		// Supports proxy-aware headers (Cloudflare, X-Forwarded-For) and sanitizes before rate limiting / auditing.
 		$ip = '';
 
 		// Check for proxy headers
@@ -529,6 +543,154 @@ abstract class EFS_Base_Ajax_Handler {
 	}
 
 	/**
+	 * Normalize localhost URLs so Docker containers reach WordPress via internal hostname.
+	 *
+	 * @param string $url External URL provided by the browser.
+	 * @return string Normalized URL suitable for container-to-container requests.
+	 */
+	protected function convert_to_internal_url( $url ) {
+		if ( ! is_string( $url ) || '' === $url ) {
+			return $url;
+		}
+
+		$etch_internal = $this->resolve_internal_service_host(
+			array(
+				'efs-etch',
+				'etch-wordpress-etch-1',
+				'etchfusion-suite-wordpress-etch-1',
+			)
+		);
+
+		$replacements = array(
+			'https://localhost:8081' => $etch_internal ?: 'http://efs-etch',
+			'http://localhost:8081'  => $etch_internal ?: 'http://efs-etch',
+			'https://localhost:8888' => $this->get_docker_host_fallback( 8888 ),
+			'http://localhost:8888'  => $this->get_docker_host_fallback( 8888 ),
+		);
+
+		if ( $etch_internal ) {
+			$replacements['https://localhost:8889'] = $etch_internal;
+			$replacements['http://localhost:8889']  = $etch_internal;
+		} else {
+			$fallback_8889                           = $this->get_docker_host_fallback( 8889 );
+			$replacements['https://localhost:8889'] = $fallback_8889;
+			$replacements['http://localhost:8889']  = $fallback_8889;
+		}
+
+		$normalized = strtr( $url, array_filter( $replacements ) );
+
+		if ( false !== strpos( $normalized, 'localhost:8081' ) ) {
+			$normalized = str_replace( 'localhost:8081', 'efs-etch', $normalized );
+
+			if ( 0 === strpos( $normalized, 'efs-etch' ) ) {
+				$normalized = 'http://' . $normalized;
+			}
+		}
+
+		if ( false !== strpos( $normalized, 'localhost:8889' ) ) {
+			$fallback = $this->get_docker_host_fallback( 8889 );
+			if ( $fallback ) {
+				$normalized = str_replace( 'localhost:8889', preg_replace( '#^https?://#', '', $fallback ), $normalized );
+				if ( 0 === strpos( $normalized, 'host.docker.internal' ) ) {
+					$normalized = 'http://' . $normalized;
+				}
+			}
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Resolve internal Docker service host for Etch target.
+	 *
+	 * @param array $candidates Hostname candidates.
+	 * @return string|null HTTP base URL for internal service.
+	 */
+	private function resolve_internal_service_host( array $candidates ) {
+		$candidates = apply_filters( 'efs_internal_service_host_candidates', $candidates );
+
+		foreach ( $candidates as $candidate ) {
+			if ( ! is_string( $candidate ) || '' === trim( $candidate ) ) {
+				continue;
+			}
+
+			$resolved = gethostbyname( $candidate );
+			if ( empty( $resolved ) || $resolved === $candidate ) {
+				continue;
+			}
+
+			if ( filter_var( $resolved, FILTER_VALIDATE_IP ) ) {
+				return sprintf( 'http://%s', $candidate );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Derive container-aware fallback host for localhost targets.
+	 *
+	 * @param int $port Target port.
+	 * @return string|null Normalized host or null when not available.
+	 */
+	private function get_docker_host_fallback( $port ) {
+		$port = absint( $port );
+		if ( $port <= 0 ) {
+			return null;
+		}
+
+		$hosts = array();
+
+		// Allow environment variable override for custom Docker gateway host.
+		$env_host = getenv( 'EFS_DOCKER_HOST' );
+		if ( $env_host ) {
+			$hosts[] = $env_host;
+		}
+
+		$hosts = array_merge(
+			$hosts,
+			array(
+				'host.docker.internal',
+				'gateway.docker.internal',
+				'docker.for.mac.localhost',
+				'docker.for.win.localhost',
+				'172.17.0.1',
+			)
+		);
+
+		/**
+		 * Filter the candidate hosts used to resolve localhost replacements inside containers.
+		 *
+		 * @since 0.11.0
+		 *
+		 * @param string[] $hosts Candidate hosts to test.
+		 * @param int      $port  Target port number.
+		 */
+		$hosts = apply_filters( 'efs_docker_host_candidates', array_unique( $hosts ), $port );
+
+		foreach ( $hosts as $host ) {
+			if ( ! is_string( $host ) || '' === trim( $host ) ) {
+				continue;
+			}
+
+			$resolved = gethostbyname( $host );
+			if ( empty( $resolved ) || $resolved === $host ) {
+				// If host resolves to itself, it may already be an IP or unreachable name.
+				if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
+					return sprintf( 'http://%s:%d', $host, $port );
+				}
+				continue;
+			}
+
+			if ( filter_var( $resolved, FILTER_VALIDATE_IP ) ) {
+				return sprintf( 'http://%s:%d', $resolved, $port );
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Sanitize text
 	 *
 	 * @param string $text
@@ -551,6 +713,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @param string $message
 	 */
 	protected function log( $message ) {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: development helper for AJAX debugging without error handler dependency
 		error_log( 'EFS AJAX: ' . $message );
 	}
 }

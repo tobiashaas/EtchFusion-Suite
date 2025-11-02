@@ -164,6 +164,7 @@ class EFS_Service_Container implements ContainerInterface {
 		try {
 			$reflection = new ReflectionClass( $concrete );
 		} catch ( ReflectionException $exception ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs failed service reflection while preserving container independence from error handler
 			error_log( sprintf( '[EFS] Service container failed to reflect "%s": %s', $concrete, sanitize_text_field( $exception->getMessage() ) ) );
 			throw new class( esc_html__( 'Unable to resolve service definition.', 'etch-fusion-suite' ) ) extends Exception implements ContainerExceptionInterface {
 			};

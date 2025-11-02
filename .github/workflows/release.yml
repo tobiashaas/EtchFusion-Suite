@@ -1,74 +1,99 @@
-name: Release
+name: Release Plugin
+
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Create Release
+  build-and-release:
+    name: Build and publish release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f
+        uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.1"
+          php-version: '7.4'
           coverage: none
-          tools: composer
+          extensions: mbstring, xml
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/composer
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('etch-fusion-suite/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
 
       - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Validate plugin headers
         run: |
-          chmod +x scripts/validate-plugin-headers.sh
-          scripts/validate-plugin-headers.sh
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Verify plugin version matches tag
+        run: |
+          HEADER_VERSION=$(grep -E "^[[:space:]]*\*[[:space:]]*Version:" etch-fusion-suite/etch-fusion-suite.php | head -n1 | sed 's/.*Version:[[:space:]]*//' | tr -d '\r' | xargs)
+          CONSTANT_VERSION=$(grep -E "define\([[:space:]]*'ETCH_FUSION_SUITE_VERSION'" etch-fusion-suite/etch-fusion-suite.php | head -n1 | sed -E "s/.*'ETCH_FUSION_SUITE_VERSION'[[:space:]]*,[[:space:]]*'([^']+)'.*/\1/")
+          if [[ -z "${HEADER_VERSION}" || -z "${CONSTANT_VERSION}" ]]; then
+            echo "::error::Unable to determine plugin version from etch-fusion-suite.php"
+            exit 1
+          fi
+          if [[ "${HEADER_VERSION}" != "${VERSION}" ]]; then
+            echo "::error::Version mismatch: plugin header has ${HEADER_VERSION}, tag is ${VERSION}"
+            exit 1
+          fi
+          if [[ "${CONSTANT_VERSION}" != "${VERSION}" ]]; then
+            echo "::error::Version mismatch: version constant has ${CONSTANT_VERSION}, tag is ${VERSION}"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Validate composer configuration
+        run: composer validate --strict
+        shell: bash
         working-directory: etch-fusion-suite
-        env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
 
-      - name: Install production dependencies
-        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-progress
-        working-directory: etch-fusion-suite
+      - name: Ensure build script is executable
+        run: chmod +x scripts/build-release.sh
+        shell: bash
 
-      - name: Create plugin ZIP
+      - name: Build release artifacts
+        run: ./scripts/build-release.sh "${VERSION}"
+        shell: bash
+
+      - name: Generate changelog
         run: |
-          cd etch-fusion-suite
-          zip -r ../etch-fusion-suite.zip . \
-            -x "*.git*" \
-            -x "*node_modules/*" \
-            -x "*.wp-env*" \
-            -x "*package*.json" \
-            -x "*composer.json" \
-            -x "*composer.lock" \
-            -x "*phpcs.xml.dist" \
-            -x "*phpunit.xml.dist" \
-            -x "*.DS_Store" \
-            -x "*tests/*" \
-            -x "*scripts/*"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [[ -n "${PREVIOUS_TAG}" ]]; then
+            git log "${PREVIOUS_TAG}"..HEAD --pretty=format:'- %s (%h)' > CHANGELOG.txt
+          else
+            git log --pretty=format:'- %s (%h)' > CHANGELOG.txt
+          fi
+        shell: bash
 
-      - name: Extract changelog
-        id: changelog
-        run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
-          CHANGELOG=$(awk "/## \[${VERSION}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md)
-          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          files: etch-fusion-suite.zip
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          tag_name: ${{ github.ref }}
+          name: Release v${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.txt
+          files: |
+            dist/etch-fusion-suite-v${{ steps.version.outputs.version }}.zip
+            dist/etch-fusion-suite-v${{ steps.version.outputs.version }}.zip.sha256
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-beta') || contains(steps.version.outputs.version, '-alpha') || contains(steps.version.outputs.version, '-rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

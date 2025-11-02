@@ -77,7 +77,9 @@ class EFS_CORS_Manager {
 	 */
 	public function is_origin_allowed( $origin ) {
 		if ( empty( $origin ) ) {
-			return false;
+			// Requests originating from the server or same-origin browsers omit the Origin header.
+			// Treat these as allowed to prevent false CORS denials for server-to-server calls.
+			return true;
 		}
 
 		$allowed_origins = $this->get_allowed_origins();
@@ -88,7 +90,7 @@ class EFS_CORS_Manager {
 		// Check if origin is in whitelist
 		foreach ( $allowed_origins as $allowed ) {
 			$allowed = rtrim( $allowed, '/' );
-			if ( $origin === $allowed ) {
+			if ( $allowed === $origin ) {
 				return true;
 			}
 		}

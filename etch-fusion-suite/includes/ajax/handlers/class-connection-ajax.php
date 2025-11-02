@@ -3,6 +3,8 @@ namespace Bricks2Etch\Ajax\Handlers;
 
 use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
 use Bricks2Etch\Api\EFS_API_Client;
+use Bricks2Etch\Controllers\EFS_Settings_Controller;
+use Bricks2Etch\Repositories\Interfaces\Settings_Repository_Interface;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -33,6 +35,444 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	protected function register_hooks() {
 		add_action( 'wp_ajax_efs_test_export_connection', array( $this, 'test_export_connection' ) );
 		add_action( 'wp_ajax_efs_test_import_connection', array( $this, 'test_import_connection' ) );
+		add_action( 'wp_ajax_efs_save_settings', array( $this, 'save_settings' ) );
+		add_action( 'wp_ajax_efs_test_connection', array( $this, 'test_connection' ) );
+		add_action( 'wp_ajax_efs_save_feature_flags', array( $this, 'save_feature_flags' ) );
+	}
+
+	/**
+	 * Save connection settings via AJAX.
+	 */
+	public function save_settings() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'connection_save_settings', 5, 60 ) ) {
+			return;
+		}
+
+		$raw_api_key         = $this->get_post( 'api_key', '' );
+		$normalized_api_key  = $this->normalize_api_key( $raw_api_key );
+
+		$raw_target_url     = $this->get_post( 'target_url', '', 'url' );
+		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
+
+		try {
+			$validated = $this->validate_input(
+				array(
+					'target_url'    => $internal_target_url,
+					'api_key'       => $normalized_api_key,
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
+				),
+				array(
+					'target_url'    => array(
+						'type'     => 'url',
+						'required' => true,
+					),
+					'api_key'       => array(
+						'type'     => 'api_key',
+						'required' => true,
+					),
+					'migration_key' => array(
+						'type'     => 'text',
+						'required' => false,
+					),
+				)
+			);
+		} catch ( \Exception $e ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection settings validation failed.',
+				array( 'error' => $e->getMessage() ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'invalid_settings_payload',
+					'message' => __( 'Invalid settings data provided. Please check the form and try again.', 'etch-fusion-suite' ),
+				),
+				400
+			);
+			return;
+		}
+
+		$settings_controller = $this->resolve_settings_controller();
+		if ( ! $settings_controller ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection settings save failed: settings controller unavailable.',
+				array( 'action' => 'efs_save_settings' ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'service_unavailable',
+					'message' => __( 'Settings service unavailable. Please ensure the plugin is fully initialised.', 'etch-fusion-suite' ),
+				),
+				503
+			);
+			return;
+		}
+
+		/** @var array|\WP_Error $result */
+		$result = $settings_controller->save_settings( $validated );
+
+		if ( is_wp_error( $result ) ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection settings save failed.',
+				array(
+					'code'    => $result->get_error_code(),
+					'context' => $this->mask_sensitive_values( $validated ),
+				)
+			);
+			wp_send_json_error(
+				array(
+					'code'    => $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'settings_save_failed',
+					'message' => $result->get_error_message(),
+				),
+				$this->determine_error_status( $result )
+			);
+			return;
+		}
+
+		$message = isset( $result['message'] ) ? (string) $result['message'] : __( 'Settings saved successfully.', 'etch-fusion-suite' );
+		$data    = wp_parse_args(
+			$result,
+			array(
+				'message'  => $message,
+				'settings' => array(),
+			)
+		);
+
+		$this->log_security_event(
+			'ajax_action',
+			'Connection settings saved successfully.',
+			array( 'action' => 'efs_save_settings' )
+		);
+
+		wp_send_json_success( $data );
+	}
+
+	/**
+	 * Persist feature flag settings via AJAX.
+	 */
+	public function save_feature_flags() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'feature_flags_save', 5, 60 ) ) {
+			return;
+		}
+
+		$raw_flags = $this->get_post( 'feature_flags', array(), 'array' );
+		$raw_flags = is_array( $raw_flags ) ? $raw_flags : array();
+
+		$invalid_flags    = array();
+		$validated_flags  = array();
+		$allowed_features = $this->get_allowed_feature_flags();
+
+		foreach ( $raw_flags as $flag_name => $value ) {
+			$sanitized_name = sanitize_key( (string) $flag_name );
+
+			if ( ! $this->validate_feature_flag_name( $sanitized_name ) ) {
+				$invalid_flags[] = $flag_name;
+				continue;
+			}
+
+			$sanitized_value = \rest_sanitize_boolean( $value );
+			$validated_flags[ $sanitized_name ] = (bool) $sanitized_value;
+		}
+
+		if ( ! empty( $invalid_flags ) ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Feature flag save rejected due to invalid flag names.',
+				array( 'invalid_flags' => $this->mask_sensitive_values( $invalid_flags ) ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'invalid_feature_flags',
+					'message' => __( 'One or more feature flags are not recognized.', 'etch-fusion-suite' ),
+					'details' => array( 'invalid_flags' => array_map( 'sanitize_text_field', $invalid_flags ) ),
+				),
+				400
+			);
+			return;
+		}
+
+		// Ensure all allowed flags are explicitly set.
+		foreach ( $allowed_features as $flag_name ) {
+			if ( ! isset( $validated_flags[ $flag_name ] ) ) {
+				$validated_flags[ $flag_name ] = false;
+			}
+		}
+
+		$repository = $this->resolve_settings_repository();
+
+		if ( ! $repository ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Feature flag save failed: settings repository unavailable.',
+				array( 'action' => 'efs_save_feature_flags' ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'service_unavailable',
+					'message' => __( 'Feature settings service unavailable. Please reload the page and try again.', 'etch-fusion-suite' ),
+				),
+				503
+			);
+			return;
+		}
+
+		$save_result = $repository->save_feature_flags( $validated_flags );
+
+		if ( ! $save_result ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Feature flag save failed.',
+				array( 'action' => 'efs_save_feature_flags', 'flags' => $this->mask_sensitive_values( $validated_flags ) ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'feature_flags_save_failed',
+					'message' => __( 'Failed to save feature flags. Please try again.', 'etch-fusion-suite' ),
+				),
+				500
+			);
+			return;
+		}
+
+		$this->log_security_event(
+			'ajax_action',
+			'Feature flags updated successfully.',
+			array( 'action' => 'efs_save_feature_flags', 'flags' => $this->mask_sensitive_values( $validated_flags ) ),
+			'low'
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Feature flags saved successfully.', 'etch-fusion-suite' ),
+			)
+		);
+	}
+
+	/**
+	 * Get the list of allowed feature flags.
+	 *
+	 * @return array<string>
+	 */
+	private function get_allowed_feature_flags(): array {
+		return apply_filters( 'efs_allowed_feature_flags', array( 'template_extractor' ) );
+	}
+
+	/**
+	 * Validate a feature flag identifier against the whitelist.
+	 *
+	 * @param string $flag_name Feature flag identifier.
+	 * @return bool
+	 */
+	private function validate_feature_flag_name( string $flag_name ): bool {
+		return in_array( $flag_name, $this->get_allowed_feature_flags(), true );
+	}
+
+	/**
+	 * Resolve the settings repository instance.
+	 *
+	 * @return Settings_Repository_Interface|null
+	 */
+	private function resolve_settings_repository() {
+		if ( ! function_exists( 'etch_fusion_suite_container' ) ) {
+			return null;
+		}
+
+		try {
+			$container = etch_fusion_suite_container();
+
+			if ( $container && method_exists( $container, 'has' ) && $container->has( 'settings_repository' ) ) {
+				$repository = $container->get( 'settings_repository' );
+
+				if ( $repository instanceof Settings_Repository_Interface ) {
+					return $repository;
+				}
+			}
+		} catch ( \Exception $e ) {
+			return null;
+		}
+
+		return null;
+	}
+
+
+	/**
+	 * Test connection via AJAX using stored settings payload.
+	 */
+	public function test_connection() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'connection_test_settings', 10, 60 ) ) {
+			return;
+		}
+
+		$raw_api_key        = $this->get_post( 'api_key', '' );
+		$normalized_api_key = $this->normalize_api_key( $raw_api_key );
+
+		$raw_target_url     = $this->get_post( 'target_url', '', 'url' );
+		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
+
+		try {
+			$validated = $this->validate_input(
+				array(
+					'target_url' => $internal_target_url,
+					'api_key'    => $normalized_api_key,
+				),
+				array(
+					'target_url' => array(
+						'type'     => 'url',
+						'required' => true,
+					),
+					'api_key'    => array(
+						'type'     => 'api_key',
+						'required' => true,
+					),
+				)
+			);
+		} catch ( \Exception $e ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection test validation failed.',
+				array( 'error' => $e->getMessage() ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'invalid_connection_payload',
+					'message' => __( 'Invalid connection details provided. Please verify the fields and try again.', 'etch-fusion-suite' ),
+				),
+				400
+			);
+			return;
+		}
+
+		$settings_controller = $this->resolve_settings_controller();
+		if ( ! $settings_controller ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection test failed: settings controller unavailable.',
+				array( 'action' => 'efs_test_connection' ),
+				'high'
+			);
+			wp_send_json_error(
+				array(
+					'code'    => 'service_unavailable',
+					'message' => __( 'Connection service unavailable. Please ensure the plugin is fully initialised.', 'etch-fusion-suite' ),
+				),
+				503
+			);
+			return;
+		}
+
+		$result = $settings_controller->test_connection( $validated );
+
+		if ( is_wp_error( $result ) ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Connection test failed.',
+				array(
+					'code'    => $result->get_error_code(),
+					'context' => $this->mask_sensitive_values( $validated ),
+				)
+			);
+			wp_send_json_error(
+				array(
+					'code'    => $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'connection_failed',
+					'message' => $result->get_error_message(),
+				),
+				$this->determine_error_status( $result )
+			);
+			return;
+		}
+
+		$message = isset( $result['message'] ) ? (string) $result['message'] : __( 'Connection successful.', 'etch-fusion-suite' );
+		$data    = wp_parse_args(
+			$result,
+			array(
+				'message' => $message,
+				'valid'   => isset( $result['valid'] ) ? (bool) $result['valid'] : true,
+			)
+		);
+
+		$this->log_security_event(
+			'ajax_action',
+			'Connection test succeeded.',
+			array( 'action' => 'efs_test_connection' )
+		);
+
+		wp_send_json_success( $data );
+	}
+
+	/**
+	 * Resolve settings controller from container.
+	 *
+	 * @return EFS_Settings_Controller|null
+	 */
+	private function resolve_settings_controller() {
+		if ( ! function_exists( 'etch_fusion_suite_container' ) ) {
+			return null;
+		}
+
+		try {
+			$container = etch_fusion_suite_container();
+			if ( $container && $container->has( 'settings_controller' ) ) {
+				$controller = $container->get( 'settings_controller' );
+				if ( $controller instanceof EFS_Settings_Controller ) {
+					return $controller;
+				}
+			}
+		} catch ( \Exception $e ) {
+			return null;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Determine HTTP status code from WP_Error.
+	 *
+	 * @param \WP_Error $error Error instance.
+	 * @return int
+	 */
+	private function determine_error_status( $error ) {
+		$status = 400;
+		if ( $error instanceof \WP_Error ) {
+			$additional_data = $error->get_error_data();
+			if ( is_array( $additional_data ) && isset( $additional_data['status'] ) ) {
+				$status = (int) $additional_data['status'];
+			}
+		}
+		return $status > 0 ? $status : 400;
+	}
+
+	/**
+	 * Normalize API key by removing whitespace characters.
+	 *
+	 * @param string $api_key Raw API key input.
+	 * @return string
+	 */
+	private function normalize_api_key( $api_key ) {
+		if ( ! is_string( $api_key ) ) {
+			return '';
+		}
+
+		return preg_replace( '/\s+/', '', $api_key );
 	}
 
 	public function test_export_connection() {
@@ -221,10 +661,4 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		);
 	}
 
-	private function convert_to_internal_url( $url ) {
-		if ( strpos( $url, 'localhost:8081' ) !== false ) {
-			$url = str_replace( array( 'http://localhost:8081', 'https://localhost:8081' ), 'http://efs-etch', $url );
-		}
-		return $url;
-	}
 }

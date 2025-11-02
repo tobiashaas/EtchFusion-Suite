@@ -44,7 +44,9 @@ const handleValidateApiKey = async (event) => {
 const handleValidateToken = async (event) => {
     event.preventDefault();
     const button = event.currentTarget;
-    const textarea = document.querySelector('[data-efs-migration-key]');
+    const migrationSection = button.closest('[data-efs-accordion-section]');
+    const textarea = migrationSection?.querySelector('#efs-migration-key')
+        || document.querySelector('#efs-migration-key');
     if (!textarea) {
         return;
     }

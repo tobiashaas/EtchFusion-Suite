@@ -134,6 +134,7 @@ class EFS_Audit_Logger {
 		$saved = update_option( $this->log_option, $logs, false );
 
 		if ( in_array( $severity, array( 'high', 'critical' ), true ) ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: mirrors high/critical security events to WordPress debug.log for real-time alerting
 			error_log(
 				sprintf(
 					'[EFS Security] %s - %s: %s',
@@ -514,7 +515,7 @@ class EFS_Audit_Logger {
 				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) );
 
 				// X-Forwarded-For can contain multiple IPs
-				if ( strpos( $ip, ',' ) !== false ) {
+				if ( false !== strpos( $ip, ',' ) ) {
 					$ips = explode( ',', $ip );
 					$ip  = trim( $ips[0] );
 				}

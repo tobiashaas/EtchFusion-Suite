@@ -39,6 +39,29 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Determine if debug logging is enabled via WordPress flags.
+	 *
+	 * @return bool True when WP_DEBUG and WP_DEBUG_LOG are enabled.
+	 */
+	private function is_debug_logging_enabled() {
+		return defined( 'WP_DEBUG' ) && WP_DEBUG && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG;
+	}
+
+	/**
+	 * Route verbose diagnostics through the error handler debug channel when enabled.
+	 *
+	 * @param string     $message Debug message to log.
+	 * @param array|null $context Optional structured context payload.
+	 */
+	private function log_debug_info( $message, $context = null ) {
+		if ( ! $this->is_debug_logging_enabled() || ! method_exists( $this->error_handler, 'debug_log' ) ) {
+			return;
+		}
+
+		$this->error_handler->debug_log( $message, $context, 'EFS_CSS_CONVERTER' );
+	}
+
+	/**
 	 * Backwards-compatible wrapper to satisfy legacy integrations.
 	 *
 	 * @param array<string,mixed> $legacy_styles Optional payload.
@@ -127,7 +150,7 @@ class EFS_CSS_Converter {
 
 		foreach ( $excluded_prefixes as $prefix ) {
 			if ( 0 === strpos( $class_name, $prefix ) ) {
-				error_log( '🎨 CSS Converter: Excluding class: ' . $class_name . ' (prefix: ' . $prefix . ')' );
+				$this->error_handler->log_info( 'CSS Converter: Excluding class ' . $class_name . ' (prefix: ' . $prefix . ')' );
 				return true;
 			}
 		}
@@ -141,10 +164,15 @@ class EFS_CSS_Converter {
 	 * Generates Etch-compatible etch_styles array structure
 	 */
 	public function convert_bricks_classes_to_etch() {
-		error_log( '🎨 CSS Converter: Starting conversion...' );
+		$this->log_debug_info( 'CSS Converter: Starting conversion' );
 
 		$bricks_classes = get_option( 'bricks_global_classes', array() );
-		error_log( '🎨 CSS Converter: Found ' . count( $bricks_classes ) . ' Bricks classes' );
+		$this->log_debug_info(
+			'CSS Converter: Loaded Bricks classes',
+			array(
+				'count' => count( $bricks_classes ),
+			)
+		);
 
 		$etch_styles = array();
 		$style_map   = array(); // Maps Bricks ID => Etch Style ID
@@ -200,7 +228,13 @@ class EFS_CSS_Converter {
 							}
 							$breakpoint_css_map[ $bricks_id ][] = $media_query . " {\n  " . $css_content . "\n}";
 
-							error_log( 'B2E CSS: Found breakpoint CSS for ' . $class_name . ' (' . $breakpoint . ')' );
+							$this->log_debug_info(
+								'CSS Converter: Found breakpoint CSS',
+								array(
+									'class_name' => $class_name,
+									'breakpoint' => $breakpoint,
+								)
+							);
 						}
 					}
 				}
@@ -241,7 +275,12 @@ class EFS_CSS_Converter {
 
 				// DEBUG: Log first 3 styles to verify selectors
 				if ( $converted_count <= 3 ) {
-					error_log( 'B2E CSS: Style ' . $style_id . ' selector: ' . ( $converted_class['selector'] ?? 'NULL' ) );
+					$this->log_debug_info(
+						'CSS Converter: Converted style',
+						array(
+							'selector' => $converted_class['selector'] ?? '',
+						)
+					);
 				}
 
 				// Map Bricks ID to Etch Style ID + Selector
@@ -254,14 +293,29 @@ class EFS_CSS_Converter {
 				}
 			}
 		}
-		error_log( '🎨 CSS Converter: Converted ' . $converted_count . ' user classes' );
+		$this->log_debug_info(
+			'CSS Converter: Converted user classes',
+			array(
+				'converted' => $converted_count,
+			)
+		);
 
 		// Step 3: Parse custom CSS stylesheet and merge with existing styles
-		error_log( 'B2E CSS: Custom CSS stylesheet length: ' . strlen( $custom_css_stylesheet ) );
+		$this->log_debug_info(
+			'CSS Converter: Custom CSS stylesheet length',
+			array(
+				'length' => strlen( $custom_css_stylesheet ),
+			)
+		);
 		if ( ! empty( $custom_css_stylesheet ) ) {
-			error_log( 'B2E CSS: Parsing custom CSS stylesheet...' );
+			$this->log_debug_info( 'CSS Converter: Parsing custom CSS stylesheet' );
 			$custom_styles = $this->parse_custom_css_stylesheet( $custom_css_stylesheet, $style_map );
-			error_log( 'B2E CSS: Found ' . count( $custom_styles ) . ' custom styles' );
+			$this->log_debug_info(
+				'CSS Converter: Parsed custom styles',
+				array(
+					'count' => count( $custom_styles ),
+				)
+			);
 
 			// Merge custom CSS with existing styles (combine CSS for same selector)
 			foreach ( $custom_styles as $style_id => $custom_style ) {
@@ -279,19 +333,34 @@ class EFS_CSS_Converter {
 						$etch_styles[ $style_id ]['css'] = $custom_css;
 					}
 
-					error_log( 'B2E CSS: Merged custom CSS for ' . $custom_style['selector'] );
+					$this->log_debug_info(
+						'CSS Converter: Merged custom CSS',
+						array(
+							'selector' => $custom_style['selector'],
+						)
+					);
 				} else {
 					// New style from custom CSS - convert to logical properties
 					$custom_style['css']      = $this->convert_to_logical_properties( $custom_style['css'] );
 					$etch_styles[ $style_id ] = $custom_style;
-					error_log( 'B2E CSS: Added new custom CSS style for ' . $custom_style['selector'] );
+					$this->log_debug_info(
+						'CSS Converter: Added custom CSS style',
+						array(
+							'selector' => $custom_style['selector'],
+						)
+					);
 				}
 			}
 		}
 
 		// Step 4: Add breakpoint-specific CSS to styles
 		if ( ! empty( $breakpoint_css_map ) ) {
-			error_log( 'B2E CSS: Adding breakpoint CSS for ' . count( $breakpoint_css_map ) . ' classes' );
+			$this->log_debug_info(
+				'CSS Converter: Adding breakpoint CSS',
+				array(
+					'class_count' => count( $breakpoint_css_map ),
+				)
+			);
 
 			foreach ( $breakpoint_css_map as $bricks_id => $media_queries ) {
 				// Find the Etch style ID for this Bricks ID
@@ -303,7 +372,13 @@ class EFS_CSS_Converter {
 						foreach ( $media_queries as $media_query ) {
 							$etch_styles[ $style_id ]['css'] .= "\n\n" . $media_query;
 						}
-						error_log( 'B2E CSS: Added ' . count( $media_queries ) . ' media queries to style ' . $style_id );
+						$this->log_debug_info(
+							'CSS Converter: Added media queries to style',
+							array(
+								'count'    => count( $media_queries ),
+								'style_id' => $style_id,
+							)
+						);
 					}
 				}
 			}
@@ -313,13 +388,23 @@ class EFS_CSS_Converter {
 		$this->style_repository->save_style_map( $style_map );
 
 		$total_styles = count( $etch_styles );
-		error_log( '🎨 CSS Converter: Converted ' . $converted_count . ' classes' );
-		error_log( '🎨 CSS Converter: Excluded ' . $excluded_count . ' classes (Bricks/WP/Woo)' );
-		error_log( '🎨 CSS Converter: Returning ' . $total_styles . ' total styles' );
-		error_log( '🎨 CSS Converter: Style map has ' . count( $style_map ) . ' entries' );
+		$this->log_debug_info(
+			'CSS Converter: Conversion summary',
+			array(
+				'converted'      => $converted_count,
+				'excluded'       => $excluded_count,
+				'total_styles'   => $total_styles,
+				'style_map_size' => count( $style_map ),
+			)
+		);
 
 		if ( 0 === $total_styles ) {
-			error_log( '⚠️ CSS Converter: WARNING - No styles generated!' );
+			$this->error_handler->log_info(
+				'CSS Converter completed without generating styles',
+				array(
+					'bricks_classes' => count( $bricks_classes ),
+				)
+			);
 		}
 
 		// Return both styles AND style map
@@ -1378,14 +1463,26 @@ class EFS_CSS_Converter {
 				// Match selector (with or without leading dot)
 				if ( '.' . $class_name === $selector || $class_name === $selector ) {
 					$style_id = is_array( $style_data ) ? $style_data['id'] : $style_data;
-					error_log( 'B2E CSS: Found existing style ID ' . $style_id . ' for custom CSS class ' . $class_name );
+					$this->log_debug_info(
+						'CSS Converter: Found existing style mapping',
+						array(
+							'class_name' => $class_name,
+							'bricks_id'  => $bricks_id,
+							'etch_id'    => $style_id,
+						)
+					);
 					break;
 				}
 			}
 
 			// If no existing style found, skip this class (it's not in our style map)
 			if ( ! $style_id ) {
-				error_log( 'B2E CSS: Skipping custom CSS for ' . $class_name . ' (not in style map)' );
+				$this->log_debug_info(
+					'CSS Converter: Skipping custom CSS outside style map',
+					array(
+						'class_name' => $class_name,
+					)
+				);
 				continue;
 			}
 
@@ -1575,7 +1672,12 @@ class EFS_CSS_Converter {
 			$result = preg_replace( '/\.' . $escaped_class . '(\s+[>+~]|\s+[.#\[]|::|:)/', '&$1', $css );
 		}
 
-		error_log( 'B2E CSS: Converted nested selectors for .' . $class_name );
+		$this->log_debug_info(
+			'CSS Converter: Converted nested selectors',
+			array(
+				'class_name' => $class_name,
+			)
+		);
 
 		return $result;
 	}
@@ -1652,20 +1754,34 @@ class EFS_CSS_Converter {
 		$escaped_class = preg_quote( $class_name, '/' );
 		$rules         = array();
 
-		error_log( 'B2E CSS: Converting media query content for .' . $class_name );
-		error_log( 'B2E CSS: Media content length: ' . strlen( $media_content ) );
+		$this->log_debug_info(
+			'CSS Converter: Converting media query content',
+			array(
+				'class_name'     => $class_name,
+				'content_length' => strlen( $media_content ),
+			)
+		);
 
 		// Pattern to match CSS rules inside media query
 		$pattern = '/\.' . $escaped_class . '([^{]*?)\{([^}]*)\}/s';
 
 		if ( preg_match_all( $pattern, $media_content, $matches, PREG_SET_ORDER ) ) {
-			error_log( 'B2E CSS: Found ' . count( $matches ) . ' rules in media query' );
+			$this->log_debug_info(
+				'CSS Converter: Found media query rules',
+				array(
+					'count' => count( $matches ),
+				)
+			);
 
 			foreach ( $matches as $match ) {
 				$selector_suffix = trim( $match[1] );
 				$rule_content    = trim( $match[2] );
-
-				error_log( 'B2E CSS: Rule content: ' . $rule_content );
+				$this->log_debug_info(
+					'CSS Converter: Processing media query rule',
+					array(
+						'length' => strlen( $rule_content ),
+					)
+				);
 
 				// Convert to & syntax
 				if ( preg_match( '/^[>+~]/', $selector_suffix ) || preg_match( '/^[.#\[]/', $selector_suffix ) ) {
@@ -1680,11 +1796,21 @@ class EFS_CSS_Converter {
 				$rules[] = $nested_selector . " {\n    " . $rule_content . "\n  }";
 			}
 		} else {
-			error_log( 'B2E CSS: NO MATCH in media query for .' . $class_name );
+			$this->log_debug_info(
+				'CSS Converter: No media query rules matched class',
+				array(
+					'class_name' => $class_name,
+				)
+			);
 		}
 
 		$result = implode( "\n\n  ", $rules );
-		error_log( 'B2E CSS: Media query result length: ' . strlen( $result ) );
+		$this->log_debug_info(
+			'CSS Converter: Media query result compiled',
+			array(
+				'length' => strlen( $result ),
+			)
+		);
 
 		return $result;
 	}
@@ -1711,8 +1837,13 @@ class EFS_CSS_Converter {
 		$etch_styles = $data['styles'] ?? $data; // Fallback to old format
 		$style_map   = $data['style_map'] ?? array();
 
-		error_log( 'B2E: import_etch_styles called with ' . count( $etch_styles ) . ' styles' );
-		error_log( 'B2E: import_etch_styles received style map with ' . count( $style_map ) . ' entries' );
+		$this->log_debug_info(
+			'CSS Converter: import_etch_styles invoked',
+			array(
+				'count_styles'    => count( $etch_styles ),
+				'count_style_map' => count( $style_map ),
+			)
+		);
 
 		// Get existing etch_styles (for Etch Editor)
 		$existing_styles = $this->style_repository->get_etch_styles();
@@ -1728,36 +1859,63 @@ class EFS_CSS_Converter {
 		$bypass_api = true; // Set to false to use Etch API again
 
 		if ( $bypass_api ) {
-			error_log( 'B2E: 🚫 BYPASSING Etch API - using direct update_option()' );
+			$this->log_debug_info( 'CSS Converter: Bypassing Etch API for direct option update' );
 
 			// DEBUG: Log first 3 styles BEFORE saving
 			$style_keys = array_keys( $merged_styles );
 			for ( $i = 0; $i < min( 3, count( $style_keys ) ); $i++ ) {
 				$key   = $style_keys[ $i ];
 				$style = $merged_styles[ $key ];
-				error_log( 'B2E CSS BEFORE SAVE: ' . $key . ' selector: ' . ( $style['selector'] ?? 'NULL' ) );
+				$this->log_debug_info(
+					'CSS Converter: Previewing style before save',
+					array(
+						'key'      => $key,
+						'selector' => $style['selector'] ?? '',
+					)
+				);
 			}
 
 			// Save directly to database
 			$update_result = $this->style_repository->save_etch_styles( $merged_styles );
 
 			if ( ! $update_result ) {
-				error_log( 'B2E: ⚠️ update_option returned false (option may already exist with same value)' );
+				$this->error_handler->log_info(
+					'CSS Converter: Style option update returned false',
+					array(
+						'context' => 'Option may already exist with same value',
+					)
+				);
 			} else {
-				error_log( 'B2E: ✅ update_option returned true' );
+				$this->log_debug_info( 'CSS Converter: Style option updated successfully' );
 			}
 
 			// DEBUG: Log first 3 styles AFTER saving (verify from DB)
 			$saved_styles = $this->style_repository->get_etch_styles();
-			error_log( 'B2E: Retrieved ' . count( $saved_styles ) . ' styles from DB' );
+			$this->log_debug_info(
+				'CSS Converter: Retrieved styles from database',
+				array(
+					'count' => count( $saved_styles ),
+				)
+			);
 
 			for ( $i = 0; $i < min( 3, count( $style_keys ) ); $i++ ) {
 				$key         = $style_keys[ $i ];
 				$saved_style = $saved_styles[ $key ] ?? null;
 				if ( $saved_style ) {
-					error_log( 'B2E CSS AFTER SAVE: ' . $key . ' selector: ' . ( $saved_style['selector'] ?? 'NULL' ) );
+					$this->log_debug_info(
+						'CSS Converter: Verified saved style',
+						array(
+							'key'      => $key,
+							'selector' => $saved_style['selector'] ?? '',
+						)
+					);
 				} else {
-					error_log( 'B2E CSS AFTER SAVE: ' . $key . ' NOT FOUND in DB!' );
+					$this->error_handler->log_info(
+						'CSS Converter: Saved style missing after database read',
+						array(
+							'key' => $key,
+						)
+					);
 				}
 			}
 
@@ -1767,24 +1925,45 @@ class EFS_CSS_Converter {
 			// Trigger CSS rebuild
 			$this->trigger_etch_css_rebuild();
 
-			error_log( 'B2E: ✅ Direct save complete - ' . count( $merged_styles ) . ' styles saved' );
+			$this->log_debug_info(
+				'CSS Converter: Direct save complete',
+				array(
+					'saved_styles' => count( $merged_styles ),
+				)
+			);
 
 			// Style map was already created during conversion!
 			// Just save it to WordPress options
 			$this->style_repository->save_style_map( $style_map );
-			error_log( 'B2E: ✅ Saved style map with ' . count( $style_map ) . ' entries' );
+			$this->log_debug_info(
+				'CSS Converter: Saved style map',
+				array(
+					'count' => count( $style_map ),
+				)
+			);
 
 			// Log first few mappings for debugging
 			$map_entries = array_slice( $style_map, 0, 3, true );
 			foreach ( $map_entries as $bricks_id => $etch_id ) {
-				error_log( 'B2E: Style Map: ' . $bricks_id . ' → ' . $etch_id );
+				$this->log_debug_info(
+					'CSS Converter: Style map entry saved',
+					array(
+						'bricks_id' => $bricks_id,
+						'etch_id'   => $etch_id,
+					)
+				);
 			}
 
 			return true;
 
 		} else {
 			// Fallback to direct DB access if Etch API not available
-			error_log( 'B2E: WARNING - Etch API not available, using fallback (styles may not render correctly)' );
+			$this->error_handler->log_info(
+				'CSS Converter: Etch API unavailable, using fallback persistence path',
+				array(
+					'count_styles' => count( $merged_styles ),
+				)
+			);
 
 			$result = $this->style_repository->save_etch_styles( $merged_styles );
 
@@ -1808,28 +1987,34 @@ class EFS_CSS_Converter {
 	 * Forces Etch to regenerate CSS files from styles
 	 */
 	private function trigger_etch_css_rebuild() {
-		error_log( 'B2E: Triggering Etch CSS rebuild...' );
+		$this->log_debug_info( 'CSS Converter: Triggering Etch CSS rebuild' );
 
 		// Method 1: Increment SVG version (forces cache invalidation)
 		$current_version = $this->style_repository->get_svg_version();
 		$new_version     = $this->style_repository->increment_svg_version();
-		error_log( 'B2E: Updated etch_svg_version from ' . $current_version . ' to ' . $new_version );
+		$this->log_debug_info(
+			'CSS Converter: Updated SVG version',
+			array(
+				'previous' => $current_version,
+				'current'  => $new_version,
+			)
+		);
 
 		// Method 2: Clear all Etch caches
 		$this->style_repository->invalidate_style_cache();
-		error_log( 'B2E: Cleared Etch caches' );
+		$this->log_debug_info( 'CSS Converter: Cleared Etch caches' );
 
 		// Method 3: Trigger WordPress actions that Etch might listen to
 		do_action( 'etch_fusion_suite_styles_updated' );
 		do_action( 'etch_fusion_suite_rebuild_css' );
-		error_log( 'B2E: Triggered Etch action hooks' );
+		$this->log_debug_info( 'CSS Converter: Triggered Etch CSS action hooks' );
 
 		// Note: We don't call Etch's internal classes directly because:
 		// - StylesheetService has protected constructor (Singleton)
 		// - StylesRegister handles rendering automatically when blocks are processed
 		// - Cache invalidation via etch_svg_version is sufficient
 
-		error_log( 'B2E: CSS rebuild trigger complete' );
+		$this->log_debug_info( 'CSS Converter: CSS rebuild trigger complete' );
 	}
 
 	/**
@@ -1839,7 +2024,7 @@ class EFS_CSS_Converter {
 	 * This converts our etch_styles format to the global stylesheet format
 	 */
 	private function save_to_global_stylesheets( $etch_styles ) {
-		error_log( 'B2E: Saving to etch_global_stylesheets for frontend rendering...' );
+		$this->log_debug_info( 'CSS Converter: Saving styles to etch_global_stylesheets' );
 
 		// Get existing global stylesheets
 		$existing_global = $this->style_repository->get_global_stylesheets();
@@ -1883,10 +2068,20 @@ class EFS_CSS_Converter {
 		$result = $this->style_repository->save_global_stylesheets( $merged_global );
 
 		if ( $result ) {
-			error_log( 'B2E: Saved ' . count( $new_stylesheets ) . ' stylesheets to etch_global_stylesheets' );
-			error_log( 'B2E: Total global stylesheets: ' . count( $merged_global ) );
+			$this->log_debug_info(
+				'CSS Converter: Saved global stylesheets',
+				array(
+					'new_stylesheets'   => count( $new_stylesheets ),
+					'total_stylesheets' => count( $merged_global ),
+				)
+			);
 		} else {
-			error_log( 'B2E: WARNING - Failed to update etch_global_stylesheets' );
+			$this->error_handler->log_info(
+				'CSS Converter: Failed to update etch_global_stylesheets',
+				array(
+					'new_stylesheets' => count( $new_stylesheets ),
+				)
+			);
 		}
 
 		return $result;

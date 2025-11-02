@@ -1,0 +1,110 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# pre-commit
+# -----------------------------------------------------------------------------
+# Template pre-commit hook for Etch Fusion Suite. Copy this file into
+# .git/hooks/pre-commit (or run composer install-hooks) to enforce PHPCS on
+# staged PHP files before each commit.
+# -----------------------------------------------------------------------------
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/pre-commit [options]
+
+Options:
+  --verify-all   Run the additional PHPCS verification scripts after PHPCS
+  --help         Show this message and exit
+USAGE
+}
+
+# Resolve repository root using git so the hook works from scripts/ or .git/hooks/
+resolve_repo_root() {
+  if command -v git >/dev/null 2>&1; then
+    git rev-parse --show-toplevel
+  else
+    echo "[✗] git command not found; cannot determine repository root." >&2
+    exit 2
+  fi
+}
+
+main() {
+  local flag_verify_all=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --verify-all)
+        flag_verify_all=true
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        echo "[✗] Unknown option: $1" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    shift
+  done
+
+  local repo_root
+  repo_root="$(resolve_repo_root)"
+  local plugin_dir="${repo_root}/etch-fusion-suite"
+
+  local staged
+  staged="$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(php|phtml)$' || true)"
+
+  if [[ -z "${staged}" ]]; then
+    exit 0
+  fi
+
+  # Normalise staged paths so PHPCS runs relative to the plugin directory.
+  local -a phpcs_targets=()
+
+  while IFS= read -r file; do
+    [[ -z "${file}" ]] && continue
+    if [[ "${file}" == "etch-fusion-suite/"* ]]; then
+      phpcs_targets+=("${file#etch-fusion-suite/}")
+    fi
+  done <<< "${staged}"
+
+  if [[ ${#phpcs_targets[@]} -eq 0 ]]; then
+    exit 0
+  fi
+
+  echo "[•] Running PHPCS on staged PHP files"
+
+  pushd "${plugin_dir}" >/dev/null
+
+  if ! vendor/bin/phpcs --standard=phpcs.xml.dist "${phpcs_targets[@]}"; then
+    cat <<'EOF' >&2
+[✗] PHPCS found coding standard violations. Commit aborted.
+
+Next steps:
+  1. Auto-fix issues: composer phpcbf
+  2. Re-run PHPCS: composer phpcs
+  3. Review PHPCS Standards & Compliance in DOCUMENTATION.md
+  4. Bypass (not recommended): git commit --no-verify
+EOF
+    exit 1
+  fi
+
+  if [[ "${flag_verify_all}" == true ]]; then
+    echo "[•] Running supplemental verification scripts"
+    ./scripts/verify-strict-comparison.sh || exit 1
+    ./scripts/verify-yoda-conditions.sh || exit 1
+    ./scripts/verify-hook-prefixing.sh || exit 1
+    ./scripts/verify-datetime-functions.sh || exit 1
+  fi
+
+  popd >/dev/null
+
+  echo "[✓] PHPCS passed for staged files"
+  exit 0
+}
+
+main "$@"

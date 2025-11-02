@@ -1,78 +1,102 @@
-import { test as setup, expect } from '@playwright/test';
+import { test as setup, expect, Page } from '@playwright/test';
 import * as path from 'path';
 import { promises as fs } from 'fs';
 
 const BRICKS_AUTH_FILE = path.join(__dirname, '../../.playwright-auth/bricks.json');
 const ETCH_AUTH_FILE = path.join(__dirname, '../../.playwright-auth/etch.json');
 
-setup('authenticate on Bricks instance', async ({ page }) => {
-  const bricksUrl = process.env.BRICKS_URL ?? 'http://localhost:8888';
-  const username = process.env.EFS_ADMIN_USER ?? 'admin';
-  const password = process.env.EFS_ADMIN_PASS ?? 'password';
+type AuthConfig = {
+  baseUrl: string;
+  storagePath: string;
+  username: string;
+  password: string;
+};
 
-  await fs.mkdir(path.dirname(BRICKS_AUTH_FILE), { recursive: true });
+const ensureSiteReachable = async (page: Page, url: string) => {
+  const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
+  if (!response || !response.ok()) {
+    throw new Error(`Site ${url} is not reachable (status: ${response?.status() ?? 'unknown'})`);
+  }
+};
 
-  const loginResponse = await page.request.post(`${bricksUrl}/wp-login.php`, {
+const ensureAdminAccessible = async (page: Page, adminUrl: string) => {
+  const response = await page.goto(adminUrl, { waitUntil: 'domcontentloaded' });
+  if (!response || response.status() >= 400) {
+    throw new Error(`Admin URL ${adminUrl} responded with status ${response?.status() ?? 'unknown'}`);
+  }
+};
+
+const performLogin = async (page: Page, adminUrl: string, username: string, password: string) => {
+  if (await page.locator('#wpadminbar').isVisible()) {
+    return;
+  }
+
+  const loginUrl = adminUrl.replace(/\/wp-admin\/?$/, '/wp-login.php');
+  const loginResponse = await page.request.post(loginUrl, {
     form: {
       log: username,
       pwd: password,
       rememberme: 'forever',
-      redirect_to: `${bricksUrl}/wp-admin/`,
+      redirect_to: adminUrl,
       testcookie: '1',
       'wp-submit': 'Log In',
     },
   });
 
   if (!loginResponse.ok()) {
-    throw new Error(`Bricks login failed with status ${loginResponse.status()}`);
+    throw new Error(`Login request to ${loginUrl} failed with status ${loginResponse.status()}`);
   }
 
-  await page.goto(`${bricksUrl}/wp-admin/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(adminUrl, { waitUntil: 'domcontentloaded' });
 
   if (page.url().includes('wp-login.php')) {
     await page.locator('#user_login').fill(username);
     await page.locator('#user_pass').fill(password);
     await page.locator('#wp-submit').click();
-    await page.waitForURL('**/wp-admin/**', { timeout: 15_000 });
+    await page.waitForURL('**/wp-admin/**', { timeout: 20_000 });
   }
+};
 
-  await expect(page.locator('#wpadminbar')).toBeVisible();
+const authenticateAndStore = async (page: Page, config: AuthConfig) => {
+  const { baseUrl, storagePath, username, password } = config;
+  const adminUrl = `${baseUrl.replace(/\/$/, '')}/wp-admin/`;
 
-  await page.context().storageState({ path: BRICKS_AUTH_FILE });
+  await fs.mkdir(path.dirname(storagePath), { recursive: true });
+
+  try {
+    await ensureSiteReachable(page, baseUrl);
+    await ensureAdminAccessible(page, adminUrl);
+    await performLogin(page, adminUrl, username, password);
+    await expect(page.locator('#wpadminbar')).toBeVisible({ timeout: 10_000 });
+    await page.context().storageState({ path: storagePath });
+  } catch (error) {
+    console.error(`[EFS][Playwright] Authentication failed for ${baseUrl}:`, error);
+    throw error;
+  }
+};
+
+setup('authenticate on Bricks instance', async ({ page }) => {
+  const baseUrl = process.env.BRICKS_URL ?? 'http://localhost:8888';
+  const username = process.env.EFS_ADMIN_USER ?? 'admin';
+  const password = process.env.EFS_ADMIN_PASS ?? 'password';
+
+  await authenticateAndStore(page, {
+    baseUrl,
+    storagePath: BRICKS_AUTH_FILE,
+    username,
+    password,
+  });
 });
 
 setup('authenticate on Etch instance', async ({ page }) => {
-  const etchUrl = process.env.ETCH_URL ?? 'http://localhost:8889';
+  const baseUrl = process.env.ETCH_URL ?? 'http://localhost:8889';
   const username = process.env.EFS_ADMIN_USER ?? 'admin';
   const password = process.env.EFS_ADMIN_PASS ?? 'password';
 
-  await fs.mkdir(path.dirname(ETCH_AUTH_FILE), { recursive: true });
-
-  const loginResponse = await page.request.post(`${etchUrl}/wp-login.php`, {
-    form: {
-      log: username,
-      pwd: password,
-      rememberme: 'forever',
-      redirect_to: `${etchUrl}/wp-admin/`,
-      testcookie: '1',
-      'wp-submit': 'Log In',
-    },
+  await authenticateAndStore(page, {
+    baseUrl,
+    storagePath: ETCH_AUTH_FILE,
+    username,
+    password,
   });
-
-  if (!loginResponse.ok()) {
-    throw new Error(`Etch login failed with status ${loginResponse.status()}`);
-  }
-
-  await page.goto(`${etchUrl}/wp-admin/`, { waitUntil: 'domcontentloaded' });
-
-  if (page.url().includes('wp-login.php')) {
-    await page.locator('#user_login').fill(username);
-    await page.locator('#user_pass').fill(password);
-    await page.locator('#wp-submit').click();
-    await page.waitForURL('**/wp-admin/**', { timeout: 15_000 });
-  }
-
-  await expect(page.locator('#wpadminbar')).toBeVisible();
-
-  await page.context().storageState({ path: ETCH_AUTH_FILE });
 });

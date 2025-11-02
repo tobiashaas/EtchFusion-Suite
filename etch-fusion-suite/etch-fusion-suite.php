@@ -12,6 +12,7 @@
  * Tested up to: 6.4
  * Requires PHP: 7.4
  * Network: false
+ * Update URI: https://github.com/tobiashaas/EtchFusion-Suite
  */
 
 // Prevent direct access
@@ -82,6 +83,13 @@ class Etch_Fusion_Suite_Plugin {
 	private $ajax_handler = null;
 
 	/**
+	 * GitHub updater instance
+	 *
+	 * @since 0.10.3
+	 */
+	private $github_updater = null;
+
+	/**
 	 * Get single instance
 	 */
 	public static function get_instance() {
@@ -106,6 +114,7 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Initialize REST API endpoints immediately
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
+		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
 		add_action( 'plugins_loaded', array( $this, 'init_migrators' ), 20 );
 
 		// Enable Application Passwords with environment-based HTTPS requirement
@@ -126,6 +135,20 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Initialize components
 		$this->init_components();
+	}
+
+	/**
+	 * Initialize GitHub updater for plugin updates
+	 *
+	 * @since 0.10.3
+	 */
+	public function init_github_updater() {
+		$container = etch_fusion_suite_container();
+
+		if ( $container->has( 'github_updater' ) ) {
+			$this->github_updater = $container->get( 'github_updater' );
+			$this->github_updater->init();
+		}
 	}
 
 	/**
@@ -294,6 +317,7 @@ class Etch_Fusion_Suite_Plugin {
 			'efs_import_api_key',
 			'efs_export_api_key',
 			'efs_migration_settings',
+			'efs_feature_flags',
 		);
 
 		foreach ( $efs_options as $option ) {
@@ -358,7 +382,49 @@ function etch_fusion_suite_debug_log( $message, $data = null, $context = 'ETCH_F
 		$log_message .= ' | Data: ' . wp_json_encode( $data );
 	}
 
+	// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: global debug helper for developers when WP_DEBUG logging is enabled
 	error_log( $log_message );
+}
+
+/**
+ * Determine if a feature flag is enabled.
+ *
+ * Provides global and feature-specific filters for extensibility.
+ *
+ * Example usage:
+ *
+ * ```php
+ * // Programmatically enable template extractor
+ * add_filter( 'efs_feature_enabled_template_extractor', '__return_true' );
+ *
+ * // Disable all features in staging
+ * add_filter(
+ * 	'efs_feature_enabled',
+ * 	function ( $enabled, $feature ) {
+ * 		return wp_get_environment_type() === 'staging' ? false : $enabled;
+ * 	},
+ * 	10,
+ * 	2
+ * );
+ * ```
+ *
+ * Filters:
+ * - `efs_feature_enabled`            (bool $enabled, string $feature_name)
+ * - `efs_feature_enabled_{$feature}` (bool $enabled)
+ *
+ * @param string $feature_name Feature identifier.
+ * @param bool   $default      Default state if not configured.
+ * @return bool Whether the feature is enabled.
+ */
+function efs_feature_enabled( string $feature_name, bool $default = false ): bool {
+	$container   = etch_fusion_suite_container();
+	$repository  = $container->get( 'settings_repository' );
+	$enabled     = (bool) $repository->get_feature_flag( $feature_name, $default );
+	$enabled     = apply_filters( 'efs_feature_enabled', $enabled, $feature_name );
+	$feature_key = sanitize_key( $feature_name );
+	$enabled     = apply_filters( "efs_feature_enabled_{$feature_key}", $enabled );
+
+	return (bool) $enabled;
 }
 
 // Initialize the plugin (new name)

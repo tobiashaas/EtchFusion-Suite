@@ -1,4 +1,5 @@
-import { initUI, showToast } from './ui.js';
+import { initUI, showToast, scrollToAccordionSection } from './ui.js';
+import { initPinInput } from './pin-input.js';
 import { bindSettings } from './settings.js';
 import { bindValidation } from './validation.js';
 import {
@@ -14,6 +15,9 @@ import { init as initTemplateExtractor } from './template-extractor.js';
 let templateExtractorInitialized = false;
 
 const ensureTemplateExtractor = () => {
+    if (!window.efsData?.template_extractor_enabled) {
+        return;
+    }
     if (templateExtractorInitialized) {
         return;
     }
@@ -65,11 +69,17 @@ const bindTabs = () => {
     const tabs = Array.from(tabsRoot.querySelectorAll('[data-efs-tab]'));
     const panels = Array.from(tabsRoot.querySelectorAll('.efs-tab__panel'));
 
+    const isFeatureDisabled = (tab) => tab?.hasAttribute('data-efs-feature-disabled')
+        || tab?.classList.contains('is-disabled');
+
     const activateTab = (targetKey) => {
         tabs.forEach((tab) => {
             const isTarget = tab.dataset.efsTab === targetKey;
             tab.classList.toggle('is-active', isTarget);
             tab.setAttribute('aria-selected', String(isTarget));
+            if (isTarget) {
+                tab.removeAttribute('aria-disabled');
+            }
         });
 
         panels.forEach((panel) => {
@@ -85,6 +95,18 @@ const bindTabs = () => {
 
     tabs.forEach((tab) => {
         tab.addEventListener('click', () => {
+            if (isFeatureDisabled(tab)) {
+                tab.setAttribute('aria-disabled', 'true');
+                const featureFlagsTarget = tab.dataset?.featureFlagsTarget
+                    || document.querySelector('[data-efs-open-feature-flags]')?.dataset?.target
+                    || 'efs-accordion-feature-flags';
+                showToast(
+                    window.efsData?.i18n?.featureDisabled || 'This feature is currently disabled. Enable it in Feature Flags.',
+                    'info',
+                );
+                scrollToAccordionSection(featureFlagsTarget);
+                return;
+            }
             activateTab(tab.dataset.efsTab);
         });
     });
@@ -99,15 +121,41 @@ const bootstrap = () => {
     // Guard: Ensure efsData is available
     if (!window.efsData) {
         console.warn('[EFS] efsData not localized. Admin scripts may not function correctly.');
-        return;
+        window.efsData = {
+            ajaxUrl: '',
+            nonce: '',
+            settings: {},
+        };
+        showToast(
+            window.efsStrings?.localizationMissing || 'Etch Fusion data not loaded. Some features may be unavailable. Refresh and ensure plugin scripts are localized.',
+            'warning'
+        );
+    }
+
+    if (!window.efsData?.ajaxUrl || !window.efsData?.nonce) {
+        console.warn('[EFS] efsData missing required fields.', window.efsData);
+        showToast(
+            window.efsStrings?.localizationInvalid || 'Etch Fusion configuration incomplete. Check your WordPress setup or refresh the page.',
+            'warning'
+        );
     }
 
     initUI();
+    initPinInput();
     bindSettings();
     bindValidation();
     bindMigrationForm();
     initLogs();
     bindTabs();
+
+    document.querySelectorAll('[data-efs-open-feature-flags]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const target = button.dataset.target || 'efs-accordion-feature-flags';
+            scrollToAccordionSection(target);
+            const checkbox = document.querySelector('#efs-feature-template-extractor');
+            checkbox?.focus({ preventScroll: true });
+        });
+    });
 
     // Resume migration if in progress
     const progress = window.efsData?.progress_data || {};

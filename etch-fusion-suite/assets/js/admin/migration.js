@@ -1,5 +1,5 @@
 import { post, buildAjaxErrorMessage } from './api.js';
-import { showToast, updateProgress } from './ui.js';
+import { showToast, updateProgress, expandAccordionSection } from './ui.js';
 
 const ACTION_START_MIGRATION = 'efs_start_migration';
 const ACTION_GET_PROGRESS = 'efs_get_migration_progress';
@@ -85,7 +85,31 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
 };
 
 export const startMigration = async (payload) => {
-    const data = await post(ACTION_START_MIGRATION, payload);
+    expandAccordionSection('efs-accordion-start-migration');
+    const tokenField = document.querySelector('#efs-migration-token');
+    if (tokenField && !payload.migration_token) {
+        payload.migration_token = tokenField.value || '';
+    }
+    const migrationForm = document.querySelector('[data-efs-migration-form]');
+    const migrationSection = migrationForm?.closest('[data-efs-accordion-section]');
+    const keyField = migrationSection?.querySelector('#efs-migration-key')
+        || document.querySelector('#efs-migration-key');
+    if (keyField && !payload.migration_key) {
+        payload.migration_key = keyField.value || '';
+    }
+
+    const requestPayload = { ...payload };
+    if (!requestPayload.migration_token) {
+        delete requestPayload.migration_token;
+    }
+
+    const data = await post(ACTION_START_MIGRATION, requestPayload);
+    if (data?.token) {
+        const tokenField = document.querySelector('#efs-migration-token');
+        if (tokenField) {
+            tokenField.value = data.token;
+        }
+    }
     if (data?.migrationId) {
         setActiveMigrationId(data.migrationId);
     }
@@ -101,6 +125,7 @@ export const startMigration = async (payload) => {
 };
 
 export const processBatch = async (payload) => {
+    expandAccordionSection('efs-accordion-start-migration');
     const migrationId = payload?.migrationId || getActiveMigrationId();
     const data = await post(ACTION_PROCESS_BATCH, {
         ...payload,
@@ -126,6 +151,7 @@ export const processBatch = async (payload) => {
 };
 
 export const cancelMigration = async (payload) => {
+    expandAccordionSection('efs-accordion-start-migration');
     const migrationId = payload?.migrationId || getActiveMigrationId();
     const data = await post(ACTION_CANCEL_MIGRATION, {
         ...payload,

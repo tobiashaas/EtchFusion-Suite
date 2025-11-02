@@ -73,12 +73,16 @@ export const openPluginDashboard = async (page: Page): Promise<void> => {
   await expect(page.locator('.efs-admin-wrap')).toBeVisible();
 };
 
+type ContextOverrides = Parameters<Browser['newContext']>[0];
+
 export const createEtchAdminContext = async (
-  browser: Browser
+  browser: Browser,
+  overrides: ContextOverrides = {}
 ): Promise<{ context: BrowserContext; page: Page }> => {
   const context = await browser.newContext({
     baseURL: DEFAULT_ETCH_URL,
     storageState: ETCH_AUTH_FILE,
+    ...overrides,
   });
   const page = await context.newPage();
   await openPluginDashboard(page);
@@ -86,11 +90,13 @@ export const createEtchAdminContext = async (
 };
 
 export const createBricksAdminContext = async (
-  browser: Browser
+  browser: Browser,
+  overrides: ContextOverrides = {}
 ): Promise<{ context: BrowserContext; page: Page }> => {
   const context = await browser.newContext({
     baseURL: DEFAULT_BRICKS_URL,
     storageState: BRICKS_AUTH_FILE,
+    ...overrides,
   });
   const page = await context.newPage();
   await openPluginDashboard(page);

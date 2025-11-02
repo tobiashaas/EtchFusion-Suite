@@ -28,12 +28,32 @@ jobs:
           coverage: none
           tools: composer
 
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.composer/cache
+            etch-fusion-suite/vendor
+          key: composer-${{ hashFiles('etch-fusion-suite/composer.lock') }}
+          restore-keys: |
+            composer-
+
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
         working-directory: etch-fusion-suite
 
       - name: Run PHP_CodeSniffer
-        run: vendor/bin/phpcs --standard=phpcs.xml.dist
+        run: |
+          vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary
+          echo "PHPCS lint completed with summary report."
+        working-directory: etch-fusion-suite
+
+      - name: Run PHPCS verification scripts
+        run: |
+          ./scripts/verify-strict-comparison.sh
+          ./scripts/verify-yoda-conditions.sh
+          ./scripts/verify-hook-prefixing.sh
+          ./scripts/verify-datetime-functions.sh
         working-directory: etch-fusion-suite
 
   test:
@@ -95,8 +115,9 @@ jobs:
         working-directory: etch-fusion-suite
 
   node:
-    name: Node
+    name: Node & Playwright
     runs-on: ubuntu-latest
+    needs: [lint, test]
     steps:
       - name: Checkout repository
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
@@ -117,4 +138,35 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+        working-directory: etch-fusion-suite
+
+      - name: Install Playwright browsers
+        run: npm run playwright:install
+        working-directory: etch-fusion-suite
+
+      - name: Start WordPress environments
+        run: npm run e2e:start
+        working-directory: etch-fusion-suite
+
+      - name: Wait for environments to become ready
+        run: npm run e2e:wait
+        working-directory: etch-fusion-suite
+
+      - name: Run Playwright test suite
+        env:
+          EFS_ADMIN_USER: admin
+          EFS_ADMIN_PASS: password
+        run: npm run test:playwright:ci
+        working-directory: etch-fusion-suite
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: etch-fusion-suite/playwright-report
+
+      - name: Stop WordPress environments
+        if: always()
+        run: npm run e2e:stop
         working-directory: etch-fusion-suite

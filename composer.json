@@ -14,7 +14,13 @@
         }
     },
     "scripts": {
-        "phpunit": "vendor/bin/phpunit --configuration=phpunit.xml.dist",
-        "test": "@phpunit"
+        "phpunit": "vendor/bin/phpunit",
+        "test": "vendor/bin/phpunit",
+        "phpcs": "vendor/bin/phpcs --standard=phpcs.xml.dist",
+        "phpcbf": "vendor/bin/phpcbf --standard=phpcs.xml.dist",
+        "phpcs:report": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary",
+        "phpcs:full": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=full",
+        "verify-strict": "./scripts/verify-strict-comparison.sh",
+        "verify-yoda": "./scripts/verify-yoda-conditions.sh"
     }
 }

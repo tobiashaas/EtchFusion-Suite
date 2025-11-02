@@ -39,12 +39,12 @@ class EFS_Media_Migrator {
 	 * Migrate all media files from source to target site
 	 */
 	public function migrate_media( $target_url, $api_key ) {
-		error_log( 'B2E Media Migration - Starting...' );
+		$this->error_handler->log_info( 'Media Migration: Starting' );
 		$media_files = $this->get_media_files();
-		error_log( 'B2E Media Migration - Found ' . count( $media_files ) . ' media files' );
+		$this->error_handler->log_info( 'Media Migration: Found ' . count( $media_files ) . ' media files' );
 
 		if ( empty( $media_files ) ) {
-			error_log( 'B2E Media Migration - No media files found, returning empty result' );
+			$this->error_handler->log_info( 'Media Migration: No media files found' );
 			return array(
 				'total'    => 0,
 				'migrated' => 0,
@@ -56,7 +56,7 @@ class EFS_Media_Migrator {
 		$total_media    = count( $media_files );
 		$migrated_media = 0;
 		$skipped_media  = 0;
-		error_log( 'B2E Media Migration - Processing ' . $total_media . ' media files' );
+		$this->error_handler->log_info( 'Media Migration: Processing ' . $total_media . ' media files' );
 
 		// Process in batches to avoid memory issues
 		$batch_size = 5; // Process 5 media files at a time
@@ -72,17 +72,15 @@ class EFS_Media_Migrator {
 				// Check if media was already migrated (deduplication)
 				$existing_mapping = $this->get_media_mapping( $media_id );
 				if ( null !== $existing_mapping ) {
-					error_log( 'B2E Media Migration - SKIPPED media ID: ' . $media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
+					$this->error_handler->log_info( 'Media Migration: Skipped media ID ' . $media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
 					++$skipped_media;
 					continue;
 				}
 
-				error_log( 'B2E Media Migration - Migrating media ID: ' . $media_id . ' (' . $media_data['title'] . ')' );
+				$this->error_handler->log_info( 'Media Migration: Migrating media ID ' . $media_id . ' (' . $media_data['title'] . ')' );
 				$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $api_key );
 
 				if ( is_wp_error( $result ) ) {
-					error_log( 'B2E Media Migration - ERROR for media ID ' . $media_id . ': ' . $result->get_error_message() );
-					error_log( 'B2E Media Migration - Error data: ' . wp_json_encode( $result->get_error_data() ) );
 					$this->error_handler->log_error(
 						'E401',
 						array(
@@ -95,7 +93,7 @@ class EFS_Media_Migrator {
 					continue;
 				}
 
-				error_log( 'B2E Media Migration - SUCCESS for media ID ' . $media_id );
+				$this->error_handler->log_info( 'Media Migration: Success for media ID ' . $media_id );
 
 				++$migrated_media;
 
@@ -109,7 +107,7 @@ class EFS_Media_Migrator {
 			usleep( 200000 ); // 0.2 seconds
 		}
 
-		error_log( 'B2E Media Migration - Complete: Total=' . $total_media . ', Migrated=' . $migrated_media . ', Skipped=' . $skipped_media . ', Failed=' . ( $total_media - $migrated_media - $skipped_media ) );
+		$this->error_handler->log_info( 'Media Migration: Complete - Total: ' . $total_media . ', Migrated: ' . $migrated_media . ', Skipped: ' . $skipped_media . ', Failed: ' . ( $total_media - $migrated_media - $skipped_media ) );
 
 		return array(
 			'total_media'    => $total_media,

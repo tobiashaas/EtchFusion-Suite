@@ -45,6 +45,12 @@
         "phpcbf": "vendor/bin/phpcbf --standard=phpcs.xml.dist",
         "phpcs:report": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary",
         "phpcs:full": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=full",
+        "verify-strict": "./scripts/verify-strict-comparison.sh",
+        "verify-yoda": "./scripts/verify-yoda-conditions.sh",
+        "verify-hooks": "./scripts/verify-hook-prefixing.sh",
+        "verify-datetime": "./scripts/verify-datetime-functions.sh",
+        "verify-phpcs": "./scripts/verify-phpcs-compliance.sh",
+        "install-hooks": "./scripts/install-git-hooks.sh --force",
         "test": [
             "@php -r \"if (!is_dir('build/logs')) { mkdir('build/logs', 0777, true); }\"",
             "@php -r \"if (!is_dir('build/coverage/html')) { mkdir('build/coverage/html', 0777, true); }\"",

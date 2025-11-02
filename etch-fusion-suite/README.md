@@ -70,6 +70,7 @@ The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), wh
 ### Composer Dependencies
 
 The `npm run dev` script automatically checks for Composer availability:
+
 - If Composer is available in the wp-env container, it will be used to install dependencies
 - If not available in the container, the script falls back to using Composer on the host machine
 - You can manually run `npm run composer:install` at any time to refresh vendor files (requires Composer in container)
@@ -137,6 +138,26 @@ vendor/bin/phpcbf --standard=phpcs.xml.dist
 
 **Important:** Always review changes before committing and run tests after auto-fixes.
 
+### Hook Prefixing
+
+- **Status:** 100% compliant (verified 2025-10-28)
+- **Verification:** `composer verify-hooks` (runs `scripts/verify-hook-prefixing.sh`; use `--report` to regenerate `docs/hook-prefixing-verification-report.md`).
+- **Documentation:** Detailed naming guidance in `docs/naming-conventions.md`.
+- **Allowed Prefixes:** Configured via `WordPress.NamingConventions.PrefixAllGlobals` in `phpcs.xml.dist` (`efs`, `etch_fusion_suite`, subsystem prefixes, and legacy tags).
+- **Best Practice:** Use `efs_` for AJAX/options/transients and `etch_fusion_suite_` for public hooks/global helpers. Document intentional exceptions with inline `phpcs:ignore` rationale.
+
+### Date/Time Functions
+
+100% compliant with `WordPress.DateTime.RestrictedFunctions`.
+
+```bash
+composer verify-datetime
+vendor/bin/phpcs --standard=phpcs.xml.dist --sniffs=WordPress.DateTime.RestrictedFunctions includes/
+```
+
+- [Date/Time Strategy](docs/datetime-functions-strategy.md)
+- [Verification Report](docs/datetime-functions-verification-report.md)
+
 ### Helper Scripts
 
 Use the provided scripts for comprehensive PHPCS workflows:
@@ -173,9 +194,32 @@ The project follows a phased approach to achieve full PHPCS compliance:
 - **Phase 1:** PHPCBF Auto-Fixes ✅ (completed)
 - **Phase 2-12:** Manual fixes for security, Yoda conditions, strict comparisons, etc.
 
-**Documentation:**
-- [Auto-fixes Report](docs/phpcs-auto-fixes-2025-10-28.md)
-- [Manual Fixes Backlog](docs/phpcs-manual-fixes-backlog.md)
+### Phase 12: Review & Validation
+
+- ✓ 100% PHPCS compliance re-verified (2025-10-29 13:30)
+- ✓ All verification scripts passing (`composer verify-*`)
+- ✓ `phpcs:ignore` audit documented intentional directives in `includes/ajax/class-base-ajax-handler.php`, `includes/error_handler.php`, `includes/admin_interface.php`, and DOM/migrator utilities (nonce access, infrastructure logging, DOM property access)
+- ✓ Test coverage documented (PHPUnit prerequisites, integration scripts, and Playwright E2E suite under `etch-fusion-suite/tests/playwright/` with wp-env storage state setup)
+- ✓ Developer quick reference and review checklist published
+
+**Quick Links:**
+
+- [Phase 12 Review Checklist](docs/phase12-review-checklist.md)
+- [PHPCS Quick Reference](docs/phpcs-quick-reference.md)
+- [Test Execution Report](docs/test-execution-report.md)
+- [Lessons Learned](docs/phpcs-lessons-learned.md)
+
+## 📚 Documentation
+
+- [Development Workflow](../DOCUMENTATION.md)
+- [PHPCS Auto-Fixes Report](docs/phpcs-auto-fixes-2025-10-28.md)
+- [PHPCS Manual Fixes Backlog](docs/phpcs-manual-fixes-backlog.md)
+- [Nonce Strategy](docs/nonce-strategy.md)
+- [Security Architecture](docs/security-architecture.md)
+- [Security Verification Checklist](docs/security-verification-checklist.md)
+- [PHPCS Quick Reference](docs/phpcs-quick-reference.md)
+- [Phase 12 Review Checklist](docs/phase12-review-checklist.md)
+- [Test Execution Report](docs/test-execution-report.md)
 - [TODOS.md](../TODOS.md) – Detailed phase tracking
 
 ### Composer Scripts
@@ -198,9 +242,20 @@ The CI workflow automatically runs PHPCS on all pull requests and pushes. The li
 - ✅ **Media Migration:** Transfers images and attachments
 - ✅ **CSS Classes:** Frontend rendering with correct class names
 - ✅ **Custom CSS:** Supports custom CSS from Global Classes
+- ✅ **Nonce Verification:** Centralized WordPress nonce protection across all AJAX handlers
 - ✅ **Batch Processing:** Efficient migration of large sites
 - 🔌 **Extensible Migrators:** Register custom migration modules via a hook-driven API
 - ✅ **Migrator System:** Allows developers to extend and customize the migration process
+
+## 🔒 Security
+
+### Nonce Verification
+
+- **Centralized architecture:** All AJAX actions share the `'efs_nonce'` token generated in `admin_interface.php` and exposed to JavaScript via `efsData.nonce`.
+- **Dual-layer verification:** `get_request_payload()` pre-validates nonce tokens (`$die = false` for JSON errors) before each handler re-validates with `verify_request()` and capability checks.
+- **Complete coverage:** Every AJAX handler extends `EFS_Base_Ajax_Handler` and invokes `verify_request()` as the first instruction, ensuring consistent CSRF protection.
+
+Learn more in the [Nonce Strategy documentation](docs/nonce-strategy.md) and supporting security guides.
 
 ## 🔧 Technical Details
 
@@ -216,6 +271,7 @@ Cross-Origin Resource Sharing (CORS) uses a whitelist-based policy instead of wi
 - **Logging**: CORS violations are logged in the security audit log
 
 **Configure CORS Origins:**
+
 ```php
 $settings_repository = $container->get('settings_repository');
 $settings_repository->save_cors_allowed_origins([
@@ -234,6 +290,7 @@ Protects endpoints from abuse using WordPress transients with sliding window alg
 - **Automatic**: Rate limits enforced automatically, no configuration needed
 
 **Rate Limit Exceeded Response:**
+
 ```json
 {
   "success": false,
@@ -280,6 +337,7 @@ Structured logging of security-relevant events:
 - **Export**: JSON export available via Audit Logger API
 
 **Access Security Logs:**
+
 ```php
 $audit_logger = $container->get('audit_logger');
 $logs = $audit_logger->get_security_logs(100, 'high'); // Last 100 high-severity events
@@ -297,11 +355,13 @@ Environment-aware HTTPS requirement for Application Passwords:
 ### Security Best Practices
 
 **For Development:**
+
 - Use default localhost origins for CORS
 - Rate limits are relaxed for local testing
 - Security logging helps debug issues
 
 **For Production:**
+
 1. **Configure CORS**: Add your production domains to the whitelist
 2. **Use HTTPS**: Always use HTTPS for API communication
 3. **Monitor Logs**: Regularly review security audit logs
@@ -310,6 +370,7 @@ Environment-aware HTTPS requirement for Application Passwords:
 6. **Review Events**: Check for `rate_limit_exceeded` and `cors_violation` events
 
 **Security Settings:**
+
 ```php
 $settings_repository = $container->get('settings_repository');
 $settings_repository->save_security_settings([
@@ -330,6 +391,7 @@ The plugin automatically detects your environment:
 - **Production**: Everything else (requires HTTPS)
 
 **Check Environment:**
+
 ```php
 $env_detector = $container->get('environment_detector');
 $is_local = $env_detector->is_local_environment();

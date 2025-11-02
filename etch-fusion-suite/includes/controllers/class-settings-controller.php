@@ -63,6 +63,37 @@ class EFS_Settings_Controller {
 	public function generate_migration_key( array $data ) {
 		$url    = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
 		$key    = isset( $data['api_key'] ) ? $this->sanitize_text( $data['api_key'] ) : '';
+
+		if ( empty( $url ) ) {
+			$url = home_url();
+		}
+
+		// If the request targets the current site, generate the key locally without an HTTP round-trip.
+		if ( home_url() === untrailingslashit( $url ) || untrailingslashit( home_url() ) === untrailingslashit( $url ) ) {
+			if ( function_exists( 'etch_fusion_suite_container' ) ) {
+				try {
+					$container = etch_fusion_suite_container();
+					if ( $container->has( 'token_manager' ) ) {
+						$token_manager = $container->get( 'token_manager' );
+						$token_data    = $token_manager->generate_migration_token();
+
+						return array(
+							'message' => __( 'Migration key generated.', 'etch-fusion-suite' ),
+							'key'     => add_query_arg(
+								array(
+									'domain'  => home_url(),
+									'token'   => $token_data['token'],
+									'expires' => $token_data['expires'],
+								),
+								home_url()
+							),
+						);
+					}
+				} catch ( \Exception $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement -- fallback to remote call below.
+				}
+			}
+		}
+
 		$result = $this->api_client->generate_migration_key( $url, $key );
 		if ( is_wp_error( $result ) ) {
 			return $result;

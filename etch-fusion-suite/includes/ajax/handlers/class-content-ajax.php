@@ -343,16 +343,4 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		);
 	}
 
-	/**
-	 * Convert localhost URL to internal Docker URL
-	 *
-	 * @param string $url
-	 * @return string
-	 */
-	private function convert_to_internal_url( $url ) {
-		if ( false !== strpos( $url, 'localhost:8081' ) ) {
-			return str_replace( 'localhost:8081', 'efs-etch', $url );
-		}
-		return $url;
-	}
 }

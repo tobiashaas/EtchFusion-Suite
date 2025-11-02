@@ -28,6 +28,7 @@ spl_autoload_register(
 			'Repositories\\'             => 'repositories/',
 			'Core\\'                     => '',
 			'Api\\'                      => '',
+			'Updater\\'                  => 'updater/',
 			'Controllers\\'              => 'controllers/',
 			'Admin\\'                    => '',
 			'Ajax\\Handlers\\'           => 'ajax/handlers/',

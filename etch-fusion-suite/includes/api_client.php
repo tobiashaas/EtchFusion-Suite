@@ -45,6 +45,60 @@ class EFS_API_Client {
 	}
 
 	/**
+	 * Validate migration key on the target site and return token data.
+	 *
+	 * @param string $target_url    Target site URL (optional – inferred from key if empty).
+	 * @param string $migration_key Migration key URL or raw token string.
+	 * @return array|\WP_Error
+	 */
+	public function validate_migration_key_on_target( $target_url, $migration_key ) {
+		if ( empty( $migration_key ) ) {
+			return new \WP_Error( 'missing_migration_key', __( 'Migration key is required.', 'etch-fusion-suite' ) );
+		}
+
+		$parsed       = wp_parse_url( $migration_key );
+		$query_params = array();
+
+		if ( isset( $parsed['query'] ) ) {
+			parse_str( $parsed['query'], $query_params );
+		}
+
+		$token   = isset( $query_params['token'] ) ? sanitize_text_field( $query_params['token'] ) : '';
+		$expires = isset( $query_params['expires'] ) ? (int) $query_params['expires'] : 0;
+		$domain  = isset( $query_params['domain'] ) ? esc_url_raw( $query_params['domain'] ) : '';
+
+		if ( empty( $token ) || empty( $expires ) ) {
+			return new \WP_Error( 'invalid_migration_key', __( 'Migration key is missing required data.', 'etch-fusion-suite' ) );
+		}
+
+		$normalized_url = $target_url;
+		if ( empty( $normalized_url ) && ! empty( $parsed['scheme'] ) && ! empty( $parsed['host'] ) ) {
+			$normalized_url = $parsed['scheme'] . '://' . $parsed['host'];
+			if ( isset( $parsed['port'] ) ) {
+				$normalized_url .= ':' . (int) $parsed['port'];
+			}
+		}
+
+		if ( empty( $normalized_url ) ) {
+			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from migration key.', 'etch-fusion-suite' ) );
+		}
+
+		$validation = $this->validate_migration_token( $normalized_url, $token, $expires );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
+		}
+
+		$response = is_array( $validation ) ? $validation : array();
+		$response['token']       = $token;
+		$response['expires']     = $expires;
+		$response['domain']      = $domain;
+		$response['target_url']  = $normalized_url;
+		$response['api_key']     = isset( $response['api_key'] ) ? sanitize_text_field( $response['api_key'] ) : '';
+
+		return $response;
+	}
+
+	/**
 	 * Send request to target site
 	 */
 	private function send_request( $url, $api_key, $endpoint, $method = 'GET', $data = null ) {
@@ -240,6 +294,45 @@ class EFS_API_Client {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Generate migration key on target site.
+	 *
+	 * @param string $url     Target site URL.
+	 * @param string $api_key Target API key.
+	 * @return array|\WP_Error
+	 */
+	public function generate_migration_key( $url, $api_key ) {
+		$response = $this->send_request(
+			$url,
+			$api_key,
+			'/generate-key',
+			'POST',
+			array(
+				'source_domain' => home_url(),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		if ( ! is_array( $response ) ) {
+			return new \WP_Error( 'invalid_response', 'Target site returned an unexpected response while generating migration key.' );
+		}
+
+		$key          = isset( $response['migration_key'] ) ? (string) $response['migration_key'] : '';
+		$message      = isset( $response['message'] ) ? (string) $response['message'] : __( 'Migration key generated.', 'etch-fusion-suite' );
+		$extra_payload = array_diff_key( $response, array_flip( array( 'migration_key', 'message' ) ) );
+
+		return array_merge(
+			array(
+				'key'     => $key,
+				'message' => $message,
+			),
+			$extra_payload
+		);
 	}
 
 	/**

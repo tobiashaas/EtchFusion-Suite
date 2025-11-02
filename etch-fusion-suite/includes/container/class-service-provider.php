@@ -25,6 +25,13 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'token_manager',
+			function ( $c ) {
+				return new \Bricks2Etch\Core\EFS_Migration_Token_Manager( $c->get( 'migration_repository' ) );
+			}
+		);
+
+		$container->singleton(
 			'style_repository',
 			function ( $c ) {
 				return new \Bricks2Etch\Repositories\EFS_WordPress_Style_Repository();
@@ -71,6 +78,15 @@ class EFS_Service_Provider {
 			'environment_detector',
 			function ( $c ) {
 				return new \Bricks2Etch\Security\EFS_Environment_Detector();
+			}
+		);
+
+		$container->singleton(
+			'github_updater',
+			function ( $c ) {
+				return new \Bricks2Etch\Updater\EFS_GitHub_Updater(
+					$c->get( 'error_handler' )
+				);
 			}
 		);
 
@@ -500,6 +516,7 @@ class EFS_Service_Provider {
 			'security_headers',
 			'audit_logger',
 			'environment_detector',
+			'github_updater',
 			'error_handler',
 			'plugin_detector',
 			'api_client',
