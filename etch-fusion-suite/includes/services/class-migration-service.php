@@ -63,7 +63,7 @@ class EFS_Migration_Service {
 		EFS_API_Client $api_client,
 		EFS_Migrator_Registry $migrator_registry,
 		Migration_Repository_Interface $migration_repository,
-		\Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager
+		?\Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager = null
 	) {
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
