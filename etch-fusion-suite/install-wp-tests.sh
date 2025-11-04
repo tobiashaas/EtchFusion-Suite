@@ -297,3 +297,13 @@ install_db() {
 install_wp
 install_test_suite
 install_db
+
+# Export the test directory paths for other processes to use
+echo "export WP_TESTS_DIR=\"$WP_TESTS_DIR\""
+echo "export WP_CORE_DIR=\"$WP_CORE_DIR\""
+export WP_TESTS_DIR="$WP_TESTS_DIR"
+export WP_CORE_DIR="$WP_CORE_DIR"
+
+echo "WordPress test suite installed successfully!"
+echo "WP_TESTS_DIR: $WP_TESTS_DIR"
+echo "WP_CORE_DIR: $WP_CORE_DIR"

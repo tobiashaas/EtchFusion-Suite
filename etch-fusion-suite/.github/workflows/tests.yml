@@ -60,10 +60,21 @@ jobs:
         run: mysql -h 127.0.0.1 -uroot -e 'CREATE DATABASE IF NOT EXISTS wordpress_test;'
 
       - name: Install WordPress test suite
-        run: bash etch-fusion-suite/install-wp-tests.sh wordpress_test root '' 127.0.0.1 latest
+        run: |
+          bash install-wp-tests.sh wordpress_test root '' 127.0.0.1 latest > wp-test-output.log 2>&1
+          echo "WordPress test installation completed"
+          cat wp-test-output.log
+          # Extract environment variables from output
+          grep "export WP_TESTS_DIR=" wp-test-output.log | sed 's/export //' >> $GITHUB_ENV
+          grep "export WP_CORE_DIR=" wp-test-output.log | sed 's/export //' >> $GITHUB_ENV
+        working-directory: etch-fusion-suite
 
       - name: Run PHPUnit suite
-        run: vendor/bin/phpunit -c phpunit.xml.dist
+        run: |
+          echo "WordPress test environment:"
+          echo "WP_TESTS_DIR: ${{ env.WP_TESTS_DIR }}"
+          echo "WP_CORE_DIR: ${{ env.WP_CORE_DIR }}"
+          vendor/bin/phpunit -c phpunit.xml.dist
         working-directory: etch-fusion-suite
 
   playwright:
