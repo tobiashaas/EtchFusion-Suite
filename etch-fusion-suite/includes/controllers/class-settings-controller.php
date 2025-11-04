@@ -11,6 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EFS_Settings_Controller {
 	private $api_client;
 	private $settings_repository;
+	private $token_manager;
 
 	/**
 	 * Constructor
@@ -21,6 +22,9 @@ class EFS_Settings_Controller {
 	public function __construct( EFS_API_Client $api_client, Settings_Repository_Interface $settings_repository ) {
 		$this->api_client          = $api_client;
 		$this->settings_repository = $settings_repository;
+		$this->token_manager       = function_exists( 'etch_fusion_suite_container' ) && etch_fusion_suite_container()->has( 'token_manager' )
+			? etch_fusion_suite_container()->get( 'token_manager' )
+			: null;
 	}
 
 	public function save_settings( array $data ) {
@@ -37,77 +41,27 @@ class EFS_Settings_Controller {
 		return is_array( $settings ) ? $settings : array();
 	}
 
-	public function test_connection( array $data ) {
-		$settings = $this->sanitize_settings( $data );
-		$url      = $settings['target_url'];
-		$key      = $settings['api_key'];
-		$result   = $this->api_client->test_connection( $url, $key );
-
-		if ( is_wp_error( $result ) ) {
-			return new \WP_Error( 'connection_failed', $result->get_error_message() );
-		}
-
-		if ( ! isset( $result['valid'] ) || ! $result['valid'] ) {
-			$errors  = isset( $result['errors'] ) && is_array( $result['errors'] ) ? array_filter( $result['errors'] ) : array();
-			$message = ! empty( $errors ) ? implode( ' ', array_map( 'wp_strip_all_tags', $errors ) ) : __( 'Connection failed.', 'etch-fusion-suite' );
-			return new \WP_Error( 'connection_failed', $message );
-		}
-
-		return array(
-			'message' => __( 'Connection successful.', 'etch-fusion-suite' ),
-			'valid'   => true,
-			'plugins' => isset( $result['plugins'] ) ? $result['plugins'] : array(),
-		);
-	}
-
 	public function generate_migration_key( array $data ) {
-		$url = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
-		$key = isset( $data['api_key'] ) ? $this->sanitize_text( $data['api_key'] ) : '';
+		$target_url = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
+		$target_url = ! empty( $target_url ) ? $target_url : home_url();
 
-		if ( empty( $url ) ) {
-			$url = home_url();
+		if ( ! $this->token_manager ) {
+			return new \WP_Error( 'token_manager_unavailable', __( 'Token manager is unavailable.', 'etch-fusion-suite' ) );
 		}
 
-		// If the request targets the current site, generate the key locally without an HTTP round-trip.
-		if ( home_url() === untrailingslashit( $url ) || untrailingslashit( home_url() ) === untrailingslashit( $url ) ) {
-			if ( function_exists( 'etch_fusion_suite_container' ) ) {
-				try {
-					$container = etch_fusion_suite_container();
-					if ( $container->has( 'token_manager' ) ) {
-						$token_manager = $container->get( 'token_manager' );
-						$token_data    = $token_manager->generate_migration_token();
+		$token_data = $this->token_manager->generate_migration_token( $target_url );
 
-						return array(
-							'message' => __( 'Migration key generated.', 'etch-fusion-suite' ),
-							'key'     => add_query_arg(
-								array(
-									'domain'  => home_url(),
-									'token'   => $token_data['token'],
-									'expires' => $token_data['expires'],
-								),
-								home_url()
-							),
-						);
-					}
-				} catch ( \Exception $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement -- fallback to remote call below.
-				}
-			}
-		}
-
-		$result = $this->api_client->generate_migration_key( $url, $key );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
 		return array(
-			'message' => __( 'Migration key generated.', 'etch-fusion-suite' ),
-			'key'     => isset( $result['key'] ) ? $result['key'] : '',
+			'message'    => __( 'Migration key generated.', 'etch-fusion-suite' ),
+			'key'        => $token_data['token'],
+			'expiration' => $token_data['expires'],
+			'domain'     => $token_data['domain'],
 		);
 	}
 
 	private function sanitize_settings( array $data ) {
 		return array(
 			'target_url'    => isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '',
-			'api_key'       => isset( $data['api_key'] ) ? $this->sanitize_text( $data['api_key'] ) : '',
 			'migration_key' => isset( $data['migration_key'] ) ? $this->sanitize_textarea( $data['migration_key'] ) : '',
 		);
 	}

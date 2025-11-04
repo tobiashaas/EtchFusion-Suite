@@ -98,6 +98,10 @@ class EFS_API_Endpoints {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function extract_template_rest( $request ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
 		$rate = self::enforce_template_rate_limit( 'extract', 15 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -147,6 +151,10 @@ class EFS_API_Endpoints {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function get_saved_templates_rest( $request ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
 		$rate = self::enforce_template_rate_limit( 'list', 30 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -167,6 +175,10 @@ class EFS_API_Endpoints {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function preview_template_rest( $request ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
 		$rate = self::enforce_template_rate_limit( 'preview', 25 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -197,6 +209,10 @@ class EFS_API_Endpoints {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function delete_template_rest( $request ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
 		$rate = self::enforce_template_rate_limit( 'delete', 15 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -227,6 +243,10 @@ class EFS_API_Endpoints {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function import_template_rest( $request ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
 		$rate = self::enforce_template_rate_limit( 'import', 10 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -499,43 +519,56 @@ class EFS_API_Endpoints {
 		}
 
 		try {
-			// Parameters are sanitized by WP_REST_Request::get_params(); token manager performs additional validation.
-			$params = $request->get_params();
+			$params        = $request->get_params();
+			$migration_key = $params['migration_key'] ?? null;
+			$target_url    = isset( $params['target_url'] ) ? esc_url_raw( $params['target_url'] ) : '';
 
-			// Extract migration parameters
-			$domain  = $params['domain'] ?? null;
-			$token   = $params['token'] ?? null;
-			$expires = isset( $params['expires'] ) ? (int) $params['expires'] : null;
-
-			if ( empty( $domain ) || empty( $token ) || empty( $expires ) ) {
-				return new \WP_Error( 'missing_params', 'Missing required migration parameters', array( 'status' => 400 ) );
+			if ( empty( $migration_key ) ) {
+				return new \WP_Error( 'missing_migration_key', __( 'Migration key is required.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
 			}
 
-			// Validate migration token
+			/** @var EFS_Migration_Token_Manager $token_manager */
 			$token_manager = self::resolve( 'token_manager' );
-			$validation    = $token_manager->validate_migration_token( $token, $domain, $expires );
+			$decoded       = $token_manager ? $token_manager->decode_migration_key_locally( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
-			if ( is_wp_error( $validation ) ) {
-				return new \WP_Error( 'invalid_token', $validation->get_error_message(), array( 'status' => 401 ) );
+			if ( is_wp_error( $decoded ) ) {
+				return new \WP_Error( 'invalid_migration_key', $decoded->get_error_message(), array( 'status' => 400 ) );
 			}
 
-			// Start import process (this runs on TARGET site)
+			$payload = $decoded['payload'] ?? array();
+			$target  = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
+			$source  = $payload['domain'] ?? '';
+			$expires = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
+
+			if ( empty( $target ) ) {
+				return new \WP_Error( 'missing_target', __( 'Target URL could not be determined from migration key.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
+			}
+
+			if ( $expires && time() > $expires ) {
+				return new \WP_Error( 'migration_key_expired', __( 'Migration key has expired.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
+			}
+
+			/** @var EFS_Migration_Manager $migration_manager */
 			$migration_manager = self::resolve( 'migration_manager' );
-			$result            = $migration_manager->start_import_process( $domain, $token );
+			if ( ! $migration_manager ) {
+				return new \WP_Error( 'migration_service_unavailable', __( 'Migration service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+			}
+
+			$result = $migration_manager->start_migration( $migration_key, $target );
 
 			if ( is_wp_error( $result ) ) {
-				return new \WP_Error( 'migration_failed', $result->get_error_message(), array( 'status' => 500 ) );
+				return new \WP_Error( 'migration_failed', $result->get_error_message(), array( 'status' => $result->get_error_data()['status'] ?? 500 ) );
 			}
 
-			// Return success response with migration details
 			return new \WP_REST_Response(
 				array(
 					'success'       => true,
-					'message'       => 'Key-based migration started successfully!',
-					'migration_url' => $request->get_route(),
-					'source_domain' => $domain,
-					'target_domain' => home_url(),
-					'started_at'    => current_time( 'mysql' ),
+					'payload'       => $payload,
+					'source_domain' => $source,
+					'target_url'    => $target,
+					'migration_id'  => $result['migrationId'] ?? '',
+					'progress'      => $result['progress'] ?? array(),
+					'validated_at'  => current_time( 'mysql' ),
 				),
 				200
 			);
@@ -551,37 +584,23 @@ class EFS_API_Endpoints {
 	 */
 	public static function generate_migration_key( $request ) {
 		try {
-			// Create token manager
+			/** @var EFS_Migration_Token_Manager $token_manager */
 			$token_manager = self::resolve( 'token_manager' );
-
-			// Generate migration token
-			$token_data = $token_manager->generate_migration_token();
+			$token_data    = $token_manager ? $token_manager->generate_migration_token( $request->get_param( 'target_url' ) ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
 			if ( is_wp_error( $token_data ) ) {
 				return new \WP_Error( 'token_generation_failed', $token_data->get_error_message(), array( 'status' => 500 ) );
 			}
 
-			// Build migration key URL
-			$migration_key = add_query_arg(
-				array(
-					'domain'  => home_url(),
-					'token'   => $token_data['token'],
-					'expires' => $token_data['expires'],
-				),
-				home_url()
-			);
-
-			// Return response
 			return new \WP_REST_Response(
 				array(
 					'success'       => true,
-					'migration_key' => $migration_key,
-					'token'         => $token_data['token'],
+					'migration_key' => $token_data['token'],
 					'domain'        => home_url(),
 					'expires'       => $token_data['expires'],
-					'expires_at'    => wp_date( 'Y-m-d H:i:s', $token_data['expires'] ),
-					'valid_for'     => '24 hours',
+					'expires_at'    => $token_data['expires_at'],
 					'generated_at'  => current_time( 'mysql' ),
+					'payload'       => $token_data['payload'],
 				),
 				200
 			);
@@ -603,25 +622,19 @@ class EFS_API_Endpoints {
 		}
 
 		try {
-			// REST requests provide JSON body parameters; each value is sanitized individually here.
 			$raw_body = $request->get_json_params();
 			$body     = is_array( $raw_body ) ? $raw_body : array();
 
-			if ( empty( $body['token'] ) || empty( $body['expires'] ) ) {
-				return new \WP_Error( 'missing_parameters', 'Token and expires parameters are required', array( 'status' => 400 ) );
+			if ( empty( $body['migration_key'] ) ) {
+				return new \WP_Error( 'missing_parameters', 'Migration key parameter is required', array( 'status' => 400 ) );
 			}
 
 			$validated = self::validate_request_data(
 				$body,
 				array(
-					'token'   => array(
-						'type'     => 'token',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
-					),
-					'expires' => array(
-						'type'     => 'integer',
-						'required' => true,
-						'min'      => time(),
 					),
 				)
 			);
@@ -630,45 +643,30 @@ class EFS_API_Endpoints {
 				return $validated;
 			}
 
-			$token   = $validated['token'];
-			$expires = (int) $validated['expires'];
+			$migration_key = $validated['migration_key'];
 
-			// Validate token using token manager
+			/** @var EFS_Migration_Token_Manager $token_manager */
 			$token_manager     = self::resolve( 'token_manager' );
-			$validation_result = $token_manager->validate_migration_token( $token, '', $expires );
+			$validation_result = $token_manager ? $token_manager->validate_migration_token( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
 			if ( is_wp_error( $validation_result ) ) {
-				return new \WP_Error( 'token_validation_failed', $validation_result->get_error_message(), array( 'status' => 401 ) );
+				$sanitized_message = $validation_result->get_error_message();
+				return new \WP_Error( 'migration_key_validation_failed', $sanitized_message, array( 'status' => 400 ) );
 			}
 
-			// Token is valid - generate or retrieve API key
-			// API key retrieval/generation is internal; no user-provided values enter this branch.
-			$api_key_data = self::$settings_repository ? self::$settings_repository->get_api_key() : get_option( 'efs_api_key' );
+			$payload       = is_array( $validation_result ) ? $validation_result : array();
+			$target_domain = $payload['domain'] ?? home_url();
 
-			// If no API key exists, generate one
-			if ( empty( $api_key_data ) ) {
-				$api_client = self::resolve( 'api_client' );
-				$api_key    = $api_client ? $api_client->create_api_key() : wp_generate_password( 32, false );
-			} else {
-				// Extract key from array if it's an array
-				if ( is_array( $api_key_data ) && isset( $api_key_data['key'] ) ) {
-					$api_key = $api_key_data['key'];
-				} else {
-					$api_key = $api_key_data; // Fallback for old format
-				}
-			}
-
-			// Return success response with API key
 			return new \WP_REST_Response(
 				array(
 					'success'           => true,
-					'message'           => 'Token validation successful',
-					'api_key'           => $api_key,
-					'target_domain'     => home_url(),
+					'message'           => 'Migration token verified successfully.',
+					'target_domain'     => $target_domain,
 					'site_name'         => get_bloginfo( 'name' ),
 					'wordpress_version' => get_bloginfo( 'version' ),
 					'etch_active'       => class_exists( 'Etch\Plugin' ) || function_exists( 'etch_run_plugin' ),
 					'validated_at'      => current_time( 'mysql' ),
+					'payload'           => $payload,
 				),
 				200
 			);
@@ -754,27 +752,36 @@ class EFS_API_Endpoints {
 	 */
 	public static function validate_connection( $request ) {
 		$params = $request->get_json_params();
-		if ( ! is_array( $params ) ) {
-			$params = array();
+		$params = is_array( $params ) ? $params : array();
+
+		$validated = self::validate_request_data(
+			$params,
+			array(
+				'migration_key' => array(
+					'type'     => 'migration_key',
+					'required' => true,
+				),
+			)
+		);
+
+		if ( is_wp_error( $validated ) ) {
+			return $validated;
 		}
 
-		// Simple validation: check if api_key is provided
-		$api_key = isset( $params['api_key'] ) ? sanitize_text_field( $params['api_key'] ) : '';
+		/** @var EFS_Migration_Token_Manager $token_manager */
+		$token_manager = self::resolve( 'token_manager' );
+		$decoded       = $token_manager ? $token_manager->decode_migration_key_locally( $validated['migration_key'] ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
-		if ( empty( $api_key ) ) {
-			return new \WP_Error(
-				'missing_api_key',
-				__( 'API key is required.', 'etch-fusion-suite' ),
-				array( 'status' => 400 )
-			);
+		if ( is_wp_error( $decoded ) ) {
+			return new \WP_Error( 'migration_key_invalid', $decoded->get_error_message(), array( 'status' => 400 ) );
 		}
 
-		// For now, just return success if api_key is provided
-		// In production, you'd validate against stored credentials
 		return new \WP_REST_Response(
 			array(
-				'valid'   => true,
-				'message' => __( 'Connection validated successfully.', 'etch-fusion-suite' ),
+				'valid'      => true,
+				'message'    => __( 'Connection validated successfully.', 'etch-fusion-suite' ),
+				'payload'    => $decoded['payload'] ?? array(),
+				'target_url' => $decoded['payload']['target_url'] ?? '',
 			),
 			200
 		);
@@ -786,67 +793,70 @@ class EFS_API_Endpoints {
 	public static function register_routes() {
 		$namespace = 'efs/v1';
 
-		register_rest_route(
-			$namespace,
-			'/template/extract',
-			array(
-				'callback'            => array( __CLASS__, 'extract_template_rest' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'methods'             => \WP_REST_Server::CREATABLE,
-			)
-		);
+		// Template extractor routes are only exposed when Framer extraction is enabled at the PHP level.
+		if ( \efs_is_framer_enabled() ) {
+			register_rest_route(
+				$namespace,
+				'/template/extract',
+				array(
+					'callback'            => array( __CLASS__, 'extract_template_rest' ),
+					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'methods'             => \WP_REST_Server::CREATABLE,
+				)
+			);
 
-		register_rest_route(
-			$namespace,
-			'/template/saved',
-			array(
-				'callback'            => array( __CLASS__, 'get_saved_templates_rest' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'methods'             => \WP_REST_Server::READABLE,
-			)
-		);
+			register_rest_route(
+				$namespace,
+				'/template/saved',
+				array(
+					'callback'            => array( __CLASS__, 'get_saved_templates_rest' ),
+					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'methods'             => \WP_REST_Server::READABLE,
+				)
+			);
 
-		register_rest_route(
-			$namespace,
-			'/template/preview/(?P<id>\d+)',
-			array(
-				'callback'            => array( __CLASS__, 'preview_template_rest' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'args'                => array(
-					'id' => array(
-						'required'          => true,
-						'sanitize_callback' => 'absint',
+			register_rest_route(
+				$namespace,
+				'/template/preview/(?P<id>\d+)',
+				array(
+					'callback'            => array( __CLASS__, 'preview_template_rest' ),
+					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'args'                => array(
+						'id' => array(
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
 					),
-				),
-				'methods'             => \WP_REST_Server::READABLE,
-			)
-		);
+					'methods'             => \WP_REST_Server::READABLE,
+				)
+			);
 
-		register_rest_route(
-			$namespace,
-			'/template/(?P<id>\d+)',
-			array(
-				'callback'            => array( __CLASS__, 'delete_template_rest' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'args'                => array(
-					'id' => array(
-						'required'          => true,
-						'sanitize_callback' => 'absint',
+			register_rest_route(
+				$namespace,
+				'/template/(?P<id>\d+)',
+				array(
+					'callback'            => array( __CLASS__, 'delete_template_rest' ),
+					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'args'                => array(
+						'id' => array(
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
 					),
-				),
-				'methods'             => \WP_REST_Server::DELETABLE,
-			)
-		);
+					'methods'             => \WP_REST_Server::DELETABLE,
+				)
+			);
 
-		register_rest_route(
-			$namespace,
-			'/template/import',
-			array(
-				'callback'            => array( __CLASS__, 'import_template_rest' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'methods'             => \WP_REST_Server::CREATABLE,
-			)
-		);
+			register_rest_route(
+				$namespace,
+				'/template/import',
+				array(
+					'callback'            => array( __CLASS__, 'import_template_rest' ),
+					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'methods'             => \WP_REST_Server::CREATABLE,
+				)
+			);
+		}
 
 		register_rest_route(
 			$namespace,

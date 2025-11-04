@@ -32,6 +32,9 @@ class EFS_Migration_Service {
 	/** @var EFS_API_Client */
 	private $api_client;
 
+	/** @var \Bricks2Etch\Core\EFS_Migration_Token_Manager */
+	private $token_manager;
+
 	/** @var EFS_Migrator_Registry */
 	private $migrator_registry;
 
@@ -48,6 +51,7 @@ class EFS_Migration_Service {
 	 * @param EFS_API_Client                   $api_client
 	 * @param EFS_Migrator_Registry            $migrator_registry
 	 * @param Migration_Repository_Interface   $migration_repository
+	 * @param \Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager
 	 */
 	public function __construct(
 		EFS_Error_Handler $error_handler,
@@ -58,7 +62,8 @@ class EFS_Migration_Service {
 		EFS_Content_Service $content_service,
 		EFS_API_Client $api_client,
 		EFS_Migrator_Registry $migrator_registry,
-		Migration_Repository_Interface $migration_repository
+		Migration_Repository_Interface $migration_repository,
+		\Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager
 	) {
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
@@ -69,20 +74,52 @@ class EFS_Migration_Service {
 		$this->api_client           = $api_client;
 		$this->migrator_registry    = $migrator_registry;
 		$this->migration_repository = $migration_repository;
+		$this->token_manager        = $token_manager;
 	}
 
 	/**
 	 * Start migration workflow.
 	 *
-	 * @param string $target_url
-	 * @param string $api_key
+	 * @param string $migration_key
+	 * @param string|null $target_url
+	 * @param int|null    $batch_size
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function start_migration( $target_url, $api_key ) {
+	public function start_migration( $migration_key, $target_url = null, $batch_size = null ) {
 		try {
+			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
+
+			if ( is_wp_error( $decoded ) ) {
+				return $decoded;
+			}
+
+			$payload = $decoded['payload'];
+			$target  = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
+
+			if ( empty( $target ) ) {
+				return new \WP_Error( 'missing_target_url', __( 'Migration key does not contain a target URL.', 'etch-fusion-suite' ) );
+			}
+
+			$expires = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
+
+			if ( ! $expires || time() > $expires ) {
+				return new \WP_Error( 'token_expired', __( 'Migration key has expired.', 'etch-fusion-suite' ) );
+			}
+
+			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
 			$migration_id = $this->generate_migration_id();
 			$this->init_progress( $migration_id );
+			$this->store_active_migration(
+				array(
+					'migration_id'  => $migration_id,
+					'migration_key' => $migration_key,
+					'target_url'    => $target,
+					'batch_size'    => $batch_size,
+					'issued_at'     => $payload['iat'] ?? time(),
+					'expires_at'    => $expires,
+				)
+			);
 
 			$this->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
 			$validation_result = $this->validate_target_site_requirements();
@@ -116,25 +153,25 @@ class EFS_Migration_Service {
 				)
 			);
 
-			$migrator_result = $this->execute_migrators( $target_url, $api_key );
+			$migrator_result = $this->execute_migrators( $target, $migration_key );
 			if ( is_wp_error( $migrator_result ) ) {
 				return $migrator_result;
 			}
 
 			$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
-			$media_result = $this->media_service->migrate_media( $target_url, $api_key );
+			$media_result = $this->media_service->migrate_media( $target, $migration_key );
 			if ( is_wp_error( $media_result ) ) {
 				return $media_result;
 			}
 
 			$this->update_progress( 'css_classes', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
-			$css_result = $this->css_service->migrate_css_classes( $target_url, $api_key );
+			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
 			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
 
 			$this->update_progress( 'posts', 80, __( 'Migrating posts and content...', 'etch-fusion-suite' ) );
-			$posts_result = $this->content_service->migrate_posts( $target_url, $api_key, $this->api_client );
+			$posts_result = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client );
 			if ( is_wp_error( $posts_result ) ) {
 				return $posts_result;
 			}
@@ -273,8 +310,20 @@ class EFS_Migration_Service {
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_single_post( $post ) {
-		return $this->content_service->convert_bricks_to_gutenberg( $post->ID, $this->api_client );
+	public function migrate_single_post( $post, $migration_key, $target_url = null ) {
+		$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
+
+		if ( is_wp_error( $decoded ) ) {
+			return $decoded;
+		}
+
+		$target = ! empty( $target_url ) ? $target_url : ( $decoded['payload']['target_url'] ?? '' );
+
+		if ( empty( $target ) ) {
+			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from migration key.', 'etch-fusion-suite' ) );
+		}
+
+		return $this->content_service->convert_bricks_to_gutenberg( $post->ID, $this->api_client, $target, $migration_key );
 	}
 
 	/**
@@ -293,22 +342,6 @@ class EFS_Migration_Service {
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Start import process on target site.
-	 *
-	 * @param string $source_domain
-	 * @param string $token
-	 *
-	 * @return mixed
-	 */
-	public function start_import_process( $source_domain, $token ) {
-		if ( method_exists( $this->api_client, 'start_import_process' ) ) {
-			return $this->api_client->start_import_process( $source_domain, $token );
-		}
-
-		return new \WP_Error( 'not_supported', __( 'Start import process is not available on the current API client version.', 'etch-fusion-suite' ) );
 	}
 
 	/**
@@ -423,6 +456,15 @@ class EFS_Migration_Service {
 	}
 
 	/**
+	 * Persist metadata about the currently running migration.
+	 *
+	 * @param array $data
+	 */
+	private function store_active_migration( array $data ) {
+		$this->migration_repository->save_active_migration( $data );
+	}
+
+	/**
 	 * Initialize default steps.
 	 *
 	 * @return array
@@ -474,8 +516,12 @@ class EFS_Migration_Service {
 
 	/**
 	 * Execute all registered migrators via registry.
+	 *
+	 * @param string $target_url
+	 * @param string $jwt_token
+	 * @return bool|\WP_Error
 	 */
-	private function execute_migrators( $target_url, $api_key ) {
+	private function execute_migrators( $target_url, $jwt_token ) {
 		$supported_migrators = $this->migrator_registry->get_supported();
 
 		if ( empty( $supported_migrators ) ) {
@@ -524,7 +570,7 @@ class EFS_Migration_Service {
 				continue;
 			}
 
-			$result = $migrator->migrate( $target_url, $api_key );
+			$result = $migrator->migrate( $target_url, $jwt_token );
 			if ( is_wp_error( $result ) ) {
 				$this->error_handler->log_error(
 					'E201',

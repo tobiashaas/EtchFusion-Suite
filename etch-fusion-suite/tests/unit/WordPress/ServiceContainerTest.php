@@ -24,13 +24,13 @@ class ServiceContainerTest extends WP_UnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->container = efs_container();
+		$this->container = \etch_fusion_suite_container();
 	}
 
 	public function test_container_returns_singleton_instance(): void {
 		$this->assertInstanceOf( EFS_Service_Container::class, $this->container );
 
-		$this->assertSame( $this->container, efs_container() );
+		$this->assertSame( $this->container, \etch_fusion_suite_container() );
 	}
 
 	public function test_core_services_are_registered(): void {

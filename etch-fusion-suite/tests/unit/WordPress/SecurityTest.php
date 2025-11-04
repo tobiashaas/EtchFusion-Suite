@@ -11,8 +11,9 @@ use Bricks2Etch\Security\EFS_Environment_Detector;
 use Bricks2Etch\Security\EFS_Input_Validator;
 use Bricks2Etch\Security\EFS_Rate_Limiter;
 use Bricks2Etch\Security\EFS_Security_Headers;
+use WP_UnitTestCase;
 
-class SecurityTest extends \WP_UnitTestCase {
+class SecurityTest extends WP_UnitTestCase {
     /** @var \Bricks2Etch\Container\EFS_Service_Container */
     private $container;
 
@@ -40,7 +41,7 @@ class SecurityTest extends \WP_UnitTestCase {
     protected function setUp(): void {
         parent::setUp();
 
-        $this->container = \efs_container();
+        $this->container = \etch_fusion_suite_container();
 
         delete_option( 'efs_cors_allowed_origins' );
         delete_option( 'efs_security_settings' );
@@ -84,7 +85,7 @@ class SecurityTest extends \WP_UnitTestCase {
      * @return never
      * @throws \RuntimeException Always thrown to stop execution flow.
      */
-    public function wp_die_handler( $message ) {
+    public function wp_die_handler( $message, $title = '', $args = array() ) {
         if ( ob_get_level() > 0 ) {
             $this->last_wp_json_output = ob_get_contents();
             ob_clean();

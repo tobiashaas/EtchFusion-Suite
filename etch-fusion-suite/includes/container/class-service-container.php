@@ -85,7 +85,7 @@ class EFS_Service_Container implements ContainerInterface {
 	/**
 	 * {@inheritdoc}
 	 */
-	public function get( $id ) {
+	public function get( string $id ) {
 		if ( isset( $this->resolved[ $id ] ) ) {
 			return $this->resolved[ $id ];
 		}
@@ -116,7 +116,7 @@ class EFS_Service_Container implements ContainerInterface {
 	/**
 	 * {@inheritdoc}
 	 */
-	public function has( $id ) {
+	public function has( string $id ): bool {
 		return isset( $this->resolved[ $id ] ) || isset( $this->services[ $id ] ) || isset( $this->bindings[ $id ] );
 	}
 

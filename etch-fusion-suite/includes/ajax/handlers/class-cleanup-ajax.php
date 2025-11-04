@@ -48,20 +48,20 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		try {
 			$validated = $this->validate_input(
 				array(
-					'target_url' => $this->get_post( 'target_url', '' ),
-					'api_key'    => $this->get_post( 'api_key', '' ),
-					'confirm'    => $this->get_post( 'confirm', false ),
+					'target_url'    => $this->get_post( 'target_url', '' ),
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
+					'confirm'       => $this->get_post( 'confirm', false ),
 				),
 				array(
-					'target_url' => array(
+					'target_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
-					'confirm'    => array(
+					'confirm'       => array(
 						'type'     => 'text',
 						'required' => false,
 					),
@@ -71,10 +71,10 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return; // Error already sent by validate_input
 		}
 
-		$target_url = $validated['target_url'];
-		$api_key    = $validated['api_key'];
-		$confirm    = $validated['confirm'] ?? false;
-		$confirmed  = is_string( $confirm ) ? filter_var( $confirm, FILTER_VALIDATE_BOOLEAN ) : (bool) $confirm;
+		$target_url    = $validated['target_url'];
+		$migration_key = $validated['migration_key'];
+		$confirm       = $validated['confirm'] ?? false;
+		$confirmed     = is_string( $confirm ) ? filter_var( $confirm, FILTER_VALIDATE_BOOLEAN ) : (bool) $confirm;
 
 		// Require confirmation for destructive operation
 		if ( ! $confirmed ) {
@@ -98,6 +98,20 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 					'code'    => 'service_unavailable',
 				),
 				503
+			);
+			return;
+		}
+
+		// Validate migration key before issuing commands.
+		$validation = $client->validate_migration_key_on_target( $this->convert_to_internal_url( $target_url ), $migration_key );
+		if ( is_wp_error( $validation ) ) {
+			$this->log_security_event( 'cleanup_denied', 'Cleanup operation rejected: migration key invalid.', array( 'target_url' => $target_url ), 'high' );
+			wp_send_json_error(
+				array(
+					'message' => $validation->get_error_message(),
+					'code'    => sanitize_key( ! empty( $validation->get_error_code() ) ? $validation->get_error_code() : 'migration_key_invalid' ),
+				),
+				400
 			);
 			return;
 		}

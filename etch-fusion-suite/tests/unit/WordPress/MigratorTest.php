@@ -25,7 +25,7 @@ class MigratorTest extends WP_UnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$container           = \efs_container();
+		$container           = \etch_fusion_suite_container();
 		$this->registry      = $container->get( 'migrator_registry' );
 		$this->error_handler = $container->get( 'error_handler' );
 

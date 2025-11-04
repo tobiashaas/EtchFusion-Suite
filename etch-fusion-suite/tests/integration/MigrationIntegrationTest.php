@@ -57,7 +57,7 @@ class MigrationIntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_container_resolves_migration_service_and_dependencies(): void {
-		$container        = efs_container();
+		$container        = \etch_fusion_suite_container();
 		$migration_service = $container->get( 'migration_service' );
 
 		$this->assertInstanceOf( EFS_Migration_Service::class, $migration_service );
@@ -66,7 +66,7 @@ class MigrationIntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_css_converter_available_for_migration_flow(): void {
-		$container = efs_container();
+		$container = \etch_fusion_suite_container();
 		$this->assertTrue( $container->has( 'css_converter' ) );
 
 		$converter = $container->get( 'css_converter' );
@@ -78,7 +78,7 @@ class MigrationIntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_registry_discovers_builtin_and_custom_migrators(): void {
-		$container = efs_container();
+		$container = \etch_fusion_suite_container();
 		/** @var EFS_Migrator_Registry $registry */
 		$registry = $container->get( 'migrator_registry' );
 
@@ -134,7 +134,7 @@ class MigrationIntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_bricks_content_fixture_detected_by_services(): void {
-		$container       = efs_container();
+		$container       = \etch_fusion_suite_container();
 		$content_service = $container->get( 'content_service' );
 
 		$analysis = $content_service->analyze_content();

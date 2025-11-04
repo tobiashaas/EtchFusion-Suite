@@ -26,6 +26,12 @@ define( 'ETCH_FUSION_SUITE_FILE', __FILE__ );
 define( 'ETCH_FUSION_SUITE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETCH_FUSION_SUITE_URL', plugin_dir_url( __FILE__ ) );
 define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
+/**
+ * Controls availability of the Framer template extraction feature.
+ *
+ * Override this constant in wp-config.php or a must-use plugin before Etch Fusion Suite loads.
+ */
+define( 'EFS_ENABLE_FRAMER', false );
 
 
 // Load Composer autoloader when available
@@ -427,6 +433,34 @@ function etch_fusion_suite_feature_enabled( string $feature_name, bool $default_
 	$enabled     = apply_filters( "etch_fusion_suite_feature_enabled_{$feature_key}", $enabled, $feature_key, $default_value );
 
 	return (bool) $enabled;
+}
+
+/**
+ * Determine if the Framer template extraction feature is enabled.
+ *
+ * This PHP-level flag supersedes the legacy settings repository feature flag storage.
+ * Define the {@see EFS_ENABLE_FRAMER} constant as true (for example in wp-config.php before the
+ * "That's all, stop editing!" comment) or hook the {@see 'efs_enable_framer'} filter to enable
+ * the feature without persisting options in the database.
+ *
+ * Example enabling via wp-config.php:
+ *
+ * ```php
+ * define( 'EFS_ENABLE_FRAMER', true );
+ * ```
+ *
+ * Example enabling via filter in a theme or plugin:
+ *
+ * ```php
+ * add_filter( 'efs_enable_framer', '__return_true' );
+ * ```
+ *
+ * @deprecated 0.11.30 Use this helper instead of `efs_feature_enabled( 'template_extractor' )`.
+ *
+ * @return bool Whether Framer template extraction is enabled.
+ */
+function efs_is_framer_enabled(): bool {
+	return apply_filters( 'efs_enable_framer', defined( 'EFS_ENABLE_FRAMER' ) && EFS_ENABLE_FRAMER );
 }
 
 if ( ! function_exists( 'efs_feature_enabled' ) ) {

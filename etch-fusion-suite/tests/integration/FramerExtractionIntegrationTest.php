@@ -18,10 +18,10 @@ class FramerExtractionIntegrationTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
-        $container = \efs_container();
+        $container = \etch_fusion_suite_container();
         $this->extractor = $container->get('template_extractor_service');
 
-        $fixture_path = EFS_PLUGIN_DIR . '/tests/fixtures/framer-sample.html';
+        $fixture_path = ETCH_FUSION_SUITE_DIR . '/tests/fixtures/framer-sample.html';
         $this->fixtureHtml = file_get_contents($fixture_path);
         $this->assertNotFalse($this->fixtureHtml, 'Fixture HTML must be readable.');
     }

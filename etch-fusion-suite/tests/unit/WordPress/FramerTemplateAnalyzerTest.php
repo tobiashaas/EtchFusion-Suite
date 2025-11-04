@@ -30,7 +30,7 @@ class FramerTemplateAnalyzerTest extends WP_UnitTestCase {
     public function setUp(): void {
         parent::setUp();
 
-        $container = \efs_container();
+        $container = \etch_fusion_suite_container();
         $this->parser = $container->get('html_parser');
         $this->sanitizer = $container->get('html_sanitizer');
         $this->analyzer = $container->get('template_analyzer');

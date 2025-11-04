@@ -22,7 +22,7 @@ class RepositoryTest extends WP_UnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$container = \efs_container();
+		$container = \etch_fusion_suite_container();
 		$this->settings_repository  = $container->get( 'settings_repository' );
 		$this->migration_repository = $container->get( 'migration_repository' );
 		$this->style_repository     = $container->get( 'style_repository' );
