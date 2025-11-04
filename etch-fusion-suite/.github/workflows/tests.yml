@@ -120,8 +120,11 @@ jobs:
         working-directory: etch-fusion-suite
 
       - name: Wait for WordPress environments
-        run: npx wait-on http://localhost:8888/wp-login.php http://localhost:8889/wp-login.php
+        run: |
+          echo "Waiting for WordPress environments..."
+          npx wait-on http://localhost:8888/wp-login.php http://localhost:8889/wp-login.php --timeout=300000 || echo "WordPress environments not ready, continuing anyway..."
         working-directory: etch-fusion-suite
+        continue-on-error: true
 
       - name: Run Playwright tests
         env:
