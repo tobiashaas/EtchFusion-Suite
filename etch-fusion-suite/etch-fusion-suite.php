@@ -31,6 +31,7 @@ define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
  *
  * Override this constant in wp-config.php or a must-use plugin before Etch Fusion Suite loads.
  */
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
 define( 'EFS_ENABLE_FRAMER', false );
 
 
@@ -460,6 +461,7 @@ function etch_fusion_suite_feature_enabled( string $feature_name, bool $default_
  * @return bool Whether Framer template extraction is enabled.
  */
 function efs_is_framer_enabled(): bool {
+	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 	return apply_filters( 'efs_enable_framer', defined( 'EFS_ENABLE_FRAMER' ) && EFS_ENABLE_FRAMER );
 }
 
