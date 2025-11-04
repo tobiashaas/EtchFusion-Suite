@@ -11,11 +11,48 @@ DB_PASS=$3
 DB_HOST=${4-localhost}
 WP_VERSION=${5-latest}
 SKIP_DB_CREATE=${6-false}
+FORCE_REINSTALL_INPUT=${7-false}
 
 TMPDIR=${TMPDIR-/tmp}
 TMPDIR=$(echo $TMPDIR | sed -e "s/\/$//")
-WP_TESTS_DIR=${WP_TESTS_DIR-/tmp/wordpress-tests-lib}
-WP_CORE_DIR=${WP_CORE_DIR-/tmp/wordpress}
+
+# Check if /tmp has enough space, fallback to alternative if needed
+if [ "$TMPDIR" = "/tmp" ]; then
+	# Check available space in /tmp (in KB)
+	AVAILABLE_SPACE=$(df /tmp | awk 'NR==2 {print $4}')
+	# Need at least 1GB (1024000 KB) for WordPress installation
+	if [ "$AVAILABLE_SPACE" -lt 1024000 ]; then
+		echo "Warning: /tmp has insufficient space (${AVAILABLE_SPACE}KB). Using alternative directory."
+		TMPDIR="${HOME}/tmp/wordpress-tests"
+		mkdir -p "$TMPDIR"
+	fi
+fi
+
+WP_TESTS_DIR=${WP_TESTS_DIR-${TMPDIR}/wordpress-tests-lib}
+WP_CORE_DIR=${WP_CORE_DIR-${TMPDIR}/wordpress}
+
+is_truthy() {
+	local value="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+	case "$value" in
+		y|yes|true|1|on)
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+AUTO_REINSTALL=false
+if is_truthy "$FORCE_REINSTALL_INPUT"; then
+	AUTO_REINSTALL=true
+fi
+if is_truthy "${WP_TESTS_FORCE_REINSTALL:-}"; then
+	AUTO_REINSTALL=true
+fi
+if [ -n "${CI:-}" ] && [ "${CI}" != "false" ]; then
+	AUTO_REINSTALL=true
+fi
 
 download() {
     local url="$1"
@@ -246,8 +283,12 @@ install_db() {
 	if [ $(mysql --user="$DB_USER" $MYSQL_PWD_FLAG$EXTRA --execute='show databases;' | grep ^$DB_NAME$) ]
 	then
 		echo "Reinstalling will delete the existing test database ($DB_NAME)"
-		read -p 'Are you sure you want to proceed? [y/N]: ' DELETE_EXISTING_DB
-		recreate_db $DELETE_EXISTING_DB
+		if $AUTO_REINSTALL; then
+			recreate_db "y"
+		else
+			read -p 'Are you sure you want to proceed? [y/N]: ' DELETE_EXISTING_DB
+			recreate_db $DELETE_EXISTING_DB
+		fi
 	else
 		create_db
 	fi
