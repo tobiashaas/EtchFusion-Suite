@@ -139,5 +139,7 @@ jobs:
 
       - name: Stop WordPress environments
         if: always()
-        run: npm run e2e:stop
+        run: |
+          chmod +x node_modules/.bin/wp-env
+          npm run e2e:stop
         working-directory: etch-fusion-suite
