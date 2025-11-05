@@ -13,27 +13,6 @@ $etch_fusion_suite_site_url = isset( $site_url ) ? $site_url : home_url();
 	</header>
 
 	<div class="efs-card__section">
-		<h3><?php esc_html_e( 'Create an Application Password', 'etch-fusion-suite' ); ?></h3>
-		<?php if ( ! $etch_fusion_suite_is_https ) : ?>
-			<div class="notice notice-warning efs-notice">
-				<h3><?php esc_html_e( 'HTTPS Recommended', 'etch-fusion-suite' ); ?></h3>
-				<p><?php esc_html_e( 'Application Passwords work best over HTTPS. For production environments, ensure HTTPS is enabled.', 'etch-fusion-suite' ); ?></p>
-			</div>
-		<?php endif; ?>
-		<ol class="efs-steps">
-			<li><?php esc_html_e( 'Navigate to Users → Profile in this WordPress dashboard.', 'etch-fusion-suite' ); ?></li>
-			<li><?php esc_html_e( 'Scroll to Application Passwords and add a new password.', 'etch-fusion-suite' ); ?></li>
-			<li><?php esc_html_e( 'Name the password “Etch Fusion Suite” for easy identification.', 'etch-fusion-suite' ); ?></li>
-			<li><?php esc_html_e( 'Copy the generated password and use it on your Bricks site.', 'etch-fusion-suite' ); ?></li>
-		</ol>
-		<p>
-			<a class="button" href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>">
-				<?php esc_html_e( 'Open Application Passwords', 'etch-fusion-suite' ); ?>
-			</a>
-		</p>
-	</div>
-
-	<div class="efs-card__section">
 		<h3><?php esc_html_e( 'Share This Site URL', 'etch-fusion-suite' ); ?></h3>
 		<p><?php esc_html_e( 'Provide this URL to the Bricks site during migration setup.', 'etch-fusion-suite' ); ?></p>
 		<div class="efs-field" data-efs-field>
