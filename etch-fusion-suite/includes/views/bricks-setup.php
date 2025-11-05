@@ -24,10 +24,7 @@ $etch_fusion_suite_nonce    = is_string( $nonce ) ? $nonce : '';
 		<h3><?php esc_html_e( 'Start Migration', 'etch-fusion-suite' ); ?></h3>
 		<form method="post" class="efs-form" data-efs-migration-form>
 			<input type="hidden" name="nonce" value="<?php echo esc_attr( $etch_fusion_suite_nonce ); ?>" />
-			<div class="efs-field" data-efs-field>
-				<label for="efs-migration-token"><?php esc_html_e( 'Migration Token', 'etch-fusion-suite' ); ?></label>
-				<textarea id="efs-migration-token" name="migration_token" rows="4" data-efs-migration-key-target readonly><?php echo isset( $etch_fusion_suite_settings['migration_token'] ) ? esc_textarea( $etch_fusion_suite_settings['migration_token'] ) : ''; ?></textarea>
-			</div>
+			<input type="hidden" id="efs-migration-token" name="migration_token" data-efs-migration-key-target value="<?php echo isset( $etch_fusion_suite_settings['migration_token'] ) ? esc_attr( $etch_fusion_suite_settings['migration_token'] ) : ''; ?>" />
 			<div class="efs-field" data-efs-field>
 				<label for="efs-migration-batch-size"><?php esc_html_e( 'Batch Size', 'etch-fusion-suite' ); ?></label>
 				<input type="number" id="efs-migration-batch-size" name="batch_size" value="50" min="1" />
