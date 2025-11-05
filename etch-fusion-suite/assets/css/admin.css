@@ -43,7 +43,6 @@
 	--e-panel-padding: var(--e-space-s);
 	--e-content-gap: var(--e-space-m);
 	--e-panel-gap: var(--e-space-s);
-	--e-accordion-gap: 4px;
 
 	/* New colors */
 	--e-primary: oklch(85.19% 0.0856 186.39);
@@ -164,6 +163,27 @@ h1 {
     color: var(--e-light);
     font-family: 'Inter', sans-serif;
     font-weight: 300;
+}
+
+.efs-card__section {
+	display: grid;
+	gap: var(--e-space-m);
+	margin-bottom: var(--e-space-l);
+	padding-bottom: var(--e-space-l);
+	border-bottom: var(--e-border-width) var(--e-border-style) var(--e-border-color-muted);
+}
+
+.efs-card__section:last-child {
+	margin-bottom: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.efs-card__section h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 400;
+	color: var(--e-light);
 }
 
 /* Progress Bar - Etch Style */
@@ -464,71 +484,7 @@ h1 {
 	line-height: 1.4;
 }
 
-/* Accordion */
-.efs-accordion {
-	display: grid;
-	gap: var(--e-accordion-gap);
-}
-
-.efs-accordion__section {
-	border: var(--e-border);
-	border-radius: var(--e-border-radius);
-	background: var(--e-base-dark);
-	overflow: hidden;
-}
-
-.efs-accordion__section.is-expanded {
-	border-color: var(--e-primary);
-	box-shadow: 0 0 0 1px color-mix(in srgb, var(--e-primary) 65%, transparent);
-}
-
-.efs-accordion__header {
-	inline-size: 100%;
-	background: none;
-	border: none;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	padding: var(--e-space-m) var(--e-space-l);
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	cursor: pointer;
-	position: relative;
-}
-
-.efs-accordion__header::after {
-	content: '';
-	inline-size: 12px;
-	block-size: 12px;
-	transform: rotate(0deg);
-	transition: transform 0.2s ease;
-	background: currentColor;
-	mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="6 9 12 15 18 9"/%3E%3C/svg%3E') center/contain no-repeat;
-}
-
-.efs-accordion__section.is-expanded .efs-accordion__header::after {
-	transform: rotate(180deg);
-}
-
-.efs-accordion__header:focus-visible {
-	outline: 2px solid var(--e-primary);
-	outline-offset: 2px;
-}
-
-.efs-accordion__content {
-	padding: 0 var(--e-space-l) var(--e-space-l);
-	background: var(--e-base);
-	max-height: var(--efs-accordion-content-height, 0);
-	overflow: hidden;
-	transition: max-height 0.3s ease;
-}
-
-.efs-card__section--borderless {
-	border: none;
-	padding: 0;
-	background: transparent;
-}
+/* Former accordion sections removed */
 
 /* Actions */
 .efs-actions {
@@ -588,11 +544,9 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.efs-accordion__header::after,
 	.efs-tab__panel,
 	.efs-progress-fill,
-	.efs-migration-step,
-	.efs-accordion__content {
+	.efs-migration-step {
 		transition: none !important;
 	}
 }
@@ -738,20 +692,6 @@ h1 {
         border-bottom: none;
     }
     
-    .efs-pin-input-wrapper {
-        justify-content: center;
-        gap: var(--e-space-m);
-    }
-
-    .efs-pin-input-block {
-        gap: var(--e-space-xs);
-    }
-
-    .efs-pin-input-box {
-        width: 1.5rem;
-        height: 2rem;
-        font-size: 1rem;
-    }
 }
 
 /* Loading States */
@@ -943,104 +883,6 @@ textarea {
 .efs-form-group select:focus {
     outline: none;
     border-color: var(--e-primary);
-}
-
-/* PIN Input */
-.efs-field-description {
-    font-size: 13px;
-    color: var(--e-foreground-color-muted);
-    margin: var(--e-space-s) 0;
-    font-style: italic;
-}
-
-.efs-pin-input-container {
-    display: flex;
-    flex-direction: column;
-    gap: var(--e-space-m);
-    margin: var(--e-space-m) 0;
-}
-
-.efs-pin-input-wrapper {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--e-space-l);
-    align-items: center;
-    justify-content: flex-start;
-}
-
-.efs-pin-input-block {
-    display: flex;
-    gap: calc(var(--e-space-s)/2);
-    align-items: center;
-}
-
-.efs-pin-input-box {
-    width: 1.75rem;
-    height: 2.25rem;
-    text-align: center;
-    font-size: 1.125rem;
-    font-family: 'MonoLisa', monospace;
-    font-weight: 500;
-    background: var(--e-base);
-    color: var(--e-light);
-    border: var(--e-border);
-    border-radius: var(--e-border-radius);
-    transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
-    padding: 0;
-    outline: none;
-    line-height: 1;
-    cursor: text;
-}
-
-.efs-pin-input-box.has-value {
-    background: var(--e-base);
-    border-color: var(--e-border-color-ultra-light);
-}
-
-.efs-pin-input-box:is(:focus, .is-focused) {
-    border-color: var(--e-primary);
-    background: var(--e-base);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--e-primary) 20%, transparent);
-    transform: scale(1.05);
-    z-index: 1;
-}
-
-.efs-pin-input-box.is-invalid {
-    border-color: var(--e-danger);
-    background: var(--e-danger-ultra-light);
-}
-
-.efs-pin-input-wrapper.shake {
-    animation: efs-pin-shake 0.3s ease;
-}
-
-.efs-pin-paste-button {
-    margin-top: var(--e-space-s);
-    font-size: 13px;
-    padding: var(--e-space-s) var(--e-space-m);
-}
-
-@keyframes efs-pin-shake {
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-    25% {
-        transform: translateX(-4px);
-    }
-    75% {
-        transform: translateX(4px);
-    }
-}
-
-@media (prefers-contrast: high) {
-    .efs-pin-input-box {
-        border-width: 2px;
-    }
-
-    .efs-pin-input-box:is(:focus, .is-focused) {
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--e-primary) 35%, transparent);
-    }
 }
 
 /* Secondary Button */

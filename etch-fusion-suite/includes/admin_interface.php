@@ -95,13 +95,19 @@ class EFS_Admin_Interface {
 			wp_script_add_data( 'efs-admin-main', 'type', 'module' );
 
 			// Localize script data
-			$context            = $this->dashboard_controller->get_dashboard_context();
-			$context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
+			$context                      = $this->dashboard_controller->get_dashboard_context();
+			$localized_context            = $context;
+			$localized_context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
 			// Nonce is generated here and consumed by verify_request() in all AJAX handlers (nonce action matches $nonce_action).
-			$context['nonce'] = wp_create_nonce( 'efs_nonce' );
+			$localized_context['nonce']          = wp_create_nonce( 'efs_nonce' );
+			$localized_context['framer_enabled'] = isset( $localized_context['framer_enabled'] ) ? (bool) $localized_context['framer_enabled'] : false;
+
+			if ( isset( $localized_context['template_extractor_enabled'] ) ) {
+				unset( $localized_context['template_extractor_enabled'] );
+			}
 
 			// wp_localize_script() escapes all values, making it safe to pass controller context directly.
-			wp_localize_script( 'efs-admin-main', 'efsData', $context );
+			wp_localize_script( 'efs-admin-main', 'efsData', $localized_context );
 		} else {
 			// Log missing asset for debugging
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs missing admin asset for debugging when WP_DEBUG is enabled

@@ -75,16 +75,16 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		try {
 			$validated = $this->validate_input(
 				array(
-					'target_url' => $this->get_post( 'target_url', '' ),
-					'api_key'    => $this->get_post( 'api_key', '' ),
+					'target_url'    => $this->get_post( 'target_url', '' ),
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'target_url' => array(
+					'target_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
 				)
@@ -94,8 +94,8 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return; // Error already sent by validate_input
 		}
 
-		$target_url = $validated['target_url'];
-		$api_key    = $validated['api_key'];
+		$target_url    = $validated['target_url'];
+		$migration_key = $validated['migration_key'];
 
 		// Convert localhost:8081 to efs-etch for Docker internal communication
 		$internal_url = $this->convert_to_internal_url( $target_url );
@@ -104,8 +104,8 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		update_option(
 			'efs_settings',
 			array(
-				'target_url' => $internal_url,
-				'api_key'    => $api_key,
+				'target_url'    => $internal_url,
+				'migration_key' => $migration_key,
 			),
 			false
 		);
@@ -124,7 +124,7 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				return;
 			}
 
-			$result = $this->css_service->migrate_css_classes( $internal_url, $api_key );
+			$result = $this->css_service->migrate_css_classes( $internal_url, $migration_key );
 
 			if ( is_wp_error( $result ) ) {
 				$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'css_migration_failed';

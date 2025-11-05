@@ -47,18 +47,19 @@ test.describe('Admin Dashboard responsive behaviour', () => {
     }
   });
 
-  test('Mobile accordion sections expand fully', async ({ browser }) => {
+  test('Mobile sections display full width content', async ({ browser }) => {
     const { context, page } = await createDashboardContext(browser, 'bricks', {
       viewport: { width: 375, height: 667 },
       isMobile: true,
     });
     try {
-      const sections = page.locator('[data-efs-accordion-section]');
-      const count = await sections.count();
+      const cards = page.locator('.efs-card__section');
+      const count = await cards.count();
+      expect(count).toBeGreaterThan(0);
       for (let i = 0; i < count; i += 1) {
-        const section = sections.nth(i);
-        await section.locator('[data-efs-accordion-header]').click();
-        const bounding = await section.locator('[data-efs-accordion-content]').boundingBox();
+        const card = cards.nth(i);
+        await expect(card).toBeVisible();
+        const bounding = await card.boundingBox();
         expect(bounding?.width).toBeGreaterThan(300);
       }
     } finally {
@@ -126,15 +127,18 @@ test.describe('Admin Dashboard responsive behaviour', () => {
     }
   });
 
-  test('Tablet accordion spacing is consistent', async ({ browser }) => {
+  test('Tablet section spacing is consistent', async ({ browser }) => {
     const { context, page } = await createDashboardContext(browser, 'etch', {
       viewport: { width: 768, height: 1024 },
     });
     try {
-      const gap = await page.locator('.efs-accordion').evaluate((node) =>
-        window.getComputedStyle(node).rowGap,
+      const cards = await page.locator('.efs-card__section').evaluateAll((nodes) =>
+        nodes.map((node) => window.getComputedStyle(node).marginBottom),
       );
-      expect(parseInt(gap ?? '0', 10)).toBeGreaterThan(8);
+      expect(cards.length).toBeGreaterThan(0);
+      cards.forEach((gap) => {
+        expect(parseInt(gap ?? '0', 10)).toBeGreaterThanOrEqual(16);
+      });
     } finally {
       await context.close();
     }
@@ -169,15 +173,14 @@ test.describe('Admin Dashboard responsive behaviour', () => {
     }
   });
 
-  test('Desktop accordions remain readable', async ({ browser }) => {
+  test('Desktop layout keeps cards readable', async ({ browser }) => {
     const { context, page } = await createDashboardContext(browser, 'etch', {
       viewport: { width: 1920, height: 1080 },
     });
     try {
-      const contentWidth = await page
-        .locator('[data-efs-accordion-content]')
-        .first()
-        .evaluate((node) => node.getBoundingClientRect().width);
+      const contentWidth = await page.locator('.efs-card__section').first().evaluate((node) =>
+        node.getBoundingClientRect().width,
+      );
       expect(contentWidth).toBeLessThan(1100);
     } finally {
       await context.close();
@@ -206,22 +209,22 @@ test.describe('Admin Dashboard responsive behaviour', () => {
       viewport: { width: 768, height: 1024 },
     });
     try {
-      const sectionCount = await page.locator('[data-efs-accordion-section]').count();
+      const sectionCount = await page.locator('.efs-card__section').count();
       expect(sectionCount).toBeGreaterThan(0);
     } finally {
       await context.close();
     }
   });
 
-  test('Accordion responds to touch events', async ({ browser }) => {
+  test('Sections respond to touch interactions', async ({ browser }) => {
     const { context, page } = await createDashboardContext(browser, 'bricks', {
       viewport: { width: 375, height: 667 },
       isMobile: true,
     });
     try {
-      const header = page.locator('[data-section="migration_key"] [data-efs-accordion-header]');
-      await header.tap();
-      await expect(page.locator('[data-section="migration_key"]')).toHaveClass(/is-expanded/);
+      const card = page.locator('#efs-migration-key-section');
+      await card.tap();
+      await expect(card).toBeVisible();
     } finally {
       await context.close();
     }
@@ -303,8 +306,8 @@ test.describe('Admin Dashboard responsive behaviour', () => {
     });
     try {
       await expect(page.locator('.efs-admin-wrap')).toBeVisible();
-      await page.locator('[data-efs-accordion-header]').first().tap();
-      await expect(page.locator('[data-efs-accordion-section]').first()).toHaveClass(/is-expanded/);
+      await page.locator('#efs-migration-key-section').tap();
+      await expect(page.locator('#efs-migration-key-section')).toBeVisible();
     } finally {
       await context.close();
     }
@@ -317,7 +320,7 @@ test.describe('Admin Dashboard responsive behaviour', () => {
     try {
       await expect(page.locator('.efs-admin-wrap')).toBeVisible();
       await page.locator('[data-efs-tab="templates"]').tap({ trial: true }).catch(() => undefined);
-      const sectionCount = await page.locator('[data-efs-accordion-section]').count();
+      const sectionCount = await page.locator('.efs-card__section').count();
       expect(sectionCount).toBeGreaterThan(0);
     } finally {
       await context.close();

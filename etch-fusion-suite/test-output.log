@@ -1,0 +1,7 @@
+Reinstalling will delete the existing test database (wordpress_test)
+Are you sure you want to proceed? [y/N]: Leaving the existing database (wordpress_test) in place.
+export WP_TESTS_DIR="/Users/tobiashaas/tmp/wordpress-tests-lib"
+export WP_CORE_DIR="/Users/tobiashaas/tmp/wordpress"
+WordPress test suite installed successfully!
+WP_TESTS_DIR: /Users/tobiashaas/tmp/wordpress-tests-lib
+WP_CORE_DIR: /Users/tobiashaas/tmp/wordpress

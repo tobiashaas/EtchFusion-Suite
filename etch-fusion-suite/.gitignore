@@ -5,3 +5,7 @@ node_modules/
 .wp-env.override.json
 package-lock.json
 npm-debug.log
+.playwright-auth/
+logs/
+logs-*.txt
+health-report-*.json

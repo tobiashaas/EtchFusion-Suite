@@ -2,6 +2,66 @@
 
 ## Completed ✅
 
+- [ ] Nov 04 verification – Framer feature flag alignment
+  - **Added:** 2025-11-04 19:45
+  - **Scope:** JS localization, PHP feature flags, REST gating, admin view guard, test updates
+- [✅] Nov 03 verification – Dashboard test & migration token alignment
+  - **Added:** 2025-11-03 19:56
+  - **Completed:** 2025-11-03 21:32
+  - **Changes:**
+    - Split migration key/token fields in Bricks setup view with unique IDs and updated labels.
+    - Confirmed admin migration script uses distinct selectors for key/token payload handling.
+    - Ensured Playwright and PHPUnit selectors align with flattened layout expectations.
+- [✅] Nov 03 admin setup simplification
+  - **Added:** 2025-11-03 18:55
+  - **Completed:** 2025-11-03 19:10
+  - **Changes:**
+    - Flattened Bricks and Etch setup cards to remove accordion markup and hidden content.
+    - Removed accordion JavaScript utilities and updated main/migration scripts to scroll directly to visible sections.
+    - Replaced accordion styles with `.efs-card__section` spacing rules in `assets/css/admin.css`.
+    - Refreshed PHPUnit admin UI assertions to verify headings and section identifiers in the new layout.
+- [✅] Nov 2 verification – Remove deprecated PIN module artifacts
+  - **Added:** 2025-11-02 23:29
+  - **Completed:** 2025-11-02 23:40
+  - **Scope:** Delete stale `pin-input.js`, remove legacy styles, confirm no remaining references
+
+- [✅] Address Nov 2 PHPCS regressions (feature flags & admin UI)
+  - **Added:** 2025-11-02 10:45
+  - **Completed:** 2025-11-02 12:13
+  - **Scope:** Restore zero-violation PHPCS summary after recent UI merge
+
+- [ ] Implement Oct 31 verification comments (CI + Playwright hardening)
+  - **Added:** 2025-10-31 07:55
+  - **Scope:** Populate tests workflow, update Playwright suites, refresh TESTING.md
+
+- [✅] Nov 1 request – Reveal application password characters
+  - **Added:** 2025-11-01 12:09
+  - **Completed:** 2025-11-01 13:15
+  - **Scope:** Unmask PIN input boxes in admin UI and remove toggle control
+
+- [✅] Oct 31 verification – Admin dashboard testing updates
+  - **Added:** 2025-10-31 09:54
+  - **Completed:** 2025-10-31 10:15
+  - **Scope:** Harden Admin UI PHPUnit tests, expand TESTING.md coverage sections, refresh CI references
+
+- [✅] Implement Nov 2 validation flow review comments
+  - **Added:** 2025-11-02 22:58
+  - **Completed:** 2025-11-02 23:40
+  - **Scope:** Address JWT validation, admin UI payload, and naming alignment feedback across PHP/JS layers
+
+- [✅] Oct 30 verification – Consolidate `.efs-log-entry` CSS definitions
+  - **Added:** 2025-10-30 23:15
+  - **Completed:** 2025-10-30 23:30
+
+- [✅] Admin dashboard accordion refactor and template extractor UX improvements
+  - **Added:** 2025-10-30 12:18
+  - **Completed:** 2025-10-30 13:45
+  - **Notes:** Consolidated migration key component, reorganised Bricks/Etch setup views into accessible accordion sections, introduced disabled Template Extractor tab state, and updated JS/CSS for new UI patterns.
+
+- [✅] Oct 30 verification – Release workflow regex and automation updates
+  - **Added:** 2025-10-30 09:15
+  - **Completed:** 2025-10-30 09:24
+
 - [✅] Oct 30 verification – GitHub updater secure download handler enhancement
   - **Added:** 2025-10-30 08:18
   - **Completed:** 2025-10-30 08:18
@@ -158,6 +218,11 @@
 
 ## In Progress 🔄
 
+- [✅] Nov 2 verification – Remove deprecated PIN module artifacts
+  - **Added:** 2025-11-02 23:29
+  - **Completed:** 2025-11-02 23:40
+  - **Scope:** Delete stale `pin-input.js`, remove legacy styles, confirm no remaining references
+
 - [✅] Address Nov 2 PHPCS regressions (feature flags & admin UI)
   - **Added:** 2025-11-02 10:45
   - **Completed:** 2025-11-02 12:13
@@ -176,6 +241,11 @@
   - **Added:** 2025-10-31 09:54
   - **Completed:** 2025-10-31 10:15
   - **Scope:** Harden Admin UI PHPUnit tests, expand TESTING.md coverage sections, refresh CI references
+
+- [✅] Implement Nov 2 validation flow review comments
+  - **Added:** 2025-11-02 22:58
+  - **Completed:** 2025-11-02 23:40
+  - **Scope:** Address JWT validation, admin UI payload, and naming alignment feedback across PHP/JS layers
 
 - [✅] Oct 30 verification – Consolidate `.efs-log-entry` CSS definitions
   - **Added:** 2025-10-30 23:15

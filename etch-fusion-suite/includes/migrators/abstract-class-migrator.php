@@ -116,7 +116,7 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 	abstract public function import( $data );
 
 	/** @inheritDoc */
-	abstract public function migrate( $target_url, $api_key );
+	abstract public function migrate( $target_url, $jwt_token );
 
 	/** @inheritDoc */
 	abstract public function validate();
@@ -130,19 +130,15 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 	 * @param string $endpoint
 	 * @param array  $data
 	 * @param string $target_url
-	 * @param string $api_key
+	 * @param string $jwt_token
 	 *
 	 * @return array|WP_Error
 	 */
-	protected function send_to_target( $endpoint, array $data, $target_url, $api_key ) {
+	protected function send_to_target( $endpoint, array $data, $target_url, $jwt_token ) {
 		if ( ! $this->api_client instanceof EFS_API_Client ) {
 			$this->api_client = new EFS_API_Client( $this->error_handler );
 		}
 
-		if ( ! method_exists( $this->api_client, 'send_request' ) ) {
-			return new WP_Error( 'api_client_missing_method', __( 'API client cannot send requests.', 'bricks-etch-migration' ) );
-		}
-
-		return $this->api_client->send_request( $endpoint, $data, $target_url, $api_key );
+		return $this->api_client->send_authorized_request( $target_url, $jwt_token, $endpoint, 'POST', $data );
 	}
 }

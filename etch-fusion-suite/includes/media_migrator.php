@@ -38,7 +38,7 @@ class EFS_Media_Migrator {
 	/**
 	 * Migrate all media files from source to target site
 	 */
-	public function migrate_media( $target_url, $api_key ) {
+	public function migrate_media( $target_url, $jwt_token ) {
 		$this->error_handler->log_info( 'Media Migration: Starting' );
 		$media_files = $this->get_media_files();
 		$this->error_handler->log_info( 'Media Migration: Found ' . count( $media_files ) . ' media files' );
@@ -78,7 +78,7 @@ class EFS_Media_Migrator {
 				}
 
 				$this->error_handler->log_info( 'Media Migration: Migrating media ID ' . $media_id . ' (' . $media_data['title'] . ')' );
-				$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $api_key );
+				$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $jwt_token );
 
 				if ( is_wp_error( $result ) ) {
 					$this->error_handler->log_error(
@@ -167,7 +167,7 @@ class EFS_Media_Migrator {
 	/**
 	 * Migrate a single media file
 	 */
-	private function migrate_single_media( $media_id, $media_data, $target_url, $api_key ) {
+	private function migrate_single_media( $media_id, $media_data, $target_url, $jwt_token ) {
 		// Read file directly from filesystem instead of downloading via URL
 		// Use the actual attachment ID from media_data, not the array key
 		$attachment_id = $media_data['id'];
@@ -202,7 +202,7 @@ class EFS_Media_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
-		$result = $api_client->send_media_data( $target_url, $api_key, $media_data );
+		$result = $api_client->send_media_data( $target_url, $jwt_token, $media_payload );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;

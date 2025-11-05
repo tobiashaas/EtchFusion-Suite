@@ -1,63 +1,32 @@
 import { post, buildAjaxErrorMessage } from './api.js';
 import { showToast, setLoading } from './ui.js';
 
-const ACTION_VALIDATE_API_KEY = 'efs_validate_api_key';
 const ACTION_VALIDATE_TOKEN = 'efs_validate_migration_token';
 
-const extractMigrationKeyParts = (rawKey) => {
-    try {
-        const url = new URL(rawKey);
-        return {
-            target_url: url.searchParams.get('domain') || url.origin,
-            token: url.searchParams.get('token'),
-            expires: url.searchParams.get('expires'),
-        };
-    } catch (error) {
-        return {
-            token: rawKey,
-        };
-    }
-};
-
-const handleValidateApiKey = async (event) => {
-    event.preventDefault();
-    const button = event.currentTarget;
-    const container = button.closest('[data-efs-field]');
-    const form = container.querySelector('form');
-    if (!form) {
-        return;
-    }
-    setLoading(button, true);
-    try {
-        const payload = extractMigrationKeyParts(form.querySelector('[name="target_url"]').value);
-        payload.api_key = form.querySelector('[name="api_key"]').value;
-        await post(ACTION_VALIDATE_API_KEY, payload);
-        showToast('API key validated successfully.', 'success');
-    } catch (error) {
-        console.error('API key validation failed', error);
-        showToast(buildAjaxErrorMessage(error, 'API key validation failed.'), 'error');
-    } finally {
-        setLoading(button, false);
-    }
-};
+const extractMigrationKey = (rawKey) => rawKey?.trim();
 
 const handleValidateToken = async (event) => {
     event.preventDefault();
     const button = event.currentTarget;
-    const migrationSection = button.closest('[data-efs-accordion-section]');
+    const migrationSection = button.closest('.efs-card__section');
     const textarea = migrationSection?.querySelector('#efs-migration-key')
         || document.querySelector('#efs-migration-key');
     if (!textarea) {
         return;
     }
-    const rawKey = textarea.value.trim();
+    const rawKey = extractMigrationKey(textarea.value);
     if (!rawKey) {
         showToast('Please provide a migration key first.', 'warning');
         return;
     }
+    const settingsForm = document.querySelector('[data-efs-settings-form]');
+    const targetUrl = settingsForm?.querySelector('input[name="target_url"]')?.value?.trim();
     setLoading(button, true);
     try {
-        const payload = extractMigrationKeyParts(rawKey);
+        const payload = { migration_key: rawKey };
+        if (targetUrl) {
+            payload.target_url = targetUrl;
+        }
         await post(ACTION_VALIDATE_TOKEN, payload);
         showToast('Migration token validated.', 'success');
     } catch (error) {
@@ -69,10 +38,6 @@ const handleValidateToken = async (event) => {
 };
 
 export const bindValidation = () => {
-    document.querySelectorAll('[data-efs-validate-api-key]').forEach((button) => {
-        button.addEventListener('click', handleValidateApiKey);
-    });
-
     document.querySelectorAll('[data-efs-validate-migration-key]').forEach((button) => {
         button.addEventListener('click', handleValidateToken);
     });

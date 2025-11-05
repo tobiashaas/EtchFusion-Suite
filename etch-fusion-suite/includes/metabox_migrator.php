@@ -59,8 +59,8 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $api_key ) {
-		return $this->migrate_metabox_configs( $target_url, $api_key );
+	public function migrate( $target_url, $jwt_token ) {
+		return $this->migrate_metabox_configs( $target_url, $jwt_token );
 	}
 
 	/** @inheritDoc */
@@ -264,7 +264,7 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate MetaBox configurations
 	 */
-	public function migrate_metabox_configs( $target_url, $api_key ) {
+	public function migrate_metabox_configs( $target_url, $jwt_token ) {
 		$configs = $this->export_metabox_configs();
 
 		if ( empty( $configs ) ) {
@@ -275,7 +275,7 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
-		$result = $api_client->send_metabox_configs( $target_url, $api_key, $configs );
+		$result = $api_client->send_metabox_configs( $target_url, $jwt_token, $configs );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;

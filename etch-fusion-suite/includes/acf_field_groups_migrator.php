@@ -66,8 +66,8 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $api_key ) {
-		return $this->migrate_acf_field_groups( $target_url, $api_key );
+	public function migrate( $target_url, $jwt_token ) {
+		return $this->migrate_acf_field_groups( $target_url, $jwt_token );
 	}
 
 	/** @inheritDoc */
@@ -411,7 +411,7 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate ACF field groups
 	 */
-	public function migrate_acf_field_groups( $target_url, $api_key ) {
+	public function migrate_acf_field_groups( $target_url, $jwt_token ) {
 		$field_groups = $this->export_field_groups();
 
 		if ( empty( $field_groups ) ) {
@@ -422,7 +422,7 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
-		$result = $api_client->send_acf_field_groups( $target_url, $api_key, $field_groups );
+		$result = $api_client->send_acf_field_groups( $target_url, $jwt_token, $field_groups );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;

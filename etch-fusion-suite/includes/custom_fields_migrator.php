@@ -59,7 +59,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $api_key ) {
+	public function migrate( $target_url, $jwt_token ) {
 		// Custom fields migrate alongside posts; nothing to do globally.
 		return true;
 	}
@@ -72,7 +72,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate post meta from source to target
 	 */
-	public function migrate_post_meta( $source_post_id, $target_post_id, $target_url, $api_key ) {
+	public function migrate_post_meta( $source_post_id, $target_post_id, $target_url, $jwt_token ) {
 		$meta_data = $this->get_post_meta( $source_post_id );
 
 		if ( empty( $meta_data ) ) {
@@ -83,7 +83,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
-		$result = $api_client->send_post_meta( $target_url, $api_key, $target_post_id, $meta_data );
+		$result = $api_client->send_post_meta( $target_url, $jwt_token, $target_post_id, $meta_data );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;

@@ -461,8 +461,13 @@ function etch_fusion_suite_feature_enabled( string $feature_name, bool $default_
  * @return bool Whether Framer template extraction is enabled.
  */
 function efs_is_framer_enabled(): bool {
-	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
-	return apply_filters( 'efs_enable_framer', defined( 'EFS_ENABLE_FRAMER' ) && EFS_ENABLE_FRAMER );
+	try {
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+		return apply_filters( 'efs_enable_framer', defined( 'EFS_ENABLE_FRAMER' ) && EFS_ENABLE_FRAMER );
+	} catch ( \Exception $e ) {
+		// Fallback to false if anything goes wrong
+		return false;
+	}
 }
 
 if ( ! function_exists( 'efs_feature_enabled' ) ) {

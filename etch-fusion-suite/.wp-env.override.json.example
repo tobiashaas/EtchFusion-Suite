@@ -1,18 +1,46 @@
 {
-  "core": "../test-environment/wordpress.zip",
+  "__comment": "Copy this file to .wp-env.override.json to customize your local setup. Overrides are ignored by git and take precedence over .wp-env.json.",
   "port": 9888,
   "testsPort": 9889,
   "phpVersion": "8.2",
+  "core": "https://wordpress.org/wordpress-6.8.zip",
   "config": {
+    "WP_DEBUG": true,
     "WP_DEBUG_DISPLAY": true,
     "SAVEQUERIES": true,
     "WP_MEMORY_LIMIT": "512M",
+    "SCRIPT_DEBUG": true,
     "XDEBUG_MODE": "debug,develop"
   },
   "plugins": [
-    "../my-local-plugin"
+    "../my-local-plugin",
+    "https://downloads.wordpress.org/plugin/query-monitor.latest-stable.zip"
+  ],
+  "themes": [
+    "../my-local-theme"
   ],
   "mappings": {
     "wp-content/uploads/local-uploads": "../test-environment/local-uploads"
+  },
+  "env": {
+    "development": {
+      "config": {
+        "WP_ENVIRONMENT_TYPE": "local",
+        "SAVEQUERIES": true
+      },
+      "port": 9088,
+      "mysqlPort": 23306
+    },
+    "tests": {
+      "config": {
+        "WP_ENVIRONMENT_TYPE": "test",
+        "WP_DEBUG_LOG": true
+      },
+      "port": 9089,
+      "mysqlPort": 23307
+    }
+  },
+  "extra": {
+    "notes": "Set EFS_ENABLE_FRAMER=true to test Framer integration locally"
   }
 }

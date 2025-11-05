@@ -33,28 +33,6 @@ interface Settings_Repository_Interface {
 	public function save_plugin_settings( array $settings ): bool;
 
 	/**
-	 * Get API key.
-	 *
-	 * @return string API key or empty string if not set.
-	 */
-	public function get_api_key(): string;
-
-	/**
-	 * Save API key.
-	 *
-	 * @param string $key API key to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_api_key( string $key ): bool;
-
-	/**
-	 * Delete API key.
-	 *
-	 * @return bool True on success, false on failure.
-	 */
-	public function delete_api_key(): bool;
-
-	/**
 	 * Get migration settings.
 	 *
 	 * @return array Migration settings array.

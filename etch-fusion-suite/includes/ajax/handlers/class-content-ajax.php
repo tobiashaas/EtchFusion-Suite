@@ -104,22 +104,22 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		try {
 			$validated = $this->validate_input(
 				array(
-					'post_id'    => $this->get_post( 'post_id', 0 ),
-					'target_url' => $this->get_post( 'target_url', '' ),
-					'api_key'    => $this->get_post( 'api_key', '' ),
+					'post_id'       => $this->get_post( 'post_id', 0 ),
+					'target_url'    => $this->get_post( 'target_url', '' ),
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'post_id'    => array(
+					'post_id'       => array(
 						'type'     => 'integer',
 						'required' => true,
 						'min'      => 1,
 					),
-					'target_url' => array(
+					'target_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
 				)
@@ -128,9 +128,9 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return; // Error already sent by validate_input
 		}
 
-		$post_id    = $validated['post_id'];
-		$target_url = $validated['target_url'];
-		$api_key    = $validated['api_key'];
+		$post_id       = $validated['post_id'];
+		$target_url    = $validated['target_url'];
+		$migration_key = $validated['migration_key'];
 
 		// Get the post
 		$post = get_post( $post_id );
@@ -166,8 +166,8 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			update_option(
 				'efs_settings',
 				array(
-					'target_url' => $internal_url,
-					'api_key'    => $api_key,
+					'target_url'    => $internal_url,
+					'migration_key' => $migration_key,
 				),
 				false
 			);
@@ -205,7 +205,7 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				return;
 			}
 
-			$result = $this->content_service->convert_bricks_to_gutenberg( $post_id, $api_client, $internal_url, $api_key );
+			$result = $this->content_service->convert_bricks_to_gutenberg( $post_id, $api_client, $internal_url, $migration_key );
 
 			if ( is_wp_error( $result ) ) {
 				$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'migration_failed';

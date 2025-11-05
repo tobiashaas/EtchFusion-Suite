@@ -24,22 +24,16 @@ const syncMigrationKeyForms = () => {
     const settings = getInitialData('settings', {});
     const settingsForm = document.querySelector('[data-efs-settings-form]');
     const formTargetUrl = settingsForm?.querySelector('input[name="target_url"]')?.value?.trim();
-    const formApiKey = settingsForm?.querySelector('input[name="api_key"]')?.value?.trim();
     const siteUrl = window.efsData?.site_url || '';
 
     document.querySelectorAll('[data-efs-generate-key]').forEach((form) => {
         const context = form.querySelector('input[name="context"]')?.value;
         const targetField = form.querySelector('input[name="target_url"]');
-        const apiKeyField = form.querySelector('input[name="api_key"]');
 
         if (context === 'bricks') {
             const targetUrl = formTargetUrl || settings.target_url || '';
-            const apiKey = formApiKey || settings.api_key || '';
             if (targetField && targetUrl) {
                 targetField.value = targetUrl;
-            }
-            if (apiKeyField && apiKey) {
-                apiKeyField.value = apiKey;
             }
         }
 
@@ -49,38 +43,17 @@ const syncMigrationKeyForms = () => {
     });
 };
 
-const setPinBoxesInvalidState = (form, isInvalid) => {
-    if (!form) {
-        return;
-    }
-    const boxes = form.querySelectorAll('[data-efs-pin-input] .efs-pin-input-box');
-    boxes.forEach((box) => {
-        box.classList.toggle('is-invalid', isInvalid);
-    });
-};
-
 const handleSaveSettings = async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const submitButton = form.querySelector('button[type="submit"]');
-    const apiKeyInput = form.querySelector('input[name="api_key"]');
-    const apiKeyValue = (apiKeyInput?.value ?? '').trim();
-
-    if (apiKeyInput) {
-        const isValidApiKey = apiKeyValue.length === 24;
-        setPinBoxesInvalidState(form, !isValidApiKey);
-        if (!isValidApiKey) {
-            showToast(
-                window.efsData?.i18n?.invalidPinPaste ?? 'Application passwords must be 24 characters.',
-                'error',
-            );
-            return;
-        }
-    }
 
     setLoading(submitButton, true);
     try {
         const payload = serializeForm(form);
+        if (payload.api_key) {
+            delete payload.api_key;
+        }
         const data = await post(ACTION_SAVE_SETTINGS, payload);
         showToast(data?.message || 'Settings saved.', 'success');
         if (data?.settings && typeof window !== 'undefined') {
@@ -105,23 +78,12 @@ const handleTestConnection = async (event) => {
         return;
     }
 
-    const apiKeyInput = form.querySelector('input[name="api_key"]');
-    const apiKeyValue = (apiKeyInput?.value ?? '').trim();
-    if (apiKeyInput) {
-        const isValidApiKey = apiKeyValue.length === 24;
-        setPinBoxesInvalidState(form, !isValidApiKey);
-        if (!isValidApiKey) {
-            showToast(
-                window.efsData?.i18n?.invalidPinPaste ?? 'Application passwords must be 24 characters.',
-                'error',
-            );
-            return;
-        }
-    }
-
     setLoading(button, true);
     try {
         const payload = serializeForm(form);
+        if (payload.api_key) {
+            delete payload.api_key;
+        }
         const data = await post(ACTION_TEST_CONNECTION, payload);
         const successMessage = data?.message || 'Connection successful.';
         showToast(successMessage, 'success');
@@ -142,13 +104,10 @@ const handleGenerateKey = async (event) => {
         const payload = serializeForm(form);
         const context = payload.context || form.querySelector('input[name="context"]')?.value || '';
 
-        if (!payload.target_url || (!payload.api_key && context !== 'etch')) {
+        if (!payload.target_url) {
             const settingsForm = document.querySelector('[data-efs-settings-form]');
             const settingsPayload = settingsForm ? serializeForm(settingsForm) : {};
             payload.target_url = payload.target_url || settingsPayload.target_url || window.efsData?.site_url || '';
-            if (context !== 'etch') {
-                payload.api_key = payload.api_key || settingsPayload.api_key || '';
-            }
         }
 
         if (!payload.target_url) {
@@ -156,15 +115,13 @@ const handleGenerateKey = async (event) => {
             return;
         }
 
-        if (context !== 'etch' && !payload.api_key) {
-            showToast('Provide the Etch application password before generating a key.', 'error');
-            return;
+        if (payload.api_key) {
+            delete payload.api_key;
         }
 
         const data = await post(ACTION_GENERATE_KEY, payload);
-        const container = form.closest('[data-efs-accordion-section]') || document;
         const targetSelector = context === 'etch' ? '#efs-generated-key' : '#efs-migration-key';
-        const textarea = container.querySelector(targetSelector) || document.querySelector(targetSelector);
+        const textarea = document.querySelector(targetSelector);
         if (textarea && data?.key) {
             textarea.value = data.key;
         }
@@ -255,7 +212,7 @@ export const bindSettings = () => {
 
     settingsForm?.addEventListener('input', (event) => {
         const name = event.target?.name;
-        if (name === 'target_url' || name === 'api_key') {
+        if (name === 'target_url') {
             syncMigrationKeyForms();
         }
     });

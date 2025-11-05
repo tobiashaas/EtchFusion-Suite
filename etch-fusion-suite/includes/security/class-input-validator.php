@@ -351,6 +351,38 @@ class EFS_Input_Validator {
 	}
 
 	/**
+	 * Validate migration key (JWT string).
+	 *
+	 * @param string $key Migration key to validate.
+	 * @return string Validated migration key.
+	 * @throws \InvalidArgumentException If validation fails.
+	 */
+	public function validate_migration_key( $key ) {
+		self::reset_last_error();
+
+		if ( empty( $key ) ) {
+			self::fail( 'migration_key_required', \__( 'Migration key is required.', 'etch-fusion-suite' ) );
+		}
+
+		$key = trim( (string) $key );
+
+		// JWTs must contain exactly two dots.
+		if ( substr_count( $key, '.' ) !== 2 ) {
+			self::fail( 'migration_key_invalid_format', \__( 'Migration key format is invalid.', 'etch-fusion-suite' ) );
+		}
+
+		// Ensure the token is base64url-safe in each segment.
+		$segments = explode( '.', $key );
+		foreach ( $segments as $segment ) {
+			if ( '' === $segment || ! preg_match( '/^[A-Za-z0-9\-_]+$/', $segment ) ) {
+				self::fail( 'migration_key_invalid_characters', \__( 'Migration key contains invalid characters.', 'etch-fusion-suite' ) );
+			}
+		}
+
+		return $key;
+	}
+
+	/**
 	 * Validate post ID.
 	 *
 	 * @param int $id Post ID to validate.
@@ -500,6 +532,9 @@ class EFS_Input_Validator {
 						break;
 					case 'token':
 						$validated[ $field ] = $validator->validate_token( $value );
+						break;
+					case 'migration_key':
+						$validated[ $field ] = $validator->validate_migration_key( $value );
 						break;
 					case 'post_id':
 						$validated[ $field ] = $validator->validate_post_id( $value );

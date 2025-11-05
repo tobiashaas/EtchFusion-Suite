@@ -92,6 +92,21 @@ interface Migration_Repository_Interface {
 	public function save_token_data( array $token_data ): bool;
 
 	/**
+	 * Store active migration metadata.
+	 *
+	 * @param array $data Migration metadata to persist.
+	 * @return bool
+	 */
+	public function save_active_migration( array $data ): bool;
+
+	/**
+	 * Retrieve active migration metadata.
+	 *
+	 * @return array
+	 */
+	public function get_active_migration(): array;
+
+	/**
 	 * Get token value.
 	 *
 	 * @return string Token value or empty string if not set.

@@ -85,10 +85,9 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		$payload = array(
-			'migration_token' => $this->get_post( 'migration_token', '', 'text' ),
-			'migration_key'   => $this->get_post( 'migration_key', '', 'textarea' ),
-			'target_url'      => $this->get_post( 'target_url', '', 'url' ),
-			'batch_size'      => $this->get_post( 'batch_size', 50, 'int' ),
+			'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
+			'target_url'    => $this->get_post( 'target_url', '', 'url' ),
+			'batch_size'    => $this->get_post( 'batch_size', 50, 'int' ),
 		);
 
 		$result = $this->migration_controller->start_migration( $payload );
@@ -252,7 +251,6 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$payload = array(
 			'target_url' => $this->get_post( 'target_url', '', 'text' ),
-			'api_key'    => $this->get_post( 'api_key', '', 'text' ),
 		);
 
 		$result = $this->settings_controller->generate_migration_key( $payload );

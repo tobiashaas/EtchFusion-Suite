@@ -1,0 +1,99 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - navigation "Main menu":
+    - link "Skip to main content" [ref=e3]:
+      - /url: "#wpbody-content"
+    - link "Skip to toolbar" [ref=e4]:
+      - /url: "#wp-toolbar"
+    - text:            
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - navigation "Toolbar":
+        - menu:
+          - group [ref=e7]:
+            - menuitem "Menu" [ref=e8]:
+              - generic [ref=e9]: 
+              - generic [ref=e10]: Menu
+          - text: 
+          - group [ref=e11]:
+            - menuitem " Etch Etch Etch" [ref=e12]
+          - group [ref=e13]:
+            - menuitem " Edit Site" [ref=e14]
+          - text:  
+          - group [ref=e15]:
+            - menuitem "New" [ref=e16]:
+              - generic [ref=e17]: 
+              - generic [ref=e18]: New
+        - menu [ref=e19]:
+          - group [ref=e20]:
+            - menuitem "Howdy, admin" [ref=e21]
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - link "WordPress 6.8.3" [ref=e25]:
+            - /url: https://wordpress.org/documentation/wordpress-version/version-6-8-3/
+          - text: is available!
+          - link "Please update WordPress now" [ref=e26]:
+            - /url: http://localhost:8889/wp-admin/update-core.php
+            - text: Please update now
+          - text: .
+        - generic [ref=e27]:
+          - heading "Etch Fusion Suite" [level=1] [ref=e28]
+          - generic [ref=e29]:
+            - heading "HTTPS Recommended" [level=3] [ref=e30]
+            - paragraph [ref=e31]: Application Passwords work best over HTTPS. For production environments, ensure HTTPS is enabled.
+          - generic [ref=e32]:
+            - heading "Environment Summary" [level=2] [ref=e33]
+            - list [ref=e34]:
+              - listitem [ref=e35]: Bricks Builder Not detected
+              - listitem [ref=e36]: Etch PageBuilder Detected
+              - listitem [ref=e37]: Site URL http://localhost:8889
+          - generic [ref=e39]:
+            - generic [ref=e40]:
+              - heading "Etch Target Site Setup" [level=2] [ref=e41]
+              - paragraph [ref=e42]: Prepare this site to receive content from your Bricks source site.
+            - generic [ref=e43]:
+              - heading "Create an Application Password" [level=3] [ref=e44]
+              - list [ref=e45]:
+                - listitem [ref=e46]: Navigate to Users → Profile in this WordPress dashboard.
+                - listitem [ref=e47]: Scroll to Application Passwords and add a new password.
+                - listitem [ref=e48]: Name the password “Etch Fusion Suite” for easy identification.
+                - listitem [ref=e49]: Copy the generated password and use it on your Bricks site.
+              - paragraph [ref=e50]:
+                - link "Open Application Passwords" [ref=e51] [cursor=pointer]:
+                  - /url: http://localhost:8889/wp-admin/profile.php#application-passwords-section
+            - generic [ref=e52]:
+              - heading "Share This Site URL" [level=3] [ref=e53]
+              - paragraph [ref=e54]: Provide this URL to the Bricks site during migration setup.
+              - generic [ref=e55]:
+                - text: Site URL
+                - textbox "Site URL" [ref=e56]: http://localhost:8889
+              - button "Copy URL" [ref=e58] [cursor=pointer]
+            - generic [ref=e59]:
+              - heading "Generate Migration Key" [level=3] [ref=e60]
+              - generic [ref=e61]:
+                - generic [ref=e62]:
+                  - heading "Generate migration key for Bricks site" [level=3] [ref=e63]
+                  - paragraph [ref=e64]: Create a migration key that your Bricks site can import. Share the generated key with the Bricks dashboard.
+                - button "Generate Migration Key" [ref=e66] [cursor=pointer]
+              - generic [ref=e67]:
+                - text: Latest Generated Key
+                - textbox "Latest Generated Key" [ref=e68]
+              - button "Copy Key" [ref=e70] [cursor=pointer]
+          - generic [ref=e71]:
+            - tablist [ref=e72]:
+              - tab "Migration Progress" [selected] [ref=e73] [cursor=pointer]
+              - tab "Recent Logs" [ref=e74] [cursor=pointer]
+              - tab "Template Extractor" [disabled] [ref=e75]: Template Extractor
+            - tabpanel [ref=e78]:
+              - generic [ref=e79]:
+                - generic [ref=e80]:
+                  - heading "Migration Progress" [level=2] [ref=e81]
+                  - paragraph [ref=e82]: idle
+                - progressbar [ref=e83]
+                - list
+                - button "Cancel Migration" [ref=e85] [cursor=pointer]
+  - text: 
+```

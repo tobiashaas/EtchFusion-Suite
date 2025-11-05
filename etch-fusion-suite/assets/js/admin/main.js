@@ -1,5 +1,4 @@
-import { initUI, showToast, scrollToAccordionSection } from './ui.js';
-import { initPinInput } from './pin-input.js';
+import { initUI, showToast } from './ui.js';
 import { bindSettings } from './settings.js';
 import { bindValidation } from './validation.js';
 import {
@@ -15,7 +14,7 @@ import { init as initTemplateExtractor } from './template-extractor.js';
 let templateExtractorInitialized = false;
 
 const ensureTemplateExtractor = () => {
-    if (!window.efsData?.template_extractor_enabled) {
+    if (!window.efsData?.framer_enabled) {
         return;
     }
     if (templateExtractorInitialized) {
@@ -70,7 +69,7 @@ const bindTabs = () => {
     const panels = Array.from(tabsRoot.querySelectorAll('.efs-tab__panel'));
 
     const isFeatureDisabled = (tab) => tab?.hasAttribute('data-efs-feature-disabled')
-        || tab?.classList.contains('is-disabled');
+        || tab?.hasAttribute('aria-disabled');
 
     const activateTab = (targetKey) => {
         tabs.forEach((tab) => {
@@ -97,14 +96,15 @@ const bindTabs = () => {
         tab.addEventListener('click', () => {
             if (isFeatureDisabled(tab)) {
                 tab.setAttribute('aria-disabled', 'true');
-                const featureFlagsTarget = tab.dataset?.featureFlagsTarget
-                    || document.querySelector('[data-efs-open-feature-flags]')?.dataset?.target
-                    || 'efs-accordion-feature-flags';
+                const targetNotice = document.querySelector('[data-efs-feature-disabled-message]');
+                if (targetNotice) {
+                    targetNotice.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
                 showToast(
-                    window.efsData?.i18n?.featureDisabled || 'This feature is currently disabled. Enable it in Feature Flags.',
+                    window.efsData?.i18n?.featureDisabled
+                        || 'This feature is currently disabled. Enable it via EFS_ENABLE_FRAMER or the efs_enable_framer filter.',
                     'info',
                 );
-                scrollToAccordionSection(featureFlagsTarget);
                 return;
             }
             activateTab(tab.dataset.efsTab);
@@ -141,21 +141,11 @@ const bootstrap = () => {
     }
 
     initUI();
-    initPinInput();
     bindSettings();
     bindValidation();
     bindMigrationForm();
     initLogs();
     bindTabs();
-
-    document.querySelectorAll('[data-efs-open-feature-flags]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const target = button.dataset.target || 'efs-accordion-feature-flags';
-            scrollToAccordionSection(target);
-            const checkbox = document.querySelector('#efs-feature-template-extractor');
-            checkbox?.focus({ preventScroll: true });
-        });
-    });
 
     // Resume migration if in progress
     const progress = window.efsData?.progress_data || {};

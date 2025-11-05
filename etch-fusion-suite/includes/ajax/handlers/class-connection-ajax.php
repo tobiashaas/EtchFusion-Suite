@@ -52,9 +52,6 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$raw_api_key        = $this->get_post( 'api_key', '' );
-		$normalized_api_key = $this->normalize_api_key( $raw_api_key );
-
 		$raw_target_url      = $this->get_post( 'target_url', '', 'url' );
 		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
 
@@ -62,7 +59,6 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			$validated = $this->validate_input(
 				array(
 					'target_url'    => $internal_target_url,
-					'api_key'       => $normalized_api_key,
 					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
@@ -70,13 +66,9 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'       => array(
-						'type'     => 'api_key',
-						'required' => true,
-					),
 					'migration_key' => array(
-						'type'     => 'text',
-						'required' => false,
+						'type'     => 'migration_key',
+						'required' => true,
 					),
 				)
 			);
@@ -170,9 +162,19 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$raw_flags = $this->get_post( 'feature_flags', array(), 'array' );
 		$raw_flags = is_array( $raw_flags ) ? $raw_flags : array();
 
-		$invalid_flags    = array();
-		$validated_flags  = array();
 		$allowed_features = $this->get_allowed_feature_flags();
+
+		if ( empty( $allowed_features ) ) {
+			wp_send_json_success(
+				array(
+					'message' => __( 'No feature flags are currently configurable.', 'etch-fusion-suite' ),
+				)
+			);
+			return;
+		}
+
+		$invalid_flags   = array();
+		$validated_flags = array();
 
 		foreach ( $raw_flags as $flag_name => $value ) {
 			$sanitized_name = sanitize_key( (string) $flag_name );
@@ -204,7 +206,6 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		// Ensure all allowed flags are explicitly set.
 		foreach ( $allowed_features as $flag_name ) {
 			if ( ! isset( $validated_flags[ $flag_name ] ) ) {
 				$validated_flags[ $flag_name ] = false;
@@ -275,7 +276,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @return array<string>
 	 */
 	private function get_allowed_feature_flags(): array {
-		$flags = apply_filters( 'etch_fusion_suite_allowed_feature_flags', array( 'template_extractor' ) );
+		$flags = apply_filters( 'etch_fusion_suite_allowed_feature_flags', array() );
 		$flags = apply_filters_deprecated(
 			'efs_allowed_feature_flags',
 			array( $flags ),
@@ -283,7 +284,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			'etch_fusion_suite_allowed_feature_flags'
 		);
 
-		return is_array( $flags ) ? array_values( array_unique( $flags ) ) : array( 'template_extractor' );
+		return is_array( $flags ) ? array_values( array_unique( $flags ) ) : array();
 	}
 
 	/**
@@ -336,25 +337,22 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$raw_api_key        = $this->get_post( 'api_key', '' );
-		$normalized_api_key = $this->normalize_api_key( $raw_api_key );
-
 		$raw_target_url      = $this->get_post( 'target_url', '', 'url' );
 		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
 
 		try {
 			$validated = $this->validate_input(
 				array(
-					'target_url' => $internal_target_url,
-					'api_key'    => $normalized_api_key,
+					'target_url'    => $internal_target_url,
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'target_url' => array(
+					'target_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
 				)
@@ -376,11 +374,11 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$settings_controller = $this->resolve_settings_controller();
-		if ( ! $settings_controller ) {
+		$client = $this->api_client;
+		if ( ! $client || ! $client instanceof EFS_API_Client ) {
 			$this->log_security_event(
 				'ajax_action',
-				'Connection test failed: settings controller unavailable.',
+				'Connection test failed: API client unavailable.',
 				array( 'action' => 'efs_test_connection' ),
 				'high'
 			);
@@ -394,12 +392,13 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$result = $settings_controller->test_connection( $validated );
+		$migration_key = $validated['migration_key'];
+		$result        = $client->validate_migration_key_on_target( $internal_target_url, $migration_key );
 
 		if ( is_wp_error( $result ) ) {
 			$this->log_security_event(
 				'ajax_action',
-				'Connection test failed.',
+				'Connection test failed: target validation rejected migration key.',
 				array(
 					'code'    => $result->get_error_code(),
 					'context' => $this->mask_sensitive_values( $validated ),
@@ -415,22 +414,22 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$message = isset( $result['message'] ) ? (string) $result['message'] : __( 'Connection successful.', 'etch-fusion-suite' );
-		$data    = wp_parse_args(
-			$result,
-			array(
-				'message' => $message,
-				'valid'   => isset( $result['valid'] ) ? (bool) $result['valid'] : true,
-			)
-		);
-
 		$this->log_security_event(
 			'ajax_action',
-			'Connection test succeeded.',
+			'Connection test succeeded: target validated migration key.',
 			array( 'action' => 'efs_test_connection' )
 		);
 
-		wp_send_json_success( $data );
+		wp_send_json_success(
+			array(
+				'valid'      => true,
+				'payload'    => $this->mask_sensitive_values( $result['payload'] ?? array() ),
+				'target_url' => $result['target_domain'] ?? $result['target_url'] ?? $internal_target_url,
+				'expiration' => $result['expires'] ?? null,
+				'issued_at'  => $result['payload']['iat'] ?? null,
+				'jwt_target' => $result['payload']['target_url'] ?? null,
+			)
+		);
 	}
 
 	/**
@@ -481,14 +480,6 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @param string $api_key Raw API key input.
 	 * @return string
 	 */
-	private function normalize_api_key( $api_key ) {
-		if ( ! is_string( $api_key ) ) {
-			return '';
-		}
-
-		return preg_replace( '/\s+/', '', $api_key );
-	}
-
 	public function test_export_connection() {
 		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
@@ -503,16 +494,16 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		try {
 			$validated = $this->validate_input(
 				array(
-					'target_url' => $this->get_post( 'target_url', '' ),
-					'api_key'    => $this->get_post( 'api_key', '' ),
+					'target_url'    => $this->get_post( 'target_url', '' ),
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'target_url' => array(
+					'target_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
 				)
@@ -521,8 +512,8 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return; // Error already sent by validate_input
 		}
 
-		$target_url = $validated['target_url'];
-		$api_key    = $validated['api_key'];
+		$target_url    = $validated['target_url'];
+		$migration_key = $validated['migration_key'];
 
 		$client = $this->api_client;
 		if ( ! $client || ! $client instanceof EFS_API_Client ) {
@@ -537,7 +528,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$result = $client->test_connection( $this->convert_to_internal_url( $target_url ), $api_key );
+		$result = $client->validate_migration_key_on_target( $this->convert_to_internal_url( $target_url ), $migration_key );
 
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
 			// Log successful connection test
@@ -596,16 +587,16 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		try {
 			$validated = $this->validate_input(
 				array(
-					'source_url' => $this->get_post( 'source_url', '' ),
-					'api_key'    => $this->get_post( 'api_key', '' ),
+					'source_url'    => $this->get_post( 'source_url', '' ),
+					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'source_url' => array(
+					'source_url'    => array(
 						'type'     => 'url',
 						'required' => true,
 					),
-					'api_key'    => array(
-						'type'     => 'api_key',
+					'migration_key' => array(
+						'type'     => 'migration_key',
 						'required' => true,
 					),
 				)
@@ -614,8 +605,8 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return; // Error already sent by validate_input
 		}
 
-		$source_url = $validated['source_url'];
-		$api_key    = $validated['api_key'];
+		$source_url    = $validated['source_url'];
+		$migration_key = $validated['migration_key'];
 
 		$client = $this->api_client;
 		if ( ! $client || ! $client instanceof EFS_API_Client ) {
@@ -630,7 +621,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$result = $client->test_connection( $this->convert_to_internal_url( $source_url ), $api_key );
+		$result = $client->validate_migration_key_on_target( $this->convert_to_internal_url( $source_url ), $migration_key );
 
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
 			// Log successful connection test

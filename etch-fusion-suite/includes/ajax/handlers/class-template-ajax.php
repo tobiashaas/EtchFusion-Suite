@@ -48,6 +48,24 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
+		if ( ! \efs_is_framer_enabled() ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Blocked template extraction attempt while Framer feature disabled.',
+				array(),
+				'low'
+			);
+
+			wp_send_json_error(
+				array(
+					'code'    => 'framer_disabled',
+					'message' => __( 'Framer template extraction is not enabled on this site.', 'etch-fusion-suite' ),
+				),
+				403
+			);
+			return;
+		}
+
 		if ( ! $this->check_rate_limit( 'template_extract', 10, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
@@ -101,6 +119,24 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
+		if ( ! \efs_is_framer_enabled() ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Blocked extraction progress request while Framer feature disabled.',
+				array(),
+				'low'
+			);
+
+			wp_send_json_error(
+				array(
+					'code'    => 'framer_disabled',
+					'message' => __( 'Framer template extraction is not enabled on this site.', 'etch-fusion-suite' ),
+				),
+				403
+			);
+			return;
+		}
+
 		if ( ! $this->check_rate_limit( 'template_progress', 60, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
@@ -114,6 +150,24 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 */
 	public function save_template() {
 		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! \efs_is_framer_enabled() ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Blocked template save attempt while Framer feature disabled.',
+				array(),
+				'low'
+			);
+
+			wp_send_json_error(
+				array(
+					'code'    => 'framer_disabled',
+					'message' => __( 'Framer template extraction is not enabled on this site.', 'etch-fusion-suite' ),
+				),
+				403
+			);
 			return;
 		}
 
@@ -181,6 +235,24 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
+		if ( ! \efs_is_framer_enabled() ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Blocked saved templates request while Framer feature disabled.',
+				array(),
+				'low'
+			);
+
+			wp_send_json_error(
+				array(
+					'code'    => 'framer_disabled',
+					'message' => __( 'Framer template extraction is not enabled on this site.', 'etch-fusion-suite' ),
+				),
+				403
+			);
+			return;
+		}
+
 		if ( ! $this->check_rate_limit( 'template_saved_list', 60, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
@@ -195,6 +267,24 @@ class EFS_Template_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 */
 	public function delete_template() {
 		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! \efs_is_framer_enabled() ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Blocked template delete attempt while Framer feature disabled.',
+				array(),
+				'low'
+			);
+
+			wp_send_json_error(
+				array(
+					'code'    => 'framer_disabled',
+					'message' => __( 'Framer template extraction is not enabled on this site.', 'etch-fusion-suite' ),
+				),
+				403
+			);
 			return;
 		}
 

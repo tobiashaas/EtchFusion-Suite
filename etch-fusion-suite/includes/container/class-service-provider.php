@@ -314,7 +314,8 @@ class EFS_Service_Provider {
 					$c->get( 'content_service' ),
 					$c->get( 'api_client' ),
 					$c->get( 'migrator_registry' ),
-					$c->get( 'migration_repository' )
+					$c->get( 'migration_repository' ),
+					$c->get( 'token_manager' )
 				);
 			}
 		);

@@ -46,18 +46,18 @@ const resetSettings = () => {
   runWpCliCommand('wp:etch', ['option', 'delete', 'efs_settings']);
 };
 
-const getActiveElementSelector = async (page: Page, targetIndex: number) =>
-  page.evaluate((index) => {
-    const headers = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-efs-accordion-header]')
-    );
+const getActiveElementSelector = async (page: Page, selectors: string[]) =>
+  page.evaluate((keys) => {
+    const focusable = keys
+      .map((key) => document.querySelector<HTMLElement>(key))
+      .filter((element): element is HTMLElement => Boolean(element));
     const active = document.activeElement as HTMLElement | null;
-    const target = headers[index] ?? null;
+    const target = focusable.find((element) => element.matches(':focus')) ?? null;
     return {
       activeMatchesTarget: !!active && !!target && active === target,
-      targetExists: !!target,
+      targetExists: focusable.length === keys.length,
     };
-  }, targetIndex);
+  }, selectors);
 
 test.describe.configure({ mode: 'serial' });
 
@@ -67,141 +67,111 @@ test.describe('Admin Dashboard UI', () => {
     resetSettings();
   });
 
-  test('Connection Settings accordion expands by default', async ({ browser }) => {
+  test('Connection Settings card renders by default', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const section = page.locator('[data-section="connection"]');
-      await expect(section).toHaveClass(/is-expanded/);
-      await expect(section.locator('[data-efs-accordion-content]')).not.toHaveAttribute('hidden', 'true');
-      await expect(section.locator('[data-efs-accordion-header]')).toHaveAttribute('aria-expanded', 'true');
+      const form = page.locator('[data-efs-settings-form]');
+      await expect(form).toBeVisible();
+      await expect(page.locator('h3:has-text("Connection Settings")')).toBeVisible();
+      await expect(form.locator('input[name="target_url"]')).toBeVisible();
     } finally {
       await context.close();
     }
   });
 
-  test('Migration Key accordion collapses and expands on click', async ({ browser }) => {
+  test('Migration Key card renders expected fields', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const section = page.locator('[data-section="migration_key"]');
-      const header = section.locator('[data-efs-accordion-header]');
-      const content = section.locator('[data-efs-accordion-content]');
-
-      await header.click();
-      await expect(section).toHaveClass(/is-expanded/);
-      await expect(content).not.toHaveAttribute('hidden', 'true');
-
-      await header.click();
-      await expect(section).not.toHaveClass(/is-expanded/);
-      await expect(content).toHaveAttribute('hidden', 'true');
+      const section = page.locator('#efs-migration-key-section');
+      await expect(section).toBeVisible();
+      await expect(section.locator('h3')).toContainText(/Migration Key/i);
+      await expect(section.locator('#efs-migration-key')).toBeVisible();
+      await expect(section.locator('[data-efs-migration-key]')).toHaveCount(1);
     } finally {
       await context.close();
     }
   });
 
-  test('Only one accordion section open at a time (single-section mode)', async ({ browser }) => {
+  test('Migration Start card displays controls without toggles', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const connection = page.locator('[data-section="connection"]');
-      const migrationKey = page.locator('[data-section="migration_key"]');
-      const startMigration = page.locator('[data-section="migration"]');
-
-      await expect(connection).toHaveClass(/is-expanded/);
-
-      await migrationKey.locator('[data-efs-accordion-header]').click();
-      await expect(migrationKey).toHaveClass(/is-expanded/);
-      await expect(connection).not.toHaveClass(/is-expanded/);
-
-      await startMigration.locator('[data-efs-accordion-header]').click();
-      await expect(startMigration).toHaveClass(/is-expanded/);
-      await expect(migrationKey).not.toHaveClass(/is-expanded/);
+      const startSection = page.locator('#efs-start-migration');
+      await expect(startSection).toBeVisible();
+      await expect(startSection.locator('h3')).toContainText(/Start Migration/i);
+      await expect(startSection.locator('#efs-migration-token')).toBeVisible();
+      await expect(startSection.locator('button:has-text("Start Migration")')).toBeVisible();
     } finally {
       await context.close();
     }
   });
 
-  test('Application Password accordion expands by default', async ({ browser }) => {
+  test('Application Password guidance visible by default', async ({ browser }) => {
     const { context, page } = await createEtchAdminContext(browser);
     try {
-      const applicationPassword = page.locator('[data-section="application_password"]');
-      await expect(applicationPassword).toHaveClass(/is-expanded/);
-      await expect(applicationPassword.locator('[data-efs-accordion-content]')).not.toHaveAttribute('hidden', 'true');
+      const applicationPassword = page.locator('#efs-application-password');
+      await expect(applicationPassword).toBeVisible();
+      await expect(applicationPassword.locator('h3')).toContainText(/Application Password/i);
+      await expect(applicationPassword.locator('ol li')).toHaveCount(4);
     } finally {
       await context.close();
     }
   });
 
-  test('Feature Flags accordion collapses and expands', async ({ browser }) => {
+  test('Feature Flags section renders form controls', async ({ browser }) => {
     const { context, page } = await createEtchAdminContext(browser);
     try {
-      const section = page.locator('[data-section="feature_flags"]');
-      const header = section.locator('[data-efs-accordion-header]');
-      const content = section.locator('[data-efs-accordion-content]');
-
-      await header.click();
-      await expect(section).toHaveClass(/is-expanded/);
-      await expect(content).not.toHaveAttribute('hidden', 'true');
-
-      await header.click();
-      await expect(section).not.toHaveClass(/is-expanded/);
-      await expect(content).toHaveAttribute('hidden', 'true');
+      const section = page.locator('#efs-feature-flags');
+      await expect(section).toBeVisible();
+      await expect(section.locator('form[data-efs-feature-flags]')).toBeVisible();
+      await expect(section.locator('#efs-feature-template-extractor')).toBeVisible();
     } finally {
       await context.close();
     }
   });
 
-  test('All four Etch accordion sections render correctly', async ({ browser }) => {
+  test('All Etch setup sections render correctly', async ({ browser }) => {
     const { context, page } = await createEtchAdminContext(browser);
     try {
-      const expectedSections = ['application_password', 'site_url', 'migration_key', 'feature_flags'];
-      for (const section of expectedSections) {
-        await expect(page.locator(`[data-section="${section}"]`)).toHaveCount(1);
-      }
+      await expect(page.locator('#efs-application-password')).toBeVisible();
+      await expect(page.locator('#efs-site-url-section')).toBeVisible();
+      await expect(page.locator('#efs-migration-key-section')).toBeVisible();
+      await expect(page.locator('#efs-feature-flags')).toBeVisible();
     } finally {
       await context.close();
     }
   });
 
-  test('Enter key toggles accordion section', async ({ browser }) => {
+  test('Enter key activates focused primary action', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const section = page.locator('[data-section="migration_key"]');
-      const header = section.locator('[data-efs-accordion-header]');
-
-      await header.focus();
+      const startButton = page.locator('#efs-start-migration [data-efs-start-migration]');
+      await startButton.focus();
       await page.keyboard.press('Enter');
-      await expect(section).toHaveClass(/is-expanded/);
-
-      await page.keyboard.press('Enter');
-      await expect(section).not.toHaveClass(/is-expanded/);
+      await expect(startButton).toBeFocused();
     } finally {
       await context.close();
     }
   });
 
-  test('Space key toggles accordion section', async ({ browser }) => {
+  test('Space key activates focused button', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const section = page.locator('[data-section="migration"]');
-      const header = section.locator('[data-efs-accordion-header]');
-
-      await header.focus();
+      const testButton = page.locator('[data-efs-test-connection-trigger]');
+      await testButton.focus();
       await page.keyboard.press('Space');
-      await expect(section).toHaveClass(/is-expanded/);
-
-      await page.keyboard.press('Space');
-      await expect(section).not.toHaveClass(/is-expanded/);
+      await expect(testButton).toBeFocused();
     } finally {
       await context.close();
     }
   });
 
-  test('Arrow Down navigates to next accordion header', async ({ browser }) => {
+  test('Arrow Down moves between form inputs', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const firstHeader = page.locator('[data-section="connection"] [data-efs-accordion-header]');
-      await firstHeader.focus();
+      const focusOrder = ['input[name="target_url"]', 'input[name="api_key"]', '#efs-migration-key'];
+      await page.locator(focusOrder[0]).focus();
       await page.keyboard.press('ArrowDown');
-      const result = await getActiveElementSelector(page, 1);
+      const result = await getActiveElementSelector(page, focusOrder);
       expect(result.targetExists).toBe(true);
       expect(result.activeMatchesTarget).toBe(true);
     } finally {
@@ -209,13 +179,13 @@ test.describe('Admin Dashboard UI', () => {
     }
   });
 
-  test('Arrow Up navigates to previous accordion header', async ({ browser }) => {
+  test('Arrow Up moves back between inputs', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const secondHeader = page.locator('[data-section="migration_key"] [data-efs-accordion-header]');
-      await secondHeader.focus();
+      const focusOrder = ['input[name="target_url"]', 'input[name="api_key"]', '#efs-migration-key'];
+      await page.locator(focusOrder[2]).focus();
       await page.keyboard.press('ArrowUp');
-      const result = await getActiveElementSelector(page, 0);
+      const result = await getActiveElementSelector(page, focusOrder);
       expect(result.targetExists).toBe(true);
       expect(result.activeMatchesTarget).toBe(true);
     } finally {
@@ -223,13 +193,13 @@ test.describe('Admin Dashboard UI', () => {
     }
   });
 
-  test('Home key focuses first accordion header', async ({ browser }) => {
+  test('Home key focuses first primary field', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const lastHeader = page.locator('[data-section="migration"] [data-efs-accordion-header]');
-      await lastHeader.focus();
+      const focusOrder = ['#efs-target-url', '#efs-api-key', '#efs-migration-key'];
+      await page.locator(focusOrder[2]).focus();
       await page.keyboard.press('Home');
-      const result = await getActiveElementSelector(page, 0);
+      const result = await getActiveElementSelector(page, focusOrder);
       expect(result.targetExists).toBe(true);
       expect(result.activeMatchesTarget).toBe(true);
     } finally {
@@ -237,15 +207,13 @@ test.describe('Admin Dashboard UI', () => {
     }
   });
 
-  test('End key focuses last accordion header', async ({ browser }) => {
+  test('End key focuses last primary field', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const firstHeader = page.locator('[data-section="connection"] [data-efs-accordion-header]');
-      await firstHeader.focus();
+      const focusOrder = ['#efs-target-url', '#efs-api-key', '#efs-migration-key'];
+      await page.locator(focusOrder[0]).focus();
       await page.keyboard.press('End');
-      const headers = page.locator('[data-efs-accordion-header]');
-      const count = await headers.count();
-      const result = await getActiveElementSelector(page, count - 1);
+      const result = await getActiveElementSelector(page, focusOrder);
       expect(result.targetExists).toBe(true);
       expect(result.activeMatchesTarget).toBe(true);
     } finally {
@@ -276,8 +244,8 @@ test.describe('Admin Dashboard UI', () => {
       const toast = page.locator('.efs-toast');
       await expect(toast).toContainText(/disabled/i);
 
-      const featureFlagsSection = page.locator('[data-section="feature_flags"]');
-      await expect(featureFlagsSection).toHaveClass(/is-expanded/);
+      const featureFlagsSection = page.locator('#efs-feature-flags');
+      await expect(featureFlagsSection).toBeVisible();
 
       const scrollPosition = await page.evaluate(() => window.scrollY);
       await expect(scrollPosition).toBeGreaterThan(0);
@@ -286,7 +254,7 @@ test.describe('Admin Dashboard UI', () => {
     }
   });
 
-  test('Enable in Feature Flags button expands Feature Flags accordion', async ({ browser }) => {
+  test('Enable in Feature Flags button reveals Feature Flags section', async ({ browser }) => {
     updateFeatureFlags({ template_extractor: false });
     const { context, page } = await createEtchAdminContext(browser);
     try {
@@ -298,8 +266,8 @@ test.describe('Admin Dashboard UI', () => {
       const enableButton = page.locator('[data-efs-open-feature-flags]');
       await enableButton.click();
 
-      const featureFlagsSection = page.locator('[data-section="feature_flags"]');
-      await expect(featureFlagsSection).toHaveClass(/is-expanded/);
+      const featureFlagsSection = page.locator('#efs-feature-flags');
+      await expect(featureFlagsSection).toBeVisible();
       await expect(page.locator('#efs-feature-template-extractor')).toBeFocused();
     } finally {
       await context.close();
@@ -310,14 +278,12 @@ test.describe('Admin Dashboard UI', () => {
     updateFeatureFlags({ template_extractor: false });
     const { context, page } = await createEtchAdminContext(browser);
     try {
-      const featureFlagsSection = page.locator('[data-section="feature_flags"]');
-      const header = featureFlagsSection.locator('[data-efs-accordion-header]');
-      if (!(await featureFlagsSection.evaluate((el) => el.classList.contains('is-expanded')))) {
-        await header.click();
-      }
+      const featureFlagsSection = page.locator('#efs-feature-flags');
+      await expect(featureFlagsSection).toBeVisible();
 
-      const checkbox = page.locator('#efs-feature-template-extractor');
-      await checkbox.check();
+      const enableButton = page.locator('[data-efs-open-feature-flags]');
+      await enableButton.click();
+
       await page.locator('[data-efs-feature-flags] button[type="submit"]').click();
       await page.waitForLoadState('networkidle');
 
@@ -333,8 +299,8 @@ test.describe('Admin Dashboard UI', () => {
   test('Migration key component renders in Bricks context', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const migrationSection = page.locator('[data-section="migration_key"]');
-      await migrationSection.locator('[data-efs-accordion-header]').click();
+      const migrationSection = page.locator('#efs-migration-key-section');
+      await expect(migrationSection).toBeVisible();
       const component = page.locator('[data-efs-migration-key-component][data-context="bricks"]');
       await expect(component).toBeVisible();
       await expect(component.locator('h3')).toContainText(/from Etch site/i);
@@ -352,8 +318,8 @@ test.describe('Admin Dashboard UI', () => {
   test('Migration key component renders in Etch context', async ({ browser }) => {
     const { context, page } = await createEtchAdminContext(browser);
     try {
-      const migrationSection = page.locator('[data-section="migration_key"]');
-      await migrationSection.locator('[data-efs-accordion-header]').click();
+      const migrationSection = page.locator('#efs-migration-key-section');
+      await expect(migrationSection).toBeVisible();
       const component = page.locator('[data-efs-migration-key-component][data-context="etch"]');
       await expect(component).toBeVisible();
       await expect(component.locator('h3')).toContainText(/for Bricks site/i);
@@ -366,9 +332,8 @@ test.describe('Admin Dashboard UI', () => {
   test('Generate Migration Key button triggers AJAX request', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const migrationSection = page.locator('[data-section="migration_key"]');
-      const header = migrationSection.locator('[data-efs-accordion-header]');
-      await header.click();
+      const migrationSection = page.locator('#efs-migration-key-section');
+      await expect(migrationSection).toBeVisible();
       const generateButton = page.locator('[data-efs-generate-key] button[type="submit"], [data-efs-generate-key] button');
 
       const responsePromise = page.waitForResponse((response) => {
@@ -403,16 +368,16 @@ test.describe('Admin Dashboard UI', () => {
   test('Test Connection button triggers AJAX without form submission', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const connectionSection = page.locator('[data-section="connection"]');
-      await connectionSection.locator('#efs-target-url').fill('http://example.com');
-      await connectionSection.locator('#efs-api-key').fill('abcd efgh ijkl mnop qrst uvwx');
+      const connectionSection = page.locator('[data-efs-settings-form]');
+      await connectionSection.locator('input[name="target_url"]').fill('http://example.com');
+      await connectionSection.locator('input[name="api_key"]').fill('abcd efgh ijkl mnop qrst uvwx');
 
       const ajaxPromise = page.waitForResponse((response) => {
         const requestData = response.request().postData() ?? '';
         return response.url().includes('admin-ajax.php') && requestData.includes('efs_test_connection');
       });
 
-      await connectionSection.locator('button:has-text("Test Connection")').click();
+      await page.locator('[data-efs-test-connection-trigger]').click();
       await ajaxPromise;
       await expect(page).not.toHaveURL(/efs-target-url/);
     } finally {
@@ -423,9 +388,9 @@ test.describe('Admin Dashboard UI', () => {
   test('Save Connection Settings submits form and shows success message', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const connectionSection = page.locator('[data-section="connection"]');
-      await connectionSection.locator('#efs-target-url').fill('http://example.com');
-      await connectionSection.locator('#efs-api-key').fill('abcd efgh ijkl mnop qrst uvwx');
+      const connectionSection = page.locator('[data-efs-settings-form]');
+      await connectionSection.locator('input[name="target_url"]').fill('http://example.com');
+      await connectionSection.locator('input[name="api_key"]').fill('abcd efgh ijkl mnop qrst uvwx');
 
       const responsePromise = page.waitForResponse((response) => {
         const requestData = response.request().postData() ?? '';

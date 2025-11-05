@@ -33,6 +33,11 @@ class EFS_Migration_Token_Manager {
 	const TOKEN_EXPIRATION = 8 * HOUR_IN_SECONDS;
 
 	/**
+	 * Option key storing the JWT signing secret
+	 */
+	private const TOKEN_SECRET_OPTION = 'efs_migration_jwt_secret';
+
+	/**
 	 * Constructor
 	 *
 	 * @param Migration_Repository_Interface|null $migration_repository
@@ -50,30 +55,38 @@ class EFS_Migration_Token_Manager {
 	/**
 	 * Generate migration token (for API endpoint)
 	 *
+	 * @param string $target_url Target URL
 	 * @param int $expiration_seconds Token expiration time in seconds
 	 * @return array Token data with token, expires, and domain
 	 */
-	public function generate_migration_token( $expiration_seconds = null ) {
+	public function generate_migration_token( $target_url = null, $expiration_seconds = null ) {
 		if ( empty( $expiration_seconds ) ) {
 			$expiration_seconds = self::TOKEN_EXPIRATION;
 		}
 
-		// Generate secure token
-		$token = $this->generate_secure_token();
+		$issued_at         = time();
+		$expires_timestamp = $issued_at + (int) $expiration_seconds;
+		$site_url          = home_url();
+		$target_url        = $target_url ? esc_url_raw( $target_url ) : $site_url;
 
-		// Store token with expiration
-		$this->store_token( $token, $expiration_seconds );
+		$payload = array(
+			'target_url' => $target_url,
+			'domain'     => $site_url,
+			'iat'        => $issued_at,
+			'exp'        => $expires_timestamp,
+		);
 
-		$current_timestamp = time();
-		$expires_timestamp = $current_timestamp + $expiration_seconds;
+		$token = $this->encode_jwt( $payload );
 
-		// Return token data
+		$this->store_token( $token );
+
 		return array(
 			'token'      => $token,
 			'expires'    => $expires_timestamp,
-			'domain'     => home_url(),
+			'domain'     => $site_url,
 			'created_at' => current_time( 'mysql' ),
 			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+			'payload'    => $payload,
 		);
 	}
 
@@ -85,154 +98,81 @@ class EFS_Migration_Token_Manager {
 	 * @return string Migration URL
 	 */
 	public function generate_migration_url( $target_domain = null, $expiration_seconds = null ) {
-		if ( empty( $target_domain ) ) {
-			$target_domain = home_url();
-		}
+		$token_data = $this->generate_migration_token( $target_domain, $expiration_seconds );
 
-		if ( empty( $expiration_seconds ) ) {
-			$expiration_seconds = self::TOKEN_EXPIRATION;
-		}
-
-		// Generate secure token
-		$token = $this->generate_secure_token();
-
-		// Store token with expiration
-		$this->store_token( $token, $expiration_seconds );
-
-		// Build migration URL (current site as base, target domain as parameter)
-		$current_site_url  = home_url();
-		$expires_timestamp = time() + $expiration_seconds;
-		$migration_url     = add_query_arg(
-			array(
-				'domain'  => $target_domain,
-				'token'   => $token,
-				'expires' => $expires_timestamp,
-			),
-			$current_site_url
-		);
-
-		return $migration_url;
+		return $token_data['token'];
 	}
-
-	/**
-	 * Generate secure migration token
-	 */
-	private function generate_secure_token() {
-		// Generate a simple secure token (not RSA key pair)
-		$token = wp_generate_password( 64, false );
-
-		// Token will be stored by store_token() method - don't store it here
-		return $token;
-	}
-
 
 	/**
 	 * Store token with expiration
 	 */
-	private function store_token( $token, $expiration_seconds = null ) {
-		if ( empty( $expiration_seconds ) ) {
-			$expiration_seconds = self::TOKEN_EXPIRATION;
+	private function store_token( $token ) {
+		$decoded = $this->decode_jwt( $token );
+
+		if ( is_wp_error( $decoded ) ) {
+			$this->error_handler->log_error(
+				'token_store_failed',
+				array(
+					'reason' => $decoded->get_error_message(),
+				)
+			);
+
+			return;
 		}
 
-		// Store simple token data
-		$current_timestamp = time();
-		$expires_timestamp = $current_timestamp + $expiration_seconds;
+		$payload           = $decoded['payload'];
+		$expires_timestamp = isset( $payload['exp'] ) ? (int) $payload['exp'] : ( time() + self::TOKEN_EXPIRATION );
+		$ttl               = max( 60, $expires_timestamp - time() );
 
 		$token_data = array(
 			'token'      => $token,
+			'payload'    => $payload,
 			'created_at' => current_time( 'mysql' ),
 			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-			'domain'     => home_url(),
+			'domain'     => $payload['domain'] ?? home_url(),
 		);
 
 		$this->migration_repository->save_token_data( $token_data );
-
-		// Store token value for validation
 		$this->migration_repository->save_token_value( $token );
 
-		// Also store in transients for faster access
-		set_transient( 'efs_token_' . substr( $token, 0, 16 ), $token_data, $expiration_seconds );
+		set_transient( 'efs_token_' . substr( hash( 'sha256', $token ), 0, 16 ), $token_data, $ttl );
 	}
 
 	/**
 	 * Validate migration token
 	 *
 	 * @param string $token Token to validate
-	 * @param string $source_domain Source domain
-	 * @param int $expires Expiration timestamp
-	 * @return bool|\WP_Error
+	 * @return array|\WP_Error
 	 */
-	public function validate_migration_token( $token, $source_domain, $expires ) {
-		// Debug logging via structured handler
-		$this->error_handler->log_info(
-			'Migration token validation started',
-			array(
-				'token_prefix'  => substr( $token, 0, 20 ),
-				'source_domain' => $source_domain,
-				'expires'       => $expires,
-				'expires_human' => wp_date( 'Y-m-d H:i:s', $expires ),
-			)
-		);
-		$current_timestamp = time();
-		$this->error_handler->log_info(
-			'Current timestamp captured for token validation',
-			array(
-				'current_timestamp' => $current_timestamp,
-				'current_human'     => wp_date( 'Y-m-d H:i:s', $current_timestamp ),
-			)
-		);
+	public function validate_migration_token( $token ) {
+		$decoded = $this->decode_jwt( $token );
 
-		// Check expiration
-		if ( $current_timestamp > (int) $expires ) {
-			$this->error_handler->log_error(
-				'token_expired',
-				array(
-					'current_timestamp' => $current_timestamp,
-					'expires'           => (int) $expires,
-				)
-			);
-			return new \WP_Error( 'token_expired', 'Migration token has expired' );
+		if ( is_wp_error( $decoded ) ) {
+			return $decoded;
 		}
 
-		// Get stored token value
+		$payload           = $decoded['payload'];
+		$expires_timestamp = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
+
+		if ( empty( $expires_timestamp ) ) {
+			return new \WP_Error( 'invalid_token', 'Token payload missing expiration.' );
+		}
+
+		if ( time() > $expires_timestamp ) {
+			return new \WP_Error( 'token_expired', 'Migration token has expired.' );
+		}
+
 		$stored_token = $this->migration_repository->get_token_value();
-		$this->error_handler->log_info(
-			'Migration token retrieved from repository',
-			array(
-				'stored_token_prefix' => $stored_token ? substr( $stored_token, 0, 20 ) : null,
-			)
-		);
 
 		if ( empty( $stored_token ) ) {
-			$this->error_handler->log_error(
-				'invalid_token',
-				array(
-					'reason' => 'Token missing from repository',
-				)
-			);
 			return new \WP_Error( 'invalid_token', 'No migration token found. Please generate a new key.' );
 		}
 
-		if ( $stored_token !== $token ) {
-			$this->error_handler->log_error(
-				'invalid_token',
-				array(
-					'reason'          => 'Token mismatch',
-					'expected_prefix' => substr( $stored_token, 0, 20 ),
-					'received_prefix' => substr( $token, 0, 20 ),
-					'source_domain'   => $source_domain,
-				)
-			);
+		if ( ! hash_equals( $stored_token, $token ) ) {
 			return new \WP_Error( 'invalid_token', 'Invalid migration token. Tokens do not match.' );
 		}
 
-		$this->error_handler->log_info(
-			'Migration token validated successfully',
-			array(
-				'source_domain' => $source_domain,
-			)
-		);
-		return true;
+		return $payload;
 	}
 
 	/**
@@ -243,55 +183,16 @@ class EFS_Migration_Token_Manager {
 	}
 
 	/**
-	 * Clean up expired tokens
-	 */
-	public function cleanup_expired_tokens() {
-		$token_data = $this->migration_repository->get_token_data();
-
-		if ( ! empty( $token_data ) && isset( $token_data['expires_at'] ) ) {
-			$expires_timestamp = strtotime( $token_data['expires_at'] );
-
-			if ( time() > $expires_timestamp ) {
-				$this->migration_repository->delete_token_data();
-
-				// Clean up transients
-				$this->migration_repository->cleanup_expired_tokens();
-			}
-		}
-	}
-
-	/**
 	 * Generate migration QR code data
 	 */
 	public function generate_qr_data( $target_domain = null ) {
-		$migration_url = $this->generate_migration_url( $target_domain );
-
-		$current_timestamp = time();
-		$expires_timestamp = $current_timestamp + self::TOKEN_EXPIRATION;
+		$token_data = $this->generate_migration_token( $target_domain );
 
 		return array(
-			'url'        => $migration_url,
-			'qr_data'    => $migration_url, // Can be used with QR code libraries
+			'token'      => $token_data['token'],
+			'qr_data'    => $token_data['token'],
 			'expires_in' => self::TOKEN_EXPIRATION,
-			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-		);
-	}
-
-	/**
-	 * Parse migration URL
-	 */
-	public function parse_migration_url( $url ) {
-		$parsed       = wp_parse_url( $url );
-		$query_params = array();
-
-		if ( isset( $parsed['query'] ) ) {
-			parse_str( $parsed['query'], $query_params );
-		}
-
-		return array(
-			'domain'  => $query_params['domain'] ?? null,
-			'token'   => $query_params['token'] ?? null,
-			'expires' => isset( $query_params['expires'] ) ? (int) $query_params['expires'] : null,
+			'expires_at' => $token_data['expires_at'],
 		);
 	}
 
@@ -299,21 +200,164 @@ class EFS_Migration_Token_Manager {
 	 * Create migration shortcut
 	 */
 	public function create_migration_shortcut( $target_domain ) {
-		$migration_url = $this->generate_migration_url( $target_domain );
-
-		// Create a short URL (optional)
-		$short_url = wp_generate_password( 8, false );
-
-		// Store short URL mapping
-		set_transient( 'efs_short_' . $short_url, $migration_url, self::TOKEN_EXPIRATION );
-
-		$expires_timestamp = time() + self::TOKEN_EXPIRATION;
+		$token_data = $this->generate_migration_token( $target_domain );
 
 		return array(
-			'full_url'   => $migration_url,
-			'short_url'  => home_url( '/migrate/' . $short_url ),
-			'qr_data'    => $migration_url,
-			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+			'token'      => $token_data['token'],
+			'qr_data'    => $token_data['token'],
+			'expires_at' => $token_data['expires_at'],
 		);
+	}
+
+	/**
+	 * Encode payload into JWT string
+	 *
+	 * @param array $payload JWT payload
+	 * @return string
+	 */
+	private function encode_jwt( array $payload ) {
+		$header = array(
+			'alg' => 'HS256',
+			'typ' => 'JWT',
+		);
+
+		$segments = array(
+			$this->base64url_encode( wp_json_encode( $header ) ),
+			$this->base64url_encode( wp_json_encode( $payload ) ),
+		);
+
+		$signing_input = implode( '.', $segments );
+		$signature     = hash_hmac( 'sha256', $signing_input, $this->get_secret_key(), true );
+
+		$segments[] = $this->base64url_encode( $signature );
+
+		return implode( '.', $segments );
+	}
+
+	/**
+	 * Decode a JWT token
+	 *
+	 * @param string $token JWT string
+	 * @return array|\WP_Error
+	 */
+	private function decode_jwt( $token ) {
+		if ( ! is_string( $token ) || '' === trim( $token ) ) {
+			return new \WP_Error( 'invalid_token', 'Token is empty.' );
+		}
+
+		$parts = explode( '.', $token );
+
+		if ( 3 !== count( $parts ) ) {
+			return new \WP_Error( 'invalid_token', 'Malformed token provided.' );
+		}
+
+		list( $encoded_header, $encoded_payload, $encoded_signature ) = $parts;
+
+		$header = json_decode( $this->base64url_decode( $encoded_header ) ?? '', true );
+
+		if ( ! is_array( $header ) || ( $header['alg'] ?? '' ) !== 'HS256' ) {
+			return new \WP_Error( 'invalid_token', 'Unsupported token algorithm.' );
+		}
+
+		$payload_json = $this->base64url_decode( $encoded_payload );
+		$payload      = json_decode( $payload_json ?? '', true );
+
+		if ( ! is_array( $payload ) ) {
+			return new \WP_Error( 'invalid_token', 'Invalid token payload.' );
+		}
+
+		$signature          = $this->base64url_decode( $encoded_signature );
+		$expected_signature = hash_hmac( 'sha256', $encoded_header . '.' . $encoded_payload, $this->get_secret_key(), true );
+
+		if ( ! $signature || ! hash_equals( $expected_signature, $signature ) ) {
+			return new \WP_Error( 'invalid_token', 'Token signature mismatch.' );
+		}
+
+		return array(
+			'header'  => $header,
+			'payload' => $payload,
+		);
+	}
+
+	/**
+	 * Decode migration key locally without persisting state.
+	 *
+	 * @param string $token Migration key token.
+	 * @return array|\WP_Error
+	 */
+	public function decode_migration_key_locally( $token ) {
+		if ( ! is_string( $token ) || '' === trim( $token ) ) {
+			return new \WP_Error( 'invalid_token', 'Token is empty.' );
+		}
+
+		$parts = explode( '.', $token );
+
+		if ( 3 !== count( $parts ) ) {
+			return new \WP_Error( 'invalid_token', 'Malformed token provided.' );
+		}
+
+		list( $encoded_header, $encoded_payload ) = $parts;
+
+		$header_json  = $this->base64url_decode( $encoded_header );
+		$payload_json = $this->base64url_decode( $encoded_payload );
+		$header       = is_string( $header_json ) ? json_decode( $header_json, true ) : null;
+		$payload      = is_string( $payload_json ) ? json_decode( $payload_json, true ) : null;
+
+		if ( ! is_array( $payload ) ) {
+			return new \WP_Error( 'invalid_token', 'Unable to parse token payload.' );
+		}
+
+		return array(
+			'header'  => is_array( $header ) ? $header : array(),
+			'payload' => $payload,
+		);
+	}
+
+	/**
+	 * Retrieve or create JWT signing secret
+	 *
+	 * @return string
+	 */
+	private function get_secret_key() {
+		$secret = get_option( self::TOKEN_SECRET_OPTION );
+
+		if ( empty( $secret ) ) {
+			$secret = bin2hex( random_bytes( 32 ) );
+			update_option( self::TOKEN_SECRET_OPTION, $secret, false );
+		}
+
+		return $secret;
+	}
+
+	/**
+	 * Perform base64url encoding
+	 *
+	 * @param string $data Raw data
+	 * @return string
+	 */
+	private function base64url_encode( $data ) {
+		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
+	}
+
+	/**
+	 * Perform base64url decoding
+	 *
+	 * @param string $data Base64url encoded string
+	 * @return string|null
+	 */
+	private function base64url_decode( $data ) {
+		if ( ! is_string( $data ) ) {
+			return null;
+		}
+
+		$remainder = strlen( $data ) % 4;
+
+		if ( $remainder > 0 ) {
+			$data .= str_repeat( '=', 4 - $remainder );
+		}
+
+		$decoded = base64_decode( strtr( $data, '-_', '+/' ) );
+
+		return false === $decoded ? null : $decoded;
 	}
 }

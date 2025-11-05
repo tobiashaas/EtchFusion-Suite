@@ -24,13 +24,13 @@ class EFS_Media_Service {
 
 	/**
 	 * @param string $target_url
-	 * @param string $api_key
+	 * @param string $jwt_token
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_media( $target_url, $api_key ) {
+	public function migrate_media( $target_url, $jwt_token ) {
 		try {
-			$result = $this->media_migrator->migrate_media( $target_url, $api_key );
+			$result = $this->media_migrator->migrate_media( $target_url, $jwt_token );
 
 			if ( is_wp_error( $result ) ) {
 				$this->error_handler->log_error(

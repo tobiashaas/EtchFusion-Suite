@@ -49,12 +49,12 @@ class EFS_Content_Service {
 
 	/**
 	 * @param string          $target_url
-	 * @param string          $api_key
+	 * @param string          $jwt_token
 	 * @param EFS_API_Client  $api_client
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_posts( $target_url, $api_key, EFS_API_Client $api_client ) {
+	public function migrate_posts( $target_url, $jwt_token, EFS_API_Client $api_client ) {
 		$bricks_posts    = $this->content_parser->get_bricks_posts();
 		$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
 		$media           = $this->content_parser->get_media();
@@ -83,7 +83,7 @@ class EFS_Content_Service {
 
 		foreach ( $batches as $batch_index => $batch ) {
 			foreach ( $batch as $post ) {
-				$result = $this->convert_bricks_to_gutenberg( $post->ID, $api_client, $target_url, $api_key );
+				$result = $this->convert_bricks_to_gutenberg( $post->ID, $api_client, $target_url, $jwt_token );
 
 				if ( is_wp_error( $result ) ) {
 					++$summary['failed'];
@@ -103,11 +103,11 @@ class EFS_Content_Service {
 	 * @param int             $post_id
 	 * @param EFS_API_Client  $api_client
 	 * @param string|null     $target_url
-	 * @param string|null     $api_key
+	 * @param string|null     $jwt_token
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function convert_bricks_to_gutenberg( $post_id, EFS_API_Client $api_client, $target_url = null, $api_key = null ) {
+	public function convert_bricks_to_gutenberg( $post_id, EFS_API_Client $api_client, $target_url = null, $jwt_token = null ) {
 		$bricks_content = $this->content_parser->parse_bricks_content( $post_id );
 
 		if ( ! $bricks_content || ! isset( $bricks_content['elements'] ) ) {
@@ -116,7 +116,7 @@ class EFS_Content_Service {
 				? $post->post_content
 				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 
-			return $this->send_post_to_target( $post, $content, $api_client, $target_url, $api_key );
+			return $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token );
 		}
 
 		$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks( $bricks_content['elements'] );
@@ -138,7 +138,7 @@ class EFS_Content_Service {
 			return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
 		}
 
-		return $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $api_key );
+		return $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $jwt_token );
 	}
 
 	/**
@@ -170,16 +170,16 @@ class EFS_Content_Service {
 	 * @param \WP_Post       $post
 	 * @param EFS_API_Client  $api_client
 	 * @param string          $target_url
-	 * @param string          $api_key
+	 * @param string          $jwt_token
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_existing_content( $post, EFS_API_Client $api_client, $target_url, $api_key ) {
+	public function migrate_existing_content( $post, EFS_API_Client $api_client, $target_url, $jwt_token ) {
 		$content = ! empty( $post->post_content )
 			? $post->post_content
 			: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 
-		return $this->send_post_to_target( $post, $content, $api_client, $target_url, $api_key );
+		return $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token );
 	}
 
 	/**
@@ -201,12 +201,12 @@ class EFS_Content_Service {
 	 * @param string          $content
 	 * @param EFS_API_Client  $api_client
 	 * @param string|null     $target_url
-	 * @param string|null     $api_key
+	 * @param string|null     $jwt_token
 	 *
 	 * @return array|\WP_Error
 	 */
-	private function send_post_to_target( $post, $content, EFS_API_Client $api_client, $target_url = null, $api_key = null ) {
-		if ( ! $target_url || ! $api_key ) {
+	private function send_post_to_target( $post, $content, EFS_API_Client $api_client, $target_url = null, $jwt_token = null ) {
+		if ( ! $target_url || ! $jwt_token ) {
 			return array(
 				'post_id' => $post->ID,
 				'content' => $content,
@@ -226,7 +226,7 @@ class EFS_Content_Service {
 			),
 		);
 
-		$response = $api_client->send_post( $target_url, $api_key, $post_data );
+		$response = $api_client->send_post( $target_url, $jwt_token, $post, $content );
 
 		if ( is_wp_error( $response ) ) {
 			$this->error_handler->log_error(

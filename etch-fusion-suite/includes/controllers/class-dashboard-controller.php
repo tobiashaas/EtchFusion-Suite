@@ -49,12 +49,23 @@ class EFS_Dashboard_Controller {
 	public function get_dashboard_context() {
 		$env = $this->detect_environment();
 
-		$progress_context           = $this->get_progress();
-		$template_extractor_enabled = \efs_feature_enabled( 'template_extractor' );
-		$saved_templates            = array();
+		$progress_context = $this->get_progress();
+		
+		// Make framer detection more robust
+		try {
+			$framer_enabled = \efs_is_framer_enabled();
+		} catch ( \Exception $e ) {
+			$framer_enabled = false;
+		}
+		
+		$saved_templates = array();
 
-		if ( $env['is_etch_site'] && $template_extractor_enabled ) {
-			$saved_templates = $this->get_saved_templates();
+		if ( $env['is_etch_site'] && $framer_enabled ) {
+			try {
+				$saved_templates = $this->get_saved_templates();
+			} catch ( \Exception $e ) {
+				$saved_templates = array();
+			}
 		}
 
 		return array(
@@ -69,7 +80,8 @@ class EFS_Dashboard_Controller {
 			'settings'                   => $this->get_settings(),
 			'nonce'                      => wp_create_nonce( 'efs_nonce' ),
 			'saved_templates'            => $saved_templates,
-			'template_extractor_enabled' => $template_extractor_enabled,
+			'framer_enabled'             => $framer_enabled,
+			'template_extractor_enabled' => $framer_enabled,
 		);
 	}
 
@@ -166,6 +178,8 @@ class EFS_Dashboard_Controller {
 	 * @return array
 	 */
 	private function prepare_dashboard_view_args( array $data ) {
+		$framer_enabled = isset( $data['framer_enabled'] ) ? (bool) $data['framer_enabled'] : false;
+
 		return array(
 			'is_bricks_site'             => isset( $data['is_bricks_site'] ) ? (bool) $data['is_bricks_site'] : false,
 			'is_etch_site'               => isset( $data['is_etch_site'] ) ? (bool) $data['is_etch_site'] : false,
@@ -178,8 +192,8 @@ class EFS_Dashboard_Controller {
 			'settings'                   => isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array(),
 			'nonce'                      => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
 			'saved_templates'            => isset( $data['saved_templates'] ) && is_array( $data['saved_templates'] ) ? $data['saved_templates'] : array(),
-			'template_extractor_enabled' => isset( $data['template_extractor_enabled'] ) ? (bool) $data['template_extractor_enabled'] : false,
-			'feature_flags_section_id'   => 'efs-accordion-feature-flags',
+			'framer_enabled'             => $framer_enabled,
+			'template_extractor_enabled' => isset( $data['template_extractor_enabled'] ) ? (bool) $data['template_extractor_enabled'] : $framer_enabled,
 		);
 	}
 

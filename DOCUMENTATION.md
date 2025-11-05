@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2025-11-02 12:15  
+**Last Updated:** 2025-11-02 23:45  
 **Version:** 0.11.27
 
 ---
@@ -141,6 +141,325 @@ Bricks Site                    Etch Site
 2. Media Migrator         →   Media Library
 3. Content Converter      →   Gutenberg Blocks
 ```
+
+---
+
+## Development Environment Setup
+
+**Updated:** 2025-11-04 21:30
+
+### Overview
+
+The plugin uses `@wordpress/env` (wp-env) to provide a Docker-based development environment with two WordPress instances:
+
+- **Bricks Site** (development environment): Source site running Bricks Builder on port 8888
+- **Etch Site** (tests environment): Target site running Etch PageBuilder on port 8889
+
+This dual-instance setup allows testing migrations in isolation without affecting source data.
+
+### Prerequisites
+
+- Node.js ≥ 18
+- npm ≥ 9
+- Docker Desktop (required by wp-env)
+- Composer (optional - can use container Composer)
+
+### Quick Start for New Developers
+
+#### 1. Clone the repository
+
+```bash
+git clone https://github.com/tobiashaas/EtchFusion-Suite.git
+cd EtchFusion-Suite/etch-fusion-suite
+```
+
+#### 2. Install dependencies
+
+```bash
+npm install
+```
+
+#### 3. Start the environment
+
+```bash
+npm run dev
+```
+
+This command performs:
+- Pre-flight checks (Docker running, ports available)
+- Starts both WordPress instances
+- Waits for WordPress to be ready
+- Installs Composer dependencies
+- Activates required plugins and themes
+- Runs health checks
+- Displays access URLs and credentials
+
+#### 4. Access the sites
+
+- Bricks: http://localhost:8888/wp-admin (admin / password)
+- Etch: http://localhost:8889/wp-admin (admin / password)
+
+#### 5. Verify setup
+
+```bash
+npm run health
+npm run test:connection
+```
+
+### Configuration Files
+
+#### `.wp-env.json` - Shared configuration
+
+This file contains the base configuration for both instances:
+
+- WordPress core version (6.8)
+- PHP version (8.1 by default)
+- Port configuration (8888, 8889)
+- Debug settings (WP_DEBUG, SCRIPT_DEBUG, SAVEQUERIES)
+- Lifecycle scripts (health checks after startup)
+- Per-environment configuration (development vs tests)
+
+#### `.wp-env.override.json` - Local customizations
+
+This file is gitignored and allows local overrides:
+
+- Custom ports to avoid conflicts
+- Different PHP version
+- Additional plugins/themes for testing
+- Exposed MySQL ports for database GUI tools
+- Custom config values (memory limits, Xdebug)
+
+Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as needed.
+
+### npm Scripts Reference
+
+#### Environment Management
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run dev` | Full setup with health checks | `npm run dev` |
+| `npm run stop` | Stop both instances | `npm run stop` |
+| `npm run destroy` | Tear down completely | `npm run destroy` |
+| `npm run reset` | Clean data and restart | `npm run reset` |
+| `npm run reset:soft` | Clean without destroying containers | `npm run reset:soft` |
+| `npm run reset:hard` | Complete teardown and rebuild | `npm run reset:hard` |
+
+#### Logging & Debugging
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run logs` | Combined logs from both instances | `npm run logs` |
+| `npm run logs:all` | All logs (same as above) | `npm run logs:all` |
+| `npm run logs:bricks` | Bricks site logs only | `npm run logs:bricks` |
+| `npm run logs:bricks:follow` | Tail Bricks logs in real-time | `npm run logs:bricks:follow` |
+| `npm run logs:bricks:errors` | Filter Bricks logs for errors only | `npm run logs:bricks:errors` |
+| `npm run logs:etch` | Etch site logs only | `npm run logs:etch` |
+| `npm run logs:etch:follow` | Tail Etch logs in real-time | `npm run logs:etch:follow` |
+| `npm run logs:etch:errors` | Filter Etch logs for errors only | `npm run logs:etch:errors` |
+| `npm run logs:save` | Capture logs to timestamped files | `npm run logs:save` |
+| `npm run debug` | Generate diagnostic report | `npm run debug` |
+| `npm run debug:full` | Generate verbose diagnostic report | `npm run debug:full` |
+
+#### Health & Diagnostics
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run health` | Comprehensive health checks | `npm run health` |
+| `npm run health:bricks` | Health check for Bricks site only | `npm run health:bricks` |
+| `npm run health:etch` | Health check for Etch site only | `npm run health:etch` |
+| `npm run ports:check` | Verify required ports are available | `npm run ports:check` |
+| `npm run env:info` | Display environment configuration | `npm run env:info` |
+
+#### Database Operations
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run db:backup` | Export both databases to backups/ | `npm run db:backup` |
+| `npm run db:restore` | Import databases from backup files | `npm run db:restore` |
+| `npm run db:export:bricks` | Export Bricks database only | `npm run db:export:bricks` |
+| `npm run db:export:etch` | Export Etch database only | `npm run db:export:etch` |
+
+#### WP-CLI Access
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run wp -- <command>` | Run WP-CLI on Bricks site | `npm run wp -- plugin list` |
+| `npm run wp:tests -- <command>` | Run WP-CLI on Etch site | `npm run wp:tests -- cache flush` |
+| `npm run wp:bricks -- <command>` | Alias for Bricks site | `npm run wp:bricks -- option get home` |
+| `npm run wp:etch -- <command>` | Alias for Etch site | `npm run wp:etch -- db query "..."` |
+| `npm run shell:bricks` | Open interactive shell in Bricks | `npm run shell:bricks` |
+| `npm run shell:etch` | Open interactive shell in Etch | `npm run shell:etch` |
+
+#### Testing
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run test:connection` | Verify API connectivity | `npm run test:connection` |
+| `npm run test:migration` | Run end-to-end migration test | `npm run test:migration` |
+| `npm run test:playwright` | Run Playwright browser tests | `npm run test:playwright` |
+| `npm run test:playwright:ci` | Run tests in CI mode | `npm run test:playwright:ci` |
+| `npm run create-test-content` | Seed Bricks site with test data | `npm run create-test-content` |
+
+#### Development Tools
+
+| Script | Description | Example |
+| --- | --- | --- |
+| `npm run composer:install` | Install PHP dependencies | `npm run composer:install` |
+| `npm run activate` | Activate required plugins | `npm run activate` |
+| `npm run plugin:list` | List active plugins | `npm run plugin:list` |
+| `npm run lint` | Run ESLint on JavaScript | `npm run lint` |
+| `npm run typecheck` | Run TypeScript type checking | `npm run typecheck` |
+
+### Common Development Workflows
+
+#### Starting a Fresh Development Session
+
+```bash
+npm run dev                  # Start environment
+npm run health               # Verify everything is working
+npm run create-test-content  # Add test data
+```
+
+#### Debugging Migration Issues
+
+```bash
+npm run test:connection      # Verify connectivity
+npm run logs:bricks:errors   # Check for errors
+npm run logs:etch:errors     # Check target site
+npm run debug:full           # Generate diagnostic report
+npm run logs:save            # Save logs for sharing
+```
+
+#### Resetting After Failed Migration
+
+```bash
+npm run reset:soft           # Clean data
+npm run create-test-content  # Recreate test data
+npm run test:migration       # Try again
+```
+
+#### Database Backup Before Risky Changes
+
+```bash
+npm run db:backup            # Export current state
+# Make changes...
+npm run db:restore           # Restore if needed
+```
+
+#### Investigating Plugin Issues
+
+```bash
+npm run shell:bricks         # Open shell
+ls -la wp-content/plugins/etch-fusion-suite/vendor/
+cat wp-content/debug.log | tail -n 50
+exit
+```
+
+#### Running WP-CLI Commands
+
+```bash
+npm run wp:bricks -- plugin list
+npm run wp:bricks -- cache flush
+npm run wp:etch -- option get etch_styles
+npm run wp:etch -- db query "SELECT * FROM wp_options WHERE option_name LIKE 'efs_%'"
+```
+
+### Troubleshooting Guide
+
+#### Environment Won't Start
+
+**Symptom**: `npm run dev` fails with Docker errors
+
+**Solutions**:
+1. Verify Docker is running: `docker ps`
+2. Check port availability: `npm run ports:check`
+3. Check Docker resources: Ensure Docker has enough memory (4GB+) and disk space
+4. Try clean start: `npm run destroy && npm run dev`
+5. Check Docker logs: `docker logs <container-id>`
+
+#### Port Conflicts
+
+**Symptom**: "Error: Port 8888 already in use"
+
+**Solutions**:
+1. Identify conflicting process: `npm run ports:check`
+2. Stop conflicting service or kill process
+3. Use custom ports: Copy `.wp-env.override.json.example` to `.wp-env.override.json` and change `port` and `testsPort`
+4. Restart: `npm run dev`
+
+#### Composer Installation Fails
+
+**Symptom**: "Composer not found" or vendor directory missing
+
+**Solutions**:
+1. Check if Composer is in container: `npm run shell:bricks` then `composer --version`
+2. Install Composer locally if needed
+3. Manually run: `npm run composer:install`
+4. Verify vendor directory: `npm run shell:bricks` then `ls -la wp-content/plugins/etch-fusion-suite/vendor/`
+
+#### Plugin Activation Fails
+
+**Symptom**: "Plugin could not be activated" or fatal errors
+
+**Solutions**:
+1. Check autoloader exists: `npm run shell:bricks` then `ls wp-content/plugins/etch-fusion-suite/vendor/autoload.php`
+2. Regenerate autoloader: `npm run composer:install`
+3. Check PHP errors: `npm run logs:bricks:errors`
+4. Verify plugin files: `npm run shell:bricks` then `ls -la wp-content/plugins/etch-fusion-suite/`
+
+#### Health Checks Fail
+
+**Symptom**: `npm run health` reports failures
+
+**Solutions**:
+1. Generate full diagnostic: `npm run debug:full`
+2. Check specific instance: `npm run health:bricks` or `npm run health:etch`
+3. Review logs: `npm run logs:bricks:errors` and `npm run logs:etch:errors`
+4. Verify WordPress is responding: Visit http://localhost:8888 and http://localhost:8889
+5. Restart if needed: `npm run reset:soft`
+
+#### Migration Fails
+
+**Symptom**: Migration errors or connection refused
+
+**Solutions**:
+1. Test connectivity: `npm run test:connection`
+2. Verify both sites are healthy: `npm run health`
+3. Check migration logs: `npm run logs:save` and review saved files
+4. Verify JWT migration key is valid (not expired)
+5. Check REST API: Visit http://localhost:8889/wp-json/efs/v1/status
+6. Review security logs in WordPress admin
+
+#### Slow Performance
+
+**Symptom**: Environment is slow or unresponsive
+
+**Solutions**:
+1. Check Docker resource allocation in Docker Desktop settings
+2. Increase memory limit: Add `WP_MEMORY_LIMIT: "512M"` to `.wp-env.override.json`
+3. Disable Xdebug if not needed
+4. Clean up old containers: `docker system prune`
+5. Restart Docker Desktop
+
+#### Database Issues
+
+**Symptom**: Database connection errors or corrupted data
+
+**Solutions**:
+1. Backup current state: `npm run db:backup`
+2. Check database connection: `npm run wp:bricks -- db check`
+3. Repair database: `npm run wp:bricks -- db repair`
+4. Reset if needed: `npm run reset:hard`
+5. Restore from backup: `npm run db:restore`
+
+#### Getting Help
+
+When reporting issues, include:
+1. Diagnostic report: `npm run debug:full > debug-report.txt`
+2. Saved logs: `npm run logs:save`
+3. Environment info: `npm run env:info > env-info.txt`
+4. Health check results: `npm run health > health-check.txt`
+5. Steps to reproduce the issue
 
 ---
 
@@ -498,7 +817,23 @@ The logger now sanitizes event metadata, masks sensitive keys (API keys, tokens,
 
 ## Admin Settings UI
 
-**Updated:** 2025-11-01 13:12
+**Updated:** 2025-11-03 21:32
+
+### Migration key & token alignment
+
+- Bricks setup view now exposes a dedicated Migration Key textarea (`#efs-migration-key`) outside the Start Migration form and keeps the Migration Token textarea (`#efs-migration-token`) inside the form with a readonly attribute.
+- Added `#efs-migration-key-section` wrapper so Playwright and PHPUnit tests can locate the section without relying on structural changes.
+- Updated labels to read “Paste Migration Key from Etch” and ensured copy-to-clipboard attributes remain intact for both key and token fields.
+- Confirmed `assets/js/admin/migration.js` pulls values from the distinct selectors and writes returned tokens back to `#efs-migration-token` after start.
+
+### Accordion removal & simplified sections
+
+- Replaced the Bricks and Etch setup accordions with always-visible card sections to improve accessibility and reduce JS complexity.
+- Updated admin JavaScript to remove accordion initialisation, scroll helpers, and expanded state management.
+- Added `.efs-card__section` styling for consistent spacing and headings now that sections are no longer collapsible.
+- Adjusted migration key validation, feature flag scroll targets, and copy/toast helpers to use the flattened markup.
+
+### Previous accordion implementation (2025-10-30 13:45)
 
 ### Overview
 
@@ -507,28 +842,140 @@ The admin settings UI provides a centralized interface for configuring Etch Fusi
 ### Key Features
 
 - **Target URL Normalization**: Docker hosts are automatically translated to `host.docker.internal` for seamless communication between containers.
-- **Connection Endpoints**: The UI now normalizes Application Password input by stripping whitespace before validation, ensuring keys copied from WordPress can include spaces without failing.
-- **Application Password Entry**: PIN inputs now render as plain-text boxes (no visibility toggle required), continue enforcing the 24-character length check before saving settings, and keep the settings form as the single source of truth for AJAX actions (connection tests, migration key generation). Hidden API key inputs remain scoped to the Bricks context so application passwords are not duplicated in the DOM for Etch instances.
+- **Connection Flow**: Settings, validation, and migration key generation now operate solely on JWT migration keys—legacy application password inputs and PIN UI have been removed, including the client-side `pin-input.js` module and associated styles.
+- **Target Validation**: Test Connection coordinates with `EFS_API_Client::validate_migration_key_on_target()` to call the Etch `/efs/v1/validate` REST endpoint, logging responses and surfacing verified payload metadata in the admin toast.
 - **Status Endpoint Details**: The Etch `/wp-json/efs/v1/status` endpoint now returns `status` and `version` fields alongside plugin activation state so automated connection checks can verify the target build before starting a migration.
-- **Accessibility Enhancements**: Field labels focus the first PIN box, the input group now exposes `aria-labelledby`, and a `<noscript>` password fallback is available when JavaScript is disabled.
-- **REST Validation Route**: `/wp-json/efs/v1/auth/validate` powers the connection test and returns a structured response when credentials are accepted, mirroring the AJAX handler.
+- **Accessibility Enhancements**: Field labels continue to expose `aria-labelledby` relationships, accordion headers manage `aria-expanded`, and non-JavaScript fallbacks ensure target URL and migration key inputs remain usable when scripting is disabled.
+- **REST Validation Route**: `/wp-json/efs/v1/auth/validate` powers the connection test and returns a structured response when the migration token is accepted, mirroring the AJAX handler feedback.
 - **CORS Defaults**: Server-origin requests (those without an `Origin` header) are accepted by the REST layer so container-to-container calls no longer fail with “Origin not allowed”.
 - **Migration Key Endpoint**: The admin form now calls the target `/wp-json/efs/v1/generate-key` endpoint, returning the generated key payload directly from the Etch instance.
 - **Service Container**: `token_manager` is registered in the plugin service container so REST endpoints can resolve `EFS_Migration_Token_Manager` without fatal errors. When the target URL resolves to the current site, migration keys are generated locally without issuing a loopback HTTP request.
-- **Accordion Layout**: Bricks and Etch setup screens are organised into a shared accordion component with accessible headers (`aria-expanded`, `role="region"`). The first panel (connection or application password) opens by default, while other panels lazily reveal forms on demand to reduce visual noise.
-- **Shared Migration Key Component**: A reusable partial renders migration key generation controls for both Bricks and Etch contexts, automatically inheriting nonce, target URL, and application password values from the primary settings form to eliminate duplicated markup and logic. Migration key textareas are now looked up within the active accordion panel to avoid collisions when both Bricks and Etch dashboards render simultaneously.
+- **Shared Migration Key Component**: A reusable partial renders migration key generation controls for both Bricks and Etch contexts, automatically inheriting nonce and target URL values from the primary settings form to eliminate duplicated markup and logic. Migration key textareas are now looked up within the active accordion panel to avoid collisions when both dashboards render simultaneously.
 - **Feature Discovery**: The Template Extractor tab now remains visible even when disabled, presenting a locked state with a call-to-action that scrolls and expands the Feature Flags accordion section so administrators understand how to enable the feature.
 - Tab navigation is keyboard accessible via `data-efs-tab` attributes and aria roles, matching the Playwright selectors in `tests/playwright/dashboard-tabs.spec.ts`.
 - Dashboard accordions expose `data-efs-accordion-section`, `data-efs-accordion-header`, and `data-efs-accordion-content` attributes used by both Playwright and PHPUnit regression tests.
 
 ## Testing Coverage
 
-**Updated:** 2025-10-31 10:15
+**Updated:** 2025-11-04 21:30
 
-- Hardened the admin UI PHPUnit suite (`tests/ui/AdminUITest.php`) to verify rendered markup instead of reflecting private controller methods, ensuring migration key components assert against actual dashboard output for both Bricks and Etch contexts.
-- Documented expanded dashboard testing procedures in `etch-fusion-suite/TESTING.md`, covering accordion behaviour, feature flag states, responsive viewports, accessibility checks, and cross-browser Playwright projects (chromium, firefox, webkit, plus optional mobile).
-- Centralised common commands for Playwright (`npm run test:playwright --project=<browser>`), responsive spec execution, and PHPUnit UI suite filters (`vendor/bin/phpunit -c phpunit.xml.dist --testsuite=ui`).
-- Linked GitHub Actions workflow `etch-fusion-suite/.github/workflows/tests.yml` for CI parity; workflow now runs PHPUnit before Playwright to mirror local guidance.
+The plugin includes comprehensive testing infrastructure with PHPUnit unit tests, integration tests, and Playwright end-to-end browser tests.
+
+### Testing Architecture
+
+**Dual-Site Testing**: Tests run against both WordPress instances to verify complete migration workflows:
+- **Bricks Site**: Test migration setup, configuration, and initiation
+- **Etch Site**: Test migration reception, processing, and results
+- **Cross-Site**: Test API communication, authentication, and data transfer
+
+**PHPUnit Suite**: Unit and integration tests cover:
+- Admin interface rendering and interactions
+- Security components (CORS, rate limiting, input validation)
+- Repository pattern and data access
+- CSS conversion logic and style mapping
+- API endpoints and authentication
+
+**Playwright Suite**: End-to-end browser tests cover:
+- Complete migration workflows
+- Admin dashboard interactions
+- Cross-site communication
+- Real-time progress updates
+- Authentication flows
+
+### Browser Testing with Playwright
+
+#### Overview
+
+Playwright tests run against both WordPress instances to verify end-to-end functionality including authentication, migration workflows, and UI interactions.
+
+#### Authentication Setup
+
+Tests use storage state authentication to avoid logging in for every test:
+- **Auth Files**: Stored in `.playwright-auth/` directory (gitignored)
+- **Separate Credentials**: Different auth files for Bricks and Etch sites
+- **Auto-Generation**: Created by `auth.setup.ts` before test runs
+- **Auto-Refresh**: Automatically regenerated when expired
+
+#### Running Tests
+
+```bash
+# Run all tests
+npm run test:playwright
+
+# Run in headed mode (see browser)
+npx playwright test --headed
+
+# Run specific test file
+npx playwright test tests/playwright/migration.spec.ts
+
+# Debug mode with Playwright Inspector
+npx playwright test --debug
+
+# Run in CI mode
+npm run test:playwright:ci
+
+# Run specific browser
+npm run test:playwright --project=chromium
+npm run test:playwright --project=firefox
+npm run test:playwright --project=webkit
+```
+
+#### Environment Variables
+
+Customize test behavior with environment variables:
+
+```bash
+# WordPress credentials (default: admin/password)
+EFS_ADMIN_USER=admin
+EFS_ADMIN_PASS=password
+
+# Site URLs (auto-detected from wp-env)
+EFS_BRICKS_URL=http://localhost:8888
+EFS_ETCH_URL=http://localhost:8889
+
+# Debug mode
+DEBUG=pw:api
+```
+
+#### Configuration
+
+Playwright configuration in `playwright.config.ts` includes:
+- **URL Resolution**: Automatic detection from environment variables
+- **Separate Projects**: Different projects for Bricks and Etch tests
+- **Auth Setup**: Dedicated project that runs before all tests
+- **Retry Logic**: Automatic retries for flaky tests
+- **Error Capture**: Screenshots and videos on failure
+- **Parallel Execution**: Optimized test performance
+
+#### Global Setup/Teardown
+
+**Global Setup** (`global-setup.ts`):
+- Runs health checks before tests
+- Creates auth directory structure
+- Validates both sites are accessible
+- Sets up test data if needed
+
+**Global Teardown** (`global-teardown.ts`):
+- Saves logs if tests fail
+- Cleans up temporary files
+- Generates test reports
+
+#### Writing Tests
+
+Reference existing test files in `tests/playwright/` for examples:
+
+**Key Patterns**:
+- Use storage state for authentication
+- Navigate between Bricks and Etch sites
+- Test migration workflows end-to-end
+- Verify UI elements and interactions
+- Check API responses and data integrity
+
+**Test Categories**:
+- **Dashboard Tests**: Admin interface functionality
+- **Migration Tests**: End-to-end migration workflows
+- **API Tests**: Cross-site communication
+- **Authentication Tests**: JWT-based login flows
 
 ### Configuration
 
@@ -797,11 +1244,55 @@ Transfers images and attachments from Bricks to Etch site.
 
 ## API Communication
 
-**Updated:** 2025-10-28 14:54
+**Updated:** 2025-11-04 21:30
 
-### Authentication
+### Authentication & Migration Keys
 
-Uses WordPress Application Passwords for secure API access.
+**JWT-Based Migration Keys**: The plugin uses JSON Web Tokens (JWT) for migration authentication, replacing the previous application password system.
+
+#### Token Structure
+
+- **Header**: Algorithm (HS256) and type (JWT)
+- **Payload**: `target_url`, `iat` (issued at), `exp` (expiration), `domain`
+- **Signature**: HMAC-SHA256 signature for verification
+
+#### Token Generation (Etch site)
+
+1. User clicks "Generate Migration Key" in Etch admin
+2. `migration_token_manager.php` generates JWT with embedded URL and credentials
+3. Token is displayed as a single string to copy
+4. Token is valid for 24 hours by default
+
+#### Token Validation (Bricks site)
+
+1. User pastes JWT migration key in Bricks admin
+2. `migration_token_manager.php` decodes JWT and verifies signature
+3. Expiration is checked against `exp` claim
+4. Target URL is extracted from payload
+5. Token is used as Bearer token for API requests
+
+#### API Authentication
+
+- All API requests use `Authorization: Bearer {jwt_token}` header
+- No separate API key or Basic Auth required
+- JWT is validated on every request
+- Expired tokens return 403 Forbidden
+
+#### Security Benefits
+
+- **Single value to copy/paste**: Better UX than separate URL and password
+- **Embedded URL**: Prevents misconfiguration
+- **Time-limited tokens**: Reduce exposure (24-hour default)
+- **Signature verification**: Prevents tampering
+- **No plaintext passwords**: Enhanced security
+
+#### Helper Function
+
+```php
+// Check if JWT is valid
+$token_manager = $container->get('migration_token_manager');
+$is_valid = $token_manager->validate_migration_token($jwt_string);
+```
 
 ### Endpoints
 

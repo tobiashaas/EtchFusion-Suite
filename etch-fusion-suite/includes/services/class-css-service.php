@@ -28,11 +28,11 @@ class EFS_CSS_Service {
 
 	/**
 	 * @param string $target_url
-	 * @param string $api_key
+	 * @param string $jwt_token
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_css_classes( $target_url, $api_key ) {
+	public function migrate_css_classes( $target_url, $jwt_token ) {
 		try {
 			$etch_styles = $this->css_converter->convert_bricks_classes_to_etch();
 
@@ -52,7 +52,7 @@ class EFS_CSS_Service {
 				);
 			}
 
-			$response = $this->api_client->send_css_styles( $target_url, $api_key, $etch_styles );
+			$response = $this->api_client->send_css_styles( $target_url, $jwt_token, $etch_styles );
 
 			if ( is_wp_error( $response ) ) {
 				$this->error_handler->log_error(
@@ -110,8 +110,8 @@ class EFS_CSS_Service {
 	 *
 	 * @return array|\\WP_Error API response or error.
 	 */
-	public function send_css_styles_to_target( $target_url, $api_key, array $etch_styles ) {
-		return $this->api_client->send_css_styles( $target_url, $api_key, $etch_styles );
+	public function send_css_styles_to_target( $target_url, $jwt_token, array $etch_styles ) {
+		return $this->api_client->send_css_styles( $target_url, $jwt_token, $etch_styles );
 	}
 
 	/**
@@ -121,8 +121,8 @@ class EFS_CSS_Service {
 	 *
 	 * @return mixed
 	 */
-	public function import_etch_styles( $target_url, $api_key, array $etch_styles ) {
-		return $this->css_converter->import_etch_styles( $target_url, $api_key, $etch_styles );
+	public function import_etch_styles( $target_url, $jwt_token, array $etch_styles ) {
+		return $this->css_converter->import_etch_styles( $target_url, $jwt_token, $etch_styles );
 	}
 
 	/**

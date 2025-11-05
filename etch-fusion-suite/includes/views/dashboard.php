@@ -3,10 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$etch_fusion_suite_extractor_nonce            = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
-$etch_fusion_suite_saved_templates            = isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array();
-$etch_fusion_suite_template_extractor_enabled = isset( $template_extractor_enabled ) ? (bool) $template_extractor_enabled : false;
-$etch_fusion_suite_feature_flags_section_id   = isset( $feature_flags_section_id ) ? sanitize_key( $feature_flags_section_id ) : 'efs-accordion-feature-flags';
+$etch_fusion_suite_extractor_nonce       = isset( $nonce ) ? $nonce : wp_create_nonce( 'efs_nonce' );
+$etch_fusion_suite_saved_templates       = isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array();
+$etch_fusion_suite_framer_enabled        = isset( $framer_enabled ) ? (bool) $framer_enabled : false;
+$etch_fusion_suite_template_tab_disabled = ! $etch_fusion_suite_framer_enabled;
 ?>
 <div class="wrap efs-typography efs-admin-wrap">
 	<h1><?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?></h1>
@@ -63,9 +63,8 @@ $etch_fusion_suite_feature_flags_section_id   = isset( $feature_flags_section_id
 					<?php esc_html_e( 'Recent Logs', 'etch-fusion-suite' ); ?>
 				</button>
 				<?php if ( $is_etch_site ) : ?>
-					<?php $etch_fusion_suite_template_tab_disabled = ! $etch_fusion_suite_template_extractor_enabled; ?>
 					<button
-						class="efs-tab<?php echo $etch_fusion_suite_template_tab_disabled ? ' is-disabled' : ''; ?>"
+						class="efs-tab"
 						data-efs-tab="templates"
 						role="tab"
 						aria-selected="false"
@@ -97,11 +96,11 @@ $etch_fusion_suite_feature_flags_section_id   = isset( $feature_flags_section_id
 						role="tabpanel"
 						hidden
 						data-efs-tab-panel="templates"
-						<?php if ( ! $etch_fusion_suite_template_extractor_enabled ) : ?>
+						<?php if ( ! $etch_fusion_suite_framer_enabled ) : ?>
 							data-efs-feature-disabled="true"
 						<?php endif; ?>
 					>
-						<?php if ( $etch_fusion_suite_template_extractor_enabled ) : ?>
+						<?php if ( $etch_fusion_suite_framer_enabled ) : ?>
 							<?php
 							$etch_fusion_suite_extractor_nonce = isset( $etch_fusion_suite_extractor_nonce ) ? $etch_fusion_suite_extractor_nonce : wp_create_nonce( 'efs_nonce' );
 							$etch_fusion_suite_saved_templates = isset( $etch_fusion_suite_saved_templates ) ? $etch_fusion_suite_saved_templates : array();
@@ -110,17 +109,7 @@ $etch_fusion_suite_feature_flags_section_id   = isset( $feature_flags_section_id
 						<?php else : ?>
 							<div class="efs-empty-state" data-efs-feature-disabled-message>
 								<h3><?php esc_html_e( 'Template Extractor is currently disabled.', 'etch-fusion-suite' ); ?></h3>
-								<p><?php esc_html_e( 'Enable this feature in the Feature Flags section to access template extraction tools.', 'etch-fusion-suite' ); ?></p>
-								<p>
-									<button
-										type="button"
-										class="button button-secondary"
-										data-efs-open-feature-flags
-										data-target="<?php echo esc_attr( $etch_fusion_suite_feature_flags_section_id ); ?>"
-									>
-										<?php esc_html_e( 'Enable in Feature Flags', 'etch-fusion-suite' ); ?>
-									</button>
-								</p>
+								<p><?php esc_html_e( 'Enable this feature by defining the EFS_ENABLE_FRAMER constant or using the efs_enable_framer filter.', 'etch-fusion-suite' ); ?></p>
 							</div>
 						<?php endif; ?>
 					</div>

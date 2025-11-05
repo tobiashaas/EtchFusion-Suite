@@ -7,14 +7,30 @@
   "themes": [],
   "port": 8888,
   "testsPort": 8889,
+  "lifecycleScripts": {
+    "afterStart": "node scripts/health-check.js --quiet && node scripts/setup-bricks.js"
+  },
   "config": {
     "WP_DEBUG": true,
     "WP_DEBUG_LOG": true,
     "WP_DEBUG_DISPLAY": false,
-    "SCRIPT_DEBUG": true
+    "SCRIPT_DEBUG": true,
+    "SAVEQUERIES": true
   },
   "env": {
-    "development": {},
-    "tests": {}
+    "development": {
+      "config": {
+        "WP_ENVIRONMENT_TYPE": "local",
+        "SCRIPT_DEBUG": true,
+        "SAVEQUERIES": true
+      }
+    },
+    "tests": {
+      "config": {
+        "WP_ENVIRONMENT_TYPE": "test",
+        "SCRIPT_DEBUG": true,
+        "SAVEQUERIES": true
+      }
+    }
   }
 }

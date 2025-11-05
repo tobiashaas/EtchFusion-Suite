@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Bricks2Etch\Tests\WordPress\PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" tests="6" assertions="13" errors="0" warnings="0" failures="0" skipped="1" time="0.014683">
-    <testcase name="test_plugin_is_loaded" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="22" assertions="3" time="0.007323"/>
-    <testcase name="test_service_container_is_available" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="31" assertions="2" time="0.000865"/>
-    <testcase name="test_core_services_are_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="41" assertions="3" time="0.000325"/>
-    <testcase name="test_admin_menu_is_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="52" assertions="1" time="0.003629"/>
-    <testcase name="test_rest_api_endpoints_are_registered" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="70" assertions="0" time="0.001584">
-      <skipped/>
-    </testcase>
-    <testcase name="test_plugin_detector" class="Bricks2Etch\Tests\WordPress\PluginActivationTest" classname="Bricks2Etch.Tests.WordPress.PluginActivationTest" file="/var/www/html/wp-content/plugins/etch-fusion-suite/tests/integration/PluginActivationTest.php" line="77" assertions="4" time="0.000957"/>
+  <testsuite name="" tests="4" assertions="19" errors="0" warnings="0" failures="0" skipped="0" time="0.019328">
+    <testsuite name="unit" tests="4" assertions="19" errors="0" warnings="0" failures="0" skipped="0" time="0.019328">
+      <testsuite name="Bricks2Etch\Tests\Unit\FramerHtmlSanitizerTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/FramerHtmlSanitizerTest.php" tests="2" assertions="7" errors="0" warnings="0" failures="0" skipped="0" time="0.008486">
+        <testcase name="test_sanitization_removes_framer_scripts" class="Bricks2Etch\Tests\Unit\FramerHtmlSanitizerTest" classname="Bricks2Etch.Tests.Unit.FramerHtmlSanitizerTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/FramerHtmlSanitizerTest.php" line="37" assertions="2" time="0.006485"/>
+        <testcase name="test_semanticization_converts_sections_and_text" class="Bricks2Etch\Tests\Unit\FramerHtmlSanitizerTest" classname="Bricks2Etch.Tests.Unit.FramerHtmlSanitizerTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/FramerHtmlSanitizerTest.php" line="48" assertions="5" time="0.002000"/>
+      </testsuite>
+      <testsuite name="Bricks2Etch\Tests\Unit\TemplateExtractorServiceTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/TemplateExtractorServiceTest.php" tests="2" assertions="12" errors="0" warnings="0" failures="0" skipped="0" time="0.010843">
+        <testcase name="test_extract_from_html_string_returns_payload" class="Bricks2Etch\Tests\Unit\TemplateExtractorServiceTest" classname="Bricks2Etch.Tests.Unit.TemplateExtractorServiceTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/TemplateExtractorServiceTest.php" line="29" assertions="9" time="0.010019"/>
+        <testcase name="test_validate_template_detects_empty_blocks" class="Bricks2Etch\Tests\Unit\TemplateExtractorServiceTest" classname="Bricks2Etch.Tests.Unit.TemplateExtractorServiceTest" file="/Users/tobiashaas/Github/EtchFusion-Suite/etch-fusion-suite/tests/unit/TemplateExtractorServiceTest.php" line="47" assertions="3" time="0.000824"/>
+      </testsuite>
+    </testsuite>
   </testsuite>
 </testsuites>

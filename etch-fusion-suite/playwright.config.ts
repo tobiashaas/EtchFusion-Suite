@@ -79,6 +79,8 @@ export default defineConfig({
         ['html', { outputFolder: 'playwright-report', open: 'never' }],
       ]
     : [['html', { outputFolder: 'playwright-report', open: 'on-demand' }]],
+  globalSetup: require.resolve('./tests/playwright/global-setup.ts'),
+  globalTeardown: require.resolve('./tests/playwright/global-teardown.ts'),
   use: {
     actionTimeout: 0,
     baseURL: bricksUrl,
@@ -91,6 +93,12 @@ export default defineConfig({
     etchUrl,
     bricksAuthFile,
     etchAuthFile,
+    nodeVersion: process.version,
+    timestamp: new Date().toISOString(),
+    // URL resolution logic documented for reference:
+    // Bricks: BRICKS_URL > BRICKS_HOST:BRICKS_PORT > localhost:8888
+    // Etch: ETCH_URL > ETCH_HOST:ETCH_PORT > localhost:8889
+    // Override with environment variables as needed
   },
   projects: [
     {
@@ -99,6 +107,7 @@ export default defineConfig({
       use: {
         storageState: undefined,
       },
+      retries: process.env.CI ? 2 : 0, // Increased retries for auth setup
     },
     {
       name: 'chromium',
@@ -107,6 +116,8 @@ export default defineConfig({
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],
+      // Skip Framer tests if EFS_ENABLE_FRAMER is not set
+      testIgnore: process.env.EFS_ENABLE_FRAMER ? undefined : /.*framer.*\.spec\.ts/,
     },
     {
       name: 'firefox',
@@ -115,6 +126,7 @@ export default defineConfig({
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],
+      testIgnore: process.env.EFS_ENABLE_FRAMER ? undefined : /.*framer.*\.spec\.ts/,
     },
     {
       name: 'webkit',
@@ -123,6 +135,7 @@ export default defineConfig({
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],
+      testIgnore: process.env.EFS_ENABLE_FRAMER ? undefined : /.*framer.*\.spec\.ts/,
     },
     {
       name: 'mobile-chrome',
@@ -131,6 +144,7 @@ export default defineConfig({
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],
+      testIgnore: process.env.EFS_ENABLE_FRAMER ? undefined : /.*framer.*\.spec\.ts/,
     },
     {
       name: 'mobile-safari',
@@ -139,6 +153,7 @@ export default defineConfig({
         storageState: bricksAuthFile,
       },
       dependencies: ['setup'],
+      testIgnore: process.env.EFS_ENABLE_FRAMER ? undefined : /.*framer.*\.spec\.ts/,
     },
   ],
 });

@@ -6,7 +6,10 @@
 
 ### ✨ Improvements
 
-- (2025-11-01 13:15) **Admin PIN Input Visibility & Status Endpoint:** Updated `assets/js/admin/pin-input.js` to render application password boxes as plain text and remove the toggle control, refreshed `assets/css/admin.css` styles accordingly, and documented the change in `DOCUMENTATION.md` together with the enhanced `/wp-json/efs/v1/status` response (now returning `status` and `version`).
+- (2025-11-03 21:32) **Migration Key/Token Alignment:** Assigned unique IDs to the Bricks dashboard migration key (`#efs-migration-key`) and token (`#efs-migration-token`) textareas, added `#efs-migration-key-section` wrapper for test selectors, updated labels to distinguish key vs token, and verified admin migration script continues updating the token field after start.
+- (2025-11-03 19:10) **Admin Setup Simplification:** Replaced Bricks/Etch dashboard accordions with always-visible card sections, removed accordion JS utilities, added `.efs-card__section` spacing styles, and refreshed admin UI tests to assert the new layout.
+- (2025-11-02 23:45) **Admin Settings PIN Cleanup:** Removed the deprecated `assets/js/admin/pin-input.js` module and all related styles, verified no remaining imports or data attributes reference the legacy PIN flow, and rebuilt admin assets to confirm bundles exclude the stale entry.
+- (2025-11-02 23:40) **JWT Validation & Settings Cleanup:** Swapped the target-side `/validate` endpoint to use `EFS_Migration_Token_Manager::validate_migration_token()` (signature & expiry aware), updated the admin validation script to send `{ migration_key, target_url }`, removed legacy API key bindings from settings/validation flows, and standardised migrator/service parameters to `$jwt_token` for clarity.
 
 ### ✨ Improvements
 
@@ -98,6 +101,7 @@
 ## [0.11.27] - 2025-11-02 (12:15)
 
 ### 🧹 Maintenance
+
 - Completed PHPCS remediation across feature flags, AJAX handlers, security headers, view templates, and the GitHub updater.
 - Prefixed legacy `efs_*` hooks/functions with the `etch_fusion_suite_*` namespace, introducing deprecated wrappers to maintain third-party compatibility.
 - Replaced short ternary fallbacks with explicit conditionals and wrapped view-level data in prefixed variables to satisfy `PrefixAllGlobals` sniffs.

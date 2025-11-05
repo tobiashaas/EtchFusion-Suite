@@ -32,6 +32,7 @@
     "e2e:wait": "node scripts/e2e-wait.js",
     "e2e:stop": "wp-env stop",
     "test:playwright:local": "node scripts/e2e-wait.js && playwright test --reporter=line",
+    "test:playwright:fast": "E2E_FAST_MODE=1 node scripts/e2e-wait.js && playwright test --reporter=line",
     "lint": "eslint --ext .js,.ts assets/js",
     "typecheck": "tsc --noEmit",
     "create-test-content": "node scripts/create-test-content.js",

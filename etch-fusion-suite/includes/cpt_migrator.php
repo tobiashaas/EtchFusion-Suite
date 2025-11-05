@@ -71,8 +71,8 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $api_key ) {
-		return $this->migrate_custom_post_types( $target_url, $api_key );
+	public function migrate( $target_url, $jwt_token ) {
+		return $this->migrate_custom_post_types( $target_url, $jwt_token );
 	}
 
 	/** @inheritDoc */
@@ -299,7 +299,7 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate custom post types
 	 */
-	public function migrate_custom_post_types( $target_url, $api_key ) {
+	public function migrate_custom_post_types( $target_url, $jwt_token ) {
 		$cpts = $this->export_custom_post_types();
 
 		if ( empty( $cpts ) ) {
@@ -310,7 +310,7 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
-		$result = $api_client->send_custom_post_types( $target_url, $api_key, $cpts );
+		$result = $api_client->send_custom_post_types( $target_url, $jwt_token, $cpts );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;

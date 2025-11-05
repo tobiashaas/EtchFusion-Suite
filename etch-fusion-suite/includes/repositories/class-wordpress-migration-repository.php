@@ -22,10 +22,11 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	/**
 	 * Cache expiration for progress/steps (2 minutes for real-time updates).
 	 */
-	const CACHE_EXPIRATION_SHORT = 120;
-	const OPTION_PROGRESS        = 'efs_migration_progress';
-	const OPTION_LAST_MIGRATION  = 'efs_last_migration';
-	const OPTION_CURRENT_ID      = 'efs_current_migration_id';
+	const CACHE_EXPIRATION_SHORT  = 120;
+	const OPTION_PROGRESS         = 'efs_migration_progress';
+	const OPTION_LAST_MIGRATION   = 'efs_last_migration';
+	const OPTION_CURRENT_ID       = 'efs_current_migration_id';
+	const OPTION_ACTIVE_MIGRATION = 'efs_active_migration';
 
 	/**
 	 * Cache expiration for stats/tokens (10 minutes).
@@ -236,9 +237,33 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$result = true;
 		$result = delete_option( 'efs_migration_token' ) && $result;
 		$result = delete_option( 'efs_migration_token_value' ) && $result;
-		$result = delete_option( 'efs_private_key' ) && $result;
 
 		return $result;
+	}
+
+	/**
+	 * Persist active migration metadata.
+	 */
+	public function save_active_migration( array $data ): bool {
+		$this->invalidate_cache( 'efs_cache_active_migration' );
+		return update_option( self::OPTION_ACTIVE_MIGRATION, $data );
+	}
+
+	/**
+	 * Retrieve active migration metadata.
+	 */
+	public function get_active_migration(): array {
+		$cache_key = 'efs_cache_active_migration';
+		$cached    = get_transient( $cache_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$data = get_option( self::OPTION_ACTIVE_MIGRATION, array() );
+		set_transient( $cache_key, $data, self::CACHE_EXPIRATION_SHORT );
+
+		return $data;
 	}
 
 	/**

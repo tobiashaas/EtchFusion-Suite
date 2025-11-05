@@ -384,7 +384,7 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return mixed
 	 */
 	protected function mask_sensitive_values( $data ) {
-		$sensitive_keys = array( 'api_key', 'token', 'authorization', 'password', 'secret' );
+		$sensitive_keys = array( 'api_key', 'token', 'migration_key', 'authorization', 'password', 'secret' );
 
 		if ( is_array( $data ) ) {
 			$masked = array();

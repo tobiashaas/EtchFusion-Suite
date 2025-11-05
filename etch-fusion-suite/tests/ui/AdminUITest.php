@@ -31,6 +31,7 @@ class AdminUITest extends WP_UnitTestCase {
 	protected function tearDown(): void {
 		delete_option( 'efs_feature_flags' );
 		delete_option( 'efs_settings' );
+		remove_filter( 'efs_enable_framer', '__return_true' );
 		$this->reset_plugin_detector();
 		parent::tearDown();
 	}
@@ -56,10 +57,7 @@ class AdminUITest extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'Etch Fusion Suite', $output );
 		$this->assertStringContainsString( 'Recent Logs', $output );
-		$this->assertStringContainsString( 'data-efs-accordion', $output );
-		$this->assertStringContainsString( 'data-efs-accordion-section', $output );
-		$this->assertStringContainsString( 'data-efs-accordion-header', $output );
-		$this->assertStringContainsString( 'data-efs-accordion-content', $output );
+		$this->assertStringContainsString( 'efs-card__section', $output );
 	}
 
 	public function test_dashboard_context_includes_required_keys(): void {
@@ -68,7 +66,7 @@ class AdminUITest extends WP_UnitTestCase {
 
 		$context = $controller->get_dashboard_context();
 
-		foreach ( array( 'is_bricks_site', 'is_etch_site', 'site_url', 'nonce', 'saved_templates', 'template_extractor_enabled', 'feature_flags_section_id' ) as $key ) {
+		foreach ( array( 'is_bricks_site', 'is_etch_site', 'site_url', 'nonce', 'saved_templates', 'framer_enabled' ) as $key ) {
 			$this->assertArrayHasKey( $key, $context );
 		}
 	}
@@ -76,17 +74,17 @@ class AdminUITest extends WP_UnitTestCase {
 	public function test_dashboard_context_reflects_feature_flag_state(): void {
 		/** @var EFS_Dashboard_Controller $controller */
 		$controller = $this->container->get( 'dashboard_controller' );
-		update_option( 'efs_feature_flags', array( 'template_extractor' => false ) );
 
 		$context = $controller->get_dashboard_context();
-		$this->assertFalse( $context['template_extractor_enabled'] );
+		$this->assertFalse( $context['framer_enabled'] );
 
-		update_option( 'efs_feature_flags', array( 'template_extractor' => true ) );
+		add_filter( 'efs_enable_framer', '__return_true' );
 		$context = $controller->get_dashboard_context();
-		$this->assertTrue( $context['template_extractor_enabled'] );
+		remove_filter( 'efs_enable_framer', '__return_true' );
+		$this->assertTrue( $context['framer_enabled'] );
 	}
 
-	public function test_bricks_dashboard_includes_accordion_structure(): void {
+	public function test_bricks_dashboard_renders_source_sections(): void {
 		$this->set_bricks_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -95,14 +93,13 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-efs-accordion', $output );
-		$this->assertGreaterThanOrEqual( 3, substr_count( $output, 'data-efs-accordion-section' ) );
-		foreach ( array( 'connection', 'migration_key', 'migration' ) as $section ) {
-			$this->assertStringContainsString( 'data-section="' . $section . '"', $output );
-		}
+		$this->assertStringContainsString( 'EFS Site Migration Setup', $output );
+		$this->assertStringContainsString( 'Paste Migration Key from Etch', $output );
+		$this->assertStringContainsString( 'Start Migration', $output );
+		$this->assertStringNotContainsString( 'data-efs-accordion', $output );
 	}
 
-	public function test_etch_dashboard_includes_accordion_structure(): void {
+	public function test_etch_dashboard_renders_target_sections(): void {
 		$this->set_etch_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -111,11 +108,11 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-efs-accordion', $output );
-		$this->assertGreaterThanOrEqual( 4, substr_count( $output, 'data-efs-accordion-section' ) );
-		foreach ( array( 'application_password', 'site_url', 'migration_key', 'feature_flags' ) as $section ) {
-			$this->assertStringContainsString( 'data-section="' . $section . '"', $output );
-		}
+		$this->assertStringContainsString( 'Etch Target Site Setup', $output );
+		$this->assertStringContainsString( 'Create an Application Password', $output );
+		$this->assertStringContainsString( 'Share This Site URL', $output );
+		$this->assertStringContainsString( 'Generate Migration Key', $output );
+		$this->assertStringNotContainsString( 'data-efs-accordion', $output );
 	}
 
 	public function test_migration_key_component_renders_in_bricks_context(): void {
@@ -156,7 +153,6 @@ class AdminUITest extends WP_UnitTestCase {
 
 	public function test_template_extractor_tab_shows_disabled_state_when_flag_off(): void {
 		$this->set_etch_environment();
-		update_option( 'efs_feature_flags', array( 'template_extractor' => false ) );
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
 
@@ -165,22 +161,23 @@ class AdminUITest extends WP_UnitTestCase {
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'data-efs-tab="templates"', $output );
-		$this->assertStringContainsString( 'is-disabled', $output );
+		$this->assertStringContainsString( 'aria-disabled="true"', $output );
 		$this->assertStringContainsString( 'data-efs-feature-disabled="true"', $output );
 	}
 
 	public function test_template_extractor_tab_enabled_when_flag_on(): void {
 		$this->set_etch_environment();
-		update_option( 'efs_feature_flags', array( 'template_extractor' => true ) );
+		add_filter( 'efs_enable_framer', '__return_true' );
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
 
 		ob_start();
 		$admin->render_dashboard();
 		$output = ob_get_clean();
+		remove_filter( 'efs_enable_framer', '__return_true' );
 
 		$this->assertStringContainsString( 'data-efs-tab="templates"', $output );
-		$this->assertStringNotContainsString( 'is-disabled', $output );
+		$this->assertStringNotContainsString( 'aria-disabled="true"', $output );
 	}
 
 	public function test_bricks_setup_section_renders_expected_fields(): void {
@@ -193,9 +190,9 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-section="connection"', $output );
-		$this->assertStringContainsString( 'data-section="migration_key"', $output );
-		$this->assertStringContainsString( 'data-section="migration"', $output );
+		$this->assertStringContainsString( 'EFS Site Migration Setup', $output );
+		$this->assertStringContainsString( 'id="efs-migration-key"', $output );
+		$this->assertStringContainsString( 'id="efs-migration-token"', $output );
 		$this->assertMatchesRegularExpression( '/name="target_url" value="https:\/\/target\.example"/', $output );
 		$this->assertMatchesRegularExpression( '/name="api_key" value="abc123"/', $output );
 	}
@@ -209,10 +206,12 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-section="application_password"', $output );
-		$this->assertStringContainsString( 'data-section="site_url"', $output );
-		$this->assertStringContainsString( 'data-section="migration_key"', $output );
-		$this->assertStringContainsString( 'data-section="feature_flags"', $output );
+		$this->assertStringContainsString( 'Etch Target Site Setup', $output );
+		$this->assertStringContainsString( 'Create an Application Password', $output );
+		$this->assertStringContainsString( 'Share This Site URL', $output );
+		$this->assertStringContainsString( 'Generate Migration Key', $output );
+		$this->assertStringContainsString( 'id="efs-site-url"', $output );
+		$this->assertStringContainsString( 'id="efs-generated-key"', $output );
 		$this->assertMatchesRegularExpression( '/name="target_url" value="https?:\/\/.+"/', $output );
 		$this->assertStringNotContainsString( 'name="api_key"', $output );
 	}
@@ -240,7 +239,7 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-section="migration"', $output );
+		$this->assertStringContainsString( 'id="efs-start-migration"', $output );
 		$this->assertStringContainsString( 'Start Migration', $output );
 		$this->assertStringContainsString( 'data-efs-cancel-migration', $output );
 	}
@@ -338,7 +337,6 @@ class AdminUITest extends WP_UnitTestCase {
 	 * Helper to toggle environment to Bricks site context.
 	 */
 	private function set_bricks_environment(): void {
-		update_option( 'efs_feature_flags', array( 'template_extractor' => true ) );
 		$this->mock_plugin_detector( true, false );
 	}
 
@@ -346,7 +344,6 @@ class AdminUITest extends WP_UnitTestCase {
 	 * Helper to toggle environment to Etch site context.
 	 */
 	private function set_etch_environment(): void {
-		update_option( 'efs_feature_flags', array( 'template_extractor' => true ) );
 		$this->mock_plugin_detector( false, true );
 	}
 

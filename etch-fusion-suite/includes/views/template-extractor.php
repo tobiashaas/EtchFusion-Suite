@@ -9,6 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! \efs_is_framer_enabled() ) {
+	echo '<div class="notice notice-warning efs-notice"><p>';
+	esc_html_e( 'Framer template extraction is disabled. Define the EFS_ENABLE_FRAMER constant or hook the efs_enable_framer filter to enable this feature.', 'etch-fusion-suite' );
+	echo '</p></div>';
+
+	return;
+}
+
 $etch_fusion_suite_template_context = array(
 	'nonce'           => isset( $nonce ) ? (string) $nonce : wp_create_nonce( 'efs_nonce' ),
 	'saved_templates' => isset( $saved_templates ) && is_array( $saved_templates ) ? $saved_templates : array(),

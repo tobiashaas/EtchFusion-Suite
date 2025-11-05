@@ -55,40 +55,25 @@ test.describe('Admin Dashboard Accessibility', () => {
     resetFeatureFlags();
   });
 
-  test('Accordion headers have correct ARIA attributes', async ({ browser }) => {
+  test('Source setup sections expose headings and landmarks', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const headers = page.locator('[data-efs-accordion-header]');
-      const count = await headers.count();
-      for (let i = 0; i < count; i += 1) {
-        const header = headers.nth(i);
-        await expect(header).toHaveAttribute('aria-expanded', /true|false/);
-        await expect(header).toHaveAttribute('aria-controls');
-        const controlsId = await header.getAttribute('aria-controls');
-        if (controlsId) {
-          await expect(page.locator(`#${controlsId}`)).toHaveAttribute('role', 'region');
-        }
-      }
+      const sourceCard = page.locator('.efs-card--source');
+      await expect(sourceCard).toHaveAttribute('role', /region|group/);
+      await expect(sourceCard.locator('h2')).toContainText(/EFS Site Migration Setup/i);
+      await expect(sourceCard.locator('.efs-card__section h3')).toHaveCount(2);
     } finally {
       await context.close();
     }
   });
 
-  test('Accordion content regions have correct ARIA attributes', async ({ browser }) => {
-    const { context, page } = await createBricksAdminContext(browser);
+  test('Target setup sections expose headings and controls', async ({ browser }) => {
+    const { context, page } = await createEtchAdminContext(browser);
     try {
-      const contents = page.locator('[data-efs-accordion-content]');
-      const count = await contents.count();
-      for (let i = 0; i < count; i += 1) {
-        const content = contents.nth(i);
-        await expect(content).toHaveAttribute('role', 'region');
-        await expect(content).toHaveAttribute('aria-labelledby');
-        const isExpanded = await content.evaluate((node) => !node.hasAttribute('hidden'));
-        const labelledBy = await content.getAttribute('aria-labelledby');
-        if (labelledBy) {
-          await expect(page.locator(`#${labelledBy}`)).toHaveAttribute('aria-expanded', String(isExpanded));
-        }
-      }
+      const targetCard = page.locator('.efs-card--target');
+      await expect(targetCard.locator('h2')).toContainText(/Etch Target Site Setup/i);
+      await expect(targetCard.locator('.efs-card__section')).toHaveCount(4);
+      await expect(page.locator('#efs-feature-flags form[data-efs-feature-flags]')).toBeVisible();
     } finally {
       await context.close();
     }
@@ -259,14 +244,13 @@ test.describe('Admin Dashboard Accessibility', () => {
     }
   });
 
-  test('Focus remains consistent when expanding accordion content', async ({ browser }) => {
+  test('Focus remains consistent when interacting with migration form', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const section = page.locator('[data-section="migration_key"]');
-      const header = section.locator('[data-efs-accordion-header]');
-      await header.focus();
-      await header.click();
-      await expect(header).toBeFocused();
+      const tokenField = page.locator('#efs-migration-token');
+      await tokenField.focus();
+      await page.keyboard.press('Tab');
+      await expect(page.locator('[data-efs-start-migration]')).toBeFocused();
     } finally {
       await context.close();
     }
@@ -302,9 +286,9 @@ test.describe('Admin Dashboard Accessibility', () => {
   test('Focus indicators have sufficient contrast', async ({ browser }) => {
     const { context, page } = await createBricksAdminContext(browser);
     try {
-      const header = page.locator('[data-section="connection"] [data-efs-accordion-header]');
-      await header.focus();
-      const outlineColor = await header.evaluate((node) =>
+      const button = page.locator('#efs-start-migration [data-efs-start-migration]');
+      await button.focus();
+      const outlineColor = await button.evaluate((node) =>
         window.getComputedStyle(node).outlineColor || window.getComputedStyle(node).boxShadow,
       );
       expect(outlineColor).not.toEqual('rgba(0, 0, 0, 0)');

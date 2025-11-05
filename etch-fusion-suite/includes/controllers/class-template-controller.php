@@ -46,6 +46,14 @@ class EFS_Template_Controller {
 	 * @return array|WP_Error
 	 */
 	public function extract_template( $source, $source_type = 'url' ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		return $this->extractor_service->extract_template( $source, $source_type );
 	}
 
@@ -57,6 +65,14 @@ class EFS_Template_Controller {
 	 * @return int|WP_Error
 	 */
 	public function save_template( array $template_data, $name ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		return $this->extractor_service->save_template( $template_data, $name );
 	}
 
@@ -68,6 +84,14 @@ class EFS_Template_Controller {
 	 * @return int|WP_Error Post ID on success.
 	 */
 	public function import_template( array $template_payload, $name = null ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		if ( empty( $template_payload['blocks'] ) || ! is_array( $template_payload['blocks'] ) ) {
 			return new WP_Error( 'b2e_template_import_invalid', __( 'Template payload is missing blocks data.', 'etch-fusion-suite' ) );
 		}
@@ -86,6 +110,14 @@ class EFS_Template_Controller {
 	 * @return array
 	 */
 	public function get_saved_templates() {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		return $this->extractor_service->get_saved_templates();
 	}
 
@@ -95,6 +127,14 @@ class EFS_Template_Controller {
 	 * @return array<string,mixed>
 	 */
 	public function get_extraction_progress() {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		return $this->extractor_service->get_extraction_progress();
 	}
 
@@ -105,6 +145,14 @@ class EFS_Template_Controller {
 	 * @return bool|WP_Error
 	 */
 	public function delete_template( $template_id ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$deleted = wp_delete_post( (int) $template_id, true );
 
 		if ( ! $deleted ) {
@@ -121,6 +169,14 @@ class EFS_Template_Controller {
 	 * @return array|WP_Error
 	 */
 	public function preview_template( $template_id ) {
+		if ( ! \efs_is_framer_enabled() ) {
+			return new WP_Error(
+				'framer_disabled',
+				__( 'Framer template extraction is not enabled.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		$post = get_post( (int) $template_id );
 
 		if ( ! $post || 'etch_template' !== $post->post_type ) {

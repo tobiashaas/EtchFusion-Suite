@@ -99,11 +99,11 @@ interface Migrator_Interface {
 	 * Performs the complete migration for this migrator.
 	 *
 	 * @param string $target_url Target site URL.
-	 * @param string $api_key    API key for target site authentication.
+	 * @param string $jwt_token  Migration JWT for authentication.
 	 *
 	 * @return bool|WP_Error True on success or WP_Error on failure.
 	 */
-	public function migrate( $target_url, $api_key );
+	public function migrate( $target_url, $jwt_token );
 
 	/**
 	 * Returns statistics about the data managed by this migrator.

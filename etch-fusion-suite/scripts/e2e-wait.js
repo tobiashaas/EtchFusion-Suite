@@ -45,6 +45,7 @@ async function main() {
   
   // Check if this is CI/CD environment
   const isCI = process.env.CI || process.env.GITHUB_ACTIONS;
+  const isFastMode = process.env.E2E_FAST_MODE;
   
   if (isCI) {
     console.log('🤖 Detected CI/CD environment - using fast timeout');
@@ -71,9 +72,16 @@ async function main() {
       
       return;
     } catch (error) {
-      console.log('⚠️ Docker check failed, continuing anyway (CI/CD mode)');
+      console.log('⚠️ Docker check failed, continuing anyway...');
       process.exit(0);
     }
+  }
+  
+  if (isFastMode) {
+    console.log('⚡ Fast mode enabled - skipping WordPress readiness check');
+    console.log('🎯 Assuming WordPress is ready for local testing');
+    process.exit(0);
+    return;
   }
   
   // Build wait-on arguments with dynamic ports and timeout (for local development)
