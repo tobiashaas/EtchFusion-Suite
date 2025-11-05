@@ -8,7 +8,7 @@
   "port": 8888,
   "testsPort": 8889,
   "lifecycleScripts": {
-    "afterStart": "node scripts/health-check.js --quiet && node scripts/setup-bricks.js"
+    "afterStart": "node scripts/setup-bricks.js"
   },
   "config": {
     "WP_DEBUG": true,

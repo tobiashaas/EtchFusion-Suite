@@ -20,8 +20,8 @@ $etch_fusion_suite_template_tab_disabled = ! $etch_fusion_suite_framer_enabled;
 				<li><?php esc_html_e( 'Install and activate Etch PageBuilder on the target WordPress site.', 'etch-fusion-suite' ); ?></li>
 			</ul>
 			<p>
-				<a class="button button-primary efs-button" href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">
-					<?php esc_html_e( 'Go to Plugins', 'etch-fusion-suite' ); ?>
+				<a class="button button-primary efs-button" href="<?php echo esc_url( admin_url( 'themes.php' ) ); ?>">
+					<?php esc_html_e( 'Go to Themes', 'etch-fusion-suite' ); ?>
 				</a>
 			</p>
 		</div>
