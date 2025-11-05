@@ -37,10 +37,12 @@ $etch_fusion_suite_template_tab_disabled = ! $etch_fusion_suite_framer_enabled;
 					<span class="efs-status-label"><?php esc_html_e( 'Etch PageBuilder', 'etch-fusion-suite' ); ?></span>
 					<span class="efs-status-value"><?php echo $is_etch_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></span>
 				</li>
+				<?php if ( $is_etch_site ) : ?>
 				<li>
 					<span class="efs-status-label"><?php esc_html_e( 'Site URL', 'etch-fusion-suite' ); ?></span>
 					<span class="efs-status-value"><?php echo esc_html( $site_url ); ?></span>
 				</li>
+				<?php endif; ?>
 			</ul>
 		</section>
 
