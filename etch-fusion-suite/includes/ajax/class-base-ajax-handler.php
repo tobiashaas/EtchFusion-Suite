@@ -571,16 +571,10 @@ abstract class EFS_Base_Ajax_Handler {
 			'http://localhost:8081'  => $default_internal,
 			'https://localhost:8888' => $this->get_docker_host_fallback( 8888 ),
 			'http://localhost:8888'  => $this->get_docker_host_fallback( 8888 ),
+			// wp-env tests container (port 8889) -> tests-wordpress
+			'https://localhost:8889' => 'http://tests-wordpress',
+			'http://localhost:8889'  => 'http://tests-wordpress',
 		);
-
-		if ( $etch_internal ) {
-			$replacements['https://localhost:8889'] = $etch_internal;
-			$replacements['http://localhost:8889']  = $etch_internal;
-		} else {
-			$fallback_8889                          = $this->get_docker_host_fallback( 8889 );
-			$replacements['https://localhost:8889'] = $fallback_8889;
-			$replacements['http://localhost:8889']  = $fallback_8889;
-		}
 
 		$normalized = strtr( $url, array_filter( $replacements ) );
 

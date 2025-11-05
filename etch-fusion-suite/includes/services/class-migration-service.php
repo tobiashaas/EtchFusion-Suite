@@ -101,6 +101,10 @@ class EFS_Migration_Service {
 				return new \WP_Error( 'missing_target_url', __( 'Migration key does not contain a target URL.', 'etch-fusion-suite' ) );
 			}
 
+			// Convert localhost URLs to Docker internal URLs for wp-env
+			$target = str_replace( 'http://localhost:8889', 'http://tests-wordpress', $target );
+			$target = str_replace( 'https://localhost:8889', 'http://tests-wordpress', $target );
+
 			$expires = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
 
 			if ( ! $expires || time() > $expires ) {

@@ -104,6 +104,13 @@ class EFS_Plugin_Detector {
 
 		// Check for Bricks global classes
 		$bricks_classes = get_option( 'bricks_global_classes', array() );
+		// Ensure it's an array (sometimes it's a serialized string)
+		if ( is_string( $bricks_classes ) ) {
+			$bricks_classes = maybe_unserialize( $bricks_classes );
+		}
+		if ( ! is_array( $bricks_classes ) ) {
+			$bricks_classes = array();
+		}
 		if ( empty( $bricks_classes ) ) {
 			$validation_results['warnings'][] = 'No Bricks global classes found';
 		} else {
