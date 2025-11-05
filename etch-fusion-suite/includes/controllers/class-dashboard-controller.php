@@ -50,14 +50,14 @@ class EFS_Dashboard_Controller {
 		$env = $this->detect_environment();
 
 		$progress_context = $this->get_progress();
-		
+
 		// Make framer detection more robust
 		try {
 			$framer_enabled = \efs_is_framer_enabled();
 		} catch ( \Exception $e ) {
 			$framer_enabled = false;
 		}
-		
+
 		$saved_templates = array();
 
 		if ( $env['is_etch_site'] && $framer_enabled ) {
