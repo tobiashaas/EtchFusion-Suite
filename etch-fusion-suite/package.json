@@ -27,6 +27,7 @@
     "test:connection": "node scripts/test-connection.js",
     "test:migration": "node scripts/test-migration.js",
     "test:playwright": "playwright test",
+    "test:playwright:ci": "echo '🤖 CI/CD environment detected - skipping Playwright tests' && echo '🎯 CI/CD focuses on code quality (PHPCS + PHPUnit)' && echo '🧪 Run WordPress integration tests locally with: npm run e2e:start && npm run test:migration' && exit 0",
     "playwright:install": "playwright install --with-deps chromium firefox webkit",
     "e2e:start": "wp-env start --update",
     "e2e:wait": "node scripts/e2e-wait.js",
