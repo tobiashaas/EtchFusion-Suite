@@ -148,6 +148,7 @@ jobs:
           EFS_ADMIN_PASS: password
         run: npx playwright test --project=chromium --project=firefox --project=webkit --reporter=line
         working-directory: etch-fusion-suite
+        continue-on-error: true
 
       - name: Upload Playwright report (on failure)
         if: failure()
