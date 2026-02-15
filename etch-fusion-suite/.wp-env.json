@@ -1,35 +1,39 @@
 {
-  "core": "https://wordpress.org/wordpress-6.8.zip",
+  "core": "https://wordpress.org/latest.zip",
   "phpVersion": "8.1",
   "plugins": [
     "."
   ],
-  "themes": [],
   "port": 8888,
   "testsPort": 8889,
-  "lifecycleScripts": {
-    "afterStart": "node scripts/setup-bricks.js"
-  },
   "config": {
     "WP_DEBUG": true,
     "WP_DEBUG_LOG": true,
     "WP_DEBUG_DISPLAY": false,
     "SCRIPT_DEBUG": true,
-    "SAVEQUERIES": true
+    "SAVEQUERIES": true,
+    "WP_MEMORY_LIMIT": "512M",
+    "WP_MAX_MEMORY_LIMIT": "512M"
   },
   "env": {
     "development": {
+      "plugins": [
+        ".",
+        "https://downloads.wordpress.org/plugin/wpvivid-backuprestore.latest-stable.zip"
+      ],
       "config": {
         "WP_ENVIRONMENT_TYPE": "local",
         "SCRIPT_DEBUG": true,
-        "SAVEQUERIES": true
+        "SAVEQUERIES": true,
+        "WP_MEMORY_LIMIT": "512M"
       }
     },
     "tests": {
       "config": {
         "WP_ENVIRONMENT_TYPE": "test",
         "SCRIPT_DEBUG": true,
-        "SAVEQUERIES": true
+        "SAVEQUERIES": true,
+        "WP_MEMORY_LIMIT": "512M"
       }
     }
   }

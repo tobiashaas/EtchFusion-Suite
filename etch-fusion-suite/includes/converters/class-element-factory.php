@@ -14,10 +14,19 @@ use Bricks2Etch\Converters\Elements\EFS_Element_Container;
 use Bricks2Etch\Converters\Elements\EFS_Element_Section;
 use Bricks2Etch\Converters\Elements\EFS_Element_Heading;
 use Bricks2Etch\Converters\Elements\EFS_Element_Paragraph;
+use Bricks2Etch\Converters\Elements\EFS_Element_Text;
 use Bricks2Etch\Converters\Elements\EFS_Element_Image;
 use Bricks2Etch\Converters\Elements\EFS_Element_Div;
 use Bricks2Etch\Converters\Elements\EFS_Button_Converter;
 use Bricks2Etch\Converters\Elements\EFS_Icon_Converter;
+use Bricks2Etch\Converters\Elements\EFS_Element_Component;
+use Bricks2Etch\Converters\Elements\EFS_Element_Svg;
+use Bricks2Etch\Converters\Elements\EFS_Element_Video;
+use Bricks2Etch\Converters\Elements\EFS_Element_Code;
+use Bricks2Etch\Converters\Elements\EFS_Element_Html;
+use Bricks2Etch\Converters\Elements\EFS_Element_Notes;
+use Bricks2Etch\Converters\Elements\EFS_Element_Shortcode;
+use Bricks2Etch\Converters\Elements\EFS_Element_TextLink;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -33,12 +42,20 @@ class EFS_Element_Factory {
 		'section'    => EFS_Element_Section::class,
 		'heading'    => EFS_Element_Heading::class,
 		'text-basic' => EFS_Element_Paragraph::class,
-		'text'       => EFS_Element_Paragraph::class,
+		'text'       => EFS_Element_Text::class,
 		'image'      => EFS_Element_Image::class,
 		'div'        => EFS_Element_Div::class,
 		'block'      => EFS_Element_Div::class,
 		'button'     => EFS_Button_Converter::class,
 		'icon'       => EFS_Icon_Converter::class,
+		'template'   => EFS_Element_Component::class,
+		'svg'        => EFS_Element_Svg::class,
+		'video'      => EFS_Element_Video::class,
+		'code'       => EFS_Element_Code::class,
+		'fr-notes'   => EFS_Element_Notes::class,
+		'html'       => EFS_Element_Html::class,
+		'shortcode'  => EFS_Element_Shortcode::class,
+		'text-link'  => EFS_Element_TextLink::class,
 	);
 
 	/**
@@ -77,8 +94,6 @@ class EFS_Element_Factory {
 	public function get_converter( $element_type ) {
 		// Elements to skip (not shown in frontend or not supported)
 		$skip_elements = array(
-			'fr-notes',      // Bricks Builder notes (not frontend)
-			'code',          // Code blocks (TODO)
 			'form',          // Forms (TODO)
 			'map',           // Maps (TODO)
 		);
@@ -110,9 +125,10 @@ class EFS_Element_Factory {
 	 *
 	 * @param array $element Bricks element
 	 * @param array $children Child elements (already converted HTML)
+	 * @param array $context Optional. Conversion context (e.g. element_map, convert_callback for slotChildren).
 	 * @return string|null Gutenberg block HTML
 	 */
-	public function convert_element( $element, $children = array() ) {
+	public function convert_element( $element, $children = array(), $context = array() ) {
 		$element_type = $element['name'] ?? '';
 
 		if ( empty( $element_type ) ) {
@@ -129,6 +145,6 @@ class EFS_Element_Factory {
 			return null;
 		}
 
-		return $converter->convert( $element, $children );
+		return $converter->convert( $element, $children, $context );
 	}
 }

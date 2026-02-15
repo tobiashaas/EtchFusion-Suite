@@ -30,6 +30,7 @@ class EFS_Migrator_Discovery {
 
 		$builtin_keys = array(
 			'cpt'           => 'cpt_migrator',
+			'component'     => 'component_migrator',
 			'acf'           => 'acf_migrator',
 			'metabox'       => 'metabox_migrator',
 			'custom_fields' => 'custom_fields_migrator',

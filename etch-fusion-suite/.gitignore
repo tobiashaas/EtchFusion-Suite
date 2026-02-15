@@ -9,3 +9,19 @@ npm-debug.log
 logs/
 logs-*.txt
 health-report-*.json
+
+# Commercial Plugins (not redistributable)
+local-plugins/*.zip
+!local-plugins/README.md
+!local-plugins/.gitkeep
+
+# Backups (contain sensitive data)
+local-backups/**
+!local-backups/
+!local-backups/README.md
+!local-backups/.gitkeep
+
+# License Keys
+.env
+.env.local
+.env.*.local

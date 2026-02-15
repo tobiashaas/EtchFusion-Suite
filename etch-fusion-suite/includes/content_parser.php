@@ -126,8 +126,8 @@ class EFS_Content_Parser {
 				return $this->process_container_element( $element, $post_id );
 
 			case 'block':
-				// Bricks block element (brxe-block) - treat as container
-				return $this->process_container_element( $element, $post_id );
+				// Bricks block element (brxe-block) behaves like a regular div wrapper.
+				return $this->process_div_element( $element, $post_id );
 
 			case 'div':
 				return $this->process_div_element( $element, $post_id );
@@ -220,19 +220,39 @@ class EFS_Content_Parser {
 	 * Process div element
 	 */
 	private function process_div_element( $element, $post_id ) {
-		$settings            = get_option( 'efs_settings', array() );
-		$convert_div_to_flex = $settings['convert_div_to_flex'] ?? true;
+		$tag = $element['settings']['tag'] ?? 'div';
 
-		if ( $convert_div_to_flex ) {
-			$element['etch_type'] = 'flex-div';
+		$semantic_tags = array(
+			'ul',
+			'ol',
+			'li',
+			'span',
+			'figure',
+			'figcaption',
+			'article',
+			'aside',
+			'nav',
+			'header',
+			'footer',
+			'main',
+			'p',
+			'blockquote',
+			'a',
+		);
+
+		if ( in_array( $tag, $semantic_tags, true ) ) {
+			$element['etch_type'] = $tag;
 			$element['etch_data'] = array(
-				'data-etch-element' => 'flex-div',
-				'class'             => $this->extract_css_classes( $element['settings'] ),
+				'tag'   => $tag,
+				'class' => $this->extract_css_classes( $element['settings'] ),
 			);
-		} else {
-			// Skip div elements if conversion is disabled
-			$element['etch_type'] = 'skip';
+			return $element;
 		}
+
+		$element['etch_type'] = 'div';
+		$element['etch_data'] = array(
+			'class' => $this->extract_css_classes( $element['settings'] ),
+		);
 
 		return $element;
 	}

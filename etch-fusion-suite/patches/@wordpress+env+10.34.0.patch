@@ -1,0 +1,52 @@
+diff --git a/node_modules/@wordpress/env/lib/build-docker-compose-config.js b/node_modules/@wordpress/env/lib/build-docker-compose-config.js
+index a1a4f68..fc6ddac 100644
+--- a/node_modules/@wordpress/env/lib/build-docker-compose-config.js
++++ b/node_modules/@wordpress/env/lib/build-docker-compose-config.js
+@@ -184,6 +184,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 	return {
+ 		services: {
+ 			mysql: {
++				container_name: 'bricks-mysql',
+ 				image: 'mariadb:lts',
+ 				ports: [ developmentMysqlPorts ],
+ 				environment: {
+@@ -195,6 +196,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 				volumes: [ 'mysql:/var/lib/mysql' ],
+ 			},
+ 			'tests-mysql': {
++				container_name: 'etch-mysql',
+ 				image: 'mariadb:lts',
+ 				ports: [ testsMysqlPorts ],
+ 				environment: {
+@@ -206,6 +208,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 				volumes: [ 'mysql-test:/var/lib/mysql' ],
+ 			},
+ 			wordpress: {
++				container_name: 'bricks',
+ 				depends_on: [ 'mysql' ],
+ 				build: {
+ 					context: '.',
+@@ -224,6 +227,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 				extra_hosts: [ 'host.docker.internal:host-gateway' ],
+ 			},
+ 			'tests-wordpress': {
++				container_name: 'etch',
+ 				depends_on: [ 'tests-mysql' ],
+ 				build: {
+ 					context: '.',
+@@ -242,6 +246,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 				extra_hosts: [ 'host.docker.internal:host-gateway' ],
+ 			},
+ 			cli: {
++				container_name: 'bricks-cli',
+ 				depends_on: [ 'wordpress' ],
+ 				build: {
+ 					context: '.',
+@@ -258,6 +263,7 @@ module.exports = function buildDockerComposeConfig( config ) {
+ 				extra_hosts: [ 'host.docker.internal:host-gateway' ],
+ 			},
+ 			'tests-cli': {
++				container_name: 'etch-cli',
+ 				depends_on: [ 'tests-wordpress' ],
+ 				build: {
+ 					context: '.',

@@ -2,7 +2,7 @@
 /**
  * Button Element Converter
  *
- * Converts Bricks button elements to Etch link elements
+ * Converts Bricks button elements to Etch link element blocks.
  *
  * @package Bricks_Etch_Migration
  * @subpackage Converters\Elements
@@ -22,77 +22,50 @@ class EFS_Button_Converter extends EFS_Base_Element {
 	protected $element_type = 'button';
 
 	/**
-	 * Convert Bricks button to Etch link
+	 * Convert Bricks button to Etch link.
 	 */
-	public function convert( $element, $children = array() ) {
+	public function convert( $element, $children = array(), $context = array() ) {
 		$settings = $element['settings'] ?? array();
-
-		// Extract button data
-		$text = $settings['text'] ?? '';
+		$text     = $settings['text'] ?? '';
+		$text     = is_string( $text ) ? $text : '';
 
 		// Extract link URL - handle both array and string formats
-		$link = '#';
+		$link    = '#';
+		$new_tab = false;
 		if ( isset( $settings['link'] ) ) {
 			if ( is_array( $settings['link'] ) ) {
-				$link = $settings['link']['url'] ?? '#';
+				$link    = $settings['link']['url'] ?? '#';
+				$new_tab = ! empty( $settings['link']['newTab'] );
 			} else {
 				$link = $settings['link'];
 			}
 		}
 
-		$style = $settings['style'] ?? 'primary'; // primary, secondary, outline, etc.
-
-		// Get style IDs
-		$style_ids = $this->get_style_ids( $element );
-
-		// Get CSS classes
-		$css_classes = $this->get_css_classes( $style_ids );
-
-		// Map .bricks-button to .btn--primary (or other style)
+		$style        = isset( $settings['style'] ) && is_string( $settings['style'] ) ? $settings['style'] : 'primary';
+		$style_ids    = $this->get_style_ids( $element );
+		$css_classes  = $this->get_css_classes( $style_ids );
 		$button_class = $this->map_button_class( $style, $css_classes );
+		$label        = $this->get_label( $element );
 
-		// Generate unique ref for nested link
-		$link_ref = $this->generate_ref();
-
-		// Build Etch metadata
-		$etch_data = array(
-			'removeWrapper' => true,
-			'block'         => array(
-				'type' => 'html',
-				'tag'  => 'p',
-			),
-			'origin'        => 'etch',
-			'nestedData'    => array(
-				$link_ref => array(
-					'origin'     => 'etch',
-					'name'       => $text,
-					'styles'     => $style_ids,
-					'attributes' => array(
-						'href'  => $link,
-						'class' => $button_class,
-					),
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => 'a',
-					),
-				),
-			),
+		$etch_attributes = array(
+			'href' => (string) $link,
 		);
 
-		// Build block attributes
-		$attrs = array(
-			'metadata' => array(
-				'etchData' => $etch_data,
-			),
+		if ( '' !== trim( $button_class ) ) {
+			$etch_attributes['class'] = $button_class;
+		}
+
+		if ( $new_tab ) {
+			$etch_attributes['target'] = '_blank';
+			$etch_attributes['rel']    = 'noopener noreferrer';
+		}
+
+		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, 'a' );
+
+		return $this->generate_etch_element_block(
+			$attrs,
+			$this->generate_etch_text_block( wp_kses_post( $text ) )
 		);
-
-		// Convert to JSON
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build block HTML (return as string, not array!)
-		return '<!-- wp:paragraph ' . $attrs_json . ' -->' . "\n" .
-				'<p><a data-etch-ref="' . $link_ref . '">' . esc_html( $text ) . '</a></p>' . "\n" .
-				'<!-- /wp:paragraph -->';
 	}
 
 	/**
@@ -121,12 +94,5 @@ class EFS_Button_Converter extends EFS_Base_Element {
 		}
 
 		return $button_class;
-	}
-
-	/**
-	 * Generate unique reference ID
-	 */
-	private function generate_ref() {
-		return substr( md5( uniqid( rand(), true ) ), 0, 7 );
 	}
 }

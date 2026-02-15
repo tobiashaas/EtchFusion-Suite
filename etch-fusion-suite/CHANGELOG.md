@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Deprecated `etch-flex-div-style` CSS style (no longer generated)
+
+### Changed
+- Migrated all element converters to Etch v1.1+ flat schema
+- `.brxe-block` class now migrates as normal global class with flex CSS
+
 ### 🐛 Bug Fixes
 - Fixed backup metadata version retrieval mis-mapping environments in `scripts/backup-db.js` - **2025-11-04 21:22**
   - Added `normalizeEnvironmentToTarget()` function for consistent environment mapping
@@ -26,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling and retry logic across all scripts
 
 ### 🔧 Technical Changes
+- Refactored structural Etch block generation to v1.1+ flat attrs (`metadata.name`, `tag`, `attributes`, `styles`) for base/container/section/div paths.
+- Updated structural serialization from `wp:group` + wrapper HTML to comment-only `wp:etch/element` blocks in converters and generator structural path.
+- Migrated generator fallback serializers (including `iframe`/semantic wrappers) away from nested `metadata.etchData` to flat comment-only Etch block output.
 - Enhanced `.wp-env.json` with per-environment configuration and lifecycle scripts
 - Added `.wp-env.override.json.example` for local customizations
 - Updated `package.json` with 20+ new npm scripts for development tasks

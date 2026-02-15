@@ -167,6 +167,18 @@ class EFS_CSS_Converter {
 		$this->log_debug_info( 'CSS Converter: Starting conversion' );
 
 		$bricks_classes = get_option( 'bricks_global_classes', array() );
+		if ( is_string( $bricks_classes ) ) {
+			$decoded = json_decode( $bricks_classes, true );
+			if ( is_array( $decoded ) ) {
+				$bricks_classes = $decoded;
+			} else {
+				$maybe          = maybe_unserialize( $bricks_classes );
+				$bricks_classes = is_array( $maybe ) ? $maybe : array();
+			}
+		} elseif ( ! is_array( $bricks_classes ) ) {
+			$bricks_classes = array();
+		}
+
 		$this->log_debug_info(
 			'CSS Converter: Loaded Bricks classes',
 			array(
@@ -190,6 +202,14 @@ class EFS_CSS_Converter {
 
 		// Collect custom CSS from global classes (skip excluded classes!)
 		foreach ( $bricks_classes as $class ) {
+			if ( ! is_array( $class ) ) {
+				continue;
+			}
+
+			if ( empty( $class['id'] ) && empty( $class['name'] ) ) {
+				continue;
+			}
+
 			// Skip excluded classes
 			if ( $this->should_exclude_class( $class ) ) {
 				continue;
@@ -198,16 +218,17 @@ class EFS_CSS_Converter {
 			$class_name = ! empty( $class['name'] ) ? $class['name'] : $class['id'];
 			$class_name = preg_replace( '/^acss_import_/', '', $class_name );
 			$bricks_id  = $class['id'];
+			$settings   = isset( $class['settings'] ) && is_array( $class['settings'] ) ? $class['settings'] : array();
 
 			// Collect main custom CSS
-			if ( ! empty( $class['settings']['_cssCustom'] ) ) {
-				$custom_css             = str_replace( '%root%', '.' . $class_name, $class['settings']['_cssCustom'] );
+			if ( ! empty( $settings['_cssCustom'] ) ) {
+				$custom_css             = str_replace( '%root%', '.' . $class_name, $settings['_cssCustom'] );
 				$custom_css_stylesheet .= "\n" . $custom_css . "\n";
 			}
 
 			// Collect breakpoint-specific custom CSS (store separately!)
 			// Bricks stores these as _cssCustom:breakpoint_name
-			foreach ( $class['settings'] as $key => $value ) {
+			foreach ( $settings as $key => $value ) {
 				if ( 0 === strpos( $key, '_cssCustom:' ) && ! empty( $value ) ) {
 					$breakpoint = str_replace( '_cssCustom:', '', $key );
 
@@ -1371,13 +1392,6 @@ class EFS_CSS_Converter {
 				'selector'   => ':where([data-etch-element="container"])',
 				'collection' => 'default',
 				'css'        => 'inline-size: 100%; display: flex; flex-direction: column; max-width: var(--content-width, 1366px); align-self: center;',
-				'readonly'   => true,
-			),
-			'etch-flex-div-style'  => array(
-				'type'       => 'element',
-				'selector'   => ':where([data-etch-element="flex-div"])',
-				'collection' => 'default',
-				'css'        => 'inline-size: 100%; display: flex; flex-direction: column;',
 				'readonly'   => true,
 			),
 			'etch-iframe-style'    => array(

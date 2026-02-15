@@ -61,8 +61,7 @@ class EFS_Content_Service {
 
 		$all_posts = array_merge(
 			is_array( $bricks_posts ) ? $bricks_posts : array(),
-			is_array( $gutenberg_posts ) ? $gutenberg_posts : array(),
-			is_array( $media ) ? $media : array()
+			is_array( $gutenberg_posts ) ? $gutenberg_posts : array()
 		);
 
 		if ( empty( $all_posts ) ) {

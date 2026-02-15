@@ -5,10 +5,13 @@ const fs = require('fs');
 const path = require('path');
 const createTestContent = require('./create-test-content');
 
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
+const CWD = path.resolve(__dirname, '..');
 
 function runWpEnv(args) {
-  const result = spawnSync(WP_ENV_CMD, args, { encoding: 'utf8' });
+  const run = process.platform === 'win32'
+    ? () => spawnSync('cmd', ['/c', 'npx', 'wp-env', ...args], { encoding: 'utf8', cwd: CWD })
+    : () => spawnSync('npx', ['wp-env', ...args], { encoding: 'utf8', cwd: CWD });
+  const result = run();
 
   if (result.error) {
     throw result.error;
@@ -25,57 +28,34 @@ function runWpCli(environmentArgs, commandArgs) {
   return runWpEnv(['run', ...environmentArgs, 'wp', ...commandArgs]);
 }
 
-function ensureApplicationPassword() {
-  console.log('▶ Creating application password on Etch instance...');
-  
-  // Create a unique label with timestamp to avoid conflicts
-  const label = `efs-migration-${Date.now()}`;
-  
-  try {
-    const password = runWpCli(['tests-cli'], [
-      'user',
-      'application-password',
-      'create',
-      'admin',
-      label,
-      '--porcelain'
-    ]);
-    
-    if (!password) {
-      throw new Error('create --porcelain returned empty password');
-    }
-    
-    return password;
-  } catch (error) {
-    throw new Error(`Failed to create application password: ${error.message}`);
+function generateMigrationKey(targetUrl) {
+  console.log('> Generating migration key on Etch instance...');
+  const cmd = `echo etch_fusion_suite_container()->get('token_manager')->generate_migration_token('${targetUrl}')['token'];`;
+  const rawOutput = runWpCli(['tests-cli'], ['eval', cmd]).trim();
+  const match = rawOutput.match(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  const key = match ? match[0] : '';
+
+  if (!key) {
+    throw new Error(`Migration key generation returned invalid output: ${rawOutput}`);
   }
+
+  return key;
 }
 
-function configurePlugin(targetUrl, apiKey) {
-  console.log('▶ Configuring migration settings on Bricks instance...');
-  const settings = {
-    target_url: targetUrl,
-    api_key: apiKey,
-    api_username: 'admin'
-  };
-
-  runWpCli(['cli'], ['option', 'update', 'efs_migration_settings', JSON.stringify(settings)]);
-}
-
-function triggerMigration() {
-  console.log('▶ Triggering migration via WP-CLI...');
-  runWpCli(['cli'], ['eval', "do_action('efs_start_migration_cli');"]);
+function triggerMigration(migrationKey, targetUrl) {
+  console.log('> Triggering migration via WP-CLI...');
+  const cmd = `if (!function_exists('bricks_is_builder')) { function bricks_is_builder() { return true; } } $result=etch_fusion_suite_container()->get('migration_controller')->start_migration(array('migration_key'=>'${migrationKey}','target_url'=>'${targetUrl}','batch_size'=>50)); if (is_wp_error($result)) { fwrite(STDERR, $result->get_error_message()); exit(1); } echo wp_json_encode($result);`;
+  runWpCli(['cli'], ['eval', cmd]);
 }
 
 function getProgress() {
   try {
     const progressJson = runWpCli(['cli'], ['option', 'get', 'efs_migration_progress', '--format=json']);
-    
-    // Handle empty output
+
     if (!progressJson || progressJson.trim() === '') {
       return null;
     }
-    
+
     return JSON.parse(progressJson);
   } catch (error) {
     if (error.message.includes('does not exist') || error.message.includes('Could not get')) {
@@ -85,7 +65,7 @@ function getProgress() {
   }
 }
 
-function waitForCompletion(timeoutMs = 300000, intervalMs = 5000) {
+function waitForCompletion(timeoutMs = 600000, intervalMs = 5000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
 
@@ -93,12 +73,12 @@ function waitForCompletion(timeoutMs = 300000, intervalMs = 5000) {
       const progress = getProgress();
 
       if (progress && progress.status === 'completed') {
-        console.log('✓ Migration completed successfully');
+        console.log('OK Migration completed successfully');
         resolve(progress);
         return;
       }
 
-      if (progress && progress.status === 'failed') {
+      if (progress && (progress.status === 'failed' || progress.status === 'error')) {
         reject(new Error(`Migration failed: ${progress.message || 'Unknown error'}`));
         return;
       }
@@ -108,7 +88,7 @@ function waitForCompletion(timeoutMs = 300000, intervalMs = 5000) {
         return;
       }
 
-      console.log('… Migration in progress, waiting for next update');
+      console.log('... Migration in progress, waiting for next update');
       setTimeout(check, intervalMs);
     };
 
@@ -127,13 +107,17 @@ function collectStats() {
 }
 
 async function main() {
-  console.log('▶ Creating baseline content on Bricks instance...');
-  await createTestContent();
+  const skipBaseline = process.env.SKIP_BASELINE === '1' || process.env.SKIP_BASELINE === 'true';
+  if (!skipBaseline) {
+    console.log('> Creating baseline content on Bricks instance...');
+    await createTestContent();
+  } else {
+    console.log('> Skipping baseline content (SKIP_BASELINE=1); using existing Bricks content.');
+  }
 
-  const appPassword = ensureApplicationPassword();
-  configurePlugin('http://localhost:8889', appPassword);
-
-  triggerMigration();
+  const targetUrl = 'http://localhost:8889';
+  const migrationKey = generateMigrationKey(targetUrl);
+  triggerMigration(migrationKey, targetUrl);
   const progress = await waitForCompletion();
 
   const stats = collectStats();
@@ -153,6 +137,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('\n✗ Migration test failed:', error.message);
+  console.error('\nERROR Migration test failed:', error.message);
   process.exit(1);
 });

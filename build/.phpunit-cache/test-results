@@ -1,0 +1,1 @@
+{"version":2,"defects":[],"times":{"EtchFusionSuite\\Tests\\BaseAjaxHandlerTest::test_verify_request_rejects_invalid_nonce":0.004,"EtchFusionSuite\\Tests\\BaseAjaxHandlerTest::test_verify_request_rejects_when_capability_missing":0,"EtchFusionSuite\\Tests\\BaseAjaxHandlerTest::test_verify_request_passes_when_nonce_and_capability_valid":0}}

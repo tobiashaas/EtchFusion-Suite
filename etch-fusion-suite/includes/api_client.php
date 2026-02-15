@@ -36,11 +36,12 @@ class EFS_API_Client {
 	 * @param string      $endpoint  REST endpoint path (without prefix).
 	 * @param string      $method    HTTP verb.
 	 * @param array|null  $data      Optional payload.
+	 * @param string      $api_base  Optional. API namespace (default 'efs/v1'). Use 'etch/v1' for Etch component API.
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function send_authorized_request( $url, $jwt_token, $endpoint, $method = 'GET', $data = null ) {
-		return $this->send_request( $url, $jwt_token, $endpoint, $method, $data );
+	public function send_authorized_request( $url, $jwt_token, $endpoint, $method = 'GET', $data = null, $api_base = 'efs/v1' ) {
+		return $this->send_request( $url, $jwt_token, $endpoint, $method, $data, $api_base );
 	}
 
 	/**
@@ -78,10 +79,23 @@ class EFS_API_Client {
 	}
 
 	/**
-	 * Send request to target site
+	 * Send request to target site.
+	 *
+	 * @param string      $url       Target site base URL.
+	 * @param string|null $jwt_token Migration token.
+	 * @param string      $endpoint  Endpoint path (e.g. '/components').
+	 * @param string      $method    HTTP method.
+	 * @param array|null  $data      Optional payload.
+	 * @param string      $api_base  API namespace (default 'efs/v1'). Use 'etch/v1' for Etch component API.
+	 *
+	 * @return array|\WP_Error
 	 */
-	private function send_request( $url, $jwt_token, $endpoint, $method = 'GET', $data = null ) {
-		$full_url = rtrim( $url, '/' ) . '/wp-json/efs/v1' . $endpoint;
+	private function send_request( $url, $jwt_token, $endpoint, $method = 'GET', $data = null, $api_base = 'efs/v1' ) {
+		if ( function_exists( 'efs_convert_to_internal_url' ) ) {
+			$url = efs_convert_to_internal_url( $url );
+		}
+		$base     = rtrim( $url, '/' );
+		$full_url = $base . '/wp-json/' . $api_base . $endpoint;
 
 		$args = array(
 			'method'  => $method,
@@ -93,6 +107,9 @@ class EFS_API_Client {
 
 		if ( ! empty( $jwt_token ) ) {
 			$args['headers']['Authorization'] = 'Bearer ' . $jwt_token;
+			// Authorization can be dropped in some server-to-server WordPress setups.
+			// Mirror the token in a custom header as a fallback transport.
+			$args['headers']['X-EFS-Migration-Key'] = $jwt_token;
 		}
 
 		if ( $data && in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) {
@@ -116,11 +133,27 @@ class EFS_API_Client {
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
 
+		// On 404, retry with ?rest_route= for targets with plain permalinks.
+		if ( 404 === (int) $response_code && false !== strpos( $full_url, '/wp-json/' ) ) {
+			$rest_route_url = $base . '/?rest_route=/' . $api_base . $endpoint;
+			$retry_response = wp_remote_request( $rest_route_url, $args );
+			if ( ! is_wp_error( $retry_response ) ) {
+				$retry_code = wp_remote_retrieve_response_code( $retry_response );
+				if ( $retry_code < 400 ) {
+					$response      = $retry_response;
+					$response_code = $retry_code;
+					$response_body = wp_remote_retrieve_body( $retry_response );
+				}
+			}
+		}
+
 		if ( $response_code >= 400 ) {
 			$decoded_error = json_decode( $response_body, true );
 			$error_message = 'API request failed with code: ' . $response_code;
 
-			if ( isset( $decoded_error['message'] ) ) {
+			if ( 404 === (int) $response_code ) {
+				$error_message .= ' - ' . __( 'Target site returned "Not Found". On the target (Bricks) site: ensure Etch Fusion Suite is active and Permalinks are not set to "Plain" (e.g. use "Post name").', 'etch-fusion-suite' );
+			} elseif ( isset( $decoded_error['message'] ) ) {
 				$error_message .= ' - ' . $decoded_error['message'];
 			} elseif ( isset( $decoded_error['data'] ) && is_string( $decoded_error['data'] ) ) {
 				$error_message .= ' - ' . $decoded_error['data'];

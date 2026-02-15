@@ -59,36 +59,9 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
-		$html_parts = array();
-
-		// Build element map for hierarchy
-		$element_map = array();
-		foreach ( $bricks_elements as $element ) {
-			if ( isset( $element['id'] ) ) {
-				$element_map[ $element['id'] ] = $element;
-			}
-		}
-
-		// Find root elements (parent = 0 or '0')
-		$root_elements = array();
-		foreach ( $bricks_elements as $element ) {
-			$parent = $element['parent'] ?? '0';
-			if ( 0 === $parent || '0' === $parent || '' === $parent ) {
-				$root_elements[] = $element;
-			}
-		}
-
-		// Generate HTML for each top-level element
-		$timestamp = wp_date( 'Y-m-d H:i:s' ); // Get current timestamp using site settings
-		$html      = $timestamp . "\n"; // Add timestamp at the beginning
-		foreach ( $root_elements as $element ) {
-			$block_html = $this->convert_single_bricks_element( $element, $element_map );
-			if ( ! empty( $block_html ) ) {
-				$html_parts[] = $block_html;
-			}
-		}
-
-		return implode( "\n\n", $html_parts );
+		// Keep legacy API stable, but route serialization through the modern
+		// element-factory path to avoid generating deprecated nested etchData.
+		return $this->generate_gutenberg_blocks( $bricks_elements );
 	}
 
 	/**
@@ -117,8 +90,8 @@ class EFS_Gutenberg_Generator {
 				return $this->convert_etch_container( $element, $children, $element_map );
 
 			case 'block':
-				// brxe-block becomes flex-div
-				return $this->convert_etch_flex_div( $element, $children, $element_map );
+				// brxe-block behaves like a regular div wrapper.
+				return $this->convert_etch_simple_div( $element, $children, $element_map );
 
 			case 'div':
 				// Regular div stays as div
@@ -158,12 +131,10 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Convert Bricks Section to Etch Section (wp:group with proper etchData)
+	 * Convert Bricks Section to Etch Section (flat Etch v1.1+ attrs).
 	 */
 	private function convert_etch_section( $element, $children, $element_map ) {
-		$classes  = $this->get_element_classes( $element );
-		$settings = $element['settings'] ?? array();
-		$label    = $element['label'] ?? '';
+		$label = $element['label'] ?? '';
 
 		// Convert children
 		$children_html = '';
@@ -180,10 +151,10 @@ class EFS_Gutenberg_Generator {
 		// Add default section style
 		array_unshift( $style_ids, 'etch-section-style' );
 
-		// Get CSS classes from style IDs for etchData.attributes.class
+		// Get CSS classes from style IDs for attributes.class
 		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
 
-		// Build Etch-compatible attributes
+		// Build Etch-compatible attributes (flat schema)
 		$etch_attributes = array(
 			'data-etch-element' => 'section',
 		);
@@ -193,44 +164,25 @@ class EFS_Gutenberg_Generator {
 			$etch_attributes['class'] = $css_classes;
 		}
 
-		// Build attributes JSON with FULL Etch structure
 		$section_name = ! empty( $label ) ? $label : 'Section';
 
 		$attrs = array(
-			'metadata' => array(
-				'name'     => $section_name,
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $section_name,
-					'styles'     => $style_ids,
-					'attributes' => $etch_attributes,
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => 'section',
-					),
-				),
+			'metadata'   => array(
+				'name' => $section_name,
 			),
+			'tag'        => 'section',
+			'attributes' => $etch_attributes,
+			'styles'     => $style_ids,
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build class attribute for HTML (Etch uses <div> in HTML, renders based on block.tag)
-		$class_attr = ! empty( $classes ) ? ' class="wp-block-group ' . esc_attr( implode( ' ', $classes ) ) . '"' : ' class="wp-block-group"';
-
-		// Etch Section = wp:group with <div> (rendered as <section> by Etch)
-		return '<!-- wp:group ' . $attrs_json . ' -->' . "\n" .
-				'<div' . $class_attr . '>' . "\n" .
-				$children_html .
-				'</div>' . "\n" .
-				'<!-- /wp:group -->';
+		return $this->serialize_etch_element_block( $attrs, $children_html );
 	}
 
 	/**
-	 * Convert Bricks Container to Etch Container (wp:group with proper etchData)
+	 * Convert Bricks Container to Etch Container (flat Etch v1.1+ attrs).
 	 */
 	private function convert_etch_container( $element, $children, $element_map ) {
-		$classes = $this->get_element_classes( $element );
-		$label   = $element['label'] ?? '';
+		$label = $element['label'] ?? '';
 
 		// Convert children
 		$children_html = '';
@@ -247,15 +199,15 @@ class EFS_Gutenberg_Generator {
 		// Add default container style
 		array_unshift( $style_ids, 'etch-container-style' );
 
-		// Get CSS classes from style IDs for etchData.attributes.class
+		// Get CSS classes from style IDs for attributes.class
 		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
 
 		// Get custom tag from element (e.g., ul, ol)
-		$tag = $element['etch_data']['tag'] ?? 'div';
+		$tag = $element['etch_data']['tag'] ?? ( $element['settings']['tag'] ?? 'div' );
 
 		$this->error_handler->log_info( 'Gutenberg Generator: convert_etch_container element ID ' . $element['id'] . ' using tag ' . $tag );
 
-		// Build Etch-compatible attributes
+		// Build Etch-compatible attributes (flat schema)
 		$etch_attributes = array(
 			'data-etch-element' => 'container',
 		);
@@ -265,111 +217,33 @@ class EFS_Gutenberg_Generator {
 			$etch_attributes['class'] = $css_classes;
 		}
 
-		// Build attributes JSON with FULL Etch structure
 		$container_name = ! empty( $label ) ? $label : 'Container';
 
 		$attrs = array(
-			'metadata' => array(
-				'name'     => $container_name,
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $container_name,
-					'styles'     => $style_ids,
-					'attributes' => $etch_attributes,
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => $tag,  // Use custom tag from Bricks
-					),
-				),
+			'metadata'   => array(
+				'name' => $container_name,
 			),
+			'tag'        => (string) $tag,
+			'attributes' => $etch_attributes,
+			'styles'     => $style_ids,
 		);
 
-		// Add tagName for Gutenberg if not div
-		if ( 'div' !== $tag ) {
-			$attrs['tagName'] = $tag;
-		}
-
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build class attribute for HTML
-		$class_attr = ! empty( $classes ) ? ' class="wp-block-group ' . esc_attr( implode( ' ', $classes ) ) . '"' : ' class="wp-block-group"';
-
-		// Etch Container = wp:group
-		return '<!-- wp:group ' . $attrs_json . ' -->' . "\n" .
-				'<div' . $class_attr . '>' . "\n" .
-				$children_html .
-				'</div>' . "\n" .
-				'<!-- /wp:group -->';
+		return $this->serialize_etch_element_block( $attrs, $children_html );
 	}
 
 	/**
-	 * Convert Bricks Block (brxe-block) to Etch Flex-Div (wp:group with proper etchData)
+	 * Legacy wrapper for older call sites.
+	 * Bricks Block now maps to the same simple div conversion as regular div.
 	 */
 	private function convert_etch_flex_div( $element, $children, $element_map ) {
-		$classes = $this->get_element_classes( $element );
-		$label   = $element['label'] ?? '';
-
-		// Convert children
-		$children_html = '';
-		foreach ( $children as $child ) {
-			$child_html = $this->convert_single_bricks_element( $child, $element_map );
-			if ( ! empty( $child_html ) ) {
-				$children_html .= $child_html . "\n";
-			}
-		}
-
-		// Build Etch-compatible attributes for flex-div
-		$etch_attributes = array(
-			'data-etch-element' => 'flex-div',
-		);
-
-		// NOTE: Do NOT add class names to etchData.attributes!
-		// Only use etchData.styles with style IDs
-
-		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Add default flex-div style
-		array_unshift( $style_ids, 'etch-flex-div-style' );
-
-		// Build attributes JSON with FULL Etch structure
-		$flex_name = ! empty( $label ) ? $label : 'Flex Div';
-
-		$attrs = array(
-			'metadata' => array(
-				'name'     => $flex_name,
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $flex_name,
-					'styles'     => $style_ids,
-					'attributes' => $etch_attributes,
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => 'div',
-					),
-				),
-			),
-		);
-
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build class attribute for HTML
-		$class_attr = ! empty( $classes ) ? ' class="wp-block-group ' . esc_attr( implode( ' ', $classes ) ) . '"' : ' class="wp-block-group"';
-
-		// Etch Flex-Div = wp:group with flex-div etchData
-		return '<!-- wp:group ' . $attrs_json . ' -->' . "\n" .
-				'<div' . $class_attr . '>' . "\n" .
-				$children_html .
-				'</div>' . "\n" .
-				'<!-- /wp:group -->';
+		return $this->convert_etch_simple_div( $element, $children, $element_map );
 	}
 
 	/**
 	 * Convert Bricks Div to simple HTML div (NOT flex-div)
 	 */
 	private function convert_etch_simple_div( $element, $children, $element_map ) {
-		$classes = $this->get_element_classes( $element );
-		$label   = $element['label'] ?? '';
+		$label = $element['label'] ?? '';
 
 		// Convert children
 		$children_html = '';
@@ -381,376 +255,213 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
+		$style_ids   = $this->get_element_style_ids( $element );
+		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
+		$tag         = $element['etch_data']['tag'] ?? ( $element['settings']['tag'] ?? 'div' );
 
-		// Build attributes JSON - simple div WITHOUT flex-div
+		$attributes = array();
+		if ( ! empty( $css_classes ) ) {
+			$attributes['class'] = $css_classes;
+		}
+
+		// Build flat attrs for a simple div/semantic wrapper (without flex-div markers).
 		$div_name = ! empty( $label ) ? $label : 'Div';
 
 		$attrs = array(
-			'metadata' => array(
-				'name'     => $div_name,
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $div_name,
-					'styles'     => $style_ids,
-					'attributes' => array(), // No special attributes for simple div
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => 'div',
-					),
-				),
+			'metadata'   => array(
+				'name' => $div_name,
 			),
+			'tag'        => (string) $tag,
+			'attributes' => $attributes,
+			'styles'     => $style_ids,
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build class attribute for HTML
-		$class_attr = ! empty( $classes ) ? ' class="wp-block-group ' . esc_attr( implode( ' ', $classes ) ) . '"' : ' class="wp-block-group"';
-
-		// Simple Div = wp:group WITHOUT flex-div
-		return '<!-- wp:group ' . $attrs_json . ' -->' . "\n" .
-				'<div' . $class_attr . '>' . "\n" .
-				$children_html .
-				'</div>' . "\n" .
-				'<!-- /wp:group -->';
+		return $this->serialize_etch_element_block( $attrs, $children_html );
 	}
 
 	/**
-	 * Convert Bricks Text to standard paragraph with Etch metadata
+	 * Convert unsupported structural elements via simple Etch element wrapper.
+	 */
+	private function convert_etch_div( $element, $children, $element_map ) {
+		return $this->convert_etch_simple_div( $element, $children, $element_map );
+	}
+
+	/**
+	 * Serialize an Etch element block without saved wrapper HTML.
+	 *
+	 * @param array  $attrs Block attrs.
+	 * @param string $children_html Serialized inner blocks.
+	 * @return string
+	 */
+	private function serialize_etch_element_block( $attrs, $children_html = '' ) {
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$content    = trim( (string) $children_html );
+
+		if ( '' === $content ) {
+			return '<!-- wp:etch/element ' . $attrs_json . ' -->' . "\n" .
+				'<!-- /wp:etch/element -->';
+		}
+
+		return '<!-- wp:etch/element ' . $attrs_json . ' -->' . "\n" .
+			$content . "\n" .
+			'<!-- /wp:etch/element -->';
+	}
+
+	/**
+	 * Convert Bricks Text to Etch paragraph with flat attrs.
 	 */
 	private function convert_etch_text( $element ) {
-		$text  = $element['settings']['text'] ?? '';
-		$label = $element['label'] ?? '';
-
-		if ( empty( $text ) ) {
+		$text = $element['settings']['text'] ?? '';
+		if ( '' === trim( (string) $text ) ) {
 			return '';
 		}
 
-		$classes    = $this->get_element_classes( $element );
-		$class_attr = ! empty( $classes ) ? ' class="' . esc_attr( implode( ' ', $classes ) ) . '"' : '';
+		$fallback_element               = $element;
+		$fallback_element['etch_type']  = 'paragraph';
+		$fallback_element['etch_data']  = array(
+			'class' => implode( ' ', $this->get_element_classes( $element ) ),
+		);
+		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'p' );
 
-		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Build attributes with Etch metadata
-		$attrs = array();
-
-		// Add etchData with styles
-		$text_name = ! empty( $label ) ? $label : 'Text';
-
-		if ( ! empty( $style_ids ) || ! empty( $classes ) ) {
-			$etch_data = array(
-				'origin'     => 'etch',
-				'name'       => $text_name,
-				'styles'     => $style_ids,
-				'attributes' => array(),
-				'block'      => array(
-					'type' => 'html',
-					'tag'  => 'p',
-				),
-			);
-
-			$attrs['metadata'] = array(
-				'name'     => $text_name,
-				'etchData' => $etch_data,
-			);
-		}
-
-		$attrs_json = ! empty( $attrs ) ? ' ' . wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : '';
-
-		// Use standard wp:paragraph
-		return '<!-- wp:paragraph' . $attrs_json . ' -->' . "\n" .
-				'<p' . $class_attr . '>' . $text . '</p>' . "\n" .
-				'<!-- /wp:paragraph -->';
+		return $this->serialize_etch_element_block( $attrs, wp_kses_post( $text ) );
 	}
 
 	/**
-	 * Convert Bricks Heading to standard heading with Etch metadata
+	 * Convert Bricks Heading to Etch heading with flat attrs.
 	 */
 	private function convert_etch_heading( $element ) {
-		$text  = $element['settings']['text'] ?? '';
-		$tag   = $element['settings']['tag'] ?? 'h2';
-		$label = $element['label'] ?? '';
-
-		if ( empty( $text ) ) {
+		$text = $element['settings']['text'] ?? '';
+		if ( '' === trim( (string) $text ) ) {
 			return '';
 		}
 
-		$classes      = $this->get_element_classes( $element );
-		$base_classes = array( 'wp-block-heading' );
-		if ( ! empty( $classes ) ) {
-			$base_classes = array_merge( $base_classes, $classes );
-		}
-		$class_attr = ' class="' . esc_attr( implode( ' ', $base_classes ) ) . '"';
-
-		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Build attributes with Etch metadata
-		$attrs = array();
-
-		// Add etchData with styles
-		$heading_name = ! empty( $label ) ? $label : 'Heading';
-
-		if ( ! empty( $style_ids ) || ! empty( $classes ) ) {
-			$etch_data = array(
-				'origin'     => 'etch',
-				'name'       => $heading_name,
-				'styles'     => $style_ids,
-				'attributes' => array(),
-				'block'      => array(
-					'type' => 'html',
-					'tag'  => $tag,
-				),
-			);
-
-			$attrs['metadata'] = array(
-				'name'     => $heading_name,
-				'etchData' => $etch_data,
-			);
+		$tag = strtolower( (string) ( $element['settings']['tag'] ?? 'h2' ) );
+		if ( ! preg_match( '/^h[1-6]$/', $tag ) ) {
+			$tag = 'h2';
 		}
 
-		// Add level attribute for heading
-		$level = (int) str_replace( 'h', '', $tag );
-		if ( $level >= 1 && $level <= 6 ) {
-			$attrs['level'] = $level;
-		}
+		$fallback_element               = $element;
+		$fallback_element['etch_type']  = 'heading';
+		$fallback_element['etch_data']  = array(
+			'class' => implode( ' ', $this->get_element_classes( $element ) ),
+		);
+		$attrs = $this->build_flat_fallback_attrs( $fallback_element, $tag );
 
-		$attrs_json = ! empty( $attrs ) ? ' ' . wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : '';
-
-		// Use standard wp:heading
-		return '<!-- wp:heading' . $attrs_json . ' -->' . "\n" .
-				'<' . $tag . $class_attr . '>' . $text . '</' . $tag . '>' . "\n" .
-				'<!-- /wp:heading -->';
+		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $text ) ) );
 	}
 
 	/**
-	 * Convert Bricks Image to standard image
+	 * Convert Bricks Image to Etch image element with flat attrs.
 	 */
 	private function convert_etch_image( $element ) {
-		$image_id  = $element['settings']['image']['id'] ?? '';
 		$image_url = $element['settings']['image']['url'] ?? '';
-		$label     = $element['label'] ?? '';
-
-		if ( empty( $image_url ) ) {
+		if ( '' === trim( (string) $image_url ) ) {
 			return '';
 		}
 
-		$classes = $this->get_element_classes( $element );
-
-		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Build attributes with Etch nestedData structure for img classes
-		$image_name = ! empty( $label ) ? $label : 'Image';
-
-		$attrs = array(
-			'metadata' => array(
-				'name'     => $image_name,
-				'etchData' => array(
-					'removeWrapper' => true,
-					'block'         => array(
-						'type' => 'html',
-						'tag'  => 'figure',
-					),
-					'origin'        => 'etch',
-					'name'          => $image_name,
-					'nestedData'    => array(
-						'img' => array(
-							'origin'     => 'etch',
-							'name'       => $image_name,
-							'styles'     => $style_ids,
-							'attributes' => array(
-								'src'   => $image_url,
-								'class' => ! empty( $classes ) ? implode( ' ', $classes ) : '',
-							),
-							'block'      => array(
-								'type' => 'html',
-								'tag'  => 'img',
-							),
-						),
-					),
-				),
-			),
+		$extra_attributes = array(
+			'src' => esc_url_raw( (string) $image_url ),
 		);
+		if ( isset( $element['settings']['image']['alt'] ) && '' !== trim( (string) $element['settings']['image']['alt'] ) ) {
+			$extra_attributes['alt'] = sanitize_text_field( (string) $element['settings']['image']['alt'] );
+		}
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$fallback_element               = $element;
+		$fallback_element['etch_type']  = 'image';
+		$fallback_element['etch_data']  = array(
+			'class' => implode( ' ', $this->get_element_classes( $element ) ),
+		);
+		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'img', $extra_attributes );
 
-		// Use standard wp:image with Etch nestedData
-		return '<!-- wp:image ' . $attrs_json . ' -->' . "\n" .
-				'<figure class="wp-block-image"><img src="' . esc_url( $image_url ) . '" alt=""/></figure>' . "\n" .
-				'<!-- /wp:image -->';
+		return $this->serialize_etch_element_block( $attrs );
 	}
 
 	/**
-	 * Convert Bricks Icon to Etch SVG or Icon element
+	 * Convert Bricks Icon to Etch SVG or Etch element icon.
 	 */
 	private function convert_etch_icon( $element ) {
 		$icon_library = $element['settings']['icon']['library'] ?? '';
 		$icon_value   = $element['settings']['icon']['icon'] ?? '';
 		$svg_code     = $element['settings']['icon']['svg'] ?? '';
-		$label        = $element['label'] ?? '';
+		$label        = ! empty( $element['label'] ) ? (string) $element['label'] : 'Icon';
+		$classes      = implode( ' ', $this->get_element_classes( $element ) );
+		$style_ids    = $this->get_element_style_ids( $element );
 
-		if ( empty( $icon_value ) && empty( $svg_code ) ) {
+		if ( '' === trim( (string) $icon_value ) && '' === trim( (string) $svg_code ) ) {
 			return '';
 		}
 
-		$classes   = $this->get_element_classes( $element );
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Check if it's an SVG or FontAwesome icon
-		if ( ! empty( $svg_code ) || strpos( $icon_library, 'svg' ) !== false ) {
-			// SVG Icon - use Etch SVG element
-			$svg_name = '';
-			if ( ! empty( $label ) ) {
-				$svg_name = $label;
-			} else {
-				$svg_name = 'SVG';
-			}
-
-			$attrs = array(
-				'metadata' => array(
-					'name'     => $svg_name,
-					'etchData' => array(
-						'origin'     => 'etch',
-						'name'       => $svg_name,
-						'styles'     => $style_ids,
-						'attributes' => array(
-							'src'         => ! empty( $svg_code ) ? $svg_code : '', // SVG code or URL
-							'stripColors' => 'true',
-						),
-						'block'      => array(
-							'type'        => 'html',
-							'tag'         => 'svg',
-							'specialized' => 'svg',
-						),
-					),
+		if ( '' !== trim( (string) $svg_code ) || false !== strpos( (string) $icon_library, 'svg' ) ) {
+			$svg_attrs = array(
+				'metadata'   => array(
+					'name' => $label,
 				),
+				'attributes' => array(
+					'src'         => (string) $svg_code,
+					'stripColors' => 'true',
+				),
+				'styles'     => $style_ids,
 			);
 
-			// NOTE: Do NOT set className! Only use etchData.styles
-
-			$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-			return '<!-- wp:group ' . $attrs_json . ' -->' . "\n" .
-					'<div class="wp-block-group"></div>' . "\n" .
-					'<!-- /wp:group -->';
-		} else {
-			// FontAwesome or other icon font - use HTML block with <i>
-			$icon_name = '';
-			if ( ! empty( $label ) ) {
-				$icon_name = $label;
-			} else {
-				$icon_name = 'Icon';
+			if ( '' !== $classes ) {
+				$svg_attrs['attributes']['class'] = $classes;
 			}
 
-			$attrs = array(
-				'metadata' => array(
-					'name'     => $icon_name,
-					'etchData' => array(
-						'origin'     => 'etch',
-						'name'       => $icon_name,
-						'styles'     => $style_ids,
-						'attributes' => array(
-							'class' => $icon_value,
-						),
-						'block'      => array(
-							'type' => 'html',
-							'tag'  => 'i',
-						),
-					),
-				),
-			);
+			$attrs_json = wp_json_encode( $svg_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
-			// NOTE: Do NOT set className! Only use etchData.styles
-
-			$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-			$class_attr = ! empty( $classes ) ? ' class="' . esc_attr( implode( ' ', $classes ) ) . '"' : '';
-
-			return '<!-- wp:html ' . $attrs_json . ' -->' . "\n" .
-					'<i' . $class_attr . ' class="' . esc_attr( $icon_value ) . '"></i>' . "\n" .
-					'<!-- /wp:html -->';
+			return '<!-- wp:etch/svg ' . $attrs_json . ' -->' . "\n" .
+				'<!-- /wp:etch/svg -->';
 		}
+
+		$fallback_element              = $element;
+		$fallback_element['etch_type'] = 'icon';
+		$fallback_element['etch_data'] = array(
+			'class' => $classes,
+		);
+		$attrs = $this->build_flat_fallback_attrs(
+			$fallback_element,
+			'i',
+			array(
+				'class' => (string) $icon_value,
+			)
+		);
+
+		return $this->serialize_etch_element_block( $attrs );
 	}
 
 	/**
-	 * Convert Bricks Button to Etch Link (Anchor)
+	 * Convert Bricks Button to Etch anchor element with flat attrs.
 	 */
 	private function convert_etch_button( $element ) {
 		$text  = $element['settings']['text'] ?? 'Button';
 		$link  = $element['settings']['link'] ?? '#';
-		$label = $element['label'] ?? '';
+		$class = implode( ' ', $this->get_element_classes( $element ) );
 
-		// Handle Bricks link format (can be array or string)
 		if ( is_array( $link ) ) {
 			$url    = $link['url'] ?? '#';
-			$target = $link['newTab'] ?? false;
+			$new_tab = ! empty( $link['newTab'] );
 		} else {
-			$url    = $link;
-			$target = false;
+			$url    = (string) $link;
+			$new_tab = false;
 		}
 
-		$classes   = $this->get_element_classes( $element );
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Generate unique ref ID for the link
-		$ref_id = substr( md5( $element['id'] ?? uniqid() ), 0, 7 );
-
-		// Build Etch Link with nestedData (like Anchor element)
-		$link_attrs = array(
-			'href' => $url,
+		$link_attributes = array(
+			'href' => esc_url_raw( (string) $url ),
 		);
 
-		if ( $target ) {
-			$link_attrs['target'] = '_blank';
-			$link_attrs['rel']    = 'noopener';
+		if ( $new_tab ) {
+			$link_attributes['target'] = '_blank';
+			$link_attributes['rel']    = 'noopener';
 		}
 
-		if ( ! empty( $classes ) ) {
-			$link_attrs['class'] = implode( ' ', $classes );
-		}
-
-		$anchor_name = '';
-		if ( ! empty( $label ) ) {
-			$anchor_name = $label;
-		} else {
-			$anchor_name = 'Anchor';
-		}
-
-		$attrs = array(
-			'metadata' => array(
-				'name'     => $anchor_name,
-				'etchData' => array(
-					'removeWrapper' => true,
-					'block'         => array(
-						'type' => 'html',
-						'tag'  => 'p',
-					),
-					'origin'        => 'etch',
-					'name'          => $anchor_name,
-					'nestedData'    => array(
-						$ref_id => array(
-							'origin'     => 'etch',
-							'name'       => $anchor_name,
-							'styles'     => $style_ids,
-							'attributes' => $link_attrs,
-							'block'      => array(
-								'type' => 'html',
-								'tag'  => 'a',
-							),
-						),
-					),
-				),
-			),
+		$fallback_element              = $element;
+		$fallback_element['etch_type'] = 'button';
+		$fallback_element['etch_data'] = array(
+			'class' => $class,
 		);
+		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'a', $link_attributes );
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Use wp:paragraph with nested anchor (Etch Link structure)
-		return '<!-- wp:paragraph ' . $attrs_json . ' -->' . "\n" .
-				'<p><a data-etch-ref="' . $ref_id . '">' . esc_html( $text ) . '</a></p>' . "\n" .
-				'<!-- /wp:paragraph -->';
+		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( (string) $text ) ) );
 	}
 
 	/**
@@ -874,10 +585,9 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Convert style IDs to CSS class names for etchData.attributes.class
-	 * This is the REAL fix! Etch renders classes from attributes.class, not from style IDs!
+	 * Convert style IDs to CSS class names for block-level attributes.class.
 	 *
-	 * Uses b2e_style_map which now contains both IDs and selectors
+	 * Uses b2e_style_map which contains both IDs and selectors.
 	 */
 	private function get_css_classes_from_style_ids( $style_ids ) {
 		if ( empty( $style_ids ) ) {
@@ -894,7 +604,7 @@ class EFS_Gutenberg_Generator {
 
 		foreach ( $style_ids as $style_id ) {
 			// Skip Etch internal styles (they don't have selectors in our map)
-			if ( in_array( $style_id, array( 'etch-section-style', 'etch-container-style', 'etch-block-style' ), true ) ) {
+			if ( in_array( $style_id, array( 'etch-section-style', 'etch-container-style', 'etch-iframe-style', 'etch-block-style' ), true ) ) {
 				$this->error_handler->log_info( 'Gutenberg Generator: Skipping internal style ID ' . $style_id );
 				continue;
 			}
@@ -1181,8 +891,17 @@ class EFS_Gutenberg_Generator {
 				}
 			}
 
+			// Pass context for template (component) elements so slotChildren can be resolved to innerBlocks.
+			$context = array();
+			if ( ( $element['name'] ?? '' ) === 'template' && ! empty( $element_map ) ) {
+				$context = array(
+					'element_map'      => $element_map,
+					'convert_callback' => array( $this, 'generate_block_html' ),
+				);
+			}
+
 			// Use factory to convert element
-			$result = $this->element_factory->convert_element( $element, $children );
+			$result = $this->element_factory->convert_element( $element, $children, $context );
 
 			if ( $result ) {
 				return $result;
@@ -1204,6 +923,7 @@ class EFS_Gutenberg_Generator {
 		$group_block_types = array(
 			'section',
 			'container',
+			'div',
 			'flex-div',
 			'iframe',
 			'ul',
@@ -1243,222 +963,90 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Generate Etch group block (wp:group with etchData)
+	 * Generate structural Etch element fallback using flat v1.1+ attrs.
 	 */
 	private function generate_etch_group_block( $element, $element_map = array() ) {
-		$etch_data = $element['etch_data'] ?? array();
+		$etch_type = $element['etch_type'] ?? 'div';
+		$etch_data = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
 		$content   = $element['content'] ?? '';
 
-		// Convert dynamic data in content
+		// Convert dynamic data in content.
 		$content = $this->dynamic_data_converter->convert_content( $content );
 
-		// Get style IDs using style map
-		$style_ids = $this->get_element_style_ids( $element );
-
-		// Use custom label if available, otherwise use element type
-		$element_name = ! empty( $element['label'] ) ? $element['label'] : ucfirst( $element['etch_type'] );
-
-		// IMPORTANT: Keep 'class' in etchData.attributes!
-		// Etch renders CSS classes from attributes.class, not from style IDs
-		$etch_data_attributes = $etch_data;
-
-		// Build etchData
-		$etch_data_array = array(
-			'origin'     => 'etch',
-			'name'       => $element_name,
-			'styles'     => $style_ids,
-			'attributes' => $etch_data_attributes,
-			'block'      => array(
-				'type' => 'html',
-				'tag'  => $this->get_html_tag( $element['etch_type'] ),
-			),
-		);
-
-		// Generate Gutenberg block
+		// Generate nested block content first.
 		$block_content = $this->generate_block_content( $element, $content, $element_map );
+		$tag           = (string) ( $etch_data['tag'] ?? $this->get_html_tag( $etch_type ) );
 
-		// Build block attributes
-		$block_attrs = array(
-			'metadata' => array(
-				'name'     => $etch_data_array['name'],
-				'etchData' => $etch_data_array,
-			),
-		);
+		$fallback_attributes = array();
+		foreach ( $etch_data as $key => $value ) {
+			if ( ! is_string( $key ) ) {
+				continue;
+			}
 
-		// NOTE: Do NOT set className! Only use etchData.styles
+			if ( in_array( $key, array( 'class', 'tag', 'content' ), true ) ) {
+				continue;
+			}
 
-		// Add tagName for non-div elements (section, article, etc.)
-		$html_tag = $this->get_html_tag( $element['etch_type'] );
-		if ( 'div' !== $html_tag ) {
-			$block_attrs['tagName'] = $html_tag;
+			if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+				$fallback_attributes[ $key ] = (string) $value;
+			}
 		}
 
-		$gutenberg_html = sprintf(
-			'<!-- wp:group %s -->',
-			wp_json_encode( $block_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
-		);
+		$attrs = $this->build_flat_fallback_attrs( $element, $tag, $fallback_attributes, $etch_type );
 
-		// Add classes to the HTML element (including Etch style IDs)
-		$classes = array( 'wp-block-group' );
-		if ( ! empty( $style_ids ) ) {
-			$classes = array_merge( $classes, $style_ids );
-		}
-		$class_attr = ' class="' . esc_attr( implode( ' ', $classes ) ) . '"';
-
-		$gutenberg_html .= "\n<div" . $class_attr . '>';
-		$gutenberg_html .= "\n" . $block_content;
-		$gutenberg_html .= "\n</div>";
-		$gutenberg_html .= "\n<!-- /wp:group -->";
-
-		return $gutenberg_html;
+		return $this->serialize_etch_element_block( $attrs, $block_content );
 	}
 
 	/**
-	 * Generate standard Gutenberg block
+	 * Generate non-structural fallback blocks using flat Etch attrs.
 	 */
 	private function generate_standard_block( $element ) {
-		$etch_type = $element['etch_type'];
-		$etch_data = $element['etch_data'] ?? array();
+		$etch_type = $element['etch_type'] ?? 'generic';
+		$etch_data = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
+		$content   = $etch_data['content'] ?? $element['content'] ?? '';
 
-		// Get content from etch_data or element
-		$content = $etch_data['content'] ?? $element['content'] ?? '';
-
-		// Convert dynamic data in content
 		$content = $this->dynamic_data_converter->convert_content( $content );
-
-		// Get style IDs for this element
-		$style_ids = $this->get_element_style_ids( $element );
 
 		switch ( $etch_type ) {
 			case 'heading':
-				$level = $etch_data['level'] ?? 'h2';
-
-				// Build class attribute for HTML (wp-block-heading only)
-				$class_attr = ' class="wp-block-heading"';
-
-				// Get element label for Etch metadata
-				$element_label = ! empty( $element['label'] ) ? $element['label'] : 'Heading';
-
-				// Get CSS classes from style IDs for etchData.attributes.class
-				$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
-
-				// Build block attributes with CSS classes in attributes.class
-				$block_attrs = array(
-					'level'    => intval( str_replace( 'h', '', $level ) ),
-					'metadata' => array(
-						'name'     => $element_label,
-						'etchData' => array(
-							'origin'     => 'etch',
-							'name'       => $element_label,
-							'styles'     => $style_ids,
-							'attributes' => ! empty( $css_classes ) ? array( 'class' => $css_classes ) : array(),
-							'block'      => array(
-								'type' => 'html',
-								'tag'  => $level,
-							),
-						),
-					),
-				);
-
-				return sprintf(
-					'<!-- wp:heading %s -->',
-					wp_json_encode( $block_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
-				) . "\n" .
-				'<' . $level . $class_attr . '>' . $content . '</' . $level . '>' . "\n" .
-				'<!-- /wp:heading -->';
+				$tag = strtolower( (string) ( $etch_data['level'] ?? 'h2' ) );
+				if ( ! preg_match( '/^h[1-6]$/', $tag ) ) {
+					$tag = 'h2';
+				}
+				$attrs = $this->build_flat_fallback_attrs( $element, $tag );
+				return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $content ) ) );
 
 			case 'paragraph':
-				// No class attribute for paragraphs
-				$class_attr = '';
-
-				// Get element label for Etch metadata
-				$element_label = ! empty( $element['label'] ) ? $element['label'] : 'Paragraph';
-
-				// Get CSS classes from style IDs for etchData.attributes.class
-				$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
-
-				// Build block attributes with CSS classes in attributes.class
-				$block_attrs = array(
-					'metadata' => array(
-						'name'     => $element_label,
-						'etchData' => array(
-							'origin'     => 'etch',
-							'name'       => $element_label,
-							'styles'     => $style_ids,
-							'attributes' => ! empty( $css_classes ) ? array( 'class' => $css_classes ) : array(),
-							'block'      => array(
-								'type' => 'html',
-								'tag'  => 'p',
-							),
-						),
-					),
-				);
-
-				$attrs_json = ! empty( $block_attrs ) ? ' ' . wp_json_encode( $block_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) : '';
-
-				return '<!-- wp:paragraph' . $attrs_json . ' -->' . "\n" .
-						'<p' . $class_attr . '>' . $content . '</p>' . "\n" .
-						'<!-- /wp:paragraph -->';
+				$attrs = $this->build_flat_fallback_attrs( $element, 'p' );
+				return $this->serialize_etch_element_block( $attrs, wp_kses_post( $content ) );
 
 			case 'image':
-				$src = $etch_data['src'] ?? '';
-				$alt = $etch_data['alt'] ?? '';
-
-				if ( empty( $src ) ) {
-					return ''; // Skip images without source
+				$src = isset( $etch_data['src'] ) ? trim( (string) $etch_data['src'] ) : '';
+				if ( '' === $src ) {
+					return '';
 				}
 
-				// Get style IDs for this element (not from etch_data!)
-				$img_style_ids = $this->get_element_style_ids( $element );
-
-				// Get CSS classes from style IDs
-				$img_css_classes = $this->get_css_classes_from_style_ids( $img_style_ids );
-				$img_class_attr  = ! empty( $img_css_classes ) ? ' class="wp-block-image ' . esc_attr( $img_css_classes ) . '"' : ' class="wp-block-image"';
-
-				// Get element label for Etch metadata (not HTML caption!)
-				$element_label = ! empty( $element['label'] ) ? $element['label'] : 'Image';
-
-				// Build block attributes WITH class in etchData.attributes
-				// Etch needs the class in attributes to render it on the figure
-				$block_attrs = array(
-					'metadata' => array(
-						'name'     => $element_label,
-						'etchData' => array(
-							'origin'     => 'etch',
-							'name'       => $element_label,
-							'styles'     => $img_style_ids,
-							'attributes' => ! empty( $img_css_classes ) ? array( 'class' => $img_css_classes ) : array(),
-							'block'      => array(
-								'type' => 'html',
-								'tag'  => 'figure',
-							),
-						),
-					),
+				$image_attributes = array(
+					'src' => esc_url_raw( $src ),
 				);
+				if ( isset( $etch_data['alt'] ) && '' !== trim( (string) $etch_data['alt'] ) ) {
+					$image_attributes['alt'] = sanitize_text_field( (string) $etch_data['alt'] );
+				}
 
-				// Gutenberg expects inline HTML for images (no line breaks)
-				// Apply CSS classes to <figure>, not <img>
-				return sprintf(
-					'<!-- wp:image %s -->',
-					wp_json_encode( $block_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
-				) . "\n" .
-				'<figure' . $img_class_attr . '><img src="' . esc_url( $src ) . '" alt="' . esc_attr( $alt ) . '"/></figure>' . "\n" .
-				'<!-- /wp:image -->';
+				$attrs = $this->build_flat_fallback_attrs( $element, 'img', $image_attributes );
+				return $this->serialize_etch_element_block( $attrs );
 
 			case 'button':
-				$href   = $etch_data['href'] ?? '#';
-				$target = $etch_data['target'] ?? '_self';
-				$class  = ! empty( $etch_data['class'] ) ? ' class="' . esc_attr( $etch_data['class'] ) . '"' : '';
+				$link_attributes = array(
+					'href' => esc_url_raw( (string) ( $etch_data['href'] ?? '#' ) ),
+				);
 
-				return '<!-- wp:buttons -->' . "\n" .
-						'<div class="wp-block-buttons">' . "\n" .
-						'<!-- wp:button -->' . "\n" .
-						'<div class="wp-block-button' . $class . '">' . "\n" .
-						'<a class="wp-block-button__link" href="' . esc_url( $href ) . '" target="' . esc_attr( $target ) . '">' . $content . '</a>' . "\n" .
-						'</div>' . "\n" .
-						'<!-- /wp:button -->' . "\n" .
-						'</div>' . "\n" .
-						'<!-- /wp:buttons -->';
+				if ( ! empty( $etch_data['target'] ) ) {
+					$link_attributes['target'] = sanitize_key( (string) $etch_data['target'] );
+				}
+
+				$attrs = $this->build_flat_fallback_attrs( $element, 'a', $link_attributes );
+				return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $content ) ) );
 
 			default:
 				return $this->generate_generic_block( $element );
@@ -1466,20 +1054,29 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Generate generic block (fallback)
+	 * Generate generic fallback as an Etch raw HTML block.
 	 */
 	private function generate_generic_block( $element ) {
+		$etch_data = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
 		$content   = $element['content'] ?? '';
-		$etch_data = $element['etch_data'] ?? array();
+		$content   = $this->dynamic_data_converter->convert_content( $content );
 
-		// Convert dynamic data in content
-		$content = $this->dynamic_data_converter->convert_content( $content );
+		if ( '' === trim( (string) $content ) && ! empty( $etch_data['content'] ) ) {
+			$content = (string) $etch_data['content'];
+		}
 
-		$class = ! empty( $etch_data['class'] ) ? ' class="' . esc_attr( $etch_data['class'] ) . '"' : '';
+		$attrs = array(
+			'metadata' => array(
+				'name' => ! empty( $element['label'] ) ? (string) $element['label'] : 'HTML',
+			),
+			'content'  => (string) $content,
+			'unsafe'   => false,
+		);
 
-		return '<!-- wp:html -->' . "\n" .
-				'<div' . $class . '>' . $content . '</div>' . "\n" .
-				'<!-- /wp:html -->';
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" .
+			'<!-- /wp:etch/raw-html -->';
 	}
 
 	/**
@@ -1505,6 +1102,175 @@ class EFS_Gutenberg_Generator {
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Build flat Etch v1.1+ attrs for fallback serialization paths.
+	 *
+	 * @param array  $element Bricks element.
+	 * @param string $tag HTML tag for the Etch element block.
+	 * @param array  $extra_attributes Optional attributes to merge.
+	 * @param string $etch_type Optional explicit etch type.
+	 * @return array<string, mixed>
+	 */
+	private function build_flat_fallback_attrs( $element, $tag, $extra_attributes = array(), $etch_type = '' ) {
+		$resolved_etch_type = '';
+		if ( '' !== $etch_type ) {
+			$resolved_etch_type = (string) $etch_type;
+		} else {
+			$resolved_etch_type = isset( $element['etch_type'] ) ? (string) $element['etch_type'] : '';
+		}
+
+		$style_ids = $this->get_element_style_ids( $element );
+		$style_ids = $this->prepend_default_structural_style( $resolved_etch_type, $style_ids );
+
+		$etch_data = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
+		$attributes = array();
+
+		if ( isset( $etch_data['data-etch-element'] ) && '' !== trim( (string) $etch_data['data-etch-element'] ) ) {
+			$attributes['data-etch-element'] = (string) $etch_data['data-etch-element'];
+		}
+
+		$attributes = array_merge( $attributes, $this->normalize_scalar_attributes( $extra_attributes ) );
+
+		$mapped_class = $this->get_css_classes_from_style_ids( $style_ids );
+		$class_value  = $this->merge_class_names(
+			$mapped_class,
+			isset( $etch_data['class'] ) ? (string) $etch_data['class'] : '',
+			isset( $attributes['class'] ) ? (string) $attributes['class'] : ''
+		);
+
+		if ( '' !== $class_value ) {
+			$attributes['class'] = $class_value;
+		} elseif ( isset( $attributes['class'] ) ) {
+			unset( $attributes['class'] );
+		}
+
+		$element_name = 'Element';
+		if ( ! empty( $element['label'] ) ) {
+			$element_name = (string) $element['label'];
+		} elseif ( '' !== $resolved_etch_type ) {
+			$element_name = ucfirst( $resolved_etch_type );
+		}
+
+		return array(
+			'metadata'   => array(
+				'name' => $element_name,
+			),
+			'tag'        => (string) $tag,
+			'attributes' => $attributes,
+			'styles'     => $style_ids,
+		);
+	}
+
+	/**
+	 * Prepend default Etch styles for semantic structural types.
+	 *
+	 * @param string $etch_type Element type.
+	 * @param array  $style_ids Existing style IDs.
+	 * @return array<int, string>
+	 */
+	private function prepend_default_structural_style( $etch_type, $style_ids ) {
+		$normalized = array();
+		foreach ( (array) $style_ids as $style_id ) {
+			if ( ! is_scalar( $style_id ) ) {
+				continue;
+			}
+
+			$style_id = trim( (string) $style_id );
+			if ( '' === $style_id ) {
+				continue;
+			}
+
+			$normalized[] = $style_id;
+		}
+
+		$default_style = '';
+		switch ( $etch_type ) {
+			case 'section':
+				$default_style = 'etch-section-style';
+				break;
+			case 'container':
+				$default_style = 'etch-container-style';
+				break;
+			case 'iframe':
+				$default_style = 'etch-iframe-style';
+				break;
+		}
+
+		if ( '' !== $default_style ) {
+			array_unshift( $normalized, $default_style );
+		}
+
+		return array_values( array_unique( $normalized ) );
+	}
+
+	/**
+	 * Normalize scalar attribute values.
+	 *
+	 * @param array $attributes Raw attributes.
+	 * @return array<string, string>
+	 */
+	private function normalize_scalar_attributes( $attributes ) {
+		$normalized = array();
+
+		if ( ! is_array( $attributes ) ) {
+			return $normalized;
+		}
+
+		foreach ( $attributes as $key => $value ) {
+			if ( ! is_string( $key ) || '' === $key ) {
+				continue;
+			}
+
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+
+			$value = trim( (string) $value );
+			if ( '' === $value ) {
+				continue;
+			}
+
+			$normalized[ $key ] = $value;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Merge class strings and remove duplicates.
+	 *
+	 * @param string ...$class_sets Class name sets.
+	 * @return string
+	 */
+	private function merge_class_names( ...$class_sets ) {
+		$classes = array();
+
+		foreach ( $class_sets as $class_set ) {
+			if ( ! is_scalar( $class_set ) ) {
+				continue;
+			}
+
+			$parts = preg_split( '/\s+/', trim( (string) $class_set ) );
+			if ( ! is_array( $parts ) ) {
+				continue;
+			}
+
+			foreach ( $parts as $class_name ) {
+				if ( '' === $class_name ) {
+					continue;
+				}
+
+				$classes[] = $class_name;
+			}
+		}
+
+		if ( empty( $classes ) ) {
+			return '';
+		}
+
+		return implode( ' ', array_values( array_unique( $classes ) ) );
 	}
 
 	/**
@@ -1573,6 +1339,8 @@ class EFS_Gutenberg_Generator {
 				return 'section';
 			case 'container':
 				return 'div';
+			case 'div':
+				return 'div';
 			case 'flex-div':
 				return 'div';
 			case 'iframe':
@@ -1594,6 +1362,9 @@ class EFS_Gutenberg_Generator {
 
 			case 'container':
 				return $this->process_container_element( $element, $post_id );
+
+			case 'block':
+				return $this->process_div_element( $element, $post_id );
 
 			case 'div':
 				return $this->process_div_element( $element, $post_id );
@@ -1702,19 +1473,11 @@ class EFS_Gutenberg_Generator {
 			return $element;
 		}
 
-		// Regular div handling
-		$settings            = get_option( 'efs_settings', array() );
-		$convert_div_to_flex = $settings['convert_div_to_flex'] ?? true;
-
-		if ( $convert_div_to_flex ) {
-			$element['etch_type'] = 'flex-div';
-			$element['etch_data'] = array(
-				'data-etch-element' => 'flex-div',
-				'class'             => $this->extract_css_classes( $element['settings'] ),
-			);
-		} else {
-			$element['etch_type'] = 'skip';
-		}
+		// Regular div handling (flex-div is deprecated in Etch).
+		$element['etch_type'] = 'div';
+		$element['etch_data'] = array(
+			'class' => $this->extract_css_classes( $element['settings'] ),
+		);
 
 		return $element;
 	}

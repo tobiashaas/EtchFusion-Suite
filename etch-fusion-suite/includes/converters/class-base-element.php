@@ -37,10 +37,11 @@ abstract class EFS_Base_Element {
 	 * Convert element to Etch format
 	 *
 	 * @param array $element Bricks element
-	 * @param array $children Child elements
+	 * @param array $children Child elements (converted block HTML)
+	 * @param array $context Optional. Conversion context (e.g. element_map, convert_callback for slotChildren).
 	 * @return string Gutenberg block HTML
 	 */
-	abstract public function convert( $element, $children = array() );
+	abstract public function convert( $element, $children = array(), $context = array() );
 
 	/**
 	 * Get style IDs for element
@@ -110,7 +111,13 @@ abstract class EFS_Base_Element {
 	 * @return string HTML tag
 	 */
 	protected function get_tag( $element, $fallback_tag = 'div' ) {
-		return $element['settings']['tag'] ?? $fallback_tag;
+		$tag = $element['settings']['tag'] ?? $fallback_tag;
+
+		if ( ! is_string( $tag ) || '' === $tag ) {
+			return (string) $fallback_tag;
+		}
+
+		return $tag;
 	}
 
 	/**
@@ -123,28 +130,109 @@ abstract class EFS_Base_Element {
 	 * @return array Block attributes
 	 */
 	protected function build_attributes( $label, $style_ids, $etch_attributes, $tag = 'div' ) {
-		$attrs = array(
-			'metadata' => array(
-				'name'     => $label,
-				'etchData' => array(
-					'origin'     => 'etch',
-					'name'       => $label,
-					'styles'     => $style_ids,
-					'attributes' => $etch_attributes,
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => $tag,
-					),
-				),
+		return array(
+			'metadata'   => array(
+				'name' => (string) $label,
 			),
+			'tag'        => (string) $tag,
+			'attributes' => $this->normalize_attributes( $etch_attributes ),
+			'styles'     => $this->normalize_style_ids( $style_ids ),
 		);
+	}
 
-		// Add tagName for Gutenberg if not div
-		if ( 'div' !== $tag ) {
-			$attrs['tagName'] = $tag;
+	/**
+	 * Generate an Etch element block with comment-only serialization.
+	 *
+	 * @param array        $attrs Block attributes.
+	 * @param string|array $children_html Optional. Inner block HTML.
+	 * @return string Gutenberg block HTML.
+	 */
+	protected function generate_etch_element_block( $attrs, $children_html = '' ) {
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$content    = is_array( $children_html ) ? implode( "\n", $children_html ) : (string) $children_html;
+		$content    = trim( $content );
+
+		if ( '' === $content ) {
+			return '<!-- wp:etch/element ' . $attrs_json . ' -->' . "\n" .
+				'<!-- /wp:etch/element -->';
 		}
 
-		return $attrs;
+		return '<!-- wp:etch/element ' . $attrs_json . ' -->' . "\n" .
+			$content . "\n" .
+			'<!-- /wp:etch/element -->';
+	}
+
+	/**
+	 * Generate an etch/text inner block.
+	 *
+	 * @param string $content Text/HTML content for the text block.
+	 * @return string Gutenberg block HTML.
+	 */
+	protected function generate_etch_text_block( $content ) {
+		$attrs = array(
+			'content' => (string) $content,
+		);
+
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return '<!-- wp:etch/text ' . $attrs_json . ' /-->';
+	}
+
+	/**
+	 * Normalize style IDs to a unique array of strings.
+	 *
+	 * @param array $style_ids Raw style IDs.
+	 * @return array Normalized style IDs.
+	 */
+	protected function normalize_style_ids( $style_ids ) {
+		$normalized = array();
+
+		if ( ! is_array( $style_ids ) ) {
+			return $normalized;
+		}
+
+		foreach ( $style_ids as $style_id ) {
+			if ( ! is_scalar( $style_id ) ) {
+				continue;
+			}
+
+			$style_id = trim( (string) $style_id );
+			if ( '' === $style_id ) {
+				continue;
+			}
+
+			$normalized[] = $style_id;
+		}
+
+		return array_values( array_unique( $normalized ) );
+	}
+
+	/**
+	 * Normalize Etch attributes to string-valued key/value pairs.
+	 *
+	 * @param array $etch_attributes Raw attributes.
+	 * @return array Normalized attributes.
+	 */
+	protected function normalize_attributes( $etch_attributes ) {
+		$normalized = array();
+
+		if ( ! is_array( $etch_attributes ) ) {
+			return $normalized;
+		}
+
+		foreach ( $etch_attributes as $key => $value ) {
+			if ( ! is_string( $key ) || '' === $key ) {
+				continue;
+			}
+
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+
+			$normalized[ $key ] = (string) $value;
+		}
+
+		return $normalized;
 	}
 
 	/**

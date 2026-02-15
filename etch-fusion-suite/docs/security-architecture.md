@@ -62,13 +62,13 @@ Etch Fusion Suite implements a layered security model to satisfy the WordPress.S
 - `EFS_Base_Ajax_Handler::verify_request()` @118-156 executes the **three-layer security model**: (1) nonce verification through `verify_nonce()` @98-101, (2) capability enforcement via `check_capability()` @109-111 with `current_user_can( 'manage_options' )`, and (3) audit logging through `audit_logger->log_authentication_attempt()`.
 - Failure paths return JSON immediately — invalid nonce → `401` (`invalid_nonce`), missing capability → `403` (`forbidden`) — ensuring handlers never process unauthenticated data.
 - Nonces originate in `admin_interface.php::enqueue_admin_assets()` @89-96 (`wp_create_nonce( 'efs_nonce' )`) and are exposed to JavaScript via `wp_localize_script()` in the `efsData.nonce` property.
-- Dual-layer verification is enforced: `admin_interface.php::get_request_payload()` @144-169 pre-validates incoming AJAX requests before delegating to handler classes.
+- Nonce verification occurs exclusively in AJAX handlers via `EFS_Base_Ajax_Handler::verify_request()`, which calls `check_ajax_referer('efs_nonce', 'nonce', false)` to enable JSON error responses.
 
 #### Nonce Lifecycle (Summary)
 
 1. **Creation** — `enqueue_admin_assets()` generates `'efs_nonce'` and localizes it for the admin bundle.
 2. **Transmission** — Admin JavaScript attaches the nonce as the `nonce` POST field on every AJAX request.
-3. **Verification** — `get_request_payload()` performs the first check (`$die = false` enables custom JSON errors), handlers run `verify_request()` for the primary guardrail, logging results through the audit logger.
+3. **Verification** — Handlers run `verify_request()` as the first executable line; it verifies the nonce, enforces capability checks, and logs results through the audit logger.
 
 #### Handler Compliance
 
@@ -140,8 +140,8 @@ All nine AJAX handler classes extend the base handler and call `verify_request()
 
 ### 7.3 Admin Interface
 
-- `enqueue_admin_assets()` generates nonces and uses `wp_localize_script()` for safe data transfer.
-- `get_request_payload()` verifies the nonce with `$die = false` to allow JSON handling, sanitizes recursively, and strips the nonce before returning.
+- `enqueue_admin_assets()` generates nonces via `wp_create_nonce('efs_nonce')` and uses `wp_localize_script()` for safe data transfer to JavaScript.
+- All nonce verification happens in handler classes; `admin_interface.php` only creates and passes the nonce to the frontend.
 - AJAX handlers are resolved from the service container to ensure dependencies (rate limiter, validator, audit logger) are injected.
 
 ## 8. PHPCS Compliance Status
@@ -157,7 +157,7 @@ All nine AJAX handler classes extend the base handler and call `verify_request()
 |--------|----------|------------|
 | Base AJAX | `includes/ajax/class-base-ajax-handler.php` @98-512 | Nonce verification, rate limiting, validation, sanitization |
 | Validation AJAX | `includes/ajax/handlers/class-validation-ajax.php` | Canonical handler pattern, URL/API key validation |
-| Admin Interface | `includes/admin_interface.php` | Nonce generation, payload sanitization, handler delegation |
+| Admin Interface | `includes/admin_interface.php` | Nonce generation, asset enqueuing, handler delegation |
 | REST API | `includes/api_endpoints.php` | CORS checks, REST validation, token handling |
 | CORS Manager | `includes/security/class-cors-manager.php` | Origin whitelist enforcement |
 | Input Validator | `includes/security/class-input-validator.php` | Central validation logic |

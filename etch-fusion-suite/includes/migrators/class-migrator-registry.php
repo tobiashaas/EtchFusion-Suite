@@ -13,6 +13,7 @@ namespace Bricks2Etch\Migrators;
 use Bricks2Etch\Migrators\Interfaces\Migrator_Interface;
 use InvalidArgumentException;
 use RuntimeException;
+use function esc_html;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -60,7 +61,7 @@ class EFS_Migrator_Registry {
 		}
 
 		if ( isset( $this->migrators[ $type ] ) ) {
-			throw new RuntimeException( sprintf( 'Migrator type "%s" is already registered.', \esc_html( (string) $type ) ) );
+			throw new RuntimeException( sprintf( 'Migrator type "%s" is already registered.', esc_html( (string) $type ) ) );
 		}
 
 		$this->migrators[ $type ] = $migrator;

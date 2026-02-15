@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-02-14T10:20:43.244Z",
+  "progress": {
+    "migrationId": "cf0fff66-fc24-4aab-b891-979b2ed79a60",
+    "status": "completed",
+    "current_step": "completed",
+    "percentage": 100,
+    "started_at": "2026-02-14 10:17:07",
+    "completed_at": "2026-02-14 10:20:28",
+    "message": "Migration completed successfully!"
+  },
+  "stats": {
+    "sourcePosts": 11,
+    "targetPosts": 11
+  }
+}

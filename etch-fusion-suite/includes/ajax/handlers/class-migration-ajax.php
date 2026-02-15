@@ -68,7 +68,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->check_rate_limit( 'migration_start', 5, MINUTE_IN_SECONDS ) ) {
+		if ( ! $this->check_rate_limit( 'migration_start', 15, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
 
@@ -84,9 +84,10 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$payload = array(
+		$raw_target = $this->get_post( 'target_url', '', 'url' );
+		$payload    = array(
 			'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
-			'target_url'    => $this->get_post( 'target_url', '', 'url' ),
+			'target_url'    => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
 			'batch_size'    => $this->get_post( 'batch_size', 50, 'int' ),
 		);
 

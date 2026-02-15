@@ -6,7 +6,11 @@ const http = require('http');
 const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 
 function runWpEnv(args) {
-  const result = spawnSync(WP_ENV_CMD, args, { encoding: 'utf8' });
+  const spawnOpts = { encoding: 'utf8' };
+  if (process.platform === 'win32') {
+    spawnOpts.shell = true;
+  }
+  const result = spawnSync(WP_ENV_CMD, args, spawnOpts);
 
   if (result.error) {
     throw result.error;

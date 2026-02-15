@@ -1,512 +1,508 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { existsSync, writeFileSync } = require('fs');
+const { join } = require('path');
 
 const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
+const REQUIRED_MEMORY_MB = 512;
+const WARNING_MEMORY_MB = 256;
+const VENDOR_AUTOLOAD_PATH = 'wp-content/plugins/etch-fusion-suite/vendor/autoload.php';
 
-function runCommand(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'pipe', ...options });
-    let stdout = '';
-    let stderr = '';
+function getWpEnvPath() {
+  if (process.platform !== 'win32') return WP_ENV_CMD;
+  const local = join(__dirname, '..', 'node_modules', '.bin', 'wp-env.cmd');
+  return existsSync(local) ? local : WP_ENV_CMD;
+}
 
-    child.stdout?.on('data', (data) => {
-      stdout += data.toString();
-    });
+function spawnWpEnv(args) {
+  const wpEnv = getWpEnvPath();
+  if (process.platform === 'win32') {
+    const cmdLine = [wpEnv, ...args]
+      .map((arg) => (/[^\w./:-]/.test(String(arg)) ? `"${String(arg).replace(/"/g, '""')}"` : String(arg)))
+      .join(' ');
+    return spawn(cmdLine, [], { stdio: 'pipe', shell: true });
+  }
 
-    child.stderr?.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    child.on('error', reject);
-
-    child.on('exit', (code) => {
-      resolve({ code, stdout, stderr });
-    });
-  });
+  return spawn(wpEnv, args, { stdio: 'pipe' });
 }
 
 function runWpEnv(args) {
-  return runCommand(WP_ENV_CMD, args);
-}
-
-function checkDockerContainers() {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
+    let child;
     try {
-      const result = await runCommand('docker', ['ps', '--format', '{{json .}}']);
-      const lines = result.stdout.split('\n').filter(line => line.trim());
-      const containers = lines.map(line => JSON.parse(line));
-      const wpEnvContainers = containers.filter(c => 
-        c.Names.includes('wordpress') || 
-        c.Names.includes('mysql') ||
-        c.Names.includes('wp-env')
-      );
-      
-      resolve({
-        status: 'pass',
-        message: `Found ${wpEnvContainers.length} wp-env containers running`,
-        details: wpEnvContainers.map(c => ({
-          name: c.Names,
-          status: c.Status,
-          ports: c.Ports
-        }))
-      });
+      child = spawnWpEnv(args);
     } catch (error) {
-      resolve({
-        status: 'fail',
-        message: `Failed to check Docker containers: ${error.message}`,
-        details: null
-      });
+      resolve({ code: 1, stdout: '', stderr: error.message });
+      return;
     }
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      resolve({ code, stdout, stderr });
+    });
+
+    child.on('error', (error) => {
+      resolve({ code: 1, stdout, stderr: error.message });
+    });
   });
 }
 
-function checkWordPressEndpoint(port, name) {
-  return new Promise(async (resolve) => {
-    try {
-      const http = require('http');
-      const startTime = Date.now();
-      
-      const req = http.request({
-        host: 'localhost',
-        port,
-        path: '/wp-admin/',
-        timeout: 5000
-      }, (res) => {
-        const elapsed = Date.now() - startTime;
-        
-        if (res.statusCode === 200 || res.statusCode === 302) {
-          resolve({
-            status: 'pass',
-            message: `${name} endpoint responding (${res.statusCode})`,
-            details: {
-              port,
-              statusCode: res.statusCode,
-              responseTime: `${elapsed}ms`
-            }
-          });
-        } else {
-          resolve({
-            status: 'fail',
-            message: `${name} endpoint returned ${res.statusCode}`,
-            details: {
-              port,
-              statusCode: res.statusCode,
-              responseTime: `${elapsed}ms`
-            }
-          });
-        }
-      });
+function parseMemoryToMb(value) {
+  if (!value) return null;
 
-      req.on('error', (error) => {
-        resolve({
-          status: 'fail',
-          message: `${name} endpoint error: ${error.message}`,
-          details: { port, error: error.code }
-        });
-      });
+  const normalized = String(value).trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === '-1') return Infinity;
 
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({
-          status: 'fail',
-          message: `${name} endpoint timeout`,
-          details: { port, error: 'timeout' }
-        });
-      });
+  const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)([KMG]?)$/);
+  if (!match) return null;
 
-      req.end();
-    } catch (error) {
-      resolve({
-        status: 'fail',
-        message: `${name} check failed: ${error.message}`,
-        details: { port, error: error.message }
-      });
-    }
-  });
+  const amount = parseFloat(match[1]);
+  const unit = match[2];
+
+  if (unit === 'G') return amount * 1024;
+  if (unit === 'M' || unit === '') return amount;
+  if (unit === 'K') return amount / 1024;
+  return null;
 }
 
-function checkDatabaseConnection(environment, name) {
-  return new Promise(async (resolve) => {
-    try {
-      const result = await runWpEnv(['run', environment, 'wp', 'db', 'check']);
-      
-      if (result.code === 0) {
-        resolve({
-          status: 'pass',
-          message: `${name} database connection OK`,
-          details: { environment }
-        });
-      } else {
-        resolve({
-          status: 'fail',
-          message: `${name} database check failed`,
-          details: { environment, error: result.stderr }
-        });
+function normalizeEnvironmentFilter(filter) {
+  if (filter === null || filter === undefined || filter === false || filter === '') {
+    return null;
+  }
+  return String(filter).trim();
+}
+
+async function checkWordPress(environment, name) {
+  const result = await runWpEnv(['run', environment, 'wp', 'core', 'is-installed']);
+  if (result.code === 0) {
+    return {
+      environment,
+      category: 'core',
+      status: 'pass',
+      label: `${name} WordPress`,
+      message: 'WordPress is installed and reachable.',
+      details: { environment }
+    };
+  }
+
+  return {
+    environment,
+    category: 'core',
+    status: 'fail',
+    label: `${name} WordPress`,
+    message: 'WordPress is not reachable via wp-env.',
+    details: {
+      environment,
+      error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
+    }
+  };
+}
+
+async function checkPluginStatus(environment, name, pluginSlug, options = {}) {
+  const required = options.required !== false;
+  const label = options.label || `${name} plugin ${pluginSlug}`;
+  const result = await runWpEnv(['run', environment, 'wp', 'plugin', 'is-active', pluginSlug]);
+
+  if (result.code === 0) {
+    return {
+      environment,
+      category: 'plugin',
+      status: 'pass',
+      label,
+      message: `${pluginSlug} is active.`,
+      details: { environment, plugin: pluginSlug }
+    };
+  }
+
+  return {
+    environment,
+    category: 'plugin',
+    status: required ? 'fail' : 'warning',
+    label,
+    message: `${pluginSlug} is not active.`,
+    details: {
+      environment,
+      plugin: pluginSlug,
+      required,
+      error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
+    }
+  };
+}
+
+async function checkMemoryLimit(environment, name) {
+  const result = await runWpEnv(['run', environment, 'wp', 'eval', 'echo WP_MEMORY_LIMIT;']);
+  if (result.code !== 0) {
+    return {
+      environment,
+      category: 'memory',
+      status: 'fail',
+      label: `${name} memory limit`,
+      message: 'Could not read WP_MEMORY_LIMIT.',
+      details: {
+        environment,
+        recommendedMinimum: `${WARNING_MEMORY_MB}M`,
+        expectedValue: `${REQUIRED_MEMORY_MB}M`,
+        error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
       }
-    } catch (error) {
-      resolve({
-        status: 'fail',
-        message: `${name} database connection error: ${error.message}`,
-        details: { environment, error: error.message }
-      });
-    }
-  });
-}
+    };
+  }
 
-function checkPluginActivation(environment, name, pluginSlug = 'etch-fusion-suite') {
-  return new Promise(async (resolve) => {
-    try {
-      const result = await runWpEnv(['run', environment, 'wp', 'plugin', 'list', '--status=active', '--field=name', '--format=json']);
-      
-      if (result.code === 0) {
-        const activePlugins = JSON.parse(result.stdout);
-        const isPluginActive = activePlugins.includes(pluginSlug);
-        
-        if (isPluginActive) {
-          resolve({
-            status: 'pass',
-            message: `${pluginSlug} is active on ${name}`,
-            details: { environment, pluginSlug, activePluginsCount: activePlugins.length }
-          });
-        } else {
-          resolve({
-            status: 'fail',
-            message: `${pluginSlug} is not active on ${name}`,
-            details: { environment, pluginSlug, activePlugins }
-          });
-        }
-      } else {
-        resolve({
-          status: 'fail',
-          message: `Failed to check plugins on ${name}`,
-          details: { environment, error: result.stderr }
-        });
+  const limit = (result.stdout || '').trim();
+  const memoryMb = parseMemoryToMb(limit);
+
+  if (memoryMb === null) {
+    return {
+      environment,
+      category: 'memory',
+      status: 'fail',
+      label: `${name} memory limit`,
+      message: `Invalid memory limit value: ${limit || 'empty'}.`,
+      details: {
+        environment,
+        limit,
+        recommendedMinimum: `${WARNING_MEMORY_MB}M`,
+        expectedValue: `${REQUIRED_MEMORY_MB}M`
       }
-    } catch (error) {
-      resolve({
-        status: 'fail',
-        message: `Plugin check error on ${name}: ${error.message}`,
-        details: { environment, error: error.message }
-      });
+    };
+  }
+
+  let status = 'fail';
+  if (memoryMb === Infinity || memoryMb >= REQUIRED_MEMORY_MB) {
+    status = 'pass';
+  } else if (memoryMb >= WARNING_MEMORY_MB) {
+    status = 'warning';
+  }
+
+  return {
+    environment,
+    category: 'memory',
+    status,
+    label: `${name} memory limit`,
+    message: `WP_MEMORY_LIMIT is ${limit} (target: ${REQUIRED_MEMORY_MB}M, minimum: ${WARNING_MEMORY_MB}M).`,
+    details: {
+      environment,
+      limit,
+      valueMb: memoryMb,
+      recommendedMinimum: `${WARNING_MEMORY_MB}M`,
+      expectedValue: `${REQUIRED_MEMORY_MB}M`
     }
-  });
+  };
 }
 
-function checkRestApi(port, name) {
-  return new Promise(async (resolve) => {
-    try {
-      const http = require('http');
-      
-      const req = http.request({
-        host: 'localhost',
-        port,
-        path: '/wp-json/efs/v1/status',
-        timeout: 5000,
-        headers: {
-          'Accept': 'application/json'
-        }
-      }, (res) => {
-        let data = '';
-        
-        res.on('data', chunk => {
-          data += chunk;
-        });
-        
-        res.on('end', () => {
-          if (res.statusCode === 200) {
-            resolve({
-              status: 'pass',
-              message: `${name} REST API responding`,
-              details: {
-                port,
-                statusCode: res.statusCode,
-                endpoint: '/wp-json/efs/v1/status',
-                responseSize: data.length
-              }
-            });
-          } else if (res.statusCode === 401) {
-            resolve({
-              status: 'pass',
-              message: `${name} REST API requires authentication (expected)`,
-              details: {
-                port,
-                statusCode: res.statusCode,
-                endpoint: '/wp-json/efs/v1/status'
-              }
-            });
-          } else if (res.statusCode === 404) {
-            resolve({
-              status: 'warning',
-              message: `${name} REST API endpoint not found (plugin may not be active)`,
-              details: {
-                port,
-                statusCode: res.statusCode,
-                endpoint: '/wp-json/efs/v1/status'
-              }
-            });
-          } else {
-            resolve({
-              status: 'fail',
-              message: `${name} REST API returned ${res.statusCode}`,
-              details: {
-                port,
-                statusCode: res.statusCode,
-                endpoint: '/wp-json/efs/v1/status'
-              }
-            });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        resolve({
-          status: 'fail',
-          message: `${name} REST API error: ${error.message}`,
-          details: { port, error: error.code }
-        });
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({
-          status: 'fail',
-          message: `${name} REST API timeout`,
-          details: { port, error: 'timeout' }
-        });
-      });
-
-      req.end();
-    } catch (error) {
-      resolve({
-        status: 'fail',
-        message: `${name} REST API check failed: ${error.message}`,
-        details: { port, error: error.message }
-      });
-    }
-  });
-}
-
-function checkFilePermissions(environment, name) {
-  return new Promise(async (resolve) => {
-    try {
-      const result = await runWpEnv(['run', environment, 'sh', '-c', 'test -w wp-content && echo "writable" || echo "not writable"']);
-      
-      if (result.code === 0) {
-        const isWritable = result.stdout.includes('writable');
-        
-        if (isWritable) {
-          resolve({
-            status: 'pass',
-            message: `${name} wp-content directory is writable`,
-            details: { environment }
-          });
-        } else {
-          resolve({
-            status: 'fail',
-            message: `${name} wp-content directory is not writable`,
-            details: { environment }
-          });
-        }
-      } else {
-        resolve({
-          status: 'warning',
-          message: `Could not check file permissions on ${name}`,
-          details: { environment, error: result.stderr }
-        });
+async function checkThemeConfiguration(environment, name) {
+  const result = await runWpEnv(['run', environment, 'wp', 'theme', 'list', '--format=json']);
+  if (result.code !== 0) {
+    return {
+      environment,
+      category: 'theme',
+      status: 'fail',
+      label: `${name} theme configuration`,
+      message: 'Could not inspect theme configuration.',
+      details: {
+        environment,
+        error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
       }
-    } catch (error) {
-      resolve({
+    };
+  }
+
+  let themes = [];
+  try {
+    themes = JSON.parse((result.stdout || '[]').trim() || '[]');
+  } catch (error) {
+    return {
+      environment,
+      category: 'theme',
+      status: 'fail',
+      label: `${name} theme configuration`,
+      message: 'Theme list output is not valid JSON.',
+      details: { environment, parseError: error.message }
+    };
+  }
+
+  const activeTheme = themes.find((theme) => theme.status === 'active');
+  const themeNames = themes.map((theme) => theme.name);
+  const hasBricks = themeNames.includes('bricks') || themeNames.includes('bricks-child');
+
+  if (environment === 'tests-cli') {
+    if (!activeTheme || activeTheme.name !== 'etch-theme') {
+      return {
+        environment,
+        category: 'theme',
+        status: 'fail',
+        label: `${name} theme configuration`,
+        message: `Expected active theme etch-theme, found ${activeTheme ? activeTheme.name : 'none'}.`,
+        details: {
+          environment,
+          activeTheme: activeTheme ? activeTheme.name : null,
+          installedThemes: themeNames
+        }
+      };
+    }
+
+    if (hasBricks) {
+      return {
+        environment,
+        category: 'theme',
         status: 'warning',
-        message: `File permissions check error on ${name}: ${error.message}`,
-        details: { environment, error: error.message }
-      });
+        label: `${name} theme configuration`,
+        message: 'Bricks themes are still installed on tests-cli.',
+        details: {
+          environment,
+          activeTheme: activeTheme.name,
+          installedThemes: themeNames
+        }
+      };
     }
+
+    return {
+      environment,
+      category: 'theme',
+      status: 'pass',
+      label: `${name} theme configuration`,
+      message: 'Active theme etch-theme on tests-cli.',
+      details: {
+        environment,
+        activeTheme: activeTheme.name,
+        installedThemes: themeNames
+      }
+    };
+  }
+
+  if (!activeTheme || !['bricks', 'bricks-child'].includes(activeTheme.name)) {
+    return {
+      environment,
+      category: 'theme',
+      status: 'fail',
+      label: `${name} theme configuration`,
+      message: `Expected active theme bricks or bricks-child, found ${activeTheme ? activeTheme.name : 'none'}.`,
+      details: {
+        environment,
+        activeTheme: activeTheme ? activeTheme.name : null,
+        installedThemes: themeNames
+      }
+    };
+  }
+
+  return {
+    environment,
+    category: 'theme',
+    status: 'pass',
+    label: `${name} theme configuration`,
+    message: `Active theme: ${activeTheme.name}.`,
+    details: {
+      environment,
+      activeTheme: activeTheme.name,
+      installedThemes: themeNames
+    }
+  };
+}
+
+async function checkComposerDependencies(environment, name) {
+  const result = await runWpEnv(['run', environment, 'test', '-f', VENDOR_AUTOLOAD_PATH]);
+  if (result.code === 0) {
+    return {
+      environment,
+      category: 'composer',
+      status: 'pass',
+      label: `${name} Composer dependencies`,
+      message: 'vendor/autoload.php is present.',
+      details: { environment, path: VENDOR_AUTOLOAD_PATH }
+    };
+  }
+
+  return {
+    environment,
+    category: 'composer',
+    status: 'fail',
+    label: `${name} Composer dependencies`,
+    message: 'vendor/autoload.php is missing. Run npm run composer:install:both.',
+    details: {
+      environment,
+      path: VENDOR_AUTOLOAD_PATH,
+      error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
+    }
+  };
+}
+
+async function checkRestApi(environment, name) {
+  const codeScript = "$response = wp_remote_get(rest_url()); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } $code = (int) wp_remote_retrieve_response_code($response); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
+  const result = await runWpEnv(['run', environment, 'wp', 'eval', codeScript]);
+
+  if (result.code === 0) {
+    const code = Number.parseInt((result.stdout || '').trim(), 10);
+    return {
+      environment,
+      category: 'rest',
+      status: 'pass',
+      label: `${name} REST API`,
+      message: `REST API responded with status ${Number.isFinite(code) ? code : '2xx'}.`,
+      details: {
+        environment,
+        statusCode: Number.isFinite(code) ? code : null
+      }
+    };
+  }
+
+  return {
+    environment,
+    category: 'rest',
+    status: 'fail',
+    label: `${name} REST API`,
+    message: 'REST API is not responding with a successful status code.',
+    details: {
+      environment,
+      error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim()
+    }
+  };
+}
+
+function parseArgs(argv) {
+  const args = argv.slice(2);
+  const envIndex = args.indexOf('--environment');
+  const environment = envIndex >= 0 ? args[envIndex + 1] : null;
+  const saveReport = args.includes('--save-report');
+  return { environment, saveReport };
+}
+
+function getEnvironments(filter) {
+  const map = {
+    development: [{ environment: 'cli', name: 'Bricks' }],
+    cli: [{ environment: 'cli', name: 'Bricks' }],
+    tests: [{ environment: 'tests-cli', name: 'Etch' }],
+    'tests-cli': [{ environment: 'tests-cli', name: 'Etch' }]
+  };
+
+  if (filter && map[filter]) {
+    return map[filter];
+  }
+
+  return [
+    { environment: 'cli', name: 'Bricks' },
+    { environment: 'tests-cli', name: 'Etch' }
+  ];
+}
+
+function sortChecks(checks) {
+  const order = {
+    core: 1,
+    memory: 2,
+    plugin: 3,
+    theme: 4,
+    composer: 5,
+    rest: 6
+  };
+
+  return checks.slice().sort((a, b) => {
+    const aOrder = order[a.category] || 99;
+    const bOrder = order[b.category] || 99;
+    return aOrder - bOrder;
   });
 }
 
-async function runHealthCheck(fixIssues = false, verbose = false, environment = null) {
-  const startTime = Date.now();
-  const checks = [];
-  
-  console.log('🔍 Running health checks...\n');
-  
-  // Determine which checks to run based on environment
-  const runBricks = !environment || environment === 'development';
-  const runEtch = !environment || environment === 'tests';
-  
-  // Run checks conditionally
-  const checkPromises = [];
-  
-  if (runBricks && runEtch) {
-    // Run all checks
-    checkPromises.push(
-      checkDockerContainers(),
-      checkWordPressEndpoint(8888, 'Bricks'),
-      checkWordPressEndpoint(8889, 'Etch'),
-      checkDatabaseConnection('cli', 'Bricks'),
-      checkDatabaseConnection('tests-cli', 'Etch'),
-      checkPluginActivation('cli', 'Bricks'),
-      checkPluginActivation('tests-cli', 'Etch'),
-      checkRestApi(8888, 'Bricks'),
-      checkRestApi(8889, 'Etch'),
-      checkFilePermissions('cli', 'Bricks'),
-      checkFilePermissions('tests-cli', 'Etch')
-    );
-  } else if (runBricks) {
-    // Run only Bricks checks
-    checkPromises.push(
-      checkDockerContainers(),
-      checkWordPressEndpoint(8888, 'Bricks'),
-      checkDatabaseConnection('cli', 'Bricks'),
-      checkPluginActivation('cli', 'Bricks'),
-      checkRestApi(8888, 'Bricks'),
-      checkFilePermissions('cli', 'Bricks')
-    );
-  } else if (runEtch) {
-    // Run only Etch checks
-    checkPromises.push(
-      checkDockerContainers(),
-      checkWordPressEndpoint(8889, 'Etch'),
-      checkDatabaseConnection('tests-cli', 'Etch'),
-      checkPluginActivation('tests-cli', 'Etch'),
-      checkRestApi(8889, 'Etch'),
-      checkFilePermissions('tests-cli', 'Etch')
-    );
-  }
-  
-  const results = await Promise.all(checkPromises);
-  
-  // Map results to check objects based on what was run
-  if (runBricks && runEtch) {
-    checks.push(
-      { name: 'Docker Containers', ...results[0] },
-      { name: 'Bricks Endpoint', ...results[1] },
-      { name: 'Etch Endpoint', ...results[2] },
-      { name: 'Bricks Database', ...results[3] },
-      { name: 'Etch Database', ...results[4] },
-      { name: 'Bricks Plugin', ...results[5] },
-      { name: 'Etch Plugin', ...results[6] },
-      { name: 'Bricks REST API', ...results[7] },
-      { name: 'Etch REST API', ...results[8] },
-      { name: 'Bricks File Permissions', ...results[9] },
-      { name: 'Etch File Permissions', ...results[10] }
-    );
-  } else if (runBricks) {
-    checks.push(
-      { name: 'Docker Containers', ...results[0] },
-      { name: 'Bricks Endpoint', ...results[1] },
-      { name: 'Bricks Database', ...results[2] },
-      { name: 'Bricks Plugin', ...results[3] },
-      { name: 'Bricks REST API', ...results[4] },
-      { name: 'Bricks File Permissions', ...results[5] }
-    );
-  } else if (runEtch) {
-    checks.push(
-      { name: 'Docker Containers', ...results[0] },
-      { name: 'Etch Endpoint', ...results[1] },
-      { name: 'Etch Database', ...results[2] },
-      { name: 'Etch Plugin', ...results[3] },
-      { name: 'Etch REST API', ...results[4] },
-      { name: 'Etch File Permissions', ...results[5] }
-    );
-  }
-  
-  // Display results
-  const passed = checks.filter(c => c.status === 'pass').length;
-  const failed = checks.filter(c => c.status === 'fail').length;
-  const warnings = checks.filter(c => c.status === 'warning').length;
-  const elapsed = Date.now() - startTime;
-  
-  for (const check of checks) {
-    const icon = check.status === 'pass' ? '✅' : 
-                 check.status === 'fail' ? '❌' : '⚠️';
-    console.log(`${icon} ${check.name}: ${check.message}`);
-    
-    if (verbose && check.details) {
-      console.log(`   Details: ${JSON.stringify(check.details, null, 2)}`);
+function printResults(checks, envs, summary) {
+  const statusIcon = {
+    pass: 'OK',
+    warning: 'WARN',
+    fail: 'FAIL'
+  };
+
+  console.log('\nHealth Check Report\n');
+
+  for (const env of envs) {
+    console.log(`${env.name} (${env.environment})`);
+    const envChecks = sortChecks(checks.filter((check) => check.environment === env.environment));
+    for (const check of envChecks) {
+      console.log(`  ${statusIcon[check.status] || 'INFO'} ${check.label}: ${check.message}`);
     }
+    console.log('');
   }
-  
-  console.log(`\n📊 Health Check Summary:`);
-  console.log(`   ✅ Passed: ${passed}`);
-  console.log(`   ❌ Failed: ${failed}`);
-  console.log(`   ⚠️ Warnings: ${warnings}`);
-  console.log(`   ⏱️ Completed in ${elapsed}ms`);
-  
-  // Attempt fixes if requested
-  if (fixIssues && failed > 0) {
-    console.log(`\n🔧 Attempting to fix issues...`);
-    
-    for (const check of checks) {
-      if (check.status === 'fail') {
-        console.log(`   🔄 Attempting to fix: ${check.name}`);
-        
-        try {
-          if (check.name.includes('Plugin')) {
-            // Try to reactivate plugin
-            const env = check.name.includes('Bricks') ? 'cli' : 'tests-cli';
-            await runWpEnv(['run', env, 'wp', 'plugin', 'activate', 'etch-fusion-suite']);
-            console.log(`      ✅ Plugin reactivated`);
-          } else if (check.name.includes('Database')) {
-            // Try to restart containers
-            await runWpEnv(['stop']);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await runWpEnv(['start']);
-            console.log(`      ✅ Containers restarted`);
-          }
-        } catch (error) {
-          console.log(`      ❌ Fix failed: ${error.message}`);
-        }
-      }
-    }
-  }
-  
-  const report = {
-    timestamp: new Date().toISOString(),
-    summary: { passed, failed, warnings, elapsed },
+
+  console.log('Summary');
+  console.log(`  Pass: ${summary.pass}`);
+  console.log(`  Warnings: ${summary.warning}`);
+  console.log(`  Failures: ${summary.fail}`);
+}
+
+function saveReport(checks, envs, summary) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const reportPath = join(__dirname, '..', `health-report-${timestamp}.json`);
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    environments: envs,
+    summary,
     checks
   };
-  
-  // Save report if requested
-  if (process.argv.includes('--save-report')) {
-    const reportPath = path.join(__dirname, '..', `health-report-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`);
-    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-    console.log(`\n📄 Report saved to: ${reportPath}`);
+
+  writeFileSync(reportPath, JSON.stringify(payload, null, 2), 'utf8');
+  console.log(`\nSaved health report: ${reportPath}`);
+}
+
+async function runHealthCheck(environmentFilter = null) {
+  const normalizedFilter = normalizeEnvironmentFilter(environmentFilter);
+  const envs = getEnvironments(normalizedFilter);
+  const checkPromises = [];
+
+  for (const env of envs) {
+    checkPromises.push(checkWordPress(env.environment, env.name));
+    checkPromises.push(checkMemoryLimit(env.environment, env.name));
+    checkPromises.push(checkPluginStatus(env.environment, env.name, 'etch-fusion-suite', {
+      label: `${env.name} plugin etch-fusion-suite`
+    }));
+    checkPromises.push(checkThemeConfiguration(env.environment, env.name));
+    checkPromises.push(checkComposerDependencies(env.environment, env.name));
+    checkPromises.push(checkRestApi(env.environment, env.name));
+
+    if (env.environment === 'tests-cli') {
+      checkPromises.push(checkPluginStatus(env.environment, env.name, 'etch', {
+        label: `${env.name} plugin etch`
+      }));
+    }
+
+    if (env.environment === 'cli') {
+      checkPromises.push(checkPluginStatus(env.environment, env.name, 'wpvivid-backuprestore', {
+        required: false,
+        label: `${env.name} plugin wpvivid-backuprestore`
+      }));
+    }
   }
-  
-  return report;
+
+  const checks = await Promise.all(checkPromises);
+
+  const summary = {
+    pass: checks.filter((check) => check.status === 'pass').length,
+    warning: checks.filter((check) => check.status === 'warning').length,
+    fail: checks.filter((check) => check.status === 'fail').length,
+    total: checks.length,
+    // Compatibility keys used by Playwright setup.
+    passed: checks.filter((check) => check.status === 'pass').length,
+    warnings: checks.filter((check) => check.status === 'warning').length,
+    failed: checks.filter((check) => check.status === 'fail').length
+  };
+
+  return { checks, envs, summary };
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const json = args.includes('--json');
-  const verbose = args.includes('--verbose');
-  const quiet = args.includes('--quiet');
-  const fixIssues = args.includes('--fix');
-  const environment = args.find(arg => arg.startsWith('--environment='))?.split('=')[1];
-  
-  if (quiet) {
-    // Suppress console output for JSON mode
-    console.log = () => {};
+  const { environment, saveReport: saveReportEnabled } = parseArgs(process.argv);
+  const { checks, envs, summary } = await runHealthCheck(environment);
+
+  printResults(checks, envs, summary);
+
+  if (saveReportEnabled) {
+    saveReport(checks, envs, summary);
   }
-  
-  const report = await runHealthCheck(fixIssues, verbose, environment);
-  
-  if (json) {
-    console.log(JSON.stringify(report, null, 2));
-  }
-  
-  // Exit codes
-  if (report.summary.failed > 0) {
-    process.exit(1);
-  } else if (report.summary.warnings > 0) {
-    process.exit(2);
-  } else {
-    process.exit(0);
-  }
+
+  process.exit(summary.fail > 0 ? 1 : 0);
 }
 
 if (require.main === module) {
@@ -516,4 +512,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { runHealthCheck };
+module.exports = {
+  checkMemoryLimit,
+  checkThemeConfiguration,
+  checkRestApi,
+  runHealthCheck
+};
