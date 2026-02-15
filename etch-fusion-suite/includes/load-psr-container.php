@@ -11,9 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	return;
 }
 
-$dir = dirname( __DIR__ ) . '/vendor/psr/container/src/';
-if ( is_dir( $dir ) ) {
-	require_once $dir . 'ContainerExceptionInterface.php';
-	require_once $dir . 'NotFoundExceptionInterface.php';
-	require_once $dir . 'ContainerInterface.php';
+$etch_fusion_suite_psr_container_dir = dirname( __DIR__ ) . '/vendor/psr/container/src/';
+if ( is_dir( $etch_fusion_suite_psr_container_dir ) ) {
+	require_once $etch_fusion_suite_psr_container_dir . 'ContainerExceptionInterface.php';
+	require_once $etch_fusion_suite_psr_container_dir . 'NotFoundExceptionInterface.php';
+	require_once $etch_fusion_suite_psr_container_dir . 'ContainerInterface.php';
 }

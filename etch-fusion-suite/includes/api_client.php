@@ -91,8 +91,8 @@ class EFS_API_Client {
 	 * @return array|\WP_Error
 	 */
 	private function send_request( $url, $jwt_token, $endpoint, $method = 'GET', $data = null, $api_base = 'efs/v1' ) {
-		if ( function_exists( 'efs_convert_to_internal_url' ) ) {
-			$url = efs_convert_to_internal_url( $url );
+		if ( function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
+			$url = etch_fusion_suite_convert_to_internal_url( $url );
 		}
 		$base     = rtrim( $url, '/' );
 		$full_url = $base . '/wp-json/' . $api_base . $endpoint;

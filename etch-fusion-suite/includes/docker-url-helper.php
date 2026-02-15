@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! function_exists( 'efs_convert_to_internal_url' ) ) {
+if ( ! function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
 
 	/**
 	 * Convert a localhost/browser URL to the internal URL for server-side requests (e.g. in Docker).
@@ -20,12 +20,12 @@ if ( ! function_exists( 'efs_convert_to_internal_url' ) ) {
 	 * @param string $url External URL (e.g. http://localhost:8888).
 	 * @return string URL suitable for container-to-container or host requests.
 	 */
-	function efs_convert_to_internal_url( $url ) {
+	function etch_fusion_suite_convert_to_internal_url( $url ) {
 		if ( ! is_string( $url ) || '' === $url ) {
 			return $url;
 		}
 
-		$etch_internal = efs_resolve_internal_service_host(
+		$etch_internal = etch_fusion_suite_resolve_internal_service_host(
 			array(
 				'efs-etch',
 				'etch-wordpress-etch-1',
@@ -38,8 +38,8 @@ if ( ! function_exists( 'efs_convert_to_internal_url' ) ) {
 			$default_internal = $etch_internal;
 		}
 
-		$bricks_internal = efs_resolve_bricks_internal_host();
-		$bricks_8888    = $bricks_internal ? $bricks_internal : efs_get_docker_host_fallback( 8888 );
+		$bricks_internal = etch_fusion_suite_resolve_bricks_internal_host();
+		$bricks_8888     = $bricks_internal ? $bricks_internal : etch_fusion_suite_get_docker_host_fallback( 8888 );
 
 		$replacements = array(
 			'https://localhost:8081' => $default_internal,
@@ -60,7 +60,7 @@ if ( ! function_exists( 'efs_convert_to_internal_url' ) ) {
 		}
 
 		if ( false !== strpos( $normalized, 'localhost:8889' ) ) {
-			$fallback = efs_get_docker_host_fallback( 8889 );
+			$fallback = etch_fusion_suite_get_docker_host_fallback( 8889 );
 			if ( $fallback ) {
 				$normalized = str_replace( 'localhost:8889', preg_replace( '#^https?://#', '', $fallback ), $normalized );
 				if ( 0 === strpos( $normalized, 'host.docker.internal' ) ) {
@@ -73,7 +73,7 @@ if ( ! function_exists( 'efs_convert_to_internal_url' ) ) {
 	}
 }
 
-if ( ! function_exists( 'efs_resolve_internal_service_host' ) ) {
+if ( ! function_exists( 'etch_fusion_suite_resolve_internal_service_host' ) ) {
 
 	/**
 	 * Resolve internal Docker service host for Etch target.
@@ -81,7 +81,7 @@ if ( ! function_exists( 'efs_resolve_internal_service_host' ) ) {
 	 * @param array $candidates Hostname candidates.
 	 * @return string|null HTTP base URL for internal service.
 	 */
-	function efs_resolve_internal_service_host( array $candidates ) {
+	function etch_fusion_suite_resolve_internal_service_host( array $candidates ) {
 		$candidates = apply_filters( 'etch_fusion_suite_internal_service_host_candidates', $candidates );
 		$candidates = apply_filters_deprecated(
 			'efs_internal_service_host_candidates',
@@ -109,14 +109,14 @@ if ( ! function_exists( 'efs_resolve_internal_service_host' ) ) {
 	}
 }
 
-if ( ! function_exists( 'efs_resolve_bricks_internal_host' ) ) {
+if ( ! function_exists( 'etch_fusion_suite_resolve_bricks_internal_host' ) ) {
 
 	/**
-	 * Resolve Bricks WordPress host inside Docker (wp-env: service "wordpress", port 80).
+	 * Resolve Bricks WordPress host inside Docker (wp-env: service "WordPress", port 80).
 	 *
 	 * @return string|null HTTP base URL (e.g. http://wordpress) or null when not in Docker.
 	 */
-	function efs_resolve_bricks_internal_host() {
+	function etch_fusion_suite_resolve_bricks_internal_host() {
 		$candidates = array( 'wordpress', 'bricks' );
 		$candidates = apply_filters( 'etch_fusion_suite_bricks_internal_host_candidates', $candidates );
 
@@ -139,7 +139,7 @@ if ( ! function_exists( 'efs_resolve_bricks_internal_host' ) ) {
 	}
 }
 
-if ( ! function_exists( 'efs_get_docker_host_fallback' ) ) {
+if ( ! function_exists( 'etch_fusion_suite_get_docker_host_fallback' ) ) {
 
 	/**
 	 * Derive container-aware fallback host for localhost targets.
@@ -147,7 +147,7 @@ if ( ! function_exists( 'efs_get_docker_host_fallback' ) ) {
 	 * @param int $port Target port.
 	 * @return string|null Normalized base URL or null when not available.
 	 */
-	function efs_get_docker_host_fallback( $port ) {
+	function etch_fusion_suite_get_docker_host_fallback( $port ) {
 		$port = absint( $port );
 		if ( $port <= 0 ) {
 			return null;
