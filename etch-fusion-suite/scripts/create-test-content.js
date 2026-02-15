@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
 const { spawnSync } = require('child_process');
+const path = require('path');
 
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
+const CWD = path.resolve(__dirname, '..');
+const WP_ENV_ARGS = ['run', 'cli', 'wp'];
 
 function runWpCli(args) {
-  const result = spawnSync(WP_ENV_CMD, ['run', 'cli', 'wp', ...args], { encoding: 'utf8' });
+  const run = process.platform === 'win32'
+    ? () => spawnSync('cmd', ['/c', 'npx', 'wp-env', ...WP_ENV_ARGS, ...args], { encoding: 'utf8', cwd: CWD })
+    : () => spawnSync('npx', ['wp-env', ...WP_ENV_ARGS, ...args], { encoding: 'utf8', cwd: CWD });
+  const result = run();
 
   if (result.error) {
     throw result.error;

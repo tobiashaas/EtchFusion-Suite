@@ -13,12 +13,130 @@
 
 **WordPress Core:** The shared `.wp-env.json` pulls the official `WordPress/WordPress#6.8` release directly from the wp-env registry. To use a custom archive (for example, a locally patched ZIP stored in `test-environment/wordpress.zip`), copy `.wp-env.override.json.example` to `.wp-env.override.json` and adjust the `core` path there.
 
+### Memory Requirements
+
+- Minimum recommended PHP memory: `256M`
+- Default project configuration: `512M` for `WP_MEMORY_LIMIT` and `WP_MAX_MEMORY_LIMIT`
+- Configuration source: `etch-fusion-suite/.wp-env.json`
+
+The dual-environment setup uses memory-intensive operations during Bricks setup, plugin activation, and migration runs. Memory limits are configured automatically in `.wp-env.json` for both Bricks (`cli`) and Etch (`tests-cli`).
+
+Verify current memory limit:
+
+```bash
+npm run wp:etch -- eval "echo WP_MEMORY_LIMIT;"
+```
+
 ### Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
+
+### Commercial Plugins Setup
+
+The project supports commercial plugins for local testing without committing them to Git.
+
+#### Required Plugins
+
+- **Bricks Theme**: Download from https://bricksbuilder.io/
+- **Etch Plugin**: Download from https://etchwp.com/
+- **Etch Theme**: Download from https://etchwp.com/
+
+#### Optional Plugins
+
+- **Frames Plugin**: Download from https://getframes.io/
+- **Automatic.css**: Download from https://automaticcss.com/
+
+Optional add-ons (including `frames-latest.zip`, `acss-latest.zip`, `wpvivid-latest.zip`, and `bricks-child-latest.zip`) are not referenced by default in `.wp-env.json`. Add them in `.wp-env.override.json` if you want `wp-env` to auto-install them.
+
+#### Setup Process
+
+1. Download plugins from their respective websites
+2. Place plugin ZIP files in `local-plugins/` directory
+3. Run `npm run setup:commercial-plugins`
+4. The script will automatically detect versions and create `-latest.zip` copies
+5. Start development with `npm run dev`
+
+#### Version Management
+
+The setup script supports version-agnostic plugin detection:
+
+- `bricks.2.2.zip`, `bricks.2.3.zip` -> `bricks-latest.zip`
+- `frames-1.5.11.zip`, `frames-1.5.12.zip` -> `frames-latest.zip`
+- `automatic.css-4.0.0-beta-2.zip` -> `acss-latest.zip`
+- `etch-1.0.1.zip`, `etch-1.0.2.zip` -> `etch-latest.zip`
+
+When multiple versions are found, the latest version is automatically selected.
+
+#### License Configuration
+
+Create a `.env` file from `.env.example` and add your license keys:
+
+```bash
+cp .env.example .env
+# Edit .env and add your license keys
+```
+
+### WPvivid Custom Content Backup Import
+
+Import real Bricks site data for testing without affecting users, plugins, or themes.
+
+#### Creating a Custom Content Backup
+
+1. Install WPvivid Backup Plugin on your live Bricks site
+2. Go to WPvivid Backup -> Backup & Restore
+3. Select "Custom Backup"
+4. Choose these items:
+   - `wp_posts`, `wp_postmeta`, `wp_options`
+   - `uploads`
+5. Do not select users, plugins, or themes
+6. Click "Backup Now"
+7. Download all backup parts (may be multiple files)
+
+#### Importing Backup
+
+1. Place all backup parts in `local-backups/` directory
+2. Run `npm run import:wpvivid`
+3. Follow the on-screen instructions
+4. The script will detect multi-part backups and guide you through import
+
+#### Backup Management
+
+```bash
+npm run backup:list      # List all available backups
+npm run backup:info      # Show detailed backup information
+npm run import:wpvivid   # Import latest backup
+```
+
+#### Real Data Migration Validation
+
+After restoring a WPvivid backup in the Bricks instance, run:
+
+```bash
+npm run test:migration
+npm run analyze:elements
+npm run report:migration-quality
+```
+
+These commands provide:
+- element type distribution from `_bricks_page_content_2`
+- supported vs unsupported converter coverage
+- CSS/component/content migration rates
+- JSON + Markdown report files under `reports/`
+
+#### For Other Developers
+
+To work with this project, you'll need to obtain commercial plugins:
+
+1. Purchase or obtain trial licenses for required plugins
+2. Download plugin ZIP files
+3. Place them in `local-plugins/` directory
+4. Run `npm run setup:commercial-plugins`
+5. Start development with `npm run dev`
+
+The `.gitignore` configuration ensures commercial files are never committed to the repository.
 
 ### Required Plugin & Theme Archives
 
@@ -84,6 +202,8 @@ The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), wh
 | `npm run reset:soft` | Clean databases and uploads without destroying containers |
 | `npm run reset:hard` | Complete teardown and rebuild from scratch |
 
+**Docker container names:** The wp-env stack uses readable container names: **bricks** (Bricks WordPress, port 8888), **etch** (Etch WordPress, port 8889), **bricks-mysql**, **etch-mysql**, **bricks-cli**, **etch-cli**. This is applied via a patch to `@wordpress/env`; after `npm install`, `patch-package` reapplies it automatically. To see the new names, run `npm run destroy` then `npm run dev` (or `npx wp-env start`) once.
+
 #### Logging & Debugging
 | Script | Description |
 | --- | --- |
@@ -108,6 +228,19 @@ The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), wh
 | `npm run ports:check` | Verify required ports are available and identify conflicts |
 | `npm run env:info` | Display environment configuration and status information |
 
+**Health check coverage (`npm run health`)**:
+- WordPress core reachability for both environments
+- Plugin activation status (`etch-fusion-suite` on both, `etch` on tests-cli)
+- Memory limit validation (`WP_MEMORY_LIMIT`, minimum `256M`, configured `512M`)
+- Theme configuration validation (Bricks environment availability and Etch environment cleanup)
+- Composer autoloader validation (`vendor/autoload.php`) in both environments
+- REST API reachability checks in both environments
+
+Example health output patterns:
+- `OK Bricks memory limit: WP_MEMORY_LIMIT is 512M`
+- `OK Etch theme configuration: Active theme etch-theme on tests-cli`
+- `WARN` or `FAIL` status when memory is below threshold or Bricks appears in tests-cli
+
 #### Database Operations
 | Script | Description |
 | --- | --- |
@@ -131,6 +264,8 @@ The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), wh
 | --- | --- |
 | `npm run test:connection` | Verify API connectivity between sites |
 | `npm run test:migration` | Run end-to-end migration smoke test |
+| `npm run analyze:elements` | Analyze Bricks element type usage in real post/page metadata |
+| `npm run report:migration-quality` | Generate migration KPIs and a Markdown quality report |
 | `npm run test:playwright` | Run Playwright browser tests |
 | `npm run test:playwright:ci` | Run tests in CI mode with line reporter |
 | `npm run create-test-content` | Seed Bricks site with test posts, pages, and media |
@@ -138,7 +273,11 @@ The base plugin directory is mounted automatically (`"."` in `.wp-env.json`), wh
 #### Development Tools
 | Script | Description |
 | --- | --- |
-| `npm run composer:install` | Install PHP dependencies in container |
+| `npm run composer:install` | Install PHP dependencies in both containers (cli + tests-cli) |
+| `npm run composer:install:cli` | Install PHP dependencies in Bricks (cli) container only |
+| `npm run composer:install:tests-cli` | Install PHP dependencies in Etch (tests-cli) container only |
+| `npm run composer:install:both` | Same as `composer:install` (runs both envs) |
+| `npm run composer:check` | Verify `vendor/autoload.php` in both envs (PASS/FAIL per env, exit 1 if any fail) |
 | `npm run activate` | Activate required plugins on both sites |
 | `npm run plugin:list` | List active plugins on both sites |
 | `npm run lint` | Run ESLint on JavaScript files |
@@ -180,6 +319,25 @@ npm run create-test-content  # Add test data for migration
 ```bash
 npm run reset:soft     # Clean data without destroying containers
 npm run create-test-content  # Recreate test data
+```
+
+### Verifying Memory Configuration
+```bash
+npm run health
+npm run wp:bricks -- eval "echo WP_MEMORY_LIMIT;"
+npm run wp:etch -- eval "echo WP_MEMORY_LIMIT;"
+```
+
+Expected result:
+1. No memory failures in `npm run health`
+2. Both environments report `512M`
+
+### Fixing Theme Issues
+```bash
+npm run wp:bricks -- theme list
+npm run wp:etch -- theme list
+npm run wp:etch -- theme delete bricks --force
+npm run wp:etch -- theme activate etch-theme
 ```
 
 ### Debugging Migration Issues
@@ -244,6 +402,60 @@ npm run ports:check          # Verify port availability
 3. Use custom ports: Copy `.wp-env.override.json.example` to `.wp-env.override.json` and modify `port` and `testsPort`
 4. Restart: `npm run dev`
 
+### Memory Exhaustion Errors
+
+**Symptom**: `PHP Fatal error: Allowed memory size ... exhausted`
+
+Memory limits are configured automatically in `etch-fusion-suite/.wp-env.json`:
+- `WP_MEMORY_LIMIT: "512M"`
+- `WP_MAX_MEMORY_LIMIT: "512M"`
+
+Verification steps:
+1. Run `npm run health`
+2. Confirm both environments report memory checks at or above `256M` (expected `512M`)
+3. Confirm direct values:
+   `npm run wp:bricks -- eval "echo WP_MEMORY_LIMIT;"`
+   `npm run wp:etch -- eval "echo WP_MEMORY_LIMIT;"`
+
+Fallback if automatic configuration is not applied:
+1. Restart with clean rebuild: `npm run destroy && npm run dev`
+2. Re-run `npm run health`
+3. Review advanced scenarios in `etch-fusion-suite/docs/wp-env-etch-memory.md`
+
+### Theme Management
+
+Theme behavior is environment-specific:
+- Bricks/development (`cli`) may include Bricks-related themes
+- Etch/tests (`tests-cli`) should use `etch-theme`
+- Bricks theme should not be present in tests-cli
+
+Verification:
+1. `npm run wp:bricks -- theme list`
+2. `npm run wp:etch -- theme list`
+
+Cleanup command for tests-cli:
+`npm run wp:etch -- theme delete bricks --force`
+
+### Composer troubleshooting and manual fix flow
+
+**Relevant npm commands:**
+
+| Command | Description |
+| --- | --- |
+| `npm run composer:install` | Install PHP dependencies in the container (populates `vendor/`) |
+| `npm run activate` | Activate required plugins on both Bricks and Etch sites |
+
+**Verifying dependencies:** After installing, confirm the autoloader exists: run `npm run shell:bricks` (or `npm run shell:etch` for the Etch site), then `ls -la wp-content/plugins/etch-fusion-suite/vendor/autoload.php`.
+
+**After importing Bricks backups:** To ensure the plugin works after a restore or import of Bricks backups:
+
+1. Ensure the environment is running (`npm run dev` or `npx wp-env start`).
+2. Install Composer dependencies so the plugin has its `vendor/` directory:  
+   `npm run composer:install`
+3. Reactivate the plugin on both sites so WordPress loads the plugin and its autoloader:  
+   `npm run activate`
+4. Optionally verify: `npm run health` and `npm run plugin:list`.
+
 ### Composer Installation Fails
 
 **Symptoms**: "Composer not found", missing vendor directory
@@ -264,6 +476,29 @@ npm run ports:check          # Verify port availability
 3. Check PHP errors: `npm run logs:bricks:errors`
 4. Verify plugin files: `npm run shell:bricks` then `ls -la wp-content/plugins/etch-fusion-suite/`
 
+### Critical Error on Etch Site ("There has been a critical error on this website")
+
+**Symptoms**: White screen or generic WordPress critical error message on the **Etch** (target) site.
+
+**Immediate recovery** (to regain access):
+1. Disable the plugin: rename the folder `wp-content/plugins/etch-fusion-suite` to `etch-fusion-suite.disabled` (via FTP, file manager, or wp-env: `npm run shell:etch` then `mv wp-content/plugins/etch-fusion-suite wp-content/plugins/etch-fusion-suite.disabled`).
+2. Reload the site; the error should disappear.
+
+**Find the actual error** (in `wp-config.php` on the Etch site):
+```php
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+```
+Then check `wp-content/debug.log` for the fatal error message.
+
+**Common causes and fixes**:
+1. **Missing Composer dependencies** – The plugin needs `vendor/` (e.g. `psr/container`). On the Etch site, run `composer install` inside the plugin directory:  
+   `cd wp-content/plugins/etch-fusion-suite && composer install --no-dev`  
+   If you use wp-env: `npm run shell:etch` then `cd wp-content/plugins/etch-fusion-suite && composer install --no-dev`.  
+   After the fix (from version 0.10.2 onward), a missing `vendor/` shows an admin notice instead of a white screen.
+2. **Missing PHP extension** – Ensure required extensions are enabled (e.g. `mysqli`, `dom`, `json`). Check with `php -m` or your host’s PHP info.
+
 ### Health Checks Fail
 
 **Symptoms**: `npm run health` reports failures, sites not responding
@@ -274,6 +509,11 @@ npm run ports:check          # Verify port availability
 3. Review logs: `npm run logs:bricks:errors` and `npm run logs:etch:errors`
 4. Verify WordPress is responding: Visit <http://localhost:8888> and <http://localhost:8889>
 5. Restart if needed: `npm run reset:soft`
+
+`npm run health` now validates:
+- Memory limits for Bricks (`cli`) and Etch (`tests-cli`)
+- Theme isolation (Bricks removed from tests-cli, `etch-theme` active in tests-cli)
+- Core and plugin health for both environments
 
 ### Migration Fails
 
@@ -286,6 +526,13 @@ npm run ports:check          # Verify port availability
 4. Verify JWT migration key is valid (not expired)
 5. Check REST API: Visit <http://localhost:8889/wp-json/efs/v1/status>
 6. Review security logs in WordPress admin
+
+**"Target site returned Not Found" (404)**  
+Migration runs from Etch (8889) and calls the Bricks site (8888). If the target returns 404:
+- **Activate the plugin on both sites**: `npm run activate` (activates Etch Fusion Suite on both development and tests).
+- **Bricks (target) Permalinks**: On <http://localhost:8888>, go to **Settings → Permalinks**. Do not use "Plain"; choose e.g. **Post name** and save (so `/wp-json/efs/v1/...` is available).
+- **Quick check**: Open <http://localhost:8888/wp-json/efs/v1/status> in the browser; you should see JSON, not a 404 page.
+- If you hit "Rate limit exceeded" after many retries, wait about a minute before trying again.
 
 ### Slow Performance
 
@@ -309,9 +556,10 @@ When reporting issues, include:
 
 ## Composer Dependencies
 
-- If Composer is available in the wp-env container, it will be used to install dependencies
-- If not available in the container, the script falls back to using Composer on the host machine
-- You can manually run `npm run composer:install` at any time to refresh vendor files (requires Composer in container)
+- If Composer is available in the wp-env container, it will be used to install dependencies in **both** `cli` (Bricks) and `tests-cli` (Etch) environments.
+- If not available in the container, the script falls back to using Composer on the host machine.
+- You can manually run `npm run composer:install` (or `npm run composer:install:both`) at any time to refresh vendor files in both envs.
+- **Full recovery:** `npm run composer:install:both && npm run composer:check` installs in both envs and verifies `vendor/autoload.php`; `composer:check` reports PASS/FAIL per env and exits with code 1 if any env is missing the autoloader.
 
 If neither option is present, install Composer locally before running the setup. In CI, provision Composer explicitly (e.g. via `shivammathur/setup-php` with `tools: composer`) so the fallback succeeds.
 
@@ -571,6 +819,20 @@ composer phpcs
 vendor/bin/phpcs --standard=phpcs.xml.dist
 ```
 
+**Windows (PowerShell):** If `composer` or `vendor/bin/phpcs` is not in your PATH, use the helper script:
+
+```powershell
+# From project root (E:\Github\EtchFusion-Suite)
+.\scripts\run-phpcs.ps1
+# or
+.\run-phpcs.ps1
+
+# From etch-fusion-suite
+.\scripts\run-phpcs.ps1
+```
+
+PHP must be in your PATH. The script uses `vendor` from either `etch-fusion-suite/` or the project root. Run `composer install` in one of those directories if PHPCS is not found.
+
 ### Auto-Fixing Violations
 
 PHPCBF can automatically fix many formatting issues:
@@ -706,15 +968,28 @@ The CI workflow automatically runs PHPCS on all pull requests and pushes. The li
 - ✅ **Custom CSS:** Supports custom CSS from Global Classes
 - ✅ **Nonce Verification:** Centralized WordPress nonce protection across all AJAX handlers
 - ✅ **Batch Processing:** Efficient migration of large sites
+- ✅ **Component Migration:** Migrates Bricks components to Etch `wp_block` (reusable blocks) with props, slots, and ID mapping
 - 🔌 **Extensible Migrators:** Register custom migration modules via a hook-driven API
 - ✅ **Migrator System:** Allows developers to extend and customize the migration process
+
+### Component Migration
+
+Bricks components (from the `bricks_components` option) are migrated before content so that component references can be resolved:
+
+- **Components** are converted to Gutenberg block HTML and sent to the Etch site via REST API (`POST /wp-json/efs/v1/components`).
+- **ID mapping** is stored in the `b2e_component_map` option: each Bricks component ID is mapped to the created Etch `wp_block` post ID. During content migration, component instances (`cid`) are replaced with Etch `ref` (post ID).
+- **Props** are mapped from Bricks property types (text, toggle, number, class) to Etch property schema.
+- **Slots** are converted to `etch/slot` blocks; slot children are handled during content migration.
+- **Execution order:** The component migrator runs with priority 15 (after CPTs at 10, before other migrators), so mappings are available when converting template elements to `etch/component` blocks.
+
+**Example:** A Bricks component "Card" with ID `abc123` is migrated and created as `wp_block` post ID `42` on Etch. The option `b2e_component_map` stores `['abc123' => 42]`. When content that uses the Card component is migrated, each instance’s `cid: 'abc123'` becomes `ref: 42` in the generated `etch/component` block.
 
 ## 🔒 Security
 
 ### Nonce Verification
 
 - **Centralized architecture:** All AJAX actions share the `'efs_nonce'` token generated in `admin_interface.php` and exposed to JavaScript via `efsData.nonce`.
-- **Dual-layer verification:** `get_request_payload()` pre-validates nonce tokens (`$die = false` for JSON errors) before each handler re-validates with `verify_request()` and capability checks.
+- **Handler-level verification:** Each AJAX handler validates nonce tokens with `verify_request()` and capability checks; nonces are created in `admin_interface.php` and passed to JavaScript via `wp_localize_script()`.
 - **Complete coverage:** Every AJAX handler extends `EFS_Base_Ajax_Handler` and invokes `verify_request()` as the first instruction, ensuring consistent CSRF protection.
 
 Learn more in the [Nonce Strategy documentation](docs/nonce-strategy.md) and supporting security guides.

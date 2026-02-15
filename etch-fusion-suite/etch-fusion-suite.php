@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Define plugin constants
+// Define plugin constants (needed for load path).
 define( 'ETCH_FUSION_SUITE_VERSION', '0.10.2' );
 define( 'ETCH_FUSION_SUITE_FILE', __FILE__ );
 define( 'ETCH_FUSION_SUITE_DIR', plugin_dir_path( __FILE__ ) );
@@ -34,14 +34,38 @@ define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
 define( 'EFS_ENABLE_FRAMER', false );
 
+// Load PSR Container via a separate file (always read from disk, not from OPcache).
+require_once ETCH_FUSION_SUITE_DIR . 'includes/load-psr-container.php';
 
-// Load Composer autoloader when available
+// Then load Composer autoloader for all other dependencies.
 if ( file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' ) ) {
 	require_once ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php';
 }
 
+// Plugin requires PSR Container. Check both interface and class for compatibility.
+$psr_container_ok = interface_exists( 'Psr\Container\ContainerInterface', false ) || class_exists( 'Psr\Container\ContainerInterface', false );
+if ( ! $psr_container_ok ) {
+	add_action(
+		'admin_notices',
+		function () {
+			if ( ! current_user_can( 'activate_plugins' ) ) {
+				return;
+			}
+			$msg = __( 'Etch Fusion Suite: Composer dependencies are missing. Run "composer install" in the plugin directory (etch-fusion-suite).', 'etch-fusion-suite' );
+			if ( file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' ) ) {
+				$msg .= ' ' . __( 'If you just ran composer install, try restarting wp-env (npm run stop && npm run dev) to clear PHP cache.', 'etch-fusion-suite' );
+			}
+			echo '<div class="notice notice-error"><p><strong>' . esc_html( $msg ) . '</strong></p></div>';
+		}
+	);
+	return;
+}
+
 // Always register manual WordPress-friendly autoloader for legacy class naming
 require_once ETCH_FUSION_SUITE_DIR . 'includes/autoloader.php';
+
+// Docker/internal URL conversion (used by API client and AJAX handlers)
+require_once ETCH_FUSION_SUITE_DIR . 'includes/docker-url-helper.php';
 
 // Manually load container classes (ensure they're available before bootstrap)
 require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-container.php';

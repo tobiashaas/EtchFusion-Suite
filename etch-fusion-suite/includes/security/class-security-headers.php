@@ -77,6 +77,7 @@ class EFS_Security_Headers {
 		 */
 		$directives = apply_filters( 'efs_security_headers_csp_directives', $directives, $context );
 		$directives = $this->apply_bricks_builder_overrides( $directives );
+		$directives = $this->apply_etch_editor_overrides( $directives );
 
 		return $this->compile_csp_directives( $directives );
 	}
@@ -220,6 +221,55 @@ class EFS_Security_Headers {
 		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
 
 		return $directives;
+	}
+
+	/**
+	 * Apply CSP overrides required by the Etch visual editor.
+	 *
+	 * The Etch editor (e.g. ?etch=magic) uses eval-based code (Main-Db-*.js), creates
+	 * workers from blob URLs, loads fonts from the same CDN as Bricks, and fetches icons
+	 * from Iconify/UniSVG/SimpleSVG APIs. Without these allowances the editor throws
+	 * CSP violations and fails to load.
+	 *
+	 * @param array $directives Current directive map.
+	 * @return array Directive map including Etch editor adjustments when applicable.
+	 */
+	protected function apply_etch_editor_overrides( array $directives ) {
+		if ( ! $this->is_etch_editor_request() ) {
+			return $directives;
+		}
+
+		$directives = $this->ensure_csp_values( $directives, 'script-src', array( "'unsafe-eval'" ) );
+		$directives = $this->ensure_csp_values( $directives, 'worker-src', array( "'self'", 'blob:' ) );
+		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
+		$directives = $this->ensure_csp_values(
+			$directives,
+			'connect-src',
+			array(
+				'https://api.iconify.design',
+				'https://api.unisvg.com',
+				'https://api.simplesvg.com',
+			)
+		);
+
+		return $directives;
+	}
+
+	/**
+	 * Determine whether the current request is loading the Etch visual editor.
+	 *
+	 * @return bool
+	 */
+	private function is_etch_editor_request() {
+		$etch_param = filter_input( INPUT_GET, 'etch', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
+
+		if ( null === $etch_param || '' === trim( (string) $etch_param ) ) {
+			return false;
+		}
+
+		$etch_param = sanitize_text_field( (string) $etch_param );
+
+		return 'magic' === $etch_param || 'editor' === $etch_param;
 	}
 
 	/**

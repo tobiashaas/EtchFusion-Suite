@@ -2,8 +2,7 @@
 /**
  * Image Element Converter
  *
- * Converts Bricks Image to Gutenberg Image with Etch metadata
- * IMPORTANT: Uses 'figure' tag, not 'img'!
+ * Converts Bricks image elements to Etch figure/image blocks.
  *
  * @package Bricks_Etch_Migration
  * @since 0.5.0
@@ -28,80 +27,60 @@ class EFS_Element_Image extends EFS_Base_Element {
 	 * @param array $children Not used for images
 	 * @return string Gutenberg block HTML
 	 */
-	public function convert( $element, $children = array() ) {
-		// Get style IDs
-		$style_ids = $this->get_style_ids( $element );
+	public function convert( $element, $children = array(), $context = array() ) {
+		$style_ids    = $this->get_style_ids( $element );
+		$css_classes  = $this->get_css_classes( $style_ids );
+		$label        = $this->get_label( $element );
+		$image_data   = isset( $element['settings']['image'] ) && is_array( $element['settings']['image'] ) ? $element['settings']['image'] : array();
+		$image_id     = isset( $image_data['id'] ) ? (int) $image_data['id'] : 0;
+		$image_url    = isset( $image_data['url'] ) ? (string) $image_data['url'] : '';
+		$alt_text     = $element['settings']['alt'] ?? ( $image_data['alt'] ?? '' );
+		$caption      = $element['settings']['caption'] ?? '';
+		$figure_attrs = array();
 
-		// Get CSS classes
-		$css_classes = $this->get_css_classes( $style_ids );
+		$alt_text = is_string( $alt_text ) ? $alt_text : '';
+		$caption  = is_string( $caption ) ? $caption : '';
 
-		// Get label
-		$label = $this->get_label( $element );
+		if ( '' === $image_url && $image_id > 0 && function_exists( 'wp_get_attachment_url' ) ) {
+			$resolved_url = wp_get_attachment_url( $image_id );
+			if ( is_string( $resolved_url ) ) {
+				$image_url = $resolved_url;
+			}
+		}
 
-		// Get image data
-		$image_id  = $element['settings']['image']['id'] ?? 0;
-		$image_url = $element['settings']['image']['url'] ?? '';
-		$alt_text  = $element['settings']['alt'] ?? '';
+		if ( '' === trim( $image_url ) ) {
+			return '';
+		}
 
-		// Build Etch structure with nestedData for img
-		// Styles and classes go on the IMG, not the FIGURE!
-		$img_attributes = array(
+		if ( '' !== $css_classes ) {
+			$figure_attrs['class'] = $css_classes;
+		}
+
+		$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure' );
+
+		$img_attrs = array(
 			'src' => $image_url,
 			'alt' => $alt_text,
 		);
 
-		if ( ! empty( $css_classes ) ) {
-			$img_attributes['class'] = $css_classes;
+		if ( $image_id > 0 ) {
+			$img_attrs['data-id'] = (string) $image_id;
 		}
 
-		$etch_data = array(
-			'origin'     => 'etch',
-			'nestedData' => array(
-				'img' => array(
-					'origin'     => 'etch',
-					'attributes' => $img_attributes,
-					'block'      => array(
-						'type' => 'html',
-						'tag'  => 'img',
-					),
-				),
-			),
+		$img_block = $this->generate_etch_element_block(
+			$this->build_attributes( 'Image', array(), $img_attrs, 'img' )
 		);
 
-		// Add styles to img nestedData
-		if ( ! empty( $style_ids ) ) {
-			$etch_data['nestedData']['img']['styles'] = $style_ids;
+		$inner_blocks = array( $img_block );
+
+		if ( '' !== trim( $caption ) ) {
+			$caption_block  = $this->generate_etch_element_block(
+				$this->build_attributes( 'Caption', array(), array(), 'figcaption' ),
+				$this->generate_etch_text_block( wp_kses_post( $caption ) )
+			);
+			$inner_blocks[] = $caption_block;
 		}
 
-		// Add label if present
-		if ( ! empty( $label ) ) {
-			$etch_data['name'] = $label;
-		}
-
-		// Build block attributes
-		$attrs = array(
-			'metadata'        => array(
-				'etchData' => $etch_data,
-			),
-			'sizeSlug'        => 'full',
-			'linkDestination' => 'none',
-		);
-
-		// Add image ID
-		if ( $image_id ) {
-			$attrs['id'] = $image_id;
-		}
-
-		// Convert to JSON
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-		// Build block HTML
-		$html  = '<!-- wp:image ' . $attrs_json . ' -->' . "\n";
-		$html .= '<figure class="wp-block-image size-full">';
-		$html .= '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $alt_text ) . '" />';
-		$html .= '</figure>' . "\n";
-		$html .= '<!-- /wp:image -->';
-
-		return $html;
+		return $this->generate_etch_element_block( $figure_block_attrs, $inner_blocks );
 	}
 }

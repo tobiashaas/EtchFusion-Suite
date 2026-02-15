@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Removed
+- Deprecated `etch-flex-div-style` CSS style (no longer generated)
+
+### Changed
+- Migrated all element converters to Etch v1.1+ flat schema
+- `.brxe-block` class now migrates as normal global class with flex CSS
+
 ### ✨ Improvements
 
 - (2025-11-03 21:32) **Migration Key/Token Alignment:** Assigned unique IDs to the Bricks dashboard migration key (`#efs-migration-key`) and token (`#efs-migration-token`) textareas, added `#efs-migration-key-section` wrapper for test selectors, updated labels to distinguish key vs token, and verified admin migration script continues updating the token field after start.
@@ -59,7 +66,8 @@
 
 ### 🛡️ Security & Hardening
 
-- Verified centralized nonce enforcement across all AJAX handlers (validation, connection, migration, cleanup, logs, CSS, media, content, template). Confirmed dual-layer verification in `admin_interface.php::get_request_payload()` and `EFS_Base_Ajax_Handler::verify_request()` with audit logging.
+- **Security Audit Completion (Phase 2):** Resolved all 13 PHPCS security violations across admin interface, service container, and migrator registry. Fixed 3 nonce verification errors in `admin_interface.php` by adding proper `phpcs:ignore` annotations with justification (nonce verification handled in AJAX handler layer). Fixed 10 output escaping errors in exception messages by wrapping variables with `esc_html()` in `class-service-container.php` (9 errors) and `class-migrator-registry.php` (1 error). Conducted comprehensive security review of all 5 security components (Rate Limiter, Input Validator, CORS Manager, Audit Logger, Security Headers) and verified all 9 AJAX handlers for nonce verification, capability checks, input sanitization, and rate limiting compliance. Updated `phase2-security.json` to reflect 0 errors. Verified WordPress Coding Standards compliance including Yoda conditions, strict comparisons, prepared statements, and hook prefixing. Updated `docs/security-verification-checklist.md` with review findings and final sign-off. — **2025-02-07**
+- Verified centralized nonce enforcement across all AJAX handlers (validation, connection, migration, cleanup, logs, CSS, media, content, template). Nonce verification occurs in handlers via `EFS_Base_Ajax_Handler::verify_request()` with audit logging; `admin_interface.php` only creates and passes the nonce to the frontend.
 - `tests/phpunit/bootstrap.php` honors the `EFS_SKIP_WP_LOAD` flag (including env var parsing) so security-focused PHPUnit suites can execute without needing a WordPress database.
 - Achieved 100% strict `in_array()` compliance across `includes/security/`, `includes/repositories/`, and core files via `scripts/verify-strict-comparison.sh` verification run.
 - Converted remaining non-Yoda comparisons to WordPress-compliant style in security and converter layers (`class-cors-manager.php`, `class-audit-logger.php`, `css_converter.php`, `gutenberg_generator.php`). Added `scripts/verify-yoda-conditions.sh` and Composer `verify-yoda` alias for automated enforcement.
@@ -97,6 +105,26 @@
 - Added `tests/unit/test-strict-comparison.php` to cover validator strict comparisons and URL scheme normalization.
 - Added `scripts/verify-strict-comparison.sh` with Composer `verify-strict` alias for ongoing automation.
 - (2025-10-29 09:26) **Phase 9 Core Files Documentation:** Added `docs/phase9-core-files-compliance.md` detailing PHPCS fixes, rationale for intentional `error_log()` usage in infrastructure files, security verification results, and testing guidance. Updated `DOCUMENTATION.md` and `TODOS.md` with Phase 9 completion notes and timestamps.
+
+## [0.12.0] - 2025-02-08
+
+### Added
+
+- **Element Converters Phase 2:** HTML, Shortcode, Text-Link, and Rich Text converters
+  - `EFS_Element_Html`: Converts Bricks HTML elements to `etch/raw-html` blocks
+  - `EFS_Element_Shortcode`: Converts Bricks shortcode elements to `etch/raw-html` blocks
+  - `EFS_Element_TextLink`: Converts Bricks text-link elements to `etch/element` blocks with anchor tags
+  - `EFS_Element_Text`: Converts Bricks rich text to multiple `etch/element` blocks with HTML parsing
+  - Comprehensive unit tests (34 test cases) for all Phase 2 converters
+  - Factory registration for all 4 new converter types
+  - **Acceptance criteria verification:** See `etch-fusion-suite/includes/converters/README.md` (Acceptance Criteria Verification section)
+
+### Changed
+
+- Updated Element Factory TYPE_MAP to include Phase 2 converters (html, shortcode, text-link, text)
+- Rich Text converter (`text`) now overrides simple paragraph converter for complex HTML content
+
+---
 
 ## [0.11.27] - 2025-11-02 (12:15)
 

@@ -54,9 +54,15 @@ function waitForWordPress({ port, maxAttempts = 60, interval = 2000, timeout = 1
         
         res.on('end', () => {
           if (statusCode === 200 || statusCode === 302) {
+            const location = String(res.headers.location || '');
+            const redirectLooksLikeWordPress = (
+              location.includes('wp-login.php') ||
+              location.includes('wp-admin')
+            );
             // Verify WordPress-specific markers
             const isWordPress = data.includes('wp-admin') || 
                                data.includes('WordPress') || 
+                               redirectLooksLikeWordPress ||
                                res.headers['x-powered-by']?.includes('WordPress') ||
                                res.headers.server?.includes('nginx'); // Common in wp-env
             

@@ -1,6 +1,6 @@
 # Element Converters Documentation
 
-**Last Updated:** 2025-10-22 00:44  
+**Last Updated:** 2025-02-08  
 **Version:** 0.5.0
 
 ---
@@ -55,7 +55,8 @@ converters/
     ├── class-heading.php           # Headings (h1-h6)
     ├── class-paragraph.php         # Text/Paragraph
     ├── class-image.php             # Images (figure tag!)
-    └── class-div.php               # Div/Flex-Div (li support)
+    ├── class-div.php               # Div/Flex-Div (li support)
+    └── class-notes.php             # Notes → HTML comment (fr-notes)
 ```
 
 ---
@@ -146,14 +147,17 @@ Factory Pattern für automatische Converter-Auswahl basierend auf Element-Typ.
 ### **Element-Typ Mapping**
 
 ```php
-'container'   => B2E_Element_Container
-'section'     => B2E_Element_Section
-'heading'     => B2E_Element_Heading
-'text-basic'  => B2E_Element_Paragraph
-'text'        => B2E_Element_Paragraph
-'image'       => B2E_Element_Image
-'div'         => B2E_Element_Div
-'block'       => B2E_Element_Div  // Bricks 'block' = Etch 'flex-div'
+'container'   => EFS_Element_Container
+'section'     => EFS_Element_Section
+'heading'     => EFS_Element_Heading
+'text-basic'  => EFS_Element_Paragraph
+'text'        => EFS_Element_Text   // Überschreibt text-basic für Rich Text
+'image'       => EFS_Element_Image
+'div'         => EFS_Element_Div
+'block'       => EFS_Element_Div     // Bricks 'block' = Etch 'flex-div'
+'html'        => EFS_Element_Html
+'shortcode'   => EFS_Element_Shortcode
+'text-link'   => EFS_Element_TextLink
 ```
 
 ### **Verwendung**
@@ -389,6 +393,129 @@ array(
 
 ---
 
+## 📌 Notes Converter
+
+**Datei:** `elements/class-notes.php`
+
+### **Zweck**
+
+Konvertiert Frames fr-notes Elemente in HTML-Kommentare zur Migrations-Nachverfolgung. Notes sind nur im Builder sichtbar und werden im Frontend nicht gerendert.
+
+### **Verhalten**
+
+- Gibt einen **plain HTML-Kommentar** zurück, keinen Gutenberg-Block (Ausnahme unter den Convertern).
+- Liest `notesContent` aus den Element-Settings, entfernt HTML per `wp_strip_all_tags()`, kürzt Leerzeichen.
+- Format: `<!-- MIGRATION NOTE: {text} -->`
+- Leerer oder fehlender Inhalt: `<!-- MIGRATION NOTE: (empty) -->`
+- `--` im Text wird ersetzt, um den HTML-Kommentar nicht zu brechen.
+
+### **Format**
+
+```html
+<!-- MIGRATION NOTE: Extracted note text here -->
+```
+
+### **Wichtige Änderungen**
+
+**2025-02-08:** Initial implementation (fr-notes aus skip_elements entfernt, Converter in TYPE_MAP aufgenommen)
+
+---
+
+## 📄 HTML Converter
+
+**Datei:** `elements/class-html.php`
+
+**Zweck:** Konvertiert Bricks HTML-Elemente zu `etch/raw-html` Gutenberg-Blöcken.
+
+**Features:**
+
+- ✅ Extrahiert `settings.html` Content
+- ✅ Generiert `etch/raw-html` Block
+- ✅ `unsafe: 'false'` für Etch-Sanitization
+- ✅ Keine CSS-Klassen (Raw HTML)
+
+**Beispiel:**
+
+**Input (Bricks):** Element mit `settings.html`
+
+**Output (Gutenberg):** `wp:etch/raw-html` Block-Kommentar mit JSON-Attributen
+
+**Wichtige Änderungen:** `2025-02-08: Initial implementation (Phase 2)`
+
+---
+
+## 🔖 Shortcode Converter
+
+**Datei:** `elements/class-shortcode.php`
+
+**Zweck:** Konvertiert Bricks Shortcode-Elemente zu `etch/raw-html` Blöcken.
+
+**Features:**
+
+- ✅ Extrahiert `settings.shortcode` Content
+- ✅ Generiert `etch/raw-html` Block
+- ✅ Shortcode-Format erhalten für WordPress-Runtime
+- ✅ `unsafe: 'false'`
+
+**Beispiel:**
+
+**Input:** `[gallery ids="1,2,3"]`
+
+**Output:** `wp:etch/raw-html` Block mit Shortcode-Content
+
+**Wichtige Änderungen:** `2025-02-08: Initial implementation (Phase 2)`
+
+---
+
+## 🔗 Text-Link Converter
+
+**Datei:** `elements/class-text-link.php`
+
+**Zweck:** Konvertiert Bricks Text-Link zu `etch/element` mit tag='a'.
+
+**Features:**
+
+- ✅ Link-URL aus `settings.link` (array oder string)
+- ✅ newTab → `target="_blank"` + `rel="noopener noreferrer"`
+- ✅ Text-Content aus `settings.text`
+- ✅ CSS-Klassen von Bricks übernommen
+- ✅ etchData mit `block.type='html'` und `block.tag='a'`
+
+**Beispiel:**
+
+**Input:** Element mit Link-Daten und newTab
+
+**Output:** `wp:etch/element` Block mit Anchor-Tag
+
+**Wichtige Änderungen:** `2025-02-08: Initial implementation (Phase 2)`
+
+---
+
+## 📝 Rich Text Converter (text)
+
+**Datei:** `elements/class-text.php`
+
+**Zweck:** Konvertiert Bricks Rich Text zu mehreren `etch/element` Blöcken.
+
+**Features:**
+
+- ✅ **KOMPLEX:** Ein Bricks-Element → Mehrere Etch-Blocks
+- ✅ HTML-Parsing mit DOMDocument
+- ✅ Top-Level-Elemente identifiziert (p, h1-h6, ul, ol, div, etc.)
+- ✅ Verschachtelte Listen (ul/ol > li als innerBlocks)
+- ✅ CSS-Klassen erhalten (von Bricks + aus HTML)
+- ✅ Inline-Elemente in Paragraphs gewrappt
+
+**Beispiel:**
+
+**Input:** `<p>Text</p><ul><li>Item</li></ul><p>More</p>`
+
+**Output:** 3 separate `wp:etch/element` Blöcke (p, ul mit list-items, p)
+
+**Wichtige Änderungen:** `2025-02-08: Initial implementation (Phase 2) - HTML parsing with DOMDocument`
+
+---
+
 ## 🔄 Workflow
 
 ### **1. Element wird verarbeitet**
@@ -466,6 +593,26 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 
 ---
 
+---
+
+## ✅ Acceptance Criteria Verification
+
+This section documents each ticket criterion for the Element Converters Phase 2 feature, marking satisfaction status or any limitation/deviation. Reference: CHANGELOG v0.12.0 (2025-02-08).
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | **EFS_Element_Html** converts Bricks HTML elements to `etch/raw-html` blocks | ✅ Satisfied | `elements/class-html.php`; outputs wp:etch/raw-html with content, unsafe, and metadata.etchData (block.type, block.tag) |
+| 2 | **EFS_Element_Shortcode** converts Bricks shortcode elements to `etch/raw-html` blocks | ✅ Satisfied | `elements/class-shortcode.php`; same structure as HTML converter |
+| 3 | **EFS_Element_TextLink** converts Bricks text-link to `etch/element` blocks with anchor tags | ✅ Satisfied | `elements/class-text-link.php`; etchData with block.type='html', block.tag='a' |
+| 4 | **EFS_Element_Text** converts Bricks rich text to multiple `etch/element` blocks | ✅ Satisfied | `elements/class-text.php`; DOMDocument parsing; multiple blocks for p, ul, ol, etc. |
+| 5 | Comprehensive unit tests for all Phase 2 converters | ✅ Satisfied | `tests/test-element-converters.php` – Tests 6–19 cover Phase 2 (HTML, Shortcode, Text-Link, Text, SVG, Video, Code, Factory, Style Map) |
+| 6 | Factory registration for all 4 new converter types (html, shortcode, text-link, text) | ✅ Satisfied | `class-element-factory.php` TYPE_MAP includes html, shortcode, text-link, text |
+| 7 | etchData schema compliance for `etch/raw-html` blocks (metadata.etchData, block.type, block.tag) | ✅ Satisfied | HTML and Shortcode converters output metadata; integration tests 13 & 14 assert presence |
+
+**Deviations / Limitations:** None. All criteria met.
+
+---
+
 ## 🧪 Testing
 
 ### **Unit Tests**
@@ -478,6 +625,9 @@ Testet jeden Converter einzeln:
 - Heading (h2)
 - Image (figure tag)
 - Section
+- Phase 2: HTML, Shortcode, Text-Link, Rich Text (Tests 13–19)
+- Phase 2 Edge Cases: leere Inhalte, fehlerhafte HTML, Link-Formate (Tests 20–28)
+- Phase 2 Integration: Pipeline aller vier Elemente, Style-Map-Propagation (Tests 29–30)
 
 ### **Integration Tests**
 
@@ -542,6 +692,10 @@ $tag = $this->get_tag($element, 'div');  // Liest aus settings.tag
 $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 ```
 
+### **Problem: Rich Text generiert nur einen Block statt mehrere**
+
+**Lösung:** Prüfe ob HTML korrekt geparst wird. `class-text.php` verwendet DOMDocument. Bei Parsing-Fehlern wird leerer String zurückgegeben.
+
 ---
 
 ## 🔮 Zukünftige Erweiterungen
@@ -573,5 +727,5 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 ---
 
 **Erstellt:** 2025-10-22 00:44  
-**Letzte Änderung:** 2025-10-22 00:44  
+**Letzte Änderung:** 2025-02-08  
 **Version:** 0.5.0

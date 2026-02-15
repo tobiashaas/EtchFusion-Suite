@@ -8,7 +8,11 @@ const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 
 function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'pipe', ...options });
+    const spawnOpts = { stdio: 'pipe', ...options };
+    if (process.platform === 'win32' && command === WP_ENV_CMD) {
+      spawnOpts.shell = true;
+    }
+    const child = spawn(command, args, spawnOpts);
     let stdout = '';
     let stderr = '';
 

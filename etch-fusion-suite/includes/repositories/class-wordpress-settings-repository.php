@@ -38,11 +38,12 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		$cache_key = 'efs_cache_settings_plugin';
 		$cached    = get_transient( $cache_key );
 
-		if ( false !== $cached ) {
+		if ( false !== $cached && is_array( $cached ) ) {
 			return $cached;
 		}
 
 		$settings = get_option( 'efs_settings', array() );
+		$settings = is_array( $settings ) ? $settings : array();
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
 
 		return $settings;
@@ -68,11 +69,12 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		$cache_key = 'efs_cache_settings_migration';
 		$cached    = get_transient( $cache_key );
 
-		if ( false !== $cached ) {
+		if ( false !== $cached && is_array( $cached ) ) {
 			return $cached;
 		}
 
 		$settings = get_option( 'efs_migration_settings', array() );
+		$settings = is_array( $settings ) ? $settings : array();
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
 
 		return $settings;
@@ -190,11 +192,12 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		$cache_key = 'efs_cache_cors_origins';
 		$cached    = get_transient( $cache_key );
 
-		if ( false !== $cached ) {
+		if ( false !== $cached && is_array( $cached ) ) {
 			return $cached;
 		}
 
 		$origins = get_option( 'efs_cors_allowed_origins', array() );
+		$origins = is_array( $origins ) ? $origins : array();
 		set_transient( $cache_key, $origins, self::CACHE_EXPIRATION );
 
 		return $origins;
@@ -240,7 +243,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		);
 
 		$settings = get_option( 'efs_security_settings', $defaults );
-		$settings = wp_parse_args( $settings, $defaults );
+		$settings = is_array( $settings ) ? wp_parse_args( $settings, $defaults ) : $defaults;
 
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
 

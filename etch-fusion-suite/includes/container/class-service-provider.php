@@ -206,6 +206,18 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'component_migrator',
+			function ( $c ) {
+				$style_map = $c->has( 'style_repository' ) ? $c->get( 'style_repository' )->get_style_map() : array();
+				return new \Bricks2Etch\Migrators\EFS_Component_Migrator(
+					$c->get( 'error_handler' ),
+					$c->get( 'api_client' ),
+					$style_map
+				);
+			}
+		);
+
+		$container->singleton(
 			'migrator_registry',
 			function ( $c ) {
 				return \Bricks2Etch\Migrators\EFS_Migrator_Registry::instance();
@@ -531,6 +543,7 @@ class EFS_Service_Provider {
 			'acf_migrator',
 			'metabox_migrator',
 			'custom_fields_migrator',
+			'component_migrator',
 			'migrator_registry',
 			'migrator_discovery',
 			'html_parser',

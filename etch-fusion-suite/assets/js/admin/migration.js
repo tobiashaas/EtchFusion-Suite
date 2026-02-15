@@ -72,6 +72,9 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
 
         return data;
     } catch (error) {
+        if (error?.name === 'AbortError') {
+            return { aborted: true, migrationId };
+        }
         console.error('[EFS] Progress request failed:', error);
         return {
             progress: { percentage: 0, status: 'error', current_step: 'error' },
@@ -220,6 +223,9 @@ export const startProgressPolling = (params = {}, options = {}) => {
         }
 
         if (!pollState) {
+            return;
+        }
+        if (result?.aborted) {
             return;
         }
 

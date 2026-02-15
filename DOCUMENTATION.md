@@ -1048,11 +1048,11 @@ For a full breakdown of helper methods, breakpoint mappings, logical property tr
 
 ## Content Migration
 
-**Updated:** 2025-10-21 23:40
+**Updated:** 2025-02-08
 
-### PHPCS Overview
+### Overview
 
-Converts Bricks elements to Gutenberg blocks with Etch metadata.
+Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Factory supports 18 converter types in total, including Phase 2 converters: HTML (`etch/raw-html`), Shortcode (`etch/raw-html`), Text-Link (`etch/element` with anchor), and Rich Text (`etch/element`, multiple blocks via DOMDocument). See `etch-fusion-suite/includes/converters/README.md` for full converter documentation.
 
 ### Element Types
 
@@ -1590,7 +1590,7 @@ All responses flow through `wp_send_json_success()`, `wp_send_json_error()`, or 
 Etch Fusion Suite protects every AJAX request with a centralized nonce architecture:
 
 - **Single nonce action** — All handlers share `'efs_nonce'`, generated in `admin_interface.php::enqueue_admin_assets()` and localized to JavaScript as `efsData.nonce`.
-- **Dual-layer verification** — `admin_interface.php::get_request_payload()` performs preflight verification (`$die = false`), while handlers call `verify_request()` as the first line to run nonce + capability checks and audit logging.
+- **Handler-level verification** — All AJAX handlers call `verify_request()` as the first line to run nonce + capability checks and audit logging; nonce creation happens in `admin_interface.php`, verification only in handlers.
 - **Comprehensive coverage** — All nine AJAX handler classes extend the base handler and invoke `verify_request()` before touching input, ensuring 100% compliance.
 
 **Documentation:**
@@ -1628,7 +1628,7 @@ Three core infrastructure files underpin the admin experience, error handling, a
 
 - **Scope:** 1,187 lines reviewed under Phase 9 (Kleinere Core-Dateien).
 - **PHPCS Fixes:** 4 Yoda comparisons corrected (`strpos` checks, `array_filter` callbacks). All intentional `error_log()` calls annotated with `phpcs:ignore` plus rationale.
-- **Security Verification:** Confirmed nonce verification (`admin_interface.php::get_request_payload()`), recursive sanitization (payload + audit logger contexts), masked sensitive keys, `wp_send_json_*` responses, and strict `in_array()` usage.
+- **Security Verification:** Confirmed nonce verification in handlers via `EFS_Base_Ajax_Handler::verify_request()`, recursive sanitization (payload + audit logger contexts), masked sensitive keys, `wp_send_json_*` responses, and strict `in_array()` usage.
 - **Documentation:** See [`docs/phase9-core-files-compliance.md`](etch-fusion-suite/docs/phase9-core-files-compliance.md) for change log, rationale, and testing guidance.
 
 ### Why `error_log()` Remains

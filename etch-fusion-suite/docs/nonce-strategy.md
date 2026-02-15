@@ -21,16 +21,9 @@ WordPress nonces ("number used once") are single-use tokens that protect authent
 - The pattern is enforced in `assets/js/admin/main.js` and reused by shared request helpers
 - All AJAX endpoints expect the nonce alongside the `action` parameter, regardless of business logic
 
-### 2.3 Nonce Verification (Dual-Layer)
+### 2.3 Nonce Verification (Single-Layer)
 
-#### Layer 1: Admin Interface Pre-Verification
-
-- Source: `includes/admin_interface.php::get_request_payload()` @144-169
-- `check_ajax_referer( 'efs_nonce', 'nonce', false )` verifies the nonce before payload sanitization
-- `$die = false` allows the admin interface to return structured JSON errors instead of triggering WordPress' default `die()` behaviour
-- Legacy actions (`efs_save_settings`, `efs_test_connection`) benefit from this guard even before the request reaches a handler class
-
-#### Layer 2: Handler Verification (Primary)
+#### Layer 1: Handler Verification
 
 - Source: `includes/ajax/class-base-ajax-handler.php::verify_request()` @119-158
 - Security model:
@@ -94,7 +87,7 @@ All handlers extend `EFS_Base_Ajax_Handler` and invoke `verify_request()` as the
 ### 4.3 CSRF Protection
 
 - Tokens cannot be forged by third parties without access to the admin session
-- Dual-layer verification (admin interface + handlers) guards against edge cases where legacy endpoints bypass the base handler
+- Handler-level verification via `EFS_Base_Ajax_Handler::verify_request()` ensures every AJAX request is validated before processing
 - Capability checks and audit logs provide a documented trail for security reviews
 
 ## 5. Error Handling
@@ -161,9 +154,9 @@ sequenceDiagram
     end
 
     rect rgb(240, 255, 240)
-        Note over Handler,Audit: 3. NONCE VERIFICATION (Dual-Layer)
+        Note over Handler,Audit: 3. NONCE VERIFICATION (Single-Layer)
 
-        Note over Handler,Base: Layer 1: Handler Verification (Primary)
+        Note over Handler,Base: Layer 1: Handler Verification
         Handler->>Base: verify_request('manage_options')
         Base->>Base: verify_nonce()
         Base->>WP: check_ajax_referer('efs_nonce', 'nonce', false)
@@ -202,7 +195,7 @@ sequenceDiagram
 ## 9. References
 
 - `includes/ajax/class-base-ajax-handler.php` @18-571
-- `includes/admin_interface.php` @19-210
+- `includes/admin_interface.php` (nonce creation via `wp_create_nonce('efs_nonce')` and `wp_localize_script()` only; no verification)
 - `docs/security-architecture.md`
 - `docs/security-best-practices.md`
 - `docs/security-verification-checklist.md`

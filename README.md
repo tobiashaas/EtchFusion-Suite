@@ -614,7 +614,7 @@ GPL v2 or later
 ## 🔗 Links
 
 - [Bricks Builder](https://bricksbuilder.io/)
-- [Etch PageBuilder](https://etchtheme.com/)
+- [Etch | visual development environment](https://etchwp.com/)
 - [GitHub Repository](https://github.com/tobiashaas/EtchFusion-Suite)
 
 ---

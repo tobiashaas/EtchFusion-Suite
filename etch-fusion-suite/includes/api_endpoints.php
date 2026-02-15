@@ -410,6 +410,12 @@ class EFS_API_Endpoints {
 			$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
 		}
 
+		// Non-browser or same-origin server-to-server requests often omit Origin.
+		// CORS is a browser concern, so allow empty Origin values.
+		if ( '' === $origin ) {
+			return true;
+		}
+
 		if ( ! self::$cors_manager->is_origin_allowed( $origin ) ) {
 			// Log CORS violation
 			if ( self::$audit_logger ) {
@@ -512,6 +518,11 @@ class EFS_API_Endpoints {
 	 * Handle key-based migration request
 	 */
 	public static function handle_key_migration( $request ) {
+		$rate = self::check_rate_limit( 'handle_key_migration', 10, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
 		// Check CORS origin
 		$cors_check = self::check_cors_origin();
 		if ( is_wp_error( $cors_check ) ) {
@@ -583,6 +594,11 @@ class EFS_API_Endpoints {
 	 * Creates a new migration token and returns the migration key URL
 	 */
 	public static function generate_migration_key( $request ) {
+		$rate = self::check_rate_limit( 'generate_migration_key', 10, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
 		try {
 			/** @var EFS_Migration_Token_Manager $token_manager */
 			$token_manager = self::resolve( 'token_manager' );
@@ -615,6 +631,11 @@ class EFS_API_Endpoints {
 	 * Used by the "Validate Key" button to test API connection
 	 */
 	public static function validate_migration_token( $request ) {
+		$rate = self::check_rate_limit( 'validate_migration_token', 10, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
 		// Check CORS origin
 		$cors_check = self::check_cors_origin();
 		if ( is_wp_error( $cors_check ) ) {
@@ -673,13 +694,6 @@ class EFS_API_Endpoints {
 
 		} catch ( \Exception $e ) {
 			return new \WP_Error( 'validation_error', 'Token validation failed: ' . $e->getMessage(), array( 'status' => 500 ) );
-		}
-	}
-
-	/**
-	 * Validate request payload using input validator.
-	 *
-	 * @param array $data  Request data.
 		}
 	}
 
@@ -782,6 +796,461 @@ class EFS_API_Endpoints {
 				'message'    => __( 'Connection validated successfully.', 'etch-fusion-suite' ),
 				'payload'    => $decoded['payload'] ?? array(),
 				'target_url' => $decoded['payload']['target_url'] ?? '',
+			),
+			200
+		);
+	}
+
+	/**
+	 * Extract Bearer token from Authorization header.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return string
+	 */
+	private static function get_bearer_token( $request ) {
+		$header = $request->get_header( 'authorization' );
+		$fallback = $request->get_header( 'x-efs-migration-key' );
+
+		if ( is_string( $fallback ) && '' !== trim( $fallback ) ) {
+			return trim( $fallback );
+		}
+
+		if ( empty( $header ) && isset( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$header = sanitize_text_field( wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] ) );
+		}
+
+		if ( ! is_string( $header ) ) {
+			return '';
+		}
+
+		if ( preg_match( '/Bearer\s+(.+)/i', $header, $matches ) ) {
+			return trim( $matches[1] );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Validate Bearer migration token for import endpoints.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return array|\WP_Error
+	 */
+	private static function validate_bearer_migration_token( $request ) {
+		$token = self::get_bearer_token( $request );
+		if ( empty( $token ) ) {
+			return new \WP_Error( 'missing_authorization', __( 'Missing Bearer token.', 'etch-fusion-suite' ), array( 'status' => 401 ) );
+		}
+
+		/** @var EFS_Migration_Token_Manager $token_manager */
+		$token_manager = self::resolve( 'token_manager' );
+		if ( ! $token_manager ) {
+			return new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$validated = $token_manager->validate_migration_token( $token );
+		if ( is_wp_error( $validated ) ) {
+			return new \WP_Error( 'invalid_migration_token', $validated->get_error_message(), array( 'status' => 401 ) );
+		}
+
+		return $validated;
+	}
+
+	/**
+	 * Import custom post types.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_cpts( $request ) {
+		$rate = self::check_rate_limit( 'import_cpts', 60, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+
+		$cpt_migrator = self::resolve( 'cpt_migrator' );
+		if ( ! $cpt_migrator || ! method_exists( $cpt_migrator, 'import_custom_post_types' ) ) {
+			return new \WP_Error( 'cpt_import_unavailable', __( 'CPT import service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$result = $cpt_migrator->import_custom_post_types( $data );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'result'  => $result,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Import ACF field groups.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_acf_field_groups( $request ) {
+		$rate = self::check_rate_limit( 'import_acf_field_groups', 60, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+
+		$acf_migrator = self::resolve( 'acf_migrator' );
+		if ( ! $acf_migrator || ! method_exists( $acf_migrator, 'import_field_groups' ) ) {
+			return new \WP_Error( 'acf_import_unavailable', __( 'ACF import service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$result = $acf_migrator->import_field_groups( $data );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'result'  => $result,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Import MetaBox configurations.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_metabox_configs( $request ) {
+		$rate = self::check_rate_limit( 'import_metabox_configs', 60, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+
+		$metabox_migrator = self::resolve( 'metabox_migrator' );
+		if ( ! $metabox_migrator || ! method_exists( $metabox_migrator, 'import_metabox_configs' ) ) {
+			return new \WP_Error( 'metabox_import_unavailable', __( 'MetaBox import service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$result = $metabox_migrator->import_metabox_configs( $data );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'result'  => $result,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Import converted CSS classes/styles.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_css_classes( $request ) {
+		$rate = self::check_rate_limit( 'import_css_classes', 120, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : array();
+
+		$css_converter = self::resolve( 'css_converter' );
+		if ( ! $css_converter || ! method_exists( $css_converter, 'import_etch_styles' ) ) {
+			return new \WP_Error( 'css_import_unavailable', __( 'CSS import service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$result = $css_converter->import_etch_styles( $data );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'result'  => $result,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Import post content into target site.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_post( $request ) {
+		$rate = self::check_rate_limit( 'import_post', 240, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$payload = $request->get_json_params();
+		$payload = is_array( $payload ) ? $payload : array();
+		$post    = isset( $payload['post'] ) && is_array( $payload['post'] ) ? $payload['post'] : array();
+
+		if ( empty( $post ) ) {
+			return new \WP_Error( 'invalid_post_payload', __( 'Invalid post payload.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
+		}
+
+		$post_type = isset( $post['post_type'] ) ? sanitize_key( $post['post_type'] ) : 'post';
+		if ( ! post_type_exists( $post_type ) ) {
+			$post_type = 'post';
+		}
+
+		$post_title = isset( $post['post_title'] ) ? sanitize_text_field( $post['post_title'] ) : '';
+		$post_slug  = isset( $post['post_name'] ) ? sanitize_title( $post['post_name'] ) : sanitize_title( $post_title );
+		$post_date  = isset( $post['post_date'] ) ? sanitize_text_field( $post['post_date'] ) : current_time( 'mysql' );
+		$post_status = isset( $post['post_status'] ) ? sanitize_key( $post['post_status'] ) : 'draft';
+		if ( ! in_array( $post_status, array( 'publish', 'draft', 'pending', 'private', 'future' ), true ) ) {
+			$post_status = 'draft';
+		}
+
+		$etch_content = isset( $payload['etch_content'] ) ? (string) $payload['etch_content'] : '';
+		if ( '' === trim( $etch_content ) ) {
+			$etch_content = '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->';
+		}
+
+		$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
+		$postarr  = array(
+			'post_title'   => $post_title,
+			'post_name'    => $post_slug,
+			'post_type'    => $post_type,
+			'post_status'  => $post_status,
+			'post_date'    => $post_date,
+			'post_content' => wp_kses_post( $etch_content ),
+		);
+		if ( $existing instanceof \WP_Post ) {
+			$postarr['ID'] = $existing->ID;
+		}
+
+		$post_id = wp_insert_post( $postarr, true );
+		if ( is_wp_error( $post_id ) ) {
+			return new \WP_Error( 'post_import_failed', $post_id->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		$source_post_id = isset( $post['ID'] ) ? absint( $post['ID'] ) : 0;
+		if ( $source_post_id > 0 ) {
+			$mappings = get_option( 'b2e_post_mappings', array() );
+			$mappings = is_array( $mappings ) ? $mappings : array();
+			$mappings[ $source_post_id ] = (int) $post_id;
+			update_option( 'b2e_post_mappings', $mappings );
+
+			update_post_meta( $post_id, '_b2e_original_post_id', $source_post_id );
+		}
+
+		update_post_meta( $post_id, '_b2e_migrated_from_bricks', 1 );
+		update_post_meta( $post_id, '_b2e_migration_date', current_time( 'mysql' ) );
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'post_id' => (int) $post_id,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Import post meta into target site.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_post_meta( $request ) {
+		$rate = self::check_rate_limit( 'import_post_meta', 240, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$payload = $request->get_json_params();
+		$payload = is_array( $payload ) ? $payload : array();
+		$meta    = isset( $payload['meta'] ) && is_array( $payload['meta'] ) ? $payload['meta'] : array();
+
+		if ( empty( $meta ) ) {
+			return new \WP_REST_Response( array( 'success' => true, 'updated' => 0 ), 200 );
+		}
+
+		$source_post_id = isset( $payload['post_id'] ) ? absint( $payload['post_id'] ) : 0;
+		$target_post_id = isset( $payload['target_post_id'] ) ? absint( $payload['target_post_id'] ) : 0;
+
+		if ( $target_post_id <= 0 && $source_post_id > 0 ) {
+			$mappings = get_option( 'b2e_post_mappings', array() );
+			if ( is_array( $mappings ) && isset( $mappings[ $source_post_id ] ) ) {
+				$target_post_id = absint( $mappings[ $source_post_id ] );
+			}
+		}
+
+		if ( $target_post_id <= 0 && $source_post_id > 0 ) {
+			$target_post_id = $source_post_id;
+		}
+
+		if ( $target_post_id <= 0 || ! get_post( $target_post_id ) ) {
+			return new \WP_Error( 'target_post_not_found', __( 'Target post not found for meta import.', 'etch-fusion-suite' ), array( 'status' => 404 ) );
+		}
+
+		$updated = 0;
+		foreach ( $meta as $meta_key => $meta_value ) {
+			$key = sanitize_key( (string) $meta_key );
+			if ( '' === $key ) {
+				continue;
+			}
+			update_post_meta( $target_post_id, $key, $meta_value );
+			++$updated;
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'updated' => $updated,
+				'post_id' => (int) $target_post_id,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Receive media payload and create attachment.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function receive_media( $request ) {
+		$rate = self::check_rate_limit( 'receive_media', 120, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$payload = $request->get_json_params();
+		$payload = is_array( $payload ) ? $payload : array();
+
+		$filename     = isset( $payload['filename'] ) ? sanitize_file_name( $payload['filename'] ) : '';
+		$title        = isset( $payload['title'] ) ? sanitize_text_field( $payload['title'] ) : '';
+		$mime_type    = isset( $payload['mime_type'] ) ? sanitize_text_field( $payload['mime_type'] ) : '';
+		$file_content = isset( $payload['file_content'] ) ? base64_decode( (string) $payload['file_content'], true ) : false;
+
+		if ( empty( $filename ) || false === $file_content ) {
+			return new \WP_Error( 'invalid_media_payload', __( 'Invalid media payload.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
+		}
+
+		$upload = wp_upload_bits( $filename, null, $file_content );
+		if ( ! empty( $upload['error'] ) ) {
+			return new \WP_Error( 'media_upload_failed', $upload['error'], array( 'status' => 500 ) );
+		}
+
+		$attachment = array(
+			'post_mime_type' => $mime_type,
+			'post_title'     => $title ?: preg_replace( '/\.[^.]+$/', '', $filename ),
+			'post_content'   => '',
+			'post_status'    => 'inherit',
+		);
+
+		$attachment_id = wp_insert_attachment( $attachment, $upload['file'] );
+		if ( is_wp_error( $attachment_id ) ) {
+			return new \WP_Error( 'media_insert_failed', $attachment_id->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		$metadata = wp_generate_attachment_metadata( $attachment_id, $upload['file'] );
+		wp_update_attachment_metadata( $attachment_id, $metadata );
+
+		if ( ! empty( $payload['alt_text'] ) ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $payload['alt_text'] ) );
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'success'  => true,
+				'media_id' => (int) $attachment_id,
 			),
 			200
 		);
@@ -903,6 +1372,76 @@ class EFS_API_Endpoints {
 			'/auth/validate',
 			array(
 				'callback'            => array( __CLASS__, 'validate_connection' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/cpts',
+			array(
+				'callback'            => array( __CLASS__, 'import_cpts' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/acf-field-groups',
+			array(
+				'callback'            => array( __CLASS__, 'import_acf_field_groups' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/metabox-configs',
+			array(
+				'callback'            => array( __CLASS__, 'import_metabox_configs' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/css-classes',
+			array(
+				'callback'            => array( __CLASS__, 'import_css_classes' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/post',
+			array(
+				'callback'            => array( __CLASS__, 'import_post' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/post-meta',
+			array(
+				'callback'            => array( __CLASS__, 'import_post_meta' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/receive-media',
+			array(
+				'callback'            => array( __CLASS__, 'receive_media' ),
 				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
