@@ -96,25 +96,65 @@ class EFS_Element_Component extends EFS_Base_Element {
 	}
 
 	/**
+	 * Whether the given value is a class-type array (sequential list of scalars/IDs).
+	 * Used to avoid mapping associative or nested arrays to style IDs. Optionally
+	 * treat as class array when values appear as keys in style_map (selectors present).
+	 *
+	 * @param array $value    Candidate array.
+	 * @param array $style_map Bricks ID => Etch style data (e.g. id, selector).
+	 * @return bool True if sequential list of scalars (and optionally IDs in style_map).
+	 */
+	protected function is_class_type_array( $value, $style_map ) {
+		if ( ! is_array( $value ) ) {
+			return false;
+		}
+		$n = count( $value );
+		if ( 0 === $n ) {
+			return true;
+		}
+		$keys          = array_keys( $value );
+		$expected_keys = range( 0, $n - 1 );
+		if ( $keys !== $expected_keys ) {
+			return false;
+		}
+		foreach ( $value as $v ) {
+			if ( is_array( $v ) || is_object( $v ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Normalize a single instance property value for Etch schema.
-	 * Class-type (array of Bricks class IDs) → Etch style IDs; toggle → bool; number → float/int; else string.
+	 * Only class-type arrays (sequential list of scalars/IDs) are mapped to style IDs.
+	 * Associative or nested arrays are recursively normalized preserving keys; leaves
+	 * get scalar/boolean/number normalization. Toggle → bool; number → float/int; else string.
 	 *
 	 * @param mixed $value Raw value from Bricks instance.
-	 * @return mixed Normalized value (array of style IDs, bool, float|int, or string).
+	 * @return mixed Normalized value (array of style IDs, normalized array, bool, float|int, or string).
 	 */
 	protected function normalize_instance_property_value( $value ) {
-		// Class-type: array of Bricks class IDs → map to Etch style IDs (same as convert_properties).
+		$style_map = is_array( $this->style_map ) ? $this->style_map : array();
+
 		if ( is_array( $value ) ) {
-			$style_ids = array();
-			$style_map = is_array( $this->style_map ) ? $this->style_map : array();
-			foreach ( $value as $class_id ) {
-				if ( isset( $style_map[ $class_id ]['id'] ) ) {
-					$style_ids[] = $style_map[ $class_id ]['id'];
-				} else {
-					$style_ids[] = $class_id;
+			if ( $this->is_class_type_array( $value, $style_map ) ) {
+				$style_ids = array();
+				foreach ( $value as $class_id ) {
+					if ( isset( $style_map[ $class_id ]['id'] ) ) {
+						$style_ids[] = $style_map[ $class_id ]['id'];
+					} else {
+						$style_ids[] = $class_id;
+					}
 				}
+				return $style_ids;
 			}
-			return $style_ids;
+
+			$normalized = array();
+			foreach ( $value as $k => $v ) {
+				$normalized[ $k ] = $this->normalize_instance_property_value( $v );
+			}
+			return $normalized;
 		}
 
 		// Boolean / toggle.

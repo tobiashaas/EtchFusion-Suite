@@ -316,12 +316,12 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
-		$fallback_element               = $element;
-		$fallback_element['etch_type']  = 'paragraph';
-		$fallback_element['etch_data']  = array(
+		$fallback_element              = $element;
+		$fallback_element['etch_type'] = 'paragraph';
+		$fallback_element['etch_data'] = array(
 			'class' => implode( ' ', $this->get_element_classes( $element ) ),
 		);
-		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'p' );
+		$attrs                         = $this->build_flat_fallback_attrs( $fallback_element, 'p' );
 
 		return $this->serialize_etch_element_block( $attrs, wp_kses_post( $text ) );
 	}
@@ -340,12 +340,12 @@ class EFS_Gutenberg_Generator {
 			$tag = 'h2';
 		}
 
-		$fallback_element               = $element;
-		$fallback_element['etch_type']  = 'heading';
-		$fallback_element['etch_data']  = array(
+		$fallback_element              = $element;
+		$fallback_element['etch_type'] = 'heading';
+		$fallback_element['etch_data'] = array(
 			'class' => implode( ' ', $this->get_element_classes( $element ) ),
 		);
-		$attrs = $this->build_flat_fallback_attrs( $fallback_element, $tag );
+		$attrs                         = $this->build_flat_fallback_attrs( $fallback_element, $tag );
 
 		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $text ) ) );
 	}
@@ -366,12 +366,12 @@ class EFS_Gutenberg_Generator {
 			$extra_attributes['alt'] = sanitize_text_field( (string) $element['settings']['image']['alt'] );
 		}
 
-		$fallback_element               = $element;
-		$fallback_element['etch_type']  = 'image';
-		$fallback_element['etch_data']  = array(
+		$fallback_element              = $element;
+		$fallback_element['etch_type'] = 'image';
+		$fallback_element['etch_data'] = array(
 			'class' => implode( ' ', $this->get_element_classes( $element ) ),
 		);
-		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'img', $extra_attributes );
+		$attrs                         = $this->build_flat_fallback_attrs( $fallback_element, 'img', $extra_attributes );
 
 		return $this->serialize_etch_element_block( $attrs );
 	}
@@ -418,7 +418,7 @@ class EFS_Gutenberg_Generator {
 		$fallback_element['etch_data'] = array(
 			'class' => $classes,
 		);
-		$attrs = $this->build_flat_fallback_attrs(
+		$attrs                         = $this->build_flat_fallback_attrs(
 			$fallback_element,
 			'i',
 			array(
@@ -438,10 +438,10 @@ class EFS_Gutenberg_Generator {
 		$class = implode( ' ', $this->get_element_classes( $element ) );
 
 		if ( is_array( $link ) ) {
-			$url    = $link['url'] ?? '#';
+			$url     = $link['url'] ?? '#';
 			$new_tab = ! empty( $link['newTab'] );
 		} else {
-			$url    = (string) $link;
+			$url     = (string) $link;
 			$new_tab = false;
 		}
 
@@ -459,7 +459,7 @@ class EFS_Gutenberg_Generator {
 		$fallback_element['etch_data'] = array(
 			'class' => $class,
 		);
-		$attrs = $this->build_flat_fallback_attrs( $fallback_element, 'a', $link_attributes );
+		$attrs                         = $this->build_flat_fallback_attrs( $fallback_element, 'a', $link_attributes );
 
 		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( (string) $text ) ) );
 	}
@@ -1124,7 +1124,7 @@ class EFS_Gutenberg_Generator {
 		$style_ids = $this->get_element_style_ids( $element );
 		$style_ids = $this->prepend_default_structural_style( $resolved_etch_type, $style_ids );
 
-		$etch_data = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
+		$etch_data  = isset( $element['etch_data'] ) && is_array( $element['etch_data'] ) ? $element['etch_data'] : array();
 		$attributes = array();
 
 		if ( isset( $etch_data['data-etch-element'] ) && '' !== trim( (string) $etch_data['data-etch-element'] ) ) {

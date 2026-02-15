@@ -43,8 +43,8 @@ if ( file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' ) ) {
 }
 
 // Plugin requires PSR Container. Check both interface and class for compatibility.
-$psr_container_ok = interface_exists( 'Psr\Container\ContainerInterface', false ) || class_exists( 'Psr\Container\ContainerInterface', false );
-if ( ! $psr_container_ok ) {
+$etch_fusion_suite_psr_container_ok = interface_exists( 'Psr\Container\ContainerInterface', false ) || class_exists( 'Psr\Container\ContainerInterface', false );
+if ( ! $etch_fusion_suite_psr_container_ok ) {
 	add_action(
 		'admin_notices',
 		function () {

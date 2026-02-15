@@ -193,7 +193,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		if ( in_array( $id, $chain, true ) ) {
 			return true;
 		}
-		$chain[] = $id;
+		$chain[]  = $id;
 		$elements = $component['elements'] ?? array();
 		foreach ( $elements as $el ) {
 			$cid = $el['cid'] ?? null;
@@ -257,35 +257,77 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		foreach ( $components as $component ) {
 			$comp_id = $component['id'] ?? '';
 			if ( ! $comp_id || ! isset( $component['elements'] ) ) {
-				$this->log_warning( 'W401', array( 'component_id' => $comp_id, 'reason' => 'missing id or elements' ) );
+				$this->log_warning(
+					'W401',
+					array(
+						'component_id' => $comp_id,
+						'reason'       => 'missing id or elements',
+					)
+				);
 				continue;
 			}
 			if ( in_array( $comp_id, $reference_chain, true ) ) {
-				$this->log_warning( 'W401', array( 'component_id' => $comp_id, 'reason' => 'circular reference skipped' ) );
+				$this->log_warning(
+					'W401',
+					array(
+						'component_id' => $comp_id,
+						'reason'       => 'circular reference skipped',
+					)
+				);
 				continue;
 			}
 
-			$this->log_info( 'Component migration start', array( 'component_id' => $comp_id, 'label' => $component['label'] ?? '' ) );
+			$this->log_info(
+				'Component migration start',
+				array(
+					'component_id' => $comp_id,
+					'label'        => $component['label'] ?? '',
+				)
+			);
 
 			$wp_block_data = $this->convert_component_to_wp_block( $component );
 			if ( is_wp_error( $wp_block_data ) ) {
-				$this->log_error( 'E401', array( 'component_id' => $comp_id, 'error' => $wp_block_data->get_error_message() ) );
+				$this->log_error(
+					'E401',
+					array(
+						'component_id' => $comp_id,
+						'error'        => $wp_block_data->get_error_message(),
+					)
+				);
 				continue;
 			}
 
 			if ( $dry_run ) {
-				$this->log_info( 'Dry run: would migrate component', array( 'component_id' => $comp_id, 'post_title' => $wp_block_data['post_title'] ) );
+				$this->log_info(
+					'Dry run: would migrate component',
+					array(
+						'component_id' => $comp_id,
+						'post_title'   => $wp_block_data['post_title'],
+					)
+				);
 				continue;
 			}
 
 			$etch_post_id = $this->create_component_on_target( $wp_block_data, $target_url, $jwt_token );
 			if ( is_wp_error( $etch_post_id ) ) {
-				$this->log_error( 'E403', array( 'component_id' => $comp_id, 'error' => $etch_post_id->get_error_message() ) );
+				$this->log_error(
+					'E403',
+					array(
+						'component_id' => $comp_id,
+						'error'        => $etch_post_id->get_error_message(),
+					)
+				);
 				continue;
 			}
 
 			$this->save_component_mapping( $comp_id, $etch_post_id );
-			$this->log_info( 'I401', array( 'component_id' => $comp_id, 'etch_post_id' => $etch_post_id ) );
+			$this->log_info(
+				'I401',
+				array(
+					'component_id' => $comp_id,
+					'etch_post_id' => $etch_post_id,
+				)
+			);
 		}
 
 		if ( ! $dry_run ) {
@@ -303,9 +345,13 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	public function get_stats() {
 		$components = get_option( 'bricks_components', array() );
 		if ( ! is_array( $components ) ) {
-			return array( 'total' => 0, 'with_props' => 0, 'with_slots' => 0 );
+			return array(
+				'total'      => 0,
+				'with_props' => 0,
+				'with_slots' => 0,
+			);
 		}
-		$total = count( $components );
+		$total      = count( $components );
 		$with_props = 0;
 		$with_slots = 0;
 		foreach ( $components as $c ) {
@@ -344,13 +390,13 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 
 		$converted_properties = $this->convert_properties( $properties );
-		$element_map         = array();
-		$parent_to_children  = array();
+		$element_map          = array();
+		$parent_to_children   = array();
 		foreach ( $elements as $el ) {
 			$eid = $el['id'] ?? null;
 			if ( $eid ) {
 				$element_map[ $eid ] = $el;
-				$parent = $el['parent'] ?? $comp_id;
+				$parent              = $el['parent'] ?? $comp_id;
 				if ( ! isset( $parent_to_children[ $parent ] ) ) {
 					$parent_to_children[ $parent ] = array();
 				}
@@ -359,15 +405,15 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 
 		// Resolve property connections to element attributes (element_id => [ setting_key => default value ]).
-		$connection_map       = $this->map_property_connections( $properties, $elements );
-		$props_by_id           = array();
+		$connection_map = $this->map_property_connections( $properties, $elements );
+		$props_by_id    = array();
 		foreach ( $properties as $p ) {
 			$pid = $p['id'] ?? null;
-			if ( $pid !== null && $pid !== '' ) {
+			if ( null !== $pid && '' !== $pid ) {
 				$props_by_id[ $pid ] = $p;
 			}
 		}
-		$resolved_connections  = array();
+		$resolved_connections = array();
 		foreach ( $connection_map as $conn ) {
 			$eid = $conn['element_id'];
 			$key = $conn['setting_key'];
@@ -382,7 +428,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		if ( empty( $root_ids ) ) {
 			foreach ( $elements as $el ) {
 				$pid = $el['parent'] ?? '';
-				if ( $pid === $comp_id || $pid === '' || $pid === '0' ) {
+				if ( $comp_id === $pid || '' === $pid || '0' === $pid ) {
 					$root_ids[] = $el['id'];
 				}
 			}
@@ -398,7 +444,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 			}
 			$child_ids = isset( $parent_to_children[ $root_id ] ) ? $parent_to_children[ $root_id ] : array();
 			$html      = $this->convert_element_tree( $element_map[ $root_id ], $element_map, $parent_to_children, $resolved_connections );
-			if ( $html !== '' ) {
+			if ( '' !== $html ) {
 				$blocks_html_parts[] = $html;
 			}
 		}
@@ -410,7 +456,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 			'post_type'    => 'wp_block',
 			'post_status'  => 'publish',
 			'meta'         => array(
-				'etch_component_html_key' => sanitize_title( $label ),
+				'etch_component_html_key'   => sanitize_title( $label ),
 				'etch_component_properties' => $converted_properties,
 			),
 		);
@@ -430,17 +476,23 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 		foreach ( $properties as $prop ) {
 			$pid = $prop['id'] ?? null;
-			if ( $pid === null || $pid === '' ) {
+			if ( null === $pid || '' === $pid ) {
 				continue;
 			}
 			$type    = $prop['type'] ?? 'text';
 			$default = $prop['default'] ?? null;
 			switch ( $type ) {
 				case 'text':
-					$result[ $pid ] = array( 'type' => 'string', 'default' => (string) $default );
+					$result[ $pid ] = array(
+						'type'    => 'string',
+						'default' => (string) $default,
+					);
 					break;
 				case 'toggle':
-					$result[ $pid ] = array( 'type' => 'boolean', 'default' => (bool) $default );
+					$result[ $pid ] = array(
+						'type'    => 'boolean',
+						'default' => (bool) $default,
+					);
 					break;
 				case 'class':
 					$style_ids = array();
@@ -451,13 +503,22 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 							}
 						}
 					}
-					$result[ $pid ] = array( 'type' => 'array', 'default' => $style_ids );
+					$result[ $pid ] = array(
+						'type'    => 'array',
+						'default' => $style_ids,
+					);
 					break;
 				case 'number':
-					$result[ $pid ] = array( 'type' => 'number', 'default' => (float) $default );
+					$result[ $pid ] = array(
+						'type'    => 'number',
+						'default' => (float) $default,
+					);
 					break;
 				default:
-					$result[ $pid ] = array( 'type' => 'string', 'default' => $default !== null ? (string) $default : '' );
+					$result[ $pid ] = array(
+						'type'    => 'string',
+						'default' => null !== $default ? (string) $default : '',
+					);
 			}
 		}
 		return $result;
@@ -500,8 +561,8 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 * @return string Gutenberg block HTML for etch/slot.
 	 */
 	public function convert_slot_element( $slot_element, $component_id = '' ) {
-		$slot_id = $slot_element['id'] ?? '';
-		$attrs = array(
+		$slot_id    = $slot_element['id'] ?? '';
+		$attrs      = array(
 			'name'   => 'Slot',
 			'slotId' => $slot_id,
 		);
@@ -542,12 +603,12 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 			return $this->convert_slot_element( $element, '' );
 		}
 
-		$child_ids = isset( $children_map[ $element['id'] ] ) ? $children_map[ $element['id'] ] : array();
+		$child_ids     = isset( $children_map[ $element['id'] ] ) ? $children_map[ $element['id'] ] : array();
 		$children_html = array();
 		foreach ( $child_ids as $cid ) {
 			if ( isset( $element_map[ $cid ] ) ) {
 				$ch_html = $this->convert_element_tree( $element_map[ $cid ], $element_map, $children_map, $resolved_connections );
-				if ( $ch_html !== '' ) {
+				if ( '' !== $ch_html ) {
 					$children_html[] = $ch_html;
 				}
 			}
@@ -557,7 +618,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		// Apply property connections to this element's settings so block attributes reflect connected props.
 		$element_to_convert = $element;
 		$eid                = $element['id'] ?? '';
-		if ( $eid !== '' && isset( $resolved_connections[ $eid ] ) && is_array( $resolved_connections[ $eid ] ) ) {
+		if ( '' !== $eid && isset( $resolved_connections[ $eid ] ) && is_array( $resolved_connections[ $eid ] ) ) {
 			$element_to_convert['settings'] = array_merge(
 				isset( $element_to_convert['settings'] ) && is_array( $element_to_convert['settings'] ) ? $element_to_convert['settings'] : array(),
 				$resolved_connections[ $eid ]
@@ -568,7 +629,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 			$this->element_factory = new EFS_Element_Factory( $this->style_map );
 		}
 		$converted = $this->element_factory->convert_element( $element_to_convert, array( $children ) );
-		return $converted !== null ? $converted : '';
+		return null !== $converted ? $converted : '';
 	}
 
 	/**
@@ -578,7 +639,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 * @return bool
 	 */
 	public function is_slot_element( $element ) {
-		return isset( $element['name'] ) && $element['name'] === 'slot';
+		return isset( $element['name'] ) && 'slot' === $element['name'];
 	}
 
 	/**
@@ -612,7 +673,13 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 				return new WP_Error( 'E403', __( 'Component API response missing post id', 'etch-fusion-suite' ) );
 			}
 			$last_error = $result;
-			$this->log_warning( 'E403', array( 'attempt' => $attempt + 1, 'error' => $result->get_error_message() ) );
+			$this->log_warning(
+				'E403',
+				array(
+					'attempt' => $attempt + 1,
+					'error'   => $result->get_error_message(),
+				)
+			);
 			if ( $attempt < $max_attempts - 1 && isset( $backoff[ $attempt ] ) ) {
 				sleep( $backoff[ $attempt ] );
 			}

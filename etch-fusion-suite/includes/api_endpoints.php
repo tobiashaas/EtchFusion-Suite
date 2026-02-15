@@ -808,7 +808,7 @@ class EFS_API_Endpoints {
 	 * @return string
 	 */
 	private static function get_bearer_token( $request ) {
-		$header = $request->get_header( 'authorization' );
+		$header   = $request->get_header( 'authorization' );
 		$fallback = $request->get_header( 'x-efs-migration-key' );
 
 		if ( is_string( $fallback ) && '' !== trim( $fallback ) ) {
@@ -1067,9 +1067,9 @@ class EFS_API_Endpoints {
 			$post_type = 'post';
 		}
 
-		$post_title = isset( $post['post_title'] ) ? sanitize_text_field( $post['post_title'] ) : '';
-		$post_slug  = isset( $post['post_name'] ) ? sanitize_title( $post['post_name'] ) : sanitize_title( $post_title );
-		$post_date  = isset( $post['post_date'] ) ? sanitize_text_field( $post['post_date'] ) : current_time( 'mysql' );
+		$post_title  = isset( $post['post_title'] ) ? sanitize_text_field( $post['post_title'] ) : '';
+		$post_slug   = isset( $post['post_name'] ) ? sanitize_title( $post['post_name'] ) : sanitize_title( $post_title );
+		$post_date   = isset( $post['post_date'] ) ? sanitize_text_field( $post['post_date'] ) : current_time( 'mysql' );
 		$post_status = isset( $post['post_status'] ) ? sanitize_key( $post['post_status'] ) : 'draft';
 		if ( ! in_array( $post_status, array( 'publish', 'draft', 'pending', 'private', 'future' ), true ) ) {
 			$post_status = 'draft';
@@ -1100,8 +1100,8 @@ class EFS_API_Endpoints {
 
 		$source_post_id = isset( $post['ID'] ) ? absint( $post['ID'] ) : 0;
 		if ( $source_post_id > 0 ) {
-			$mappings = get_option( 'b2e_post_mappings', array() );
-			$mappings = is_array( $mappings ) ? $mappings : array();
+			$mappings                    = get_option( 'b2e_post_mappings', array() );
+			$mappings                    = is_array( $mappings ) ? $mappings : array();
 			$mappings[ $source_post_id ] = (int) $post_id;
 			update_option( 'b2e_post_mappings', $mappings );
 
@@ -1147,7 +1147,13 @@ class EFS_API_Endpoints {
 		$meta    = isset( $payload['meta'] ) && is_array( $payload['meta'] ) ? $payload['meta'] : array();
 
 		if ( empty( $meta ) ) {
-			return new \WP_REST_Response( array( 'success' => true, 'updated' => 0 ), 200 );
+			return new \WP_REST_Response(
+				array(
+					'success' => true,
+					'updated' => 0,
+				),
+				200
+			);
 		}
 
 		$source_post_id = isset( $payload['post_id'] ) ? absint( $payload['post_id'] ) : 0;
@@ -1229,7 +1235,7 @@ class EFS_API_Endpoints {
 
 		$attachment = array(
 			'post_mime_type' => $mime_type,
-			'post_title'     => $title ?: preg_replace( '/\.[^.]+$/', '', $filename ),
+			'post_title'     => ! empty( $title ) ? $title : preg_replace( '/\.[^.]+$/', '', $filename ),
 			'post_content'   => '',
 			'post_status'    => 'inherit',
 		);

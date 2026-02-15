@@ -549,8 +549,8 @@ abstract class EFS_Base_Ajax_Handler {
 	 * @return string Normalized URL suitable for container-to-container requests.
 	 */
 	protected function convert_to_internal_url( $url ) {
-		if ( function_exists( 'efs_convert_to_internal_url' ) ) {
-			return efs_convert_to_internal_url( $url );
+		if ( function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
+			return etch_fusion_suite_convert_to_internal_url( $url );
 		}
 		return is_string( $url ) ? $url : '';
 	}
