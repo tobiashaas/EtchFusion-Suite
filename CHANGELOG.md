@@ -2,7 +2,22 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-## [Unreleased]
+## [0.11.0] — 2026-02-16
+
+### Added
+- Dynamic Data / Loops / Conditions mapping reference in `converters/README.md` — full Bricks→Etch translation tables for 43 dynamic tags, 80 loops, 13 conditions
+- Upcoming converter tasks (Dynamic Tag, Loop, Condition converters) in `TODOS.md`
+- Deferred WooCommerce and `{echo:}` tag documentation with rationale
+- `CLAUDE.md` project instructions for Claude Code
+- `@wordpress/env` patch regenerated for v10.39.0
+
+### Changed
+- Minimum PHP version raised from 7.4 to 8.1 (plugin header, CI matrix, release workflow)
+- CI test matrix: PHP 7.4 removed, now 8.1/8.2/8.3/8.4
+
+### Fixed
+- Etch site critical error: restored `PRIMARY KEY` + `AUTO_INCREMENT` on `wp_posts` and 4 other tables broken by production SQL import
+- Deleted 18 orphan rows with `ID=0` from `wp_posts`
 
 ### Removed
 - Deprecated `etch-flex-div-style` CSS style (no longer generated)

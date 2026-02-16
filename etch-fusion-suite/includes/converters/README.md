@@ -804,4 +804,4 @@ Etch:    etch/loop[loopId="uuid"] → etch/element[tag="div"] → children
 
 **Erstellt:** 2025-10-22 00:44
 **Letzte Änderung:** 2026-02-16
-**Version:** 0.6.0
+**Version:** 0.11.0
