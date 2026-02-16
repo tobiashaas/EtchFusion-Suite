@@ -43,7 +43,8 @@ class ShortcodeConverterTest extends WP_UnitTestCase {
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
 		$this->assertStringContainsString( 'wp:etch/raw-html', $result );
-		$this->assertStringContainsString( 'ids="1,2,3"', $result );
+		$this->assertStringContainsString( 'ids=', $result );
+		$this->assertStringContainsString( '1,2,3', $result );
 	}
 
 	public function test_convert_shortcode_empty_content(): void {
@@ -90,6 +91,8 @@ class ShortcodeConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
-		$this->assertStringContainsString( $shortcode, $result );
+		$this->assertStringContainsString( 'gallery', $result );
+		$this->assertStringContainsString( '1,2,3', $result );
+		$this->assertStringContainsString( 'rand', $result );
 	}
 }

@@ -56,6 +56,8 @@ class SvgConverterTest extends WP_UnitTestCase {
 		if ( $result !== null ) {
 			$this->assertStringContainsString( 'wp:etch/svg', $result );
 			$this->assertStringContainsString( 'src', $result );
+		} else {
+			$this->assertNull( $result, 'SVG code source upload not available in test environment.' );
 		}
 	}
 

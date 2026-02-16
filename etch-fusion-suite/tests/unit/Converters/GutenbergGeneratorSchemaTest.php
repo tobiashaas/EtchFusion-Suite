@@ -21,7 +21,7 @@ class GutenbergGeneratorSchemaTest extends WP_UnitTestCase {
 		parent::setUp();
 
 		update_option(
-			'b2e_style_map',
+			'efs_style_map',
 			array(
 				'global-class-1' => array(
 					'id'       => 'etch-style-1',
@@ -32,7 +32,7 @@ class GutenbergGeneratorSchemaTest extends WP_UnitTestCase {
 	}
 
 	protected function tearDown(): void {
-		delete_option( 'b2e_style_map' );
+		delete_option( 'efs_style_map' );
 		parent::tearDown();
 	}
 

@@ -164,7 +164,7 @@ Factory Pattern für automatische Converter-Auswahl basierend auf Element-Typ.
 
 ```php
 // Factory initialisieren
-$style_map = get_option('b2e_style_map', array());
+$style_map = get_option('efs_style_map', array());
 $factory = new B2E_Element_Factory($style_map);
 
 // Element konvertieren
@@ -706,6 +706,21 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 - [ ] Form Converter
 - [ ] Video Converter
 - [ ] Custom Element Support
+- [ ] Dynamic Data Tag Converter (Bricks `{tag:param}` → Etch `{source.path}`)
+- [ ] Loop Converter (Bricks `hasLoop`/`query` → `etch/loop` Wrapper-Block + `etch_loops` Presets)
+- [ ] Condition Converter (Bricks `_conditions` → `etch/condition` Wrapper-Block)
+
+### **Deferred (Blocked by Etch Feature Support):**
+
+> Die folgenden Features werden zurückgestellt, bis Etch native Unterstützung dafür bietet.
+> Sobald verfügbar, sollten diese Converter nachgezogen werden.
+
+- [ ] **WooCommerce Dynamic Tags** — Bricks Tags wie `{woo_product_rating:value}`, `{woo_product_stock:value}`, `{woo_product_on_sale}`, `{woo_product_stock_status}`, `{woo_cart_remove_link:...}` haben kein Etch-Äquivalent. Etch hat aktuell keine native WooCommerce-Integration. Workaround via `this.meta._field` ist möglich aber unzuverlässig für berechnete WooCommerce-Felder.
+- [ ] **WooCommerce Action Hooks** — Bricks `{do_action:woocommerce_*}` Tags (25 Instanzen in Prod-DB) rufen WooCommerce-Hooks direkt auf. Etch hat kein `do_action`-Äquivalent. Betrifft: Shop-Loop, Single-Product, Cart, Checkout, Account-Seiten.
+- [ ] **WooCommerce Cart Loop** — Bricks `wooCart:default` Query-Typ hat kein Etch Loop-Äquivalent.
+- [ ] **PHP Echo Tags** — Bricks `{echo:function_name}` führt beliebige PHP-Funktionen aus. Etch unterstützt das bewusst nicht (Sicherheitsmodell). 2 Instanzen in Prod-DB (`{echo:frames_get_current_post_type}`).
+
+**Hinweis:** Stand 2026-02-16 betrifft dies 4 Prod-Posts (WooCommerce-Templates) und 2 Posts mit `{echo:...}`. Alle anderen Dynamic Data Tags, Loops und Conditions sind konvertierbar.
 
 ### **Wie neue Converter hinzufügen:**
 
@@ -718,6 +733,67 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 
 ---
 
+## 🔄 Dynamic Data / Loops / Conditions — Mapping Reference
+
+> Dokumentiert 2026-02-16 auf Basis der Prod-DB (1018 Posts, 80 Loops, 43 Dynamic Tags, 13 Conditions).
+
+### Bricks → Etch: Dynamic Tag Mapping
+
+| Bricks Tag | Etch Expression | Kontext |
+|---|---|---|
+| `{post_title:N}` | `{this.title}` | N = Char-Limit, in Etch via `.slice(0,N)` Modifier |
+| `{post_excerpt:N}` | `{this.excerpt}` | Analog |
+| `{post_content:N}` | `{this.content}` | Analog |
+| `{post_date:FORMAT}` | `{this.date.format("FORMAT")}` | PHP-Datumsformat → Etch `.format()` Modifier |
+| `{post_date:timestamp}` | `{this.date}` | ISO 8601 in Etch |
+| `{post_terms_category:plain}` | `{this.categories}` | Etch liefert Array, nicht String |
+| `{author_name:plain}` | `{this.author.name}` | Dot-Path |
+| `{current_date:Y}` | `{site.currentDate}` | + `.format("Y")` |
+| `{term_name:plain}` | `{item.name}` | Innerhalb Term-Loop |
+| `{query_results_count:ID}` | — | Kein direktes Äquivalent, Custom-Lösung nötig |
+
+### Bricks → Etch: Loop Mapping
+
+**Strukturunterschied:** Bricks setzt Loop auf das Element selbst (`hasLoop` + `query`). Etch wickelt einen `etch/loop` Block **um** die Children.
+
+```
+Bricks:  div[hasLoop=true, query={post_type:["post"]}] → children
+Etch:    etch/loop[loopId="uuid"] → etch/element[tag="div"] → children
+```
+
+| Bricks Query | Etch Loop Preset (`etch_loops` Option) |
+|---|---|
+| `{objectType:"post", post_type:["post"], posts_per_page:8}` | `{type:"wp-query", args:{post_type:"post", posts_per_page:8}}` |
+| `{objectType:"post", post_type:["attachment"], tax_query:[...]}` | `{type:"wp-query", args:{post_type:"attachment", tax_query:[...]}}` |
+| `{objectType:"post", post_type:["product"]}` | `{type:"wp-query", args:{post_type:"product"}}` |
+| `{objectType:"post", post_type:["slider"]}` | `{type:"wp-query", args:{post_type:"slider"}}` |
+| `{objectType:"post", post_type:["locations"]}` | `{type:"wp-query", args:{post_type:"locations"}}` |
+| Term-Loop (`term:default`) | `{type:"wp-terms", args:{taxonomy:"category"}}` |
+| ~~`wooCart:default`~~ | **DEFERRED** — Kein Etch-Äquivalent |
+
+### Bricks → Etch: Condition Mapping
+
+**Strukturunterschied:** Bricks packt Conditions als `_conditions` Property auf das Element. Etch wickelt einen `etch/condition` Block **um** das Element.
+
+| Bricks Condition | Etch Condition AST |
+|---|---|
+| `{key:"user_logged_in"}` | `{leftHand:"user.loggedIn", operator:"isTruthy", rightHand:null}` |
+| `{key:"featured_image"}` | `{leftHand:"this.featuredImage", operator:"isTruthy", rightHand:null}` |
+| `{key:"dynamic_data", dynamic_data:"{woo_product_rating:value}", compare:"==", value:"0"}` | **DEFERRED** — WooCommerce |
+| `{key:"dynamic_data", dynamic_data:"{woo_product_on_sale}", compare:"!="}` | **DEFERRED** — WooCommerce |
+| `{key:"dynamic_data", dynamic_data:"{woo_product_stock_status}", compare:"==", value:"instock"}` | **DEFERRED** — WooCommerce |
+
+### Prod-DB Statistik (Stand 2026-02-16)
+
+| Feature | Gesamt | Konvertierbar | Deferred (WooCommerce/echo) |
+|---|---|---|---|
+| Dynamic Tags | 43 unique | 30 | 13 (alle `woo_*`, `do_action:woocommerce_*`, `echo:*`) |
+| Loops | 80 | 79 | 1 (`wooCart:default`) |
+| Conditions | 13 Elemente | 7 | 6 (alle WooCommerce-bezogen) |
+| Hidden Elements | 389 | — | — (werden nicht migriert) |
+
+---
+
 ## 📚 Siehe auch
 
 - [REFACTORING-STATUS.md](../../../REFACTORING-STATUS.md) - Refactoring Übersicht
@@ -726,6 +802,6 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 
 ---
 
-**Erstellt:** 2025-10-22 00:44  
-**Letzte Änderung:** 2025-02-08  
-**Version:** 0.5.0
+**Erstellt:** 2025-10-22 00:44
+**Letzte Änderung:** 2026-02-16
+**Version:** 0.6.0

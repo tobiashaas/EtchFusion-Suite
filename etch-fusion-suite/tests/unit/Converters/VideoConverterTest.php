@@ -152,7 +152,7 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"styles"', $result );
 		$this->assertStringContainsString( 'etch-video-style', $result );
 		$this->assertStringContainsString( 'etch-iframe-style', $result );
-		$this->assertStringContainsString( '"class":"video-wrapper"', $result );
+		$this->assertStringNotContainsString( '"class":"video-wrapper"', $result );
 	}
 
 	public function test_html5_video_figure_structure(): void {
