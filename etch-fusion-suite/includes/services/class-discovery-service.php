@@ -4,6 +4,7 @@ namespace Bricks2Etch\Services;
 use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Core\EFS_Plugin_Detector;
 use Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter;
+// phpcs:disable Generic.Formatting.MultipleStatementAlignment.NotSameWarning,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -186,11 +187,11 @@ class EFS_Discovery_Service {
 		}
 
 		return array(
-			'total_files'           => count( $attachment_ids ),
-			'total_size'            => $total_size,
-			'by_type'               => $by_type,
-			'max_upload_size'       => wp_max_upload_size(),
-			'supported_mime_types'  => array_values( array_keys( get_allowed_mime_types() ) ),
+			'total_files'          => count( $attachment_ids ),
+			'total_size'           => $total_size,
+			'by_type'              => $by_type,
+			'max_upload_size'      => wp_max_upload_size(),
+			'supported_mime_types' => array_values( array_keys( get_allowed_mime_types() ) ),
 		);
 	}
 
@@ -274,7 +275,7 @@ class EFS_Discovery_Service {
 			'jetengine_tags'    => $providers['jetengine_tags'],
 			'other_tags'        => $providers['other_tags'],
 			'convertibility'    => $convertibility,
-			'unconvertible_list'=> array_values( array_unique( $unconvertible_list ) ),
+			'unconvertible_list' => array_values( array_unique( $unconvertible_list ) ),
 			'deferred_list'     => array_values( array_unique( $deferred_list ) ),
 			'sample_size'       => $full_scan ? null : $sample_size,
 			'analyzed_posts'    => $analyzed_posts,
@@ -439,7 +440,7 @@ class EFS_Discovery_Service {
 		$sql = "SELECT DISTINCT meta_key FROM {$wpdb->postmeta} WHERE " . implode( ' OR ', $likes ) . ' ORDER BY meta_key ASC LIMIT 500';
 		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Placeholders are safely assembled and prepared below.
 		$query = $wpdb->prepare( $sql, $args );
-		$rows  = $wpdb->get_col( $query ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$rows  = $wpdb->get_col( $query ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared -- $query is prepared above via $wpdb->prepare().
 
 		$rows = is_array( $rows ) ? array_map( 'sanitize_key', $rows ) : array();
 		$rows = array_filter( $rows );
@@ -564,7 +565,7 @@ class EFS_Discovery_Service {
 				'yellow' => 0,
 				'red'    => 0,
 			),
-			'unconvertible_list'=> array(),
+			'unconvertible_list' => array(),
 			'deferred_list'     => array(),
 			'sample_size'       => $full_scan ? null : $this->normalize_sample_size( $sample_size ),
 			'analyzed_posts'    => 0,
@@ -657,4 +658,3 @@ class EFS_Discovery_Service {
 		return 'other_tags';
 	}
 }
-

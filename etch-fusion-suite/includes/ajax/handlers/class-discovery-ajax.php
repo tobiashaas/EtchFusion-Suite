@@ -4,6 +4,7 @@ namespace Bricks2Etch\Ajax\Handlers;
 use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Services\EFS_Discovery_Service;
+// phpcs:disable Generic.Formatting.MultipleStatementAlignment.NotSameWarning,WordPress.Arrays.MultipleStatementAlignment.DoubleArrowNotAligned
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -188,7 +189,7 @@ class EFS_Discovery_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			array(
 				'source'       => $local_discovery,
 				'target'       => $remote_discovery,
-				'discovered_at'=> current_time( 'mysql' ),
+				'discovered_at' => current_time( 'mysql' ),
 			)
 		);
 	}
@@ -264,4 +265,3 @@ class EFS_Discovery_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		);
 	}
 }
-
