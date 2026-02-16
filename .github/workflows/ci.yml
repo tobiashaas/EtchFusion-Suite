@@ -190,3 +190,4 @@ jobs:
         if: always()
         run: npm run e2e:stop
         working-directory: etch-fusion-suite
+        continue-on-error: true
