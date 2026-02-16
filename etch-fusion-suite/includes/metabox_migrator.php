@@ -152,7 +152,15 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 					'action' => 'MetaBox plugin not active, skipping configurations import',
 				)
 			);
-			return new \WP_Error( 'metabox_not_active', 'MetaBox plugin is not active' );
+			$skipped_count = is_array( $configs_data ) ? count( $configs_data ) : 0;
+
+			return array(
+				'imported_count' => 0,
+				'skipped'        => true,
+				'skipped_count'  => $skipped_count,
+				'warnings'       => array( 'MetaBox plugin is not active; configurations import was skipped.' ),
+				'errors'         => array(),
+			);
 		}
 
 		if ( empty( $configs_data ) || ! is_array( $configs_data ) ) {
