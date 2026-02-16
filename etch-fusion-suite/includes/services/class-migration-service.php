@@ -100,7 +100,7 @@ class EFS_Migration_Service {
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function start_migration( $migration_key, $target_url = null, $batch_size = null, EFS_Migration_Config $config = null ) {
+	public function start_migration( $migration_key, $target_url = null, $batch_size = null, ?EFS_Migration_Config $config = null ) {
 		try {
 			$config = $this->resolve_config( $config, $batch_size );
 			$validation = $config->validate();
@@ -344,7 +344,7 @@ class EFS_Migration_Service {
 		return $migrator->migrate( $target_url, $jwt_token, $config );
 	}
 
-	public function run_media_phase( string $target_url, string $jwt_token, EFS_Migration_Config $config = null ): array {
+	public function run_media_phase( string $target_url, string $jwt_token, ?EFS_Migration_Config $config = null ): array {
 		return $this->media_service->migrate_media( $target_url, $jwt_token, $config );
 	}
 
@@ -400,6 +400,12 @@ class EFS_Migration_Service {
 	 * @return array
 	 */
 	public function cancel_migration( $migration_id = '' ) {
+		$job_id = $this->resolve_job_id( $migration_id );
+
+		if ( $job_id && $this->job_runner instanceof EFS_Migration_Job_Runner ) {
+			$this->job_runner->cancel_job( $job_id );
+		}
+
 		$this->migration_repository->delete_progress();
 		$this->migration_repository->delete_steps();
 		$this->migration_repository->delete_token_data();
@@ -408,6 +414,7 @@ class EFS_Migration_Service {
 			'W900',
 			array(
 				'action' => 'Migration cancelled by user',
+				'job_id' => $job_id,
 			)
 		);
 
@@ -417,6 +424,44 @@ class EFS_Migration_Service {
 			'steps'       => $this->get_steps_state(),
 			'migrationId' => '',
 			'completed'   => false,
+		);
+	}
+
+	/**
+	 * Request pause for a running background migration.
+	 */
+	public function pause_migration( $migration_id = '' ) {
+		$job_id = $this->resolve_job_id( $migration_id );
+		if ( ! $job_id || ! $this->job_runner instanceof EFS_Migration_Job_Runner ) {
+			return new \WP_Error( 'job_runner_unavailable', __( 'Migration job runner unavailable.', 'etch-fusion-suite' ) );
+		}
+
+		if ( ! $this->job_runner->pause_job( $job_id ) ) {
+			return new \WP_Error( 'pause_failed', __( 'Unable to pause migration job.', 'etch-fusion-suite' ) );
+		}
+
+		return array(
+			'message'     => __( 'Migration pause requested.', 'etch-fusion-suite' ),
+			'migrationId' => $job_id,
+		);
+	}
+
+	/**
+	 * Resume a paused background migration.
+	 */
+	public function resume_migration( $migration_id = '' ) {
+		$job_id = $this->resolve_job_id( $migration_id );
+		if ( ! $job_id || ! $this->job_runner instanceof EFS_Migration_Job_Runner ) {
+			return new \WP_Error( 'job_runner_unavailable', __( 'Migration job runner unavailable.', 'etch-fusion-suite' ) );
+		}
+
+		if ( ! $this->job_runner->resume_job( $job_id ) ) {
+			return new \WP_Error( 'resume_failed', __( 'Unable to resume migration job.', 'etch-fusion-suite' ) );
+		}
+
+		return array(
+			'message'     => __( 'Migration resumed.', 'etch-fusion-suite' ),
+			'migrationId' => $job_id,
 		);
 	}
 
@@ -599,6 +644,28 @@ class EFS_Migration_Service {
 	}
 
 	/**
+	 * Resolve a job identifier from explicit input or active migration metadata.
+	 */
+	private function resolve_job_id( $migration_id ): string {
+		$job_id = is_string( $migration_id ) ? sanitize_text_field( $migration_id ) : '';
+		if ( $job_id ) {
+			return $job_id;
+		}
+
+		$active = $this->migration_repository->get_active_migration();
+		if ( isset( $active['migration_id'] ) && is_string( $active['migration_id'] ) ) {
+			return sanitize_text_field( $active['migration_id'] );
+		}
+
+		$progress = $this->get_progress_data();
+		if ( isset( $progress['migrationId'] ) && is_string( $progress['migrationId'] ) ) {
+			return sanitize_text_field( $progress['migrationId'] );
+		}
+
+		return '';
+	}
+
+	/**
 	 * Initialize default steps.
 	 *
 	 * @return array
@@ -656,7 +723,7 @@ class EFS_Migration_Service {
 	 * @param EFS_Migration_Config|null $config
 	 * @return bool|\WP_Error
 	 */
-	private function execute_migrators( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+	private function execute_migrators( $target_url, $jwt_token, ?EFS_Migration_Config $config = null ) {
 		$supported_migrators = $this->migrator_registry->get_supported();
 
 		if ( empty( $supported_migrators ) ) {

@@ -440,7 +440,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 
 		$option_names = $wpdb->get_col(
 			$wpdb->prepare(
-				\"SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s\",
+				"SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
 				$prefix
 			)
 		);

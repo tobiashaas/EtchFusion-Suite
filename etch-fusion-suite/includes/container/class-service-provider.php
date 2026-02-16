@@ -332,6 +332,22 @@ class EFS_Service_Provider {
 			}
 		);
 
+		$container->singleton(
+			'migration_job_runner',
+			function ( $c ) {
+				$job_runner = new \Bricks2Etch\Services\EFS_Migration_Job_Runner(
+					$c->get( 'migration_service' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'migrator_registry' )
+				);
+
+				$c->get( 'migration_service' )->set_job_runner( $job_runner );
+
+				return $job_runner;
+			}
+		);
+
 		// Controller Services
 		$container->singleton(
 			'settings_controller',
@@ -556,6 +572,7 @@ class EFS_Service_Provider {
 			'media_service',
 			'content_service',
 			'migration_service',
+			'migration_job_runner',
 			'settings_controller',
 			'migration_controller',
 			'dashboard_controller',

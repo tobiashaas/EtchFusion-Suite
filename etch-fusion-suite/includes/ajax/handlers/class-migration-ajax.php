@@ -74,6 +74,8 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
 		add_action( 'wp_ajax_efs_process_job_batch', array( $this, 'process_migration_job_batch' ) );
 		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
+		add_action( 'wp_ajax_efs_pause_migration', array( $this, 'pause_migration' ) );
+		add_action( 'wp_ajax_efs_resume_migration', array( $this, 'resume_migration' ) );
 		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
 		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
 	}
@@ -224,11 +226,80 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$payload = array(
 			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'job_id'      => $this->get_post( 'job_id', '', 'text' ),
 		);
 
 		$result = $this->migration_controller->cancel_migration( $payload );
 
 		$this->send_controller_response( $result, 'migration_cancel_failed', 'Migration cancelled.', array(), array( 'cancelled' => true ) );
+	}
+
+	/**
+	 * Pause migration.
+	 */
+	public function pause_migration() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'migration_pause', 10, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
+			$this->log_security_event( 'ajax_action', 'Migration pause aborted: controller unavailable.' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$payload = array(
+			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'job_id'      => $this->get_post( 'job_id', '', 'text' ),
+		);
+
+		$result = $this->migration_controller->pause_migration( $payload );
+
+		$this->send_controller_response( $result, 'migration_pause_failed', 'Migration pause requested.', array(), array( 'paused' => true ) );
+	}
+
+	/**
+	 * Resume migration.
+	 */
+	public function resume_migration() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'migration_resume', 10, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
+			$this->log_security_event( 'ajax_action', 'Migration resume aborted: controller unavailable.' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$payload = array(
+			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'job_id'      => $this->get_post( 'job_id', '', 'text' ),
+		);
+
+		$result = $this->migration_controller->resume_migration( $payload );
+
+		$this->send_controller_response( $result, 'migration_resume_failed', 'Migration resumed.', array(), array( 'resumed' => true ) );
 	}
 
 	/**

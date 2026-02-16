@@ -102,6 +102,10 @@ class EFS_Migration_Controller {
 
 	public function cancel_migration( array $data = array() ) {
 		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		if ( empty( $migration_id ) && isset( $data['job_id'] ) ) {
+			$migration_id = sanitize_text_field( $data['job_id'] );
+		}
+
 		$result       = $this->manager->cancel_migration( $migration_id );
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -112,6 +116,42 @@ class EFS_Migration_Controller {
 			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
 			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'completed'   => ! empty( $result['completed'] ),
+		);
+	}
+
+	public function pause_migration( array $data = array() ) {
+		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		if ( empty( $migration_id ) && isset( $data['job_id'] ) ) {
+			$migration_id = sanitize_text_field( $data['job_id'] );
+		}
+
+		$result = $this->manager->pause_migration( $migration_id );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'message'     => isset( $result['message'] ) ? $result['message'] : __( 'Migration pause requested.', 'etch-fusion-suite' ),
+			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : $migration_id,
+			'completed'   => false,
+		);
+	}
+
+	public function resume_migration( array $data = array() ) {
+		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		if ( empty( $migration_id ) && isset( $data['job_id'] ) ) {
+			$migration_id = sanitize_text_field( $data['job_id'] );
+		}
+
+		$result = $this->manager->resume_migration( $migration_id );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array(
+			'message'     => isset( $result['message'] ) ? $result['message'] : __( 'Migration resumed.', 'etch-fusion-suite' ),
+			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : $migration_id,
+			'completed'   => false,
 		);
 	}
 

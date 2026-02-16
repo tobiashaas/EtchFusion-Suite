@@ -117,20 +117,25 @@ class EFS_Migration_Job_Runner {
 			return new \WP_Error( 'job_not_found', __( 'Migration job not found.', 'etch-fusion-suite' ) );
 		}
 
-		$config        = $this->load_config( $job_id );
+		$status = $state['status'] ?? 'running';
+		if ( in_array( $status, array( 'completed', 'cancelled', 'failed', 'paused' ), true ) ) {
+			return $state;
+		}
+
 		$phase         = $state['current_phase'] ?? $this->phase_sequence[0];
 		$batch_index   = max( 0, (int) ( $state['current_batch'] ?? 0 ) );
 		$total_batches = max( 0, (int) ( $state['total_batches'] ?? 0 ) );
 		$pending       = $state['pending_action'] ?? '';
 
 		if ( $pending && $this->is_safe_boundary( $phase, $batch_index, $total_batches ) ) {
-			return $this->apply_pending_action( $job_id, $state );
+			$state = $this->apply_pending_action( $job_id, $state );
+			$status = $state['status'] ?? 'running';
+			if ( in_array( $status, array( 'completed', 'cancelled', 'failed', 'paused' ), true ) ) {
+				return $state;
+			}
 		}
 
-		$status = $state['status'] ?? 'running';
-		if ( in_array( $status, array( 'completed', 'cancelled', 'failed', 'paused', 'pause_requested', 'cancel_requested' ), true ) ) {
-			return $state;
-		}
+		$config        = $this->load_config( $job_id );
 
 		switch ( $phase ) {
 			case 'validation':
@@ -165,6 +170,25 @@ class EFS_Migration_Job_Runner {
 				break;
 		}
 
+		$state = $this->migration_repository->get_job_state( $job_id );
+		if ( ! empty( $state['pending_action'] ) ) {
+			$current_phase   = $state['current_phase'] ?? $phase;
+			$current_batch   = max( 0, (int) ( $state['current_batch'] ?? 0 ) );
+			$current_total   = max( 0, (int) ( $state['total_batches'] ?? 0 ) );
+			$state['status'] = 'running';
+
+			if ( $this->is_safe_boundary( $current_phase, $current_batch, $current_total ) ) {
+				$state = $this->apply_pending_action( $job_id, $state );
+			} else {
+				$this->migration_repository->save_job_state( $job_id, $state );
+			}
+		}
+
+		$status = $state['status'] ?? 'running';
+		if ( in_array( $status, array( 'completed', 'cancelled', 'failed', 'paused' ), true ) ) {
+			return $state;
+		}
+
 		if ( $this->is_running( $job_id ) ) {
 			$this->schedule_next_batch( $job_id );
 		}
@@ -178,10 +202,11 @@ class EFS_Migration_Job_Runner {
 			return false;
 		}
 
-		$state['status']         = 'pause_requested';
+		$state['status']         = 'running';
 		$state['pending_action'] = self::ACTION_PAUSE;
 		$state['updated_at']     = current_time( 'timestamp' );
 		$this->migration_repository->save_job_state( $job_id, $state );
+		$this->schedule_next_batch( $job_id, 0 );
 
 		return true;
 	}
@@ -207,10 +232,12 @@ class EFS_Migration_Job_Runner {
 			return false;
 		}
 
-		$state['status']         = 'cancel_requested';
+		$state['status']         = 'running';
 		$state['pending_action'] = self::ACTION_CANCEL;
 		$state['updated_at']     = current_time( 'timestamp' );
 		$this->migration_repository->save_job_state( $job_id, $state );
+		$this->unschedule_job( $job_id );
+		$this->schedule_next_batch( $job_id, 0 );
 
 		return true;
 	}
@@ -394,7 +421,7 @@ class EFS_Migration_Job_Runner {
 				return true;
 			}
 
-			return 0 === $batch_index || $batch_index >= $total_batches;
+			return $batch_index > 0 && $batch_index <= $total_batches;
 		}
 
 		return true;
