@@ -68,25 +68,47 @@ class EFS_Migration_Token_Manager {
 		$expires_timestamp = $issued_at + (int) $expiration_seconds;
 		$site_url          = home_url();
 		$target_url        = $target_url ? esc_url_raw( $target_url ) : $site_url;
+		$target_url        = $this->normalize_target_url( $target_url );
+		$security          = $this->analyze_url_security( $target_url );
+		$previous_token    = $this->migration_repository->get_token_value();
+		$had_previous      = ! empty( $previous_token );
 
 		$payload = array(
 			'target_url' => $target_url,
 			'domain'     => $site_url,
 			'iat'        => $issued_at,
 			'exp'        => $expires_timestamp,
+			'jti'        => wp_generate_uuid4(),
 		);
 
 		$token = $this->encode_jwt( $payload );
 
+		if ( $had_previous && ! hash_equals( (string) $previous_token, $token ) ) {
+			$this->invalidate_token_transient( $previous_token );
+		}
+
 		$this->store_token( $token );
+		$migration_url = $this->build_migration_url( $target_url, $token );
+
+		$message = $had_previous
+			? __( 'New migration key generated. Previous keys are now invalid.', 'etch-fusion-suite' )
+			: __( 'Migration key generated.', 'etch-fusion-suite' );
 
 		return array(
-			'token'      => $token,
-			'expires'    => $expires_timestamp,
-			'domain'     => $site_url,
-			'created_at' => current_time( 'mysql' ),
-			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-			'payload'    => $payload,
+			'token'                      => $token,
+			'expires'                    => $expires_timestamp,
+			'domain'                     => $site_url,
+			'created_at'                 => current_time( 'mysql' ),
+			'expires_at'                 => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+			'expiration_seconds'         => (int) $expiration_seconds,
+			'migration_url'              => $migration_url,
+			'https_warning'              => (bool) $security['https_warning'],
+			'security_warning'           => (string) $security['warning_message'],
+			'security'                   => $security,
+			'treat_as_password_note'     => __( 'Treat this migration key like a password. Do not share it publicly.', 'etch-fusion-suite' ),
+			'invalidated_previous_token' => $had_previous,
+			'message'                    => $message,
+			'payload'                    => $payload,
 		);
 	}
 
@@ -100,7 +122,7 @@ class EFS_Migration_Token_Manager {
 	public function generate_migration_url( $target_domain = null, $expiration_seconds = null ) {
 		$token_data = $this->generate_migration_token( $target_domain, $expiration_seconds );
 
-		return $token_data['token'];
+		return isset( $token_data['migration_url'] ) ? (string) $token_data['migration_url'] : '';
 	}
 
 	/**
@@ -125,11 +147,15 @@ class EFS_Migration_Token_Manager {
 		$ttl               = max( 60, $expires_timestamp - time() );
 
 		$token_data = array(
-			'token'      => $token,
-			'payload'    => $payload,
-			'created_at' => current_time( 'mysql' ),
-			'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-			'domain'     => $payload['domain'] ?? home_url(),
+			'token'             => $token,
+			'payload'           => $payload,
+			'created_at'        => current_time( 'mysql' ),
+			'expires_at'        => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+			'expires_timestamp' => $expires_timestamp,
+			'issued_at'         => isset( $payload['iat'] ) ? (int) $payload['iat'] : time(),
+			'expires_in'        => max( 0, $expires_timestamp - time() ),
+			'token_hash'        => substr( hash( 'sha256', $token ), 0, 16 ),
+			'domain'            => $payload['domain'] ?? home_url(),
 		);
 
 		$this->migration_repository->save_token_data( $token_data );
@@ -190,7 +216,7 @@ class EFS_Migration_Token_Manager {
 
 		return array(
 			'token'      => $token_data['token'],
-			'qr_data'    => $token_data['token'],
+			'qr_data'    => $token_data['migration_url'],
 			'expires_in' => self::TOKEN_EXPIRATION,
 			'expires_at' => $token_data['expires_at'],
 		);
@@ -204,9 +230,84 @@ class EFS_Migration_Token_Manager {
 
 		return array(
 			'token'      => $token_data['token'],
-			'qr_data'    => $token_data['token'],
+			'qr_data'    => $token_data['migration_url'],
 			'expires_at' => $token_data['expires_at'],
 		);
+	}
+
+	/**
+	 * Analyze URL transport security.
+	 *
+	 * @param string $url Target URL.
+	 * @return array
+	 */
+	public function analyze_url_security( string $url ): array {
+		$normalized = $this->normalize_target_url( $url );
+		$parsed     = wp_parse_url( $normalized );
+		$scheme     = isset( $parsed['scheme'] ) ? strtolower( (string) $parsed['scheme'] ) : '';
+		$host       = isset( $parsed['host'] ) ? strtolower( (string) $parsed['host'] ) : '';
+
+		$is_https      = 'https' === $scheme;
+		$is_local_host = in_array( $host, array( 'localhost', '127.0.0.1', '::1', '[::1]' ), true );
+		$warn_https    = ! $is_https && ! $is_local_host;
+		$warning       = $warn_https
+			? __( 'Warning: This URL does not use HTTPS. Migration keys can be intercepted over insecure networks.', 'etch-fusion-suite' )
+			: '';
+
+		return array(
+			'url'             => $normalized,
+			'host'            => $host,
+			'is_https'        => $is_https,
+			'is_localhost'    => $is_local_host,
+			'https_warning'   => $warn_https,
+			'warning_message' => $warning,
+		);
+	}
+
+	/**
+	 * Build copy-friendly migration URL containing token query parameter.
+	 *
+	 * @param string $target_url Base URL.
+	 * @param string $token      Migration token.
+	 * @return string
+	 */
+	private function build_migration_url( string $target_url, string $token ): string {
+		$base = untrailingslashit( $this->normalize_target_url( $target_url ) );
+		return $base . '/wp-json/efs/v1/migrate?token=' . rawurlencode( $token );
+	}
+
+	/**
+	 * Normalize target URL.
+	 *
+	 * @param string $target_url Raw URL.
+	 * @return string
+	 */
+	private function normalize_target_url( string $target_url ): string {
+		$target_url = esc_url_raw( $target_url );
+		if ( '' === $target_url ) {
+			return home_url();
+		}
+
+		$parsed = wp_parse_url( $target_url );
+		if ( ! is_array( $parsed ) || empty( $parsed['host'] ) ) {
+			return home_url();
+		}
+
+		return $target_url;
+	}
+
+	/**
+	 * Delete transient associated with a token hash.
+	 *
+	 * @param string $token Token value.
+	 * @return void
+	 */
+	private function invalidate_token_transient( string $token ): void {
+		if ( '' === $token ) {
+			return;
+		}
+
+		delete_transient( 'efs_token_' . substr( hash( 'sha256', $token ), 0, 16 ) );
 	}
 
 	/**
