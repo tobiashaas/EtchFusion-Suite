@@ -4,8 +4,8 @@
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "require": {
-        "php": "^7.4",
-        "psr/container": "2.0.2"
+        "php": "^8.1",
+        "psr/container": "^2.0"
     },
     "require-dev": {
         "wp-coding-standards/wpcs": "^3.1",
@@ -32,7 +32,7 @@
     ],
     "config": {
         "platform": {
-            "php": "7.4.0"
+            "php": "8.1.0"
         },
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
