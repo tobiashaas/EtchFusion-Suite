@@ -265,7 +265,7 @@ class StrictComparisonTest extends \WP_UnitTestCase {
         );
     }
 
-    private function invokeSendRequest( EFS_API_Client $client, string $url, string $apiKey, string $endpoint, string $method, array $data = null ) {
+    private function invokeSendRequest( EFS_API_Client $client, string $url, string $apiKey, string $endpoint, string $method, ?array $data = null ) {
         $reflection = new \ReflectionClass( EFS_API_Client::class );
         $methodRef  = $reflection->getMethod( 'send_request' );
         $methodRef->setAccessible( true );

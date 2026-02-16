@@ -52,7 +52,7 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 	/**
 	 * Constructor.
 	 */
-	public function __construct( EFS_Error_Handler $error_handler, EFS_API_Client $api_client = null ) {
+	public function __construct( EFS_Error_Handler $error_handler, ?EFS_API_Client $api_client = null ) {
 		$this->error_handler = $error_handler;
 		$this->api_client    = $api_client;
 	}

@@ -43,7 +43,7 @@ class EFS_Migration_Manager {
 	 * @param EFS_Migration_Service|null $migration_service
 	 * @param Migration_Repository_Interface|null $migration_repository
 	 */
-	public function __construct( EFS_Migration_Service $migration_service = null, Migration_Repository_Interface $migration_repository = null ) {
+	public function __construct( ?EFS_Migration_Service $migration_service = null, ?Migration_Repository_Interface $migration_repository = null ) {
 		if ( $migration_service ) {
 			$this->migration_service = $migration_service;
 

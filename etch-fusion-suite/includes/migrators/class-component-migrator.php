@@ -79,7 +79,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 * @param EFS_API_Client    $api_client    API client instance.
 	 * @param array             $style_map    Optional. Style map for CSS class mapping.
 	 */
-	public function __construct( EFS_Error_Handler $error_handler, EFS_API_Client $api_client = null, $style_map = array() ) {
+	public function __construct( EFS_Error_Handler $error_handler, ?EFS_API_Client $api_client = null, $style_map = array() ) {
 		parent::__construct( $error_handler, $api_client );
 		$this->style_map = is_array( $style_map ) ? $style_map : array();
 	}

@@ -509,7 +509,20 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			return; // Error already sent by validate_input
+			$this->log_security_event(
+				'invalid_input',
+				'Export connection test payload was invalid.',
+				array( 'error' => $e->getMessage() ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid export connection payload.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_export_connection_payload',
+				),
+				400
+			);
+			return;
 		}
 
 		$target_url    = $validated['target_url'];
@@ -602,7 +615,20 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			return; // Error already sent by validate_input
+			$this->log_security_event(
+				'invalid_input',
+				'Import connection test payload was invalid.',
+				array( 'error' => $e->getMessage() ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid import connection payload.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_import_connection_payload',
+				),
+				400
+			);
+			return;
 		}
 
 		$source_url    = $validated['source_url'];

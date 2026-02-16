@@ -42,7 +42,7 @@ class EFS_Migration_Token_Manager {
 	 *
 	 * @param Migration_Repository_Interface|null $migration_repository
 	 */
-	public function __construct( Migration_Repository_Interface $migration_repository = null ) {
+	public function __construct( ?Migration_Repository_Interface $migration_repository = null ) {
 		$this->error_handler = new \Bricks2Etch\Core\EFS_Error_Handler();
 
 		if ( null === $migration_repository ) {
