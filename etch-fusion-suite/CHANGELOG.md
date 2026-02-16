@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Code Converter:** Maximale native Etch-Integration statt pauschalem `etch/raw-html` Dump — **2026-02-16**
+  - JS aus `javascriptCode` Feld und `<script>` Tags im HTML-Feld wird extrahiert und als `wp:etch/element` mit `script.code` base64 ausgegeben (Etch-nativ)
+  - CSS aus `cssCode` Feld und `<style>` Tags im HTML-Feld wird extrahiert und als `wp:etch/raw-html` mit `<style>` ausgegeben (separater Block mit `(CSS)` Label)
+  - PHP-Code (`<?php`/`<?`) wird erkannt und als nicht-ausführbarer Warnungs-Block mit `esc_html()`-escaped Original ausgegeben
+  - HTML-Kommentare und Whitespace-only Reste nach Extraktion werden ignoriert
+  - Verbleibender HTML-Content geht als `wp:etch/raw-html` mit `executeCode` → `unsafe` Flag
+
 ### Removed
 - Deprecated `etch-flex-div-style` CSS style (no longer generated)
 

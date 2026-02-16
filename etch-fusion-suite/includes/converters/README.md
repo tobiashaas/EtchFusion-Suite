@@ -56,6 +56,7 @@ converters/
     ├── class-paragraph.php         # Text/Paragraph
     ├── class-image.php             # Images (figure tag!)
     ├── class-div.php               # Div/Flex-Div (li support)
+    ├── class-code.php              # Code (JS→script.code, CSS→style, PHP→warning)
     └── class-notes.php             # Notes → HTML comment (fr-notes)
 ```
 
@@ -464,6 +465,46 @@ Konvertiert Frames fr-notes Elemente in HTML-Kommentare zur Migrations-Nachverfo
 **Output:** `wp:etch/raw-html` Block mit Shortcode-Content
 
 **Wichtige Änderungen:** `2025-02-08: Initial implementation (Phase 2)`
+
+---
+
+## 💻 Code Converter
+
+**Datei:** `elements/class-code.php`
+
+**Zweck:** Konvertiert Bricks Code-Elemente mit maximaler nativer Etch-Integration. Statt alles pauschal in `etch/raw-html` zu dumpen, wird JS/CSS/HTML/PHP separat erkannt und optimal behandelt.
+
+**Logik:**
+
+1. **PHP-Erkennung** (`<?php` / `<?`) → Frühzeitiger Abbruch mit Warnungs-Block (`unsafe: false`, Original esc_html-escaped in HTML-Kommentar)
+2. **`<script>` Tags** aus dem HTML-Feld extrahieren → mit `javascriptCode` Feld zusammenführen → `wp:etch/element` mit `script.code` base64 (Etch-nativ)
+3. **`<style>` Tags** aus dem HTML-Feld extrahieren → mit `cssCode` Feld zusammenführen → `wp:etch/raw-html` mit `<style>` (kein natives Etch-CSS-Attribut)
+4. **Rest-HTML** nach Extraktion → HTML-Kommentare/Whitespace entfernen → substantielles HTML als `wp:etch/raw-html`
+
+**Output-Blöcke (bis zu 3 pro Element):**
+
+| Quelle | Etch Block | Format |
+|--------|-----------|--------|
+| JS (Feld + `<script>` Tags) | `wp:etch/element` | `script.code` base64 |
+| CSS (Feld + `<style>` Tags) | `wp:etch/raw-html` | `<style>...</style>`, Label `(CSS)` |
+| Rest-HTML | `wp:etch/raw-html` | `content`, `unsafe` Flag |
+| PHP | `wp:etch/raw-html` | HTML-Kommentar mit Warnung |
+
+**Etch-Einschränkung:** Etch hat kein `style.code` Pendant zu `script.code`. Custom-CSS bleibt daher bei `etch/raw-html` mit `<style>` Tag.
+
+**Hilfsmethoden (privat):**
+- `extract_script_tags($html)` — Regex-Extraktion aller `<script>` Inhalte
+- `extract_style_tags($html)` — Regex-Extraktion aller `<style>` Inhalte
+- `contains_php($code)` — Prüft auf `<?` Tags
+- `clean_remaining_html($html)` — Entfernt HTML-Kommentare + Whitespace
+- `build_js_block($js, $element)` — `wp:etch/element` mit `script.code` base64
+- `build_css_block($css, $element)` — `wp:etch/raw-html` mit `<style>`
+- `build_html_block($html, $element)` — `wp:etch/raw-html` mit `unsafe` Flag
+- `build_php_warning_block($code, $element)` — Warnungs-Block mit esc_html
+
+**Wichtige Änderungen:**
+- `2025-02-08: Initial implementation (Phase 2) — alles als etch/raw-html`
+- `2026-02-16: Maximale native Integration — JS als script.code base64, CSS/HTML/PHP separat behandelt`
 
 ---
 
