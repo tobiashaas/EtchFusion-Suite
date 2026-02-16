@@ -216,6 +216,37 @@
   - **Added:** 2025-10-27 20:52
   - **Completed:** 2025-10-27 20:52
 
+## Upcoming 📋
+
+- [ ] Implement Dynamic Data Tag Converter (Bricks `{tag:param}` → Etch `{source.path}`)
+  - **Added:** 2026-02-16
+  - **Scope:** Parser for Bricks dynamic tag syntax, mapping table to Etch expressions, integration into element converters
+  - **Reference:** `includes/converters/README.md` — Mapping Reference section
+  - **Prod-DB:** 30 konvertierbare Tags (post_title, post_excerpt, post_date, author_name, categories, etc.)
+
+- [ ] Implement Loop Converter (Bricks `hasLoop`/`query` → Etch `etch/loop` blocks)
+  - **Added:** 2026-02-16
+  - **Scope:** Wrap looped elements in `etch/loop` block, generate `etch_loops` presets from Bricks query config
+  - **Prod-DB:** 79 konvertierbare Loops (wp-query: post, attachment, slider, locations, product; wp-terms)
+
+- [ ] Implement Condition Converter (Bricks `_conditions` → Etch `etch/condition` blocks)
+  - **Added:** 2026-02-16
+  - **Scope:** Wrap conditional elements in `etch/condition` block, translate condition AST
+  - **Prod-DB:** 7 konvertierbare Conditions (user_logged_in, featured_image)
+
+- [ ] **DEFERRED:** WooCommerce Dynamic Tags, Loops & Conditions
+  - **Added:** 2026-02-16
+  - **Blocked by:** Etch hat aktuell keine native WooCommerce-Integration
+  - **Scope:** `{woo_*}` Tags, `{do_action:woocommerce_*}` Hooks, `wooCart` Loop, WooCommerce Conditions
+  - **Prod-DB:** 13 WooCommerce Dynamic Tags, 1 wooCart Loop, 6 WooCommerce Conditions
+  - **Action:** Erneut evaluieren sobald Etch WooCommerce-Support einführt
+
+- [ ] **DEFERRED:** PHP Echo Tags (`{echo:function_name}`)
+  - **Added:** 2026-02-16
+  - **Blocked by:** Etch Sicherheitsmodell erlaubt keine beliebigen PHP-Funktionsaufrufe
+  - **Prod-DB:** 2 Instanzen (`{echo:frames_get_current_post_type}`)
+  - **Action:** Erneut evaluieren sobald Etch ein sicheres Äquivalent bietet
+
 ## In Progress 🔄
 
 - [✅] Nov 2 verification – Remove deprecated PIN module artifacts

@@ -35,11 +35,11 @@ class StructuralConvertersSchemaTest extends WP_UnitTestCase {
 			),
 		);
 
-		update_option( 'b2e_style_map', $this->style_map );
+		update_option( 'efs_style_map', $this->style_map );
 	}
 
 	protected function tearDown(): void {
-		delete_option( 'b2e_style_map' );
+		delete_option( 'efs_style_map' );
 		parent::tearDown();
 	}
 

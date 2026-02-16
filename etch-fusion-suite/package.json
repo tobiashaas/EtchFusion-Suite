@@ -79,7 +79,7 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "@wordpress/env": "^10.30.0",
+    "@wordpress/env": "^10.39.0",
     "concurrently": "^8.2.2",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",

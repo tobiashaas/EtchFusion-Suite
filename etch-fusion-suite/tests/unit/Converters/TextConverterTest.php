@@ -56,7 +56,7 @@ class TextConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'First', $result );
 		$this->assertStringContainsString( 'Second', $result );
 		$this->assertStringContainsString( 'Third', $result );
-		$this->assertSame( 3, substr_count( $result, 'wp:etch/element' ) );
+		$this->assertSame( 3, substr_count( $result, '<!-- wp:etch/element ' ) );
 		$this->assertSame( 3, substr_count( $result, 'wp:etch/text' ) );
 	}
 
@@ -90,7 +90,7 @@ class TextConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Intro', $result );
 		$this->assertStringContainsString( 'Point 1', $result );
 		$this->assertStringContainsString( 'Conclusion', $result );
-		$this->assertSame( 3, substr_count( $result, 'wp:etch/element' ) );
+		$this->assertSame( 3, substr_count( $result, '<!-- wp:etch/element ' ) );
 		$this->assertSame( 3, substr_count( $result, 'wp:etch/text' ) );
 	}
 
@@ -123,7 +123,7 @@ class TextConverterTest extends WP_UnitTestCase {
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
 		$this->assertStringContainsString( 'custom-class', $result );
-		$this->assertStringContainsString( 'content-text', $result );
+		$this->assertStringContainsString( 'etch-text-style', $result );
 		$this->assertMatchesRegularExpression( '/"class":\s*"[^"]*custom-class[^"]*"/', $result );
 	}
 

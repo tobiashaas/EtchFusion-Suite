@@ -227,14 +227,14 @@ async function detectCliContainer() {
 async function copyBackupToContainer(containerName, backup, dryRun) {
   const targetDir = `${CONTAINER_IMPORT_DIR}/${backup.backupId}`;
   if (dryRun) {
-    console.log(`[dry-run] docker exec ${containerName} sh -lc "mkdir -p ${targetDir}"`);
+    console.log(`[dry-run] docker exec ${containerName} mkdir -p ${targetDir}`);
     for (const part of backup.files) {
       console.log(`[dry-run] docker cp "${part.fullPath}" "${containerName}:${targetDir}/${part.fileName}"`);
     }
     return true;
   }
 
-  const mkdirResult = await run('docker', ['exec', containerName, 'sh', '-lc', `mkdir -p ${targetDir}`]);
+  const mkdirResult = await run('docker', ['exec', containerName, 'mkdir', '-p', targetDir]);
   if (mkdirResult.code !== 0) {
     console.error(`Failed to prepare container import directory: ${mkdirResult.stderr || mkdirResult.stdout}`);
     return false;

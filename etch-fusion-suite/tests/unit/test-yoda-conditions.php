@@ -131,7 +131,7 @@ CSS;
 		);
 
 		$previous_options = $GLOBALS['__efs_test_options'];
-		$GLOBALS['__efs_test_options']['b2e_style_map']        = $style_map;
+		$GLOBALS['__efs_test_options']['efs_style_map']        = $style_map;
 		$GLOBALS['__efs_test_options']['bricks_global_classes'] = $classes_option;
 
 		$element = array(

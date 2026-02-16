@@ -13,7 +13,7 @@ This directory documents the CI/CD automation that keeps Etch Fusion Suite healt
 Runs on pushes to `main`, `develop`, and every pull request. Jobs execute sequentially:
 
 1. **Lint** – Installs Composer dependencies inside `etch-fusion-suite/` and runs `vendor/bin/phpcs --standard=phpcs.xml.dist`, explicitly scanning `etch-fusion-suite.php`, `includes/`, `assets/`, and other PHP sources.
-2. **Test** – Matrix across PHP 7.4, 8.1, 8.2, 8.3, and 8.4. Exports `WP_TESTS_DIR=/tmp/wordpress-tests-lib` and `WP_CORE_DIR=/tmp/wordpress`, provisions the WordPress PHPUnit library via `install-wp-tests.sh`, and executes `vendor/bin/phpunit -c etch-fusion-suite/phpunit.xml.dist`.
+2. **Test** – Matrix across PHP 8.1, 8.2, 8.3, and 8.4. Exports `WP_TESTS_DIR=/tmp/wordpress-tests-lib` and `WP_CORE_DIR=/tmp/wordpress`, provisions the WordPress PHPUnit library via `install-wp-tests.sh`, and executes `vendor/bin/phpunit -c etch-fusion-suite/phpunit.xml.dist`.
 3. **Node** – Sets up Node 18 with npm caching and runs `npm ci` inside `etch-fusion-suite/` to validate front-end tooling.
 
 **Local Reproduction**

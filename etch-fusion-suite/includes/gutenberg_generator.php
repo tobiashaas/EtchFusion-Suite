@@ -516,7 +516,7 @@ class EFS_Gutenberg_Generator {
 		// Method 1: Get Bricks global class IDs (if available)
 		if ( isset( $element['settings']['_cssGlobalClasses'] ) && is_array( $element['settings']['_cssGlobalClasses'] ) ) {
 			// Get style map (Bricks ID => Etch ID)
-			$style_map = get_option( 'b2e_style_map', array() );
+			$style_map = get_option( 'efs_style_map', array() );
 
 			$this->error_handler->log_info( 'Gutenberg Generator: Element ' . $element_name . ' has ' . count( $element['settings']['_cssGlobalClasses'] ) . ' global classes' );
 
@@ -550,7 +550,7 @@ class EFS_Gutenberg_Generator {
 
 			// Only generate IDs for classes that exist in Bricks Global Classes
 			// We need to find the Bricks ID for this class name, then lookup in style_map
-			$style_map = get_option( 'b2e_style_map', array() );
+			$style_map = get_option( 'efs_style_map', array() );
 			$this->error_handler->log_info( 'Gutenberg Generator: Style map has ' . count( $style_map ) . ' entries' );
 			$this->error_handler->log_info( 'Gutenberg Generator: Processing ' . count( $classes ) . ' classes: ' . implode( ', ', $classes ) );
 
@@ -587,7 +587,7 @@ class EFS_Gutenberg_Generator {
 	/**
 	 * Convert style IDs to CSS class names for block-level attributes.class.
 	 *
-	 * Uses b2e_style_map which contains both IDs and selectors.
+	 * Uses efs_style_map which contains both IDs and selectors.
 	 */
 	private function get_css_classes_from_style_ids( $style_ids ) {
 		if ( empty( $style_ids ) ) {
@@ -596,7 +596,7 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Get style map which now contains selectors
-		$style_map = get_option( 'b2e_style_map', array() );
+		$style_map = get_option( 'efs_style_map', array() );
 		$this->error_handler->log_info( 'Gutenberg Generator: Style map has ' . count( $style_map ) . ' entries' );
 		$this->error_handler->log_info( 'Gutenberg Generator: Looking for style IDs: ' . implode( ', ', $style_ids ) );
 
@@ -653,7 +653,7 @@ class EFS_Gutenberg_Generator {
 		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks at ' . $generation_timestamp . ' with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
-		$style_map             = get_option( 'b2e_style_map', array() );
+		$style_map             = get_option( 'efs_style_map', array() );
 		$this->element_factory = new EFS_Element_Factory( $style_map );
 		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
 

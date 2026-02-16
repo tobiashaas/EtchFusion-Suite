@@ -24,6 +24,8 @@ class AdminUITest extends WP_UnitTestCase {
 		$this->reset_plugin_detector();
 		delete_option( 'efs_feature_flags' );
 		delete_option( 'efs_settings' );
+		delete_option( 'efs_migration_settings' );
+		delete_transient( 'efs_cache_settings_migration' );
 
 		wp_set_current_user( $this->factory->user->create( array( 'role' => 'administrator' ) ) );
 	}
@@ -31,6 +33,8 @@ class AdminUITest extends WP_UnitTestCase {
 	protected function tearDown(): void {
 		delete_option( 'efs_feature_flags' );
 		delete_option( 'efs_settings' );
+		delete_option( 'efs_migration_settings' );
+		delete_transient( 'efs_cache_settings_migration' );
 		remove_filter( 'efs_enable_framer', '__return_true' );
 		$this->reset_plugin_detector();
 		parent::tearDown();
@@ -49,6 +53,7 @@ class AdminUITest extends WP_UnitTestCase {
 	}
 
 	public function test_dashboard_render_outputs_markup(): void {
+		$this->set_bricks_environment();
 		ob_start();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -109,14 +114,14 @@ class AdminUITest extends WP_UnitTestCase {
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'Etch Target Site Setup', $output );
-		$this->assertStringContainsString( 'Create an Application Password', $output );
 		$this->assertStringContainsString( 'Share This Site URL', $output );
 		$this->assertStringContainsString( 'Generate Migration Key', $output );
 		$this->assertStringNotContainsString( 'data-efs-accordion', $output );
 	}
 
-	public function test_migration_key_component_renders_in_bricks_context(): void {
-		update_option( 'efs_settings', array( 'target_url' => 'https://target.example', 'api_key' => 'abc123' ) );
+	public function test_bricks_migration_form_renders_key_fields(): void {
+		update_option( 'efs_migration_settings', array( 'migration_key' => 'test-key-value' ) );
+		delete_transient( 'efs_cache_settings_migration' );
 		$this->set_bricks_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -125,12 +130,11 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'data-efs-migration-key-component', $output );
-		$this->assertStringContainsString( 'data-context="bricks"', $output );
-		$this->assertStringContainsString( 'name="api_key"', $output );
-		$this->assertStringContainsString( 'name="target_url"', $output );
-		$this->assertStringContainsString( 'value="https://target.example"', $output );
-		$this->assertStringContainsString( 'value="abc123"', $output );
+		$this->assertStringContainsString( 'id="efs-migration-key"', $output );
+		$this->assertStringContainsString( 'Paste Migration Key from Etch', $output );
+		$this->assertStringContainsString( 'id="efs-migration-token"', $output );
+		$this->assertStringContainsString( 'data-efs-migration-form', $output );
+		$this->assertStringContainsString( 'test-key-value', $output );
 	}
 
 	public function test_migration_key_component_renders_in_etch_context(): void {
@@ -181,7 +185,6 @@ class AdminUITest extends WP_UnitTestCase {
 	}
 
 	public function test_bricks_setup_section_renders_expected_fields(): void {
-		update_option( 'efs_settings', array( 'target_url' => 'https://target.example', 'api_key' => 'abc123' ) );
 		$this->set_bricks_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -193,8 +196,8 @@ class AdminUITest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'EFS Site Migration Setup', $output );
 		$this->assertStringContainsString( 'id="efs-migration-key"', $output );
 		$this->assertStringContainsString( 'id="efs-migration-token"', $output );
-		$this->assertMatchesRegularExpression( '/name="target_url" value="https:\/\/target\.example"/', $output );
-		$this->assertMatchesRegularExpression( '/name="api_key" value="abc123"/', $output );
+		$this->assertStringContainsString( 'name="migration_token"', $output );
+		$this->assertStringContainsString( 'name="batch_size"', $output );
 	}
 
 	public function test_etch_setup_section_renders_expected_fields(): void {
@@ -207,7 +210,6 @@ class AdminUITest extends WP_UnitTestCase {
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'Etch Target Site Setup', $output );
-		$this->assertStringContainsString( 'Create an Application Password', $output );
 		$this->assertStringContainsString( 'Share This Site URL', $output );
 		$this->assertStringContainsString( 'Generate Migration Key', $output );
 		$this->assertStringContainsString( 'id="efs-site-url"', $output );
@@ -216,7 +218,7 @@ class AdminUITest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'name="api_key"', $output );
 	}
 
-	public function test_connection_settings_form_has_grouped_actions(): void {
+	public function test_migration_form_has_inline_actions(): void {
 		$this->set_bricks_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -226,8 +228,8 @@ class AdminUITest extends WP_UnitTestCase {
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'efs-actions efs-actions--inline', $output );
-		$this->assertStringContainsString( 'Save Connection Settings', $output );
-		$this->assertStringContainsString( 'Test Connection', $output );
+		$this->assertStringContainsString( 'data-efs-start-migration', $output );
+		$this->assertStringContainsString( 'data-efs-cancel-migration', $output );
 	}
 
 	public function test_migration_form_has_grouped_actions(): void {
@@ -244,8 +246,9 @@ class AdminUITest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'data-efs-cancel-migration', $output );
 	}
 
-	public function test_settings_are_passed_to_migration_key_component(): void {
-		update_option( 'efs_settings', array( 'target_url' => 'https://target.example', 'api_key' => 'abc123' ) );
+	public function test_settings_are_passed_to_bricks_setup_view(): void {
+		update_option( 'efs_migration_settings', array( 'migration_key' => 'my-test-key', 'migration_token' => 'my-test-token' ) );
+		delete_transient( 'efs_cache_settings_migration' );
 		$this->set_bricks_environment();
 		/** @var EFS_Admin_Interface $admin */
 		$admin = $this->container->get( 'admin_interface' );
@@ -254,8 +257,8 @@ class AdminUITest extends WP_UnitTestCase {
 		$admin->render_dashboard();
 		$output = ob_get_clean();
 
-		$this->assertStringContainsString( 'value="https://target.example"', $output );
-		$this->assertStringContainsString( 'name="api_key"', $output );
+		$this->assertStringContainsString( 'my-test-key', $output );
+		$this->assertStringContainsString( 'my-test-token', $output );
 	}
 
 	public function test_dashboard_renders_without_errors_on_bricks_site(): void {
@@ -305,7 +308,7 @@ class AdminUITest extends WP_UnitTestCase {
 		$result = $controller->start_migration( array() );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'missing_token', $result->get_error_code() );
+		$this->assertSame( 'missing_migration_key', $result->get_error_code() );
 	}
 
 	public function test_template_extractor_supported_sources_and_extraction(): void {
@@ -369,6 +372,10 @@ class AdminUITest extends WP_UnitTestCase {
 		};
 
 		$this->container->singleton( 'plugin_detector', $stub );
+
+		// Flush all resolved singletons so dependents (dashboard_controller,
+		// admin_interface) re-resolve and pick up the new mock detector.
+		$this->container->flush();
 	}
 
 	private function reset_plugin_detector(): void {
@@ -378,6 +385,7 @@ class AdminUITest extends WP_UnitTestCase {
 				return new EFS_Plugin_Detector( $container->get( 'error_handler' ) );
 			}
 		);
+		$this->container->flush();
 	}
 
 }

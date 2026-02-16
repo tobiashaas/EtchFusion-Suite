@@ -115,7 +115,7 @@ class TextLinkConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
-		$this->assertStringContainsString( '"class":"text-link-class"', $result );
+		$this->assertStringContainsString( 'etch-text-link-style', $result );
 	}
 
 	public function test_flat_schema_structure(): void {

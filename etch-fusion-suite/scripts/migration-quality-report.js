@@ -423,7 +423,7 @@ function main() {
     const bricksPosts = getPostCount('cli', args.postTypes);
     const etchPosts = getPostCount('tests-cli', args.postTypes);
     const bricksGlobalClasses = getOptionLength('cli', 'bricks_global_classes');
-    const etchStyleMap = getOptionLength('tests-cli', 'b2e_style_map');
+    const etchStyleMap = getOptionLength('tests-cli', 'efs_style_map');
     const bricksComponents = getOptionLength('cli', 'bricks_components');
     const etchComponents = getWpBlockCount();
 

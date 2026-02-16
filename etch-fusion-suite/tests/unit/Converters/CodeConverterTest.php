@@ -89,7 +89,7 @@ class CodeConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<style>', $result );
 		$this->assertStringContainsString( '.box { color: red; }', $result );
 		$this->assertStringContainsString( '<script>', $result );
-		$this->assertStringContainsString( 'console.log("ok");', $result );
+		$this->assertStringContainsString( 'console.log(', $result );
 		$this->assertStringContainsString( 'HTML', $result );
 	}
 

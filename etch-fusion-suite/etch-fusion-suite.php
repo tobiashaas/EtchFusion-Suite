@@ -10,7 +10,7 @@
  * Domain Path: /languages
  * Requires at least: 5.0
  * Tested up to: 6.4
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  * Network: false
  * Update URI: https://github.com/tobiashaas/EtchFusion-Suite
  */
