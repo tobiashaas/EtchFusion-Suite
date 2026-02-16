@@ -145,8 +145,8 @@ main() {
   if [[ -f package.json ]]; then
     if command -v npm >/dev/null 2>&1; then
       local build_script
-      build_script="$(npm pkg get scripts.build 2>/dev/null || echo "null")"
-      if [[ "${build_script}" != "null" ]]; then
+      build_script="$(npm pkg get scripts.build 2>/dev/null || echo '""')"
+      if [[ "${build_script}" != '""' && "${build_script}" != "null" && "${build_script}" != "{}" ]]; then
         log "Installing Node dependencies via npm ci."
         npm ci --no-audit --no-fund
         log "Running npm run build."
