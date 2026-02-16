@@ -91,7 +91,20 @@ class EFS_CSS_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			);
 		} catch ( \Exception $e ) {
 			$this->log( '❌ CSS Migration: Validation failed: ' . $e->getMessage() );
-			return; // Error already sent by validate_input
+			$this->log_security_event(
+				'invalid_input',
+				'CSS migration payload validation failed.',
+				array( 'error' => $e->getMessage() ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid CSS migration payload.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_css_payload',
+				),
+				400
+			);
+			return;
 		}
 
 		$target_url    = $validated['target_url'];

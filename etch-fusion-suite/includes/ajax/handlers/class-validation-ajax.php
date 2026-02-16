@@ -79,7 +79,20 @@ class EFS_Validation_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			return; // Error already sent by validate_input
+			$this->log_security_event(
+				'invalid_input',
+				'Migration key validation request payload was invalid.',
+				array( 'error' => $e->getMessage() ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid validation request payload.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_validation_payload',
+				),
+				400
+			);
+			return;
 		}
 
 		$migration_key = $validated['migration_key'];

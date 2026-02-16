@@ -30,7 +30,7 @@ class EFS_Media_Migrator {
 	/**
 	 * Constructor
 	 */
-	public function __construct( EFS_Error_Handler $error_handler, EFS_API_Client $api_client = null ) {
+	public function __construct( EFS_Error_Handler $error_handler, ?EFS_API_Client $api_client = null ) {
 		$this->error_handler = $error_handler;
 		$this->api_client    = $api_client;
 	}
@@ -265,37 +265,86 @@ class EFS_Media_Migrator {
 	 * Get media statistics
 	 */
 	public function get_media_stats() {
-		$media_query = new \WP_Query(
-			array(
-				'post_type'      => 'attachment',
-				'post_status'    => 'inherit',
-				'posts_per_page' => -1,
-			)
+		global $wpdb;
+
+		$media_by_type = array();
+		$total_media   = 0;
+		$total_size    = 0;
+
+		$mime_rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_mime_type, COUNT(*) AS total
+				FROM {$wpdb->posts}
+				WHERE post_type = %s AND post_status = %s
+				GROUP BY post_mime_type",
+				'attachment',
+				'inherit'
+			),
+			ARRAY_A
 		);
 
-		$total_media   = $media_query->found_posts;
-		$total_size    = 0;
-		$media_by_type = array();
+		if ( is_array( $mime_rows ) ) {
+			foreach ( $mime_rows as $row ) {
+				$count = isset( $row['total'] ) ? (int) $row['total'] : 0;
+				if ( $count <= 0 ) {
+					continue;
+				}
 
-		if ( $media_query->have_posts() ) {
-			while ( $media_query->have_posts() ) {
-				$media_query->the_post();
-				$attachment_id = get_the_ID();
-				$mime_type     = get_post_mime_type( $attachment_id );
-				$file_size     = filesize( get_attached_file( $attachment_id ) );
+				$mime_type = isset( $row['post_mime_type'] ) ? (string) $row['post_mime_type'] : '';
+				$type_bits = explode( '/', $mime_type, 2 );
+				$type      = ! empty( $type_bits[0] ) ? $type_bits[0] : 'other';
 
-				$total_size += $file_size;
-
-				// Group by type
-				$type = explode( '/', $mime_type )[0];
 				if ( ! isset( $media_by_type[ $type ] ) ) {
 					$media_by_type[ $type ] = 0;
 				}
-				++$media_by_type[ $type ];
+
+				$media_by_type[ $type ] += $count;
+				$total_media            += $count;
 			}
 		}
 
-		wp_reset_postdata();
+		if ( $total_media > 0 ) {
+			$sample_limit = (int) apply_filters( 'etch_fusion_suite_media_stats_sample_limit', 200 );
+			$sample_limit = max( 1, min( 500, $sample_limit ) );
+
+			$sample_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT ID
+					FROM {$wpdb->posts}
+					WHERE post_type = %s AND post_status = %s
+					ORDER BY ID DESC
+					LIMIT %d",
+					'attachment',
+					'inherit',
+					$sample_limit
+				)
+			);
+
+			$sample_total_size = 0;
+			$sample_count      = 0;
+
+			if ( is_array( $sample_ids ) ) {
+				foreach ( $sample_ids as $attachment_id ) {
+					$file_path = get_attached_file( (int) $attachment_id );
+					if ( ! is_string( $file_path ) || '' === $file_path || ! file_exists( $file_path ) ) {
+						continue;
+					}
+
+					$file_size = filesize( $file_path );
+					if ( false === $file_size ) {
+						continue;
+					}
+
+					$sample_total_size += (int) $file_size;
+					++$sample_count;
+				}
+			}
+
+			if ( $sample_count > 0 ) {
+				$average_size = $sample_total_size / $sample_count;
+				$total_size   = (int) round( $average_size * $total_media );
+			}
+		}
 
 		return array(
 			'total_media'   => $total_media,

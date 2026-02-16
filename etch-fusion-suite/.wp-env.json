@@ -18,8 +18,7 @@
   "env": {
     "development": {
       "plugins": [
-        ".",
-        "https://downloads.wordpress.org/plugin/wpvivid-backuprestore.latest-stable.zip"
+        "."
       ],
       "config": {
         "WP_ENVIRONMENT_TYPE": "local",

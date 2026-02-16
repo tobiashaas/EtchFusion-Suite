@@ -24,7 +24,7 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null   $rate_limiter   Rate limiter instance (optional).
 	 * @param \Bricks2Etch\Security\EFS_Input_Validator|null $input_validator Input validator instance (optional).
 	 */
-	public function __construct( EFS_Audit_Logger $audit_logger = null, $rate_limiter = null, $input_validator = null ) {
+	public function __construct( ?EFS_Audit_Logger $audit_logger = null, $rate_limiter = null, $input_validator = null ) {
 		$this->audit_logger = $audit_logger;
 		parent::__construct( $rate_limiter, $input_validator, $audit_logger );
 	}

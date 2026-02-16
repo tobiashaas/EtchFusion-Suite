@@ -68,7 +68,20 @@ class EFS_Cleanup_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				)
 			);
 		} catch ( \Exception $e ) {
-			return; // Error already sent by validate_input
+			$this->log_security_event(
+				'invalid_input',
+				'Cleanup payload validation failed.',
+				array( 'error' => $e->getMessage() ),
+				'medium'
+			);
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid cleanup request payload.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_cleanup_payload',
+				),
+				400
+			);
+			return;
 		}
 
 		$target_url    = $validated['target_url'];

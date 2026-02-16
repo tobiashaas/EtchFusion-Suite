@@ -21,7 +21,7 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 	/**
 	 * Constructor
 	 */
-	public function __construct( EFS_Error_Handler $error_handler, EFS_API_Client $api_client = null ) {
+	public function __construct( EFS_Error_Handler $error_handler, ?EFS_API_Client $api_client = null ) {
 		parent::__construct( $error_handler, $api_client );
 
 		$this->name     = 'ACF Field Groups';
