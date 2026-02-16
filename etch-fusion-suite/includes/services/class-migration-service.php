@@ -10,6 +10,26 @@ use Bricks2Etch\Parsers\EFS_Content_Parser;
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
 
 class EFS_Migration_Service {
+	/**
+	 * Canonical phase order for dashboard progress.
+	 */
+	private const PHASES = array(
+		'validation'    => 'Validation',
+		'analyzing'     => 'Analyzing',
+		'cpts'          => 'Custom Post Types',
+		'acf'           => 'ACF Field Groups',
+		'metabox'       => 'MetaBox Configs',
+		'custom_fields' => 'Custom Fields',
+		'media'         => 'Media',
+		'css'           => 'CSS',
+		'posts'         => 'Posts',
+		'finalization'  => 'Finalization',
+	);
+
+	/**
+	 * Running progress with no updates for this period is stale.
+	 */
+	private const PROGRESS_STALE_TTL = 300;
 
 	/** @var EFS_Error_Handler */
 	private $error_handler;
@@ -88,6 +108,11 @@ class EFS_Migration_Service {
 	 */
 	public function start_migration( $migration_key, $target_url = null, $batch_size = null ) {
 		try {
+			$in_progress = $this->detect_in_progress_migration();
+			if ( ! empty( $in_progress['migrationId'] ) && empty( $in_progress['is_stale'] ) ) {
+				return new \WP_Error( 'migration_in_progress', __( 'A migration is already in progress.', 'etch-fusion-suite' ) );
+			}
+
 			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
 
 			if ( is_wp_error( $decoded ) ) {
@@ -137,7 +162,9 @@ class EFS_Migration_Service {
 						'action'            => 'Target site validation failed',
 					)
 				);
-				$this->update_progress( 'error', 0, $error_message );
+				$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
+				$this->update_progress( 'error', $current_percentage, $error_message );
+				$this->store_active_migration( array() );
 
 				return new \WP_Error( 'validation_failed', $error_message );
 			}
@@ -168,7 +195,7 @@ class EFS_Migration_Service {
 				return $media_result;
 			}
 
-			$this->update_progress( 'css_classes', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
+			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
 			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
@@ -187,6 +214,7 @@ class EFS_Migration_Service {
 			}
 
 			$this->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
+			$this->store_active_migration( array() );
 
 			$migration_stats                   = $this->migration_repository->get_stats();
 			$migration_stats['last_migration'] = current_time( 'mysql' );
@@ -224,7 +252,9 @@ class EFS_Migration_Service {
 				)
 			);
 
-			$this->update_progress( 'error', 0, $error_message );
+			$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
+			$this->update_progress( 'error', $current_percentage, $error_message );
+			$this->store_active_migration( array() );
 
 			return new \WP_Error( 'migration_failed', $error_message );
 		}
@@ -241,12 +271,73 @@ class EFS_Migration_Service {
 		$progress_data = $this->get_progress_data();
 		$steps         = $this->get_steps_state();
 		$migration_id  = isset( $progress_data['migrationId'] ) ? $progress_data['migrationId'] : '';
+		$progress_data['steps'] = $steps;
+		$progress_data['is_stale'] = ! empty( $progress_data['is_stale'] );
 
 		return array(
 			'progress'    => $progress_data,
 			'steps'       => $steps,
 			'migrationId' => $migration_id,
+			'last_updated' => isset( $progress_data['last_updated'] ) ? $progress_data['last_updated'] : '',
+			'is_stale'    => ! empty( $progress_data['is_stale'] ),
+			'estimated_time_remaining' => isset( $progress_data['estimated_time_remaining'] ) ? $progress_data['estimated_time_remaining'] : null,
 			'completed'   => $this->is_migration_complete(),
+		);
+	}
+
+	/**
+	 * Detect resumable in-progress migration state.
+	 *
+	 * @return array
+	 */
+	public function detect_in_progress_migration() {
+		$state       = $this->get_progress();
+		$progress    = isset( $state['progress'] ) && is_array( $state['progress'] ) ? $state['progress'] : array();
+		$migration_id = isset( $state['migrationId'] ) ? (string) $state['migrationId'] : '';
+		$status      = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
+		$is_stale    = ! empty( $progress['is_stale'] ) || 'stale' === $status;
+		$is_running  = in_array( $status, array( 'running', 'receiving' ), true );
+
+		if ( '' !== $migration_id && $is_running ) {
+			return array(
+				'migrationId' => $migration_id,
+				'progress'    => $progress,
+				'steps'       => $state['steps'],
+				'is_stale'    => $is_stale,
+				'resumable'   => true,
+			);
+		}
+
+		if ( in_array( $status, array( 'completed', 'error' ), true ) ) {
+			return array(
+				'migrationId' => '',
+				'progress'    => $progress,
+				'steps'       => $state['steps'],
+				'is_stale'    => false,
+				'resumable'   => false,
+			);
+		}
+
+		$active = $this->migration_repository->get_active_migration();
+		if ( is_array( $active ) && ! empty( $active['migration_id'] ) ) {
+			$expires_at      = isset( $active['expires_at'] ) ? (int) $active['expires_at'] : 0;
+			$active_is_stale = $is_stale || ( $expires_at > 0 && time() > $expires_at );
+			$progress['migrationId'] = (string) $active['migration_id'];
+			return array(
+				'migrationId' => (string) $active['migration_id'],
+				'progress'    => $progress,
+				'steps'       => $state['steps'],
+				'is_stale'    => $active_is_stale,
+				'resumable'   => ! $active_is_stale,
+			);
+		}
+
+		return array(
+			'migrationId' => '',
+			'progress'    => $progress,
+			'steps'       => $state['steps'],
+			'is_stale'    => false,
+			'resumable'   => false,
 		);
 	}
 
@@ -273,6 +364,7 @@ class EFS_Migration_Service {
 		$this->migration_repository->delete_progress();
 		$this->migration_repository->delete_steps();
 		$this->migration_repository->delete_token_data();
+		$this->store_active_migration( array() );
 
 		$this->error_handler->log_warning(
 			'W900',
@@ -353,12 +445,18 @@ class EFS_Migration_Service {
 	 */
 	public function init_progress( $migration_id ) {
 		$progress = array(
-			'migrationId'  => sanitize_text_field( $migration_id ),
-			'status'       => 'running',
-			'current_step' => 'validation',
-			'percentage'   => 0,
-			'started_at'   => current_time( 'mysql' ),
-			'completed_at' => null,
+			'migrationId'               => sanitize_text_field( $migration_id ),
+			'status'                    => 'running',
+			'current_step'              => 'validation',
+			'current_phase_name'        => self::PHASES['validation'],
+			'current_phase_status'      => 'active',
+			'percentage'                => 0,
+			'started_at'                => current_time( 'mysql' ),
+			'last_updated'              => current_time( 'mysql' ),
+			'completed_at'              => null,
+			'items_processed'           => 0,
+			'items_total'               => 0,
+			'estimated_time_remaining'  => null,
 		);
 
 		$this->migration_repository->save_progress( $progress );
@@ -385,26 +483,81 @@ class EFS_Migration_Service {
 	 * @param int    $percentage
 	 * @param string $message
 	 */
-	public function update_progress( $step, $percentage, $message ) {
+	public function update_progress( $step, $percentage, $message, $items_processed = null, $items_total = null ) {
 		$progress                 = $this->migration_repository->get_progress();
-		$progress['current_step'] = $step;
-		$progress['percentage']   = $percentage;
+		$previous_percentage      = isset( $progress['percentage'] ) ? (float) $progress['percentage'] : 0.0;
+		$normalized_percentage    = max( $previous_percentage, min( 100, (float) $percentage ) );
+		$progress['current_step'] = sanitize_key( (string) $step );
+		$progress['percentage']   = $normalized_percentage;
 		$progress['message']      = $message;
+		$progress['last_updated'] = current_time( 'mysql' );
+		$progress['is_stale']     = false;
+
+		if ( isset( self::PHASES[ $step ] ) ) {
+			$progress['current_phase_name'] = self::PHASES[ $step ];
+		}
+
+		if ( null !== $items_processed ) {
+			$progress['items_processed'] = max( 0, (int) $items_processed );
+		}
+		if ( null !== $items_total ) {
+			$progress['items_total'] = max( 0, (int) $items_total );
+		}
+
+		$progress['estimated_time_remaining'] = $this->estimate_time_remaining( $progress );
 
 		if ( 'completed' === $step ) {
 			$progress['status']       = 'completed';
+			$progress['current_phase_status'] = 'completed';
 			$progress['completed_at'] = current_time( 'mysql' );
 		} elseif ( 'error' === $step ) {
 			$progress['status']       = 'error';
+			$progress['current_phase_status'] = 'failed';
 			$progress['completed_at'] = current_time( 'mysql' );
+		} else {
+			$progress['status'] = 'running';
+			$progress['current_phase_status'] = 'active';
 		}
 
 		$this->migration_repository->save_progress( $progress );
 
 		$steps = $this->get_steps_state();
-		if ( isset( $steps[ $step ] ) ) {
-			$steps[ $step ]['status']     = ( 'error' === $step ) ? 'error' : 'completed';
-			$steps[ $step ]['updated_at'] = current_time( 'mysql' );
+		if ( ! empty( $steps ) ) {
+			foreach ( $steps as $key => &$step_data ) {
+				if ( ! is_array( $step_data ) ) {
+					continue;
+				}
+
+				if ( 'error' === $step ) {
+					if ( ! empty( $step_data['active'] ) ) {
+						$step_data['status'] = 'failed';
+						$step_data['active'] = false;
+					}
+				} elseif ( $key === $step ) {
+					$step_data['status'] = 'completed';
+					$step_data['active'] = false;
+					$step_data['completed'] = true;
+				} elseif ( empty( $step_data['completed'] ) && ! empty( $step_data['active'] ) ) {
+					$step_data['status'] = 'completed';
+					$step_data['active'] = false;
+					$step_data['completed'] = true;
+				} elseif ( empty( $step_data['completed'] ) && 'pending' === ( $step_data['status'] ?? 'pending' ) ) {
+					$step_data['status'] = 'pending';
+				}
+
+				$step_data['updated_at'] = current_time( 'mysql' );
+			}
+			unset( $step_data );
+
+			if ( 'completed' !== $step && 'error' !== $step ) {
+				$next_phase = $this->get_next_phase_key( $step );
+				if ( $next_phase && isset( $steps[ $next_phase ] ) && empty( $steps[ $next_phase ]['completed'] ) ) {
+					$steps[ $next_phase ]['status']  = 'active';
+					$steps[ $next_phase ]['active']  = true;
+					$steps[ $next_phase ]['updated_at'] = current_time( 'mysql' );
+				}
+			}
+
 			$this->set_steps_state( $steps );
 		}
 	}
@@ -422,8 +575,28 @@ class EFS_Migration_Service {
 				'status'       => 'idle',
 				'current_step' => '',
 				'percentage'   => 0,
+				'last_updated' => '',
+				'is_stale'     => false,
 			);
 		}
+
+		if ( empty( $progress['last_updated'] ) ) {
+			$progress['last_updated'] = isset( $progress['started_at'] ) ? $progress['started_at'] : current_time( 'mysql' );
+		}
+
+		$status = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
+		if ( in_array( $status, array( 'running', 'receiving' ), true ) ) {
+			$last_updated_ts       = strtotime( (string) $progress['last_updated'] );
+			$is_stale              = false !== $last_updated_ts && ( time() - $last_updated_ts ) >= self::PROGRESS_STALE_TTL;
+			$progress['is_stale']  = $is_stale;
+			if ( $is_stale ) {
+				$progress['status'] = 'stale';
+			}
+		} else {
+			$progress['is_stale'] = false;
+		}
+
+		$progress['estimated_time_remaining'] = $this->estimate_time_remaining( $progress );
 
 		return $progress;
 	}
@@ -474,26 +647,21 @@ class EFS_Migration_Service {
 	 * @return array
 	 */
 	private function initialize_steps() {
-		$steps = array(
-			'validation' => array( 'status' => 'pending' ),
-			'analyzing'  => array( 'status' => 'pending' ),
-		);
-
-		$supported = $this->migrator_registry->get_supported();
-		foreach ( $supported as $migrator ) {
-			$steps[ $this->get_migrator_step_key( $migrator ) ] = array( 'status' => 'pending' );
-		}
-
-		$steps += array(
-			'media'        => array( 'status' => 'pending' ),
-			'css_classes'  => array( 'status' => 'pending' ),
-			'posts'        => array( 'status' => 'pending' ),
-			'finalization' => array( 'status' => 'pending' ),
-		);
-
+		$steps     = array();
+		$index     = 0;
 		$timestamp = current_time( 'mysql' );
-		foreach ( $steps as &$step ) {
-			$step['updated_at'] = $timestamp;
+		foreach ( self::PHASES as $phase_key => $label ) {
+			$steps[ $phase_key ] = array(
+				'label'           => $label,
+				'status'          => 0 === $index ? 'active' : 'pending',
+				'active'          => 0 === $index,
+				'completed'       => false,
+				'failed'          => false,
+				'items_processed' => 0,
+				'items_total'     => 0,
+				'updated_at'      => $timestamp,
+			);
+			++$index;
 		}
 
 		return $steps;
@@ -602,11 +770,55 @@ class EFS_Migration_Service {
 
 		$mapping = array(
 			'cpt'           => 'cpts',
-			'acf'           => 'acf_field_groups',
-			'metabox'       => 'metabox_configs',
+			'acf'           => 'acf',
+			'metabox'       => 'metabox',
 			'custom_fields' => 'custom_fields',
+			'css_classes'   => 'css',
 		);
 
 		return $mapping[ $type ] ?? $type;
+	}
+
+	/**
+	 * Get next phase key in canonical order.
+	 *
+	 * @param string $phase Current phase.
+	 * @return string
+	 */
+	private function get_next_phase_key( $phase ) {
+		$keys  = array_keys( self::PHASES );
+		$index = array_search( $phase, $keys, true );
+
+		if ( false === $index ) {
+			return '';
+		}
+
+		$next = $index + 1;
+		return isset( $keys[ $next ] ) ? $keys[ $next ] : '';
+	}
+
+	/**
+	 * Estimate remaining time in seconds based on elapsed time and percentage.
+	 *
+	 * @param array $progress Progress payload.
+	 * @return int|null
+	 */
+	private function estimate_time_remaining( array $progress ) {
+		$percentage = isset( $progress['percentage'] ) ? (float) $progress['percentage'] : 0.0;
+		$status     = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
+		if ( $percentage <= 0 || $percentage >= 100 || in_array( $status, array( 'completed', 'error', 'stale', 'idle' ), true ) ) {
+			return null;
+		}
+
+		$started_at = isset( $progress['started_at'] ) ? strtotime( (string) $progress['started_at'] ) : false;
+		if ( false === $started_at || $started_at <= 0 ) {
+			return null;
+		}
+
+		$elapsed = max( 1, time() - $started_at );
+		$total   = (int) round( $elapsed / ( $percentage / 100 ) );
+		$remain  = max( 0, $total - $elapsed );
+
+		return $remain;
 	}
 }

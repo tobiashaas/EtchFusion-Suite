@@ -77,6 +77,7 @@ class EFS_Dashboard_Controller {
 			'progress_data'              => $progress_context['progress'],
 			'progress_steps'             => $progress_context['steps'],
 			'migration_id'               => isset( $progress_context['migrationId'] ) ? $progress_context['migrationId'] : '',
+			'in_progress_migration'      => $this->detect_in_progress_migration(),
 			'settings'                   => $this->get_settings(),
 			'nonce'                      => wp_create_nonce( 'efs_nonce' ),
 			'saved_templates'            => $saved_templates,
@@ -105,12 +106,33 @@ class EFS_Dashboard_Controller {
 		$steps_data    = isset( $progress['steps'] ) && is_array( $progress['steps'] ) ? $progress['steps'] : array();
 		$migration_id  = isset( $progress['migrationId'] ) ? sanitize_text_field( $progress['migrationId'] ) : '';
 		$completed     = isset( $progress['completed'] ) ? (bool) $progress['completed'] : false;
+		$progress_data['steps'] = $steps_data;
 
 		return array(
 			'progress'    => $progress_data,
 			'steps'       => $steps_data,
 			'migrationId' => $migration_id,
 			'completed'   => $completed,
+		);
+	}
+
+	/**
+	 * Get in-progress migration context for auto-resume logic.
+	 *
+	 * @return array
+	 */
+	private function detect_in_progress_migration() {
+		if ( ! method_exists( $this->migration_service, 'detect_in_progress_migration' ) ) {
+			return array(
+				'migrationId' => '',
+				'resumable'   => false,
+			);
+		}
+
+		$state = $this->migration_service->detect_in_progress_migration();
+		return is_array( $state ) ? $state : array(
+			'migrationId' => '',
+			'resumable'   => false,
 		);
 	}
 

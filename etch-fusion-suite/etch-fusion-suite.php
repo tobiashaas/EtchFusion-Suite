@@ -342,6 +342,7 @@ class Etch_Fusion_Suite_Plugin {
 			'efs_migration_progress',
 			'efs_migration_token',
 			'efs_migration_token_value',
+			'efs_migration_token_expires',
 			'efs_private_key',
 			'efs_error_log',
 			'efs_api_key',

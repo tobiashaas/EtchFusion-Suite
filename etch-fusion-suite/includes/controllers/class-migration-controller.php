@@ -60,7 +60,7 @@ class EFS_Migration_Controller {
 			return $result;
 		}
 		return array(
-			' message'    => __( 'Migration started.', 'etch-fusion-suite' ),
+			'message'    => __( 'Migration started.', 'etch-fusion-suite' ),
 			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
 			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
@@ -74,12 +74,44 @@ class EFS_Migration_Controller {
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
+
+		$progress = isset( $result['progress'] ) && is_array( $result['progress'] ) ? $result['progress'] : array();
+		$steps    = isset( $result['steps'] ) && is_array( $result['steps'] ) ? $result['steps'] : array();
+		$progress['steps'] = $steps;
+
 		return array(
-			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
-			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
+			'progress'    => $progress,
+			'steps'       => $steps,
 			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
+			'last_updated' => isset( $progress['last_updated'] ) ? $progress['last_updated'] : '',
+			'is_stale'    => ! empty( $progress['is_stale'] ),
+			'estimated_time_remaining' => isset( $progress['estimated_time_remaining'] ) ? $progress['estimated_time_remaining'] : null,
 			'completed'   => ! empty( $result['completed'] ),
 		);
+	}
+
+	/**
+	 * Detect currently running migration for dashboard auto-resume.
+	 *
+	 * @return array
+	 */
+	public function detect_in_progress_migration(): array {
+		$service = $this->get_migration_service();
+		if ( ! $service || ! method_exists( $service, 'detect_in_progress_migration' ) ) {
+			$progress = $this->get_progress();
+			$status   = isset( $progress['progress']['status'] ) ? $progress['progress']['status'] : 'idle';
+			$running  = in_array( $status, array( 'running', 'receiving' ), true );
+
+			return array(
+				'migrationId' => $running ? ( $progress['migrationId'] ?? '' ) : '',
+				'progress'    => $progress['progress'] ?? array(),
+				'steps'       => $progress['steps'] ?? array(),
+				'is_stale'    => ! empty( $progress['is_stale'] ),
+				'resumable'   => $running,
+			);
+		}
+
+		return $service->detect_in_progress_migration();
 	}
 
 	public function process_batch( array $data ) {
@@ -151,6 +183,22 @@ class EFS_Migration_Controller {
 			$container = etch_fusion_suite_container();
 			if ( $container->has( 'settings_controller' ) ) {
 				return $container->get( 'settings_controller' );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Resolve migration service from container.
+	 *
+	 * @return mixed|null
+	 */
+	private function get_migration_service() {
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			$container = etch_fusion_suite_container();
+			if ( $container->has( 'migration_service' ) ) {
+				return $container->get( 'migration_service' );
 			}
 		}
 

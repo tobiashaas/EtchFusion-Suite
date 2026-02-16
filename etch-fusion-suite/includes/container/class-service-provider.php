@@ -332,6 +332,13 @@ class EFS_Service_Provider {
 			}
 		);
 
+		$container->singleton(
+			'wizard_state_service',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Wizard_State_Service();
+			}
+		);
+
 		// Controller Services
 		$container->singleton(
 			'settings_controller',
@@ -484,6 +491,32 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'wizard_ajax',
+			function ( $c ) {
+				return new \Bricks2Etch\Ajax\Handlers\EFS_Wizard_Ajax_Handler(
+					$c->get( 'wizard_state_service' ),
+					$c->get( 'token_manager' ),
+					$c->get( 'rate_limiter' ),
+					$c->get( 'input_validator' ),
+					$c->get( 'audit_logger' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'progress_ajax',
+			function ( $c ) {
+				return new \Bricks2Etch\Ajax\Handlers\EFS_Progress_Ajax_Handler(
+					$c->get( 'migration_controller' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'rate_limiter' ),
+					$c->get( 'input_validator' ),
+					$c->get( 'audit_logger' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'ajax_handler',
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\EFS_Ajax_Handler(
@@ -495,7 +528,9 @@ class EFS_Service_Provider {
 					$c->get( 'connection_ajax' ),
 					$c->get( 'cleanup_ajax' ),
 					$c->get( 'template_ajax' ),
-					$c->get( 'migration_ajax' )
+					$c->get( 'migration_ajax' ),
+					$c->get( 'wizard_ajax' ),
+					$c->get( 'progress_ajax' )
 				);
 			}
 		);
@@ -556,6 +591,7 @@ class EFS_Service_Provider {
 			'media_service',
 			'content_service',
 			'migration_service',
+			'wizard_state_service',
 			'settings_controller',
 			'migration_controller',
 			'dashboard_controller',
@@ -568,6 +604,8 @@ class EFS_Service_Provider {
 			'connection_ajax',
 			'cleanup_ajax',
 			'template_ajax',
+			'wizard_ajax',
+			'progress_ajax',
 			'ajax_handler',
 			'admin_interface',
 		);

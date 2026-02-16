@@ -52,10 +52,17 @@ class EFS_Settings_Controller {
 		$token_data = $this->token_manager->generate_migration_token( $target_url );
 
 		return array(
-			'message'    => __( 'Migration key generated.', 'etch-fusion-suite' ),
-			'key'        => $token_data['token'],
-			'expiration' => $token_data['expires'],
-			'domain'     => $token_data['domain'],
+			'message'                  => isset( $token_data['message'] ) ? $token_data['message'] : __( 'Migration key generated.', 'etch-fusion-suite' ),
+			'key'                      => $token_data['token'],
+			'migration_url'            => $token_data['migration_url'] ?? '',
+			'expiration'               => $token_data['expires'],
+			'expires_at'               => $token_data['expires_at'] ?? '',
+			'expiration_seconds'       => $token_data['expiration_seconds'] ?? 0,
+			'domain'                   => $token_data['domain'],
+			'https_warning'            => $token_data['https_warning'] ?? false,
+			'security_warning'         => $token_data['security_warning'] ?? '',
+			'treat_as_password_note'   => $token_data['treat_as_password_note'] ?? '',
+			'invalidated_previous_key' => $token_data['invalidated_previous_token'] ?? false,
 		);
 	}
 

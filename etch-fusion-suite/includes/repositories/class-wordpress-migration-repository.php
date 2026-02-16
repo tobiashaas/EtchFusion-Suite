@@ -27,11 +27,17 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	const OPTION_LAST_MIGRATION   = 'efs_last_migration';
 	const OPTION_CURRENT_ID       = 'efs_current_migration_id';
 	const OPTION_ACTIVE_MIGRATION = 'efs_active_migration';
+	const OPTION_RECEIVING_STATE  = 'efs_receiving_migration';
 
 	/**
 	 * Cache expiration for stats/tokens (10 minutes).
 	 */
 	const CACHE_EXPIRATION_LONG = 600;
+	const OPTION_TOKEN_DATA     = 'efs_migration_token';
+	const OPTION_TOKEN_VALUE    = 'efs_migration_token_value';
+	const OPTION_TOKEN_EXPIRES  = 'efs_migration_token_expires';
+	const RECEIVING_STALE_TTL    = 300;
+	const RECEIVING_RETENTION_TTL = 3600;
 
 	/**
 	 * Get migration progress.
@@ -178,7 +184,15 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			return $cached;
 		}
 
-		$token_data = get_option( 'efs_migration_token', array() );
+		$token_data = get_option( self::OPTION_TOKEN_DATA, array() );
+
+		if ( is_array( $token_data ) && ! isset( $token_data['expires_timestamp'] ) && isset( $token_data['expires_at'] ) ) {
+			$expires = strtotime( (string) $token_data['expires_at'] );
+			if ( false !== $expires ) {
+				$token_data['expires_timestamp'] = (int) $expires;
+			}
+		}
+
 		set_transient( $cache_key, $token_data, self::CACHE_EXPIRATION_LONG );
 
 		return $token_data;
@@ -192,7 +206,10 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_token_data( array $token_data ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_token_data' );
-		return update_option( 'efs_migration_token', $token_data );
+		if ( isset( $token_data['expires_timestamp'] ) ) {
+			update_option( self::OPTION_TOKEN_EXPIRES, (int) $token_data['expires_timestamp'] );
+		}
+		return update_option( self::OPTION_TOKEN_DATA, $token_data );
 	}
 
 	/**
@@ -208,7 +225,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			return $cached;
 		}
 
-		$token = get_option( 'efs_migration_token_value', '' );
+		$token = get_option( self::OPTION_TOKEN_VALUE, '' );
 		set_transient( $cache_key, $token, self::CACHE_EXPIRATION_LONG );
 
 		return $token;
@@ -222,7 +239,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_token_value( string $token ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_token_value' );
-		return update_option( 'efs_migration_token_value', $token );
+		return update_option( self::OPTION_TOKEN_VALUE, $token );
 	}
 
 	/**
@@ -235,8 +252,9 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$this->invalidate_cache( 'efs_cache_migration_token_value' );
 
 		$result = true;
-		$result = delete_option( 'efs_migration_token' ) && $result;
-		$result = delete_option( 'efs_migration_token_value' ) && $result;
+		$result = delete_option( self::OPTION_TOKEN_DATA ) && $result;
+		$result = delete_option( self::OPTION_TOKEN_VALUE ) && $result;
+		$result = delete_option( self::OPTION_TOKEN_EXPIRES ) && $result;
 
 		return $result;
 	}
@@ -264,6 +282,77 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		set_transient( $cache_key, $data, self::CACHE_EXPIRATION_SHORT );
 
 		return $data;
+	}
+
+	/**
+	 * Persist receiving state metadata.
+	 *
+	 * @param array $state Receiving state.
+	 * @return bool
+	 */
+	public function save_receiving_state( array $state ): bool {
+		$this->invalidate_cache( 'efs_cache_receiving_state' );
+
+		$current = get_option( self::OPTION_RECEIVING_STATE, array() );
+		$current = is_array( $current ) ? $current : array();
+		$state   = $this->normalize_receiving_state( array_merge( $current, $state ) );
+
+		return update_option( self::OPTION_RECEIVING_STATE, $state );
+	}
+
+	/**
+	 * Retrieve normalized receiving state with stale + cleanup handling.
+	 *
+	 * @return array
+	 */
+	public function get_receiving_state(): array {
+		$cache_key = 'efs_cache_receiving_state';
+		$cached    = get_transient( $cache_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$state = get_option( self::OPTION_RECEIVING_STATE, array() );
+		$state = is_array( $state ) ? $this->normalize_receiving_state( $state ) : $this->idle_receiving_state();
+
+		$last_activity_ts = $this->timestamp_from_maybe_string( $state['last_activity'] ?? '' );
+		$is_stale         = $last_activity_ts > 0 && ( time() - $last_activity_ts ) >= self::RECEIVING_STALE_TTL;
+
+		if ( 'receiving' === $state['status'] && $is_stale ) {
+			$state['status']       = 'stale';
+			$state['is_stale']     = true;
+			$state['last_updated'] = current_time( 'mysql' );
+			update_option( self::OPTION_RECEIVING_STATE, $state );
+		}
+
+		$status = $state['status'] ?? 'idle';
+		if ( in_array( $status, array( 'stale', 'completed' ), true ) ) {
+			$reference_ts = $this->timestamp_from_maybe_string( $state['last_updated'] ?? '' );
+			if ( $reference_ts <= 0 ) {
+				$reference_ts = $last_activity_ts;
+			}
+
+			if ( $reference_ts > 0 && ( time() - $reference_ts ) >= self::RECEIVING_RETENTION_TTL ) {
+				$this->clear_receiving_state();
+				$state = $this->idle_receiving_state();
+			}
+		}
+
+		$state['is_stale'] = 'stale' === $state['status'];
+		set_transient( $cache_key, $state, self::CACHE_EXPIRATION_SHORT );
+
+		return $state;
+	}
+
+	/**
+	 * Clear receiving state.
+	 *
+	 * @return bool
+	 */
+	public function clear_receiving_state(): bool {
+		$this->invalidate_cache( 'efs_cache_receiving_state' );
+		return delete_option( self::OPTION_RECEIVING_STATE );
 	}
 
 	/**
@@ -346,5 +435,89 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	private function invalidate_cache( string $cache_key ): void {
 		delete_transient( $cache_key );
+	}
+
+	/**
+	 * Normalize receiving state into canonical schema.
+	 *
+	 * @param array $state Raw state payload.
+	 * @return array
+	 */
+	private function normalize_receiving_state( array $state ): array {
+		$now         = current_time( 'mysql' );
+		$defaults    = $this->idle_receiving_state();
+		$normalized  = array_merge( $defaults, $state );
+		$status      = sanitize_key( (string) ( $normalized['status'] ?? 'idle' ) );
+		$allowed     = array( 'idle', 'receiving', 'stale', 'completed' );
+		$is_receiving = 'receiving' === $status;
+
+		if ( ! in_array( $status, $allowed, true ) ) {
+			$status = 'idle';
+		}
+
+		$normalized['status']         = $status;
+		$normalized['source_site']    = esc_url_raw( (string) ( $normalized['source_site'] ?? '' ) );
+		$normalized['migration_id']   = sanitize_text_field( (string) ( $normalized['migration_id'] ?? '' ) );
+		$normalized['current_phase']  = sanitize_key( (string) ( $normalized['current_phase'] ?? '' ) );
+		$normalized['items_received'] = max( 0, absint( $normalized['items_received'] ?? 0 ) );
+		$normalized['started_at']     = sanitize_text_field( (string) ( $normalized['started_at'] ?? '' ) );
+		$normalized['last_activity']  = sanitize_text_field( (string) ( $normalized['last_activity'] ?? '' ) );
+		$normalized['last_updated']   = sanitize_text_field( (string) ( $normalized['last_updated'] ?? '' ) );
+
+		if ( '' === $normalized['started_at'] && $is_receiving ) {
+			$normalized['started_at'] = $now;
+		}
+		if ( '' === $normalized['last_activity'] && $is_receiving ) {
+			$normalized['last_activity'] = $now;
+		}
+		if ( '' === $normalized['last_updated'] ) {
+			if ( $is_receiving ) {
+				$normalized['last_updated'] = $now;
+			} elseif ( '' !== $normalized['last_activity'] ) {
+				$normalized['last_updated'] = $normalized['last_activity'];
+			} else {
+				$normalized['last_updated'] = $now;
+			}
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Return idle receiving state shape.
+	 *
+	 * @return array
+	 */
+	private function idle_receiving_state(): array {
+		return array(
+			'status'         => 'idle',
+			'source_site'    => '',
+			'migration_id'   => '',
+			'started_at'     => '',
+			'last_activity'  => '',
+			'last_updated'   => '',
+			'current_phase'  => '',
+			'items_received' => 0,
+			'is_stale'       => false,
+		);
+	}
+
+	/**
+	 * Convert possibly formatted time value to unix timestamp.
+	 *
+	 * @param string $value Time value.
+	 * @return int
+	 */
+	private function timestamp_from_maybe_string( string $value ): int {
+		if ( '' === $value ) {
+			return 0;
+		}
+
+		if ( ctype_digit( $value ) ) {
+			return (int) $value;
+		}
+
+		$timestamp = strtotime( $value );
+		return false === $timestamp ? 0 : (int) $timestamp;
 	}
 }

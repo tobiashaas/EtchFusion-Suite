@@ -531,7 +531,7 @@ class EFS_API_Endpoints {
 
 		try {
 			$params        = $request->get_params();
-			$migration_key = $params['migration_key'] ?? null;
+			$migration_key = $params['migration_key'] ?? ( $params['token'] ?? null );
 			$target_url    = isset( $params['target_url'] ) ? esc_url_raw( $params['target_url'] ) : '';
 
 			if ( empty( $migration_key ) ) {
@@ -539,24 +539,23 @@ class EFS_API_Endpoints {
 			}
 
 			/** @var EFS_Migration_Token_Manager $token_manager */
-			$token_manager = self::resolve( 'token_manager' );
-			$decoded       = $token_manager ? $token_manager->decode_migration_key_locally( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
+			$token_manager      = self::resolve( 'token_manager' );
+			$validation_result  = $token_manager ? $token_manager->validate_migration_token( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
-			if ( is_wp_error( $decoded ) ) {
-				return new \WP_Error( 'invalid_migration_key', $decoded->get_error_message(), array( 'status' => 400 ) );
+			if ( is_wp_error( $validation_result ) ) {
+				$error_code = $validation_result->get_error_code();
+				$status     = in_array( $error_code, array( 'invalid_token', 'token_expired' ), true ) ? 401 : 400;
+				$validation_result->add_data( array( 'status' => $status ) );
+				return $validation_result;
 			}
 
-			$payload = $decoded['payload'] ?? array();
+			$validated_token = $migration_key;
+			$payload         = is_array( $validation_result ) ? $validation_result : array();
 			$target  = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
 			$source  = $payload['domain'] ?? '';
-			$expires = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
 
 			if ( empty( $target ) ) {
 				return new \WP_Error( 'missing_target', __( 'Target URL could not be determined from migration key.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
-			}
-
-			if ( $expires && time() > $expires ) {
-				return new \WP_Error( 'migration_key_expired', __( 'Migration key has expired.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
 			}
 
 			/** @var EFS_Migration_Manager $migration_manager */
@@ -565,7 +564,7 @@ class EFS_API_Endpoints {
 				return new \WP_Error( 'migration_service_unavailable', __( 'Migration service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
 			}
 
-			$result = $migration_manager->start_migration( $migration_key, $target );
+			$result = $migration_manager->start_migration( $validated_token, $target );
 
 			if ( is_wp_error( $result ) ) {
 				return new \WP_Error( 'migration_failed', $result->get_error_message(), array( 'status' => $result->get_error_data()['status'] ?? 500 ) );
@@ -610,13 +609,21 @@ class EFS_API_Endpoints {
 
 			return new \WP_REST_Response(
 				array(
-					'success'       => true,
-					'migration_key' => $token_data['token'],
-					'domain'        => home_url(),
-					'expires'       => $token_data['expires'],
-					'expires_at'    => $token_data['expires_at'],
-					'generated_at'  => current_time( 'mysql' ),
-					'payload'       => $token_data['payload'],
+					'success'                    => true,
+					'message'                    => $token_data['message'] ?? __( 'Migration key generated.', 'etch-fusion-suite' ),
+					'migration_key'              => $token_data['token'],
+					'migration_url'              => $token_data['migration_url'] ?? '',
+					'domain'                     => home_url(),
+					'expires'                    => $token_data['expires'],
+					'expires_at'                 => $token_data['expires_at'],
+					'expiration_seconds'         => $token_data['expiration_seconds'] ?? EFS_Migration_Token_Manager::TOKEN_EXPIRATION,
+					'generated_at'               => current_time( 'mysql' ),
+					'https_warning'              => $token_data['https_warning'] ?? false,
+					'security_warning'           => $token_data['security_warning'] ?? '',
+					'security'                   => $token_data['security'] ?? array(),
+					'treat_as_password_note'     => $token_data['treat_as_password_note'] ?? '',
+					'invalidated_previous_token' => $token_data['invalidated_previous_token'] ?? false,
+					'payload'                    => $token_data['payload'],
 				),
 				200
 			);
@@ -857,6 +864,60 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Resolve migration repository from container fallback.
+	 *
+	 * @return \Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface|null
+	 */
+	private static function resolve_migration_repository() {
+		if ( self::$migration_repository ) {
+			return self::$migration_repository;
+		}
+
+		$repository = self::resolve( 'migration_repository' );
+		if ( $repository ) {
+			self::$migration_repository = $repository;
+		}
+
+		return self::$migration_repository;
+	}
+
+	/**
+	 * Record receiving activity for target-side progress polling.
+	 *
+	 * @param array  $token_payload Validated token payload.
+	 * @param string $phase Current import phase.
+	 * @param int    $items_increment How much to increment items received.
+	 * @return void
+	 */
+	private static function touch_receiving_state( array $token_payload, string $phase, int $items_increment = 0 ): void {
+		$repository = self::resolve_migration_repository();
+		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
+			return;
+		}
+
+		$current = $repository->get_receiving_state();
+		$current = is_array( $current ) ? $current : array();
+
+		$now        = current_time( 'mysql' );
+		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
+		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
+
+		$repository->save_receiving_state(
+			array(
+				'status'         => 'receiving',
+				'source_site'    => isset( $token_payload['domain'] ) ? esc_url_raw( (string) $token_payload['domain'] ) : '',
+				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
+				'started_at'     => $started_at,
+				'last_activity'  => $now,
+				'last_updated'   => $now,
+				'current_phase'  => sanitize_key( $phase ),
+				'items_received' => max( 0, $items + $items_increment ),
+				'is_stale'       => false,
+			)
+		);
+	}
+
+	/**
 	 * Import custom post types.
 	 *
 	 * @param \WP_REST_Request $request REST request.
@@ -877,6 +938,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'cpts' );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -921,6 +983,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'acf' );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -965,6 +1028,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'metabox' );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1009,6 +1073,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'css' );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1053,6 +1118,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'posts', 1 );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();
@@ -1141,6 +1207,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'posts' );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();
@@ -1215,6 +1282,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		self::touch_receiving_state( $token, 'media', 1 );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();

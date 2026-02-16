@@ -107,6 +107,28 @@ interface Migration_Repository_Interface {
 	public function get_active_migration(): array;
 
 	/**
+	 * Save receiving state for target-site imports.
+	 *
+	 * @param array $state Receiving state payload.
+	 * @return bool
+	 */
+	public function save_receiving_state( array $state ): bool;
+
+	/**
+	 * Get receiving state for target-site imports.
+	 *
+	 * @return array
+	 */
+	public function get_receiving_state(): array;
+
+	/**
+	 * Clear receiving state.
+	 *
+	 * @return bool
+	 */
+	public function clear_receiving_state(): bool;
+
+	/**
 	 * Get token value.
 	 *
 	 * @return string Token value or empty string if not set.
