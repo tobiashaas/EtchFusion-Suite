@@ -26,44 +26,54 @@ class EFS_Dynamic_Data_Converter {
 	 */
 	private $mapping = array(
 		// Post data
-		'post_title'        => 'this.title',
-		'post_content'      => 'this.content',
-		'post_excerpt'      => 'this.excerpt',
-		'post_date'         => 'this.date',
-		'post_modified'     => 'this.modified',
-		'post_author'       => 'this.author.name',
-		'post_id'           => 'this.id',
-		'post_slug'         => 'this.slug',
-		'post_url'          => 'this.url',
+		'post_title'          => 'this.title',
+		'post_content'        => 'this.content',
+		'post_excerpt'        => 'this.excerpt',
+		'post_date'           => 'this.date',
+		'post_modified'       => 'this.modified',
+		'post_author'         => 'this.author.name',
+		'post_id'             => 'this.id',
+		'post_slug'           => 'this.slug',
+		'post_url'            => 'this.url',
 
 		// Site data
-		'site_title'        => 'site.name',
-		'site_tagline'      => 'site.description',
-		'site_url'          => 'site.url',
-		'site_admin_email'  => 'site.admin_email',
+		'site_title'          => 'site.name',
+		'site_tagline'        => 'site.description',
+		'site_url'            => 'site.url',
+		'site_admin_email'    => 'site.admin_email',
+
+		// Author data
+		'author_name'         => 'this.author.name',
+
+		// Term/taxonomy data
+		'term_name'           => 'this.term.name',
+		'post_terms_category' => 'this.terms.category',
+
+		// Date
+		'current_date'        => 'site.date',
 
 		// User data
-		'user_login'        => 'user.login',
-		'user_email'        => 'user.email',
-		'user_display_name' => 'user.display_name',
-		'user_first_name'   => 'user.first_name',
-		'user_last_name'    => 'user.last_name',
+		'user_login'          => 'user.login',
+		'user_email'          => 'user.email',
+		'user_display_name'   => 'user.display_name',
+		'user_first_name'     => 'user.first_name',
+		'user_last_name'      => 'user.last_name',
 
 		// Query data
-		'query_title'       => 'query.title',
-		'query_content'     => 'query.content',
-		'query_excerpt'     => 'query.excerpt',
-		'query_date'        => 'query.date',
-		'query_author'      => 'query.author.name',
-		'query_id'          => 'query.id',
-		'query_slug'        => 'query.slug',
-		'query_url'         => 'query.url',
+		'query_title'         => 'query.title',
+		'query_content'       => 'query.content',
+		'query_excerpt'       => 'query.excerpt',
+		'query_date'          => 'query.date',
+		'query_author'        => 'query.author.name',
+		'query_id'            => 'query.id',
+		'query_slug'          => 'query.slug',
+		'query_url'           => 'query.url',
 
 		// URL parameters
-		'url_parameter'     => 'url.parameter',
+		'url_parameter'       => 'url.parameter',
 
 		// Meta fields
-		'meta'              => 'this.meta',
+		'meta'                => 'this.meta',
 	);
 
 	/**
@@ -105,6 +115,9 @@ class EFS_Dynamic_Data_Converter {
 		// Convert basic tags
 		$converted = $this->convert_basic_tags( $content );
 
+		// Convert tags with colon parameters (e.g. {post_title:10}, {featured_image:medium})
+		$converted = $this->convert_tags_with_colon_params( $converted );
+
 		// Convert tags with modifiers
 		$converted = $this->convert_tags_with_modifiers( $converted );
 
@@ -140,6 +153,61 @@ class EFS_Dynamic_Data_Converter {
 		foreach ( $this->mapping as $bricks_tag => $etch_key ) {
 			$content = str_replace( '{' . $bricks_tag . '}', '{' . $etch_key . '}', $content );
 		}
+
+		return $content;
+	}
+
+	/**
+	 * Deferred tag prefixes that should pass through unconverted.
+	 *
+	 * @var array
+	 */
+	private $deferred_prefixes = array(
+		'woo_',
+		'echo_',
+		'do_action',
+	);
+
+	/**
+	 * Convert Bricks tags with colon parameters.
+	 *
+	 * Handles patterns like {post_title:10}, {featured_image:medium},
+	 * {post_terms_category:3}. Deferred tags (woo_*, echo, do_action)
+	 * are passed through unchanged.
+	 *
+	 * @param string $content Content with Bricks tags.
+	 * @return string Content with converted tags.
+	 */
+	private function convert_tags_with_colon_params( $content ) {
+		$pattern = '/\{([a-zA-Z0-9_-]+):([^}]+)\}/';
+
+		$content = preg_replace_callback(
+			$pattern,
+			function ( $matches ) {
+				$tag   = $matches[1];
+				$param = $matches[2];
+
+				// Skip deferred tags — pass through unchanged.
+				foreach ( $this->deferred_prefixes as $prefix ) {
+					if ( 0 === strpos( $tag, $prefix ) ) {
+						return $matches[0];
+					}
+				}
+
+				// Skip tags already handled by dedicated converters (acf, mb, metabox, jet, jetengine, meta, query, url_parameter).
+				$dedicated = array( 'acf', 'mb', 'metabox', 'jet', 'jetengine', 'meta', 'query', 'url_parameter' );
+				if ( in_array( $tag, $dedicated, true ) ) {
+					return $matches[0];
+				}
+
+				// Convert the base tag if it exists in the mapping.
+				$etch_tag = isset( $this->mapping[ $tag ] ) ? $this->mapping[ $tag ] : $tag;
+
+				// Append colon param as a function-style argument.
+				return '{' . $etch_tag . '(' . $param . ')}';
+			},
+			$content
+		);
 
 		return $content;
 	}
@@ -438,5 +506,123 @@ class EFS_Dynamic_Data_Converter {
 	 */
 	public function get_modifier_mapping() {
 		return $this->modifier_mapping;
+	}
+
+	/**
+	 * Extract unique dynamic-data tags from content.
+	 *
+	 * @param string $content
+	 * @return array<int,string>
+	 */
+	public function extract_dynamic_tags( $content ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
+			return array();
+		}
+
+		if ( ! preg_match_all( '/\{[^{}\r\n]+\}/', $content, $matches ) ) {
+			return array();
+		}
+
+		$tags = array_map(
+			static function ( $tag ) {
+				return trim( (string) $tag );
+			},
+			$matches[0]
+		);
+
+		$tags = array_filter( array_unique( $tags ) );
+
+		return array_values( $tags );
+	}
+
+	/**
+	 * Classify dynamic tag convertibility.
+	 *
+	 * @param string $tag
+	 * @return string green|yellow|red
+	 */
+	public function classify_dynamic_tag( $tag ) {
+		$normalized = $this->normalize_dynamic_tag( $tag );
+		if ( '' === $normalized ) {
+			return 'red';
+		}
+
+		// Already converted Etch expressions are treated as fully supported.
+		if ( 0 === strpos( $normalized, 'this.' ) ||
+			0 === strpos( $normalized, 'site.' ) ||
+			0 === strpos( $normalized, 'user.' ) ||
+			0 === strpos( $normalized, 'query.' ) ||
+			0 === strpos( $normalized, 'url.' ) ) {
+			return 'green';
+		}
+
+		$base = $this->extract_dynamic_tag_base( $normalized );
+		if ( '' === $base ) {
+			return 'red';
+		}
+
+		if ( isset( $this->mapping[ $base ] ) ) {
+			return 'green';
+		}
+
+		if ( 0 === strpos( $base, 'acf' ) ||
+			0 === strpos( $base, 'mb' ) ||
+			0 === strpos( $base, 'metabox' ) ||
+			0 === strpos( $base, 'jet' ) ||
+			0 === strpos( $base, 'jetengine' ) ||
+			0 === strpos( $base, 'meta' ) ||
+			0 === strpos( $base, 'query' ) ||
+			0 === strpos( $base, 'url_parameter' ) ) {
+			return 'green';
+		}
+
+		foreach ( $this->deferred_prefixes as $prefix ) {
+			if ( 0 === strpos( $base, strtolower( $prefix ) ) ) {
+				return 'yellow';
+			}
+		}
+
+		return 'red';
+	}
+
+	/**
+	 * Determine if a tag is directly convertible.
+	 *
+	 * @param string $tag
+	 * @return bool
+	 */
+	public function is_convertible_dynamic_tag( $tag ) {
+		return 'green' === $this->classify_dynamic_tag( $tag );
+	}
+
+	/**
+	 * @param string $tag
+	 * @return string
+	 */
+	private function normalize_dynamic_tag( $tag ) {
+		if ( ! is_string( $tag ) ) {
+			return '';
+		}
+
+		$normalized = trim( $tag );
+		$normalized = trim( $normalized, '{}' );
+
+		return strtolower( trim( $normalized ) );
+	}
+
+	/**
+	 * @param string $tag
+	 * @return string
+	 */
+	private function extract_dynamic_tag_base( $tag ) {
+		$base = $tag;
+		if ( false !== strpos( $base, '|' ) ) {
+			$base = explode( '|', $base )[0];
+		}
+		if ( false !== strpos( $base, ':' ) ) {
+			$base = explode( ':', $base )[0];
+		}
+
+		return trim( $base );
 	}
 }

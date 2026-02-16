@@ -9,6 +9,7 @@ namespace Bricks2Etch\Api;
 
 use Bricks2Etch\Core\EFS_Migration_Token_Manager;
 use Bricks2Etch\Core\EFS_Migration_Manager;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use Bricks2Etch\Migrators\EFS_Migrator_Registry;
 use Bricks2Etch\Migrators\Interfaces\Migrator_Interface;
 use Bricks2Etch\Security\EFS_Input_Validator;
@@ -565,7 +566,10 @@ class EFS_API_Endpoints {
 				return new \WP_Error( 'migration_service_unavailable', __( 'Migration service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
 			}
 
-			$result = $migration_manager->start_migration( $migration_key, $target );
+			$config     = self::build_migration_config_from_params( $params );
+			$batch_size = isset( $params['batch_size'] ) ? (int) $params['batch_size'] : null;
+
+			$result = $migration_manager->start_migration( $migration_key, $target, $batch_size, $config );
 
 			if ( is_wp_error( $result ) ) {
 				return new \WP_Error( 'migration_failed', $result->get_error_message(), array( 'status' => $result->get_error_data()['status'] ?? 500 ) );
@@ -587,6 +591,14 @@ class EFS_API_Endpoints {
 		} catch ( \Exception $e ) {
 			return new \WP_Error( 'migration_error', 'Migration failed: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')', array( 'status' => 500 ) );
 		}
+	}
+
+	private static function build_migration_config_from_params( array $params ): ?EFS_Migration_Config {
+		if ( empty( $params['config'] ) || ! is_array( $params['config'] ) ) {
+			return null;
+		}
+
+		return EFS_Migration_Config::from_array( $params['config'] );
 	}
 
 	/**
@@ -799,6 +811,109 @@ class EFS_API_Endpoints {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Discover site capabilities and content shape.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function handle_discover_request( $request ) {
+		$rate = self::check_rate_limit( 'discover_content', 20, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			if ( self::$audit_logger ) {
+				self::$audit_logger->log_security_event(
+					'auth_failure',
+					'medium',
+					'Discovery request rejected due to invalid or missing migration token.',
+					array(
+						'route' => '/efs/v1/discover',
+					)
+				);
+			}
+			return $token;
+		}
+
+		$params = $request->get_json_params();
+		$params = is_array( $params ) ? $params : array();
+
+		$validated = self::validate_request_data(
+			$params,
+			array(
+				'sample_size' => array(
+					'type'     => 'integer',
+					'required' => false,
+					'min'      => 1,
+					'max'      => 100,
+				),
+			)
+		);
+
+		if ( is_wp_error( $validated ) ) {
+			return $validated;
+		}
+
+		$sample_size = isset( $validated['sample_size'] ) ? (int) $validated['sample_size'] : 25;
+		$full_scan   = isset( $params['full_scan'] ) ? (bool) rest_sanitize_boolean( $params['full_scan'] ) : false;
+
+		$discovery_service = self::resolve( 'discovery_service' );
+		if ( ! $discovery_service || ! method_exists( $discovery_service, 'generate_discovery_response' ) ) {
+			return new \WP_Error( 'discovery_service_unavailable', __( 'Discovery service unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		try {
+			$payload = $discovery_service->generate_discovery_response( $sample_size, $full_scan );
+		} catch ( \Exception $e ) {
+			if ( self::$audit_logger ) {
+				self::$audit_logger->log_security_event(
+					'api_error',
+					'high',
+					'Discovery request failed with an exception.',
+					array(
+						'route'   => '/efs/v1/discover',
+						'message' => $e->getMessage(),
+					)
+				);
+			}
+
+			return new \WP_Error( 'discovery_failed', __( 'Failed to complete discovery request.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$response = array(
+			'post_types'    => isset( $payload['post_types'] ) && is_array( $payload['post_types'] ) ? $payload['post_types'] : array(),
+			'custom_fields' => isset( $payload['custom_fields'] ) && is_array( $payload['custom_fields'] ) ? $payload['custom_fields'] : array(),
+			'taxonomies'    => isset( $payload['taxonomies'] ) && is_array( $payload['taxonomies'] ) ? $payload['taxonomies'] : array(),
+			'media_stats'   => isset( $payload['media_stats'] ) && is_array( $payload['media_stats'] ) ? $payload['media_stats'] : array(),
+			'dynamic_data'  => isset( $payload['dynamic_data'] ) && is_array( $payload['dynamic_data'] ) ? $payload['dynamic_data'] : array(),
+			'capabilities'  => isset( $payload['capabilities'] ) && is_array( $payload['capabilities'] ) ? $payload['capabilities'] : array(),
+			'generated_at'  => isset( $payload['generated_at'] ) ? $payload['generated_at'] : current_time( 'mysql' ),
+		);
+
+		if ( self::$audit_logger ) {
+			self::$audit_logger->log_security_event(
+				'api_access',
+				'low',
+				'Discovery request completed successfully.',
+				array(
+					'route'       => '/efs/v1/discover',
+					'full_scan'   => $full_scan,
+					'sample_size' => $sample_size,
+				)
+			);
+		}
+
+		return new \WP_REST_Response( $response, 200 );
 	}
 
 	/**
@@ -1368,6 +1483,16 @@ class EFS_API_Endpoints {
 			'/validate',
 			array(
 				'callback'            => array( __CLASS__, 'validate_migration_token' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/discover',
+			array(
+				'callback'            => array( __CLASS__, 'handle_discover_request' ),
 				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
