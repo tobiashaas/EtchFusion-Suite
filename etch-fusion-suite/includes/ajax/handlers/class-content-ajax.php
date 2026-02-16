@@ -83,6 +83,7 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Register WordPress hooks
 	 */
 	protected function register_hooks() {
+		// Legacy single post migration endpoint; job-based migrations use efs_process_job_batch.
 		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'migrate_batch' ) );
 		add_action( 'wp_ajax_efs_get_bricks_posts', array( $this, 'get_bricks_posts' ) );
 	}
@@ -205,7 +206,7 @@ class EFS_Content_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				return;
 			}
 
-			$result = $this->content_service->convert_bricks_to_gutenberg( $post_id, $api_client, $internal_url, $migration_key );
+			$result = $this->content_service->convert_bricks_to_gutenberg( $post_id, $api_client, $internal_url, $migration_key, null );
 
 			if ( is_wp_error( $result ) ) {
 				$error_code = $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'migration_failed';

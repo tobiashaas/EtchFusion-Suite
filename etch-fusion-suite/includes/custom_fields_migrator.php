@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use WP_Error;
 
 // Prevent direct access
@@ -59,7 +60,7 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $jwt_token ) {
+	public function migrate( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
 		// Custom fields migrate alongside posts; nothing to do globally.
 		return true;
 	}
@@ -72,7 +73,16 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate post meta from source to target
 	 */
-	public function migrate_post_meta( $source_post_id, $target_post_id, $target_url, $jwt_token ) {
+	public function migrate_post_meta( $source_post_id, $target_post_id, $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+		if ( $config ) {
+			$selected = $config->get_selected_post_types();
+			if ( ! empty( $selected ) ) {
+				$post = get_post( $source_post_id );
+				if ( $post && ! in_array( $post->post_type, $selected, true ) ) {
+					return true;
+				}
+			}
+		}
 		$meta_data = $this->get_post_meta( $source_post_id );
 
 		if ( empty( $meta_data ) ) {

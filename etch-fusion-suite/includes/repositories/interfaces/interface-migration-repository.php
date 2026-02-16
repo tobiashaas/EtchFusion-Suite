@@ -151,4 +151,65 @@ interface Migration_Repository_Interface {
 	 * @return int Number of expired transients deleted.
 	 */
 	public function cleanup_expired_tokens(): int;
+
+	/**
+	 * Persist job state for background execution.
+	 *
+	 * @param string $job_id
+	 * @param array  $state
+	 * @return bool
+	 */
+	public function save_job_state( string $job_id, array $state ): bool;
+
+	/**
+	 * Retrieve job state.
+	 *
+	 * @param string $job_id
+	 * @return array
+	 */
+	public function get_job_state( string $job_id ): array;
+
+	/**
+	 * Update job progress markers.
+	 *
+	 * @param string $job_id
+	 * @param string $phase
+	 * @param int    $batch_index
+	 * @param array  $metadata
+	 * @return bool
+	 */
+	public function update_job_progress( string $job_id, string $phase, int $batch_index, array $metadata ): bool;
+
+	/**
+	 * Return safe boundary markers for the job.
+	 *
+	 * @param string $job_id
+	 * @return array
+	 */
+	public function get_safe_boundaries( string $job_id ): array;
+
+	/**
+	 * Store migration configuration per job.
+	 *
+	 * @param string $job_id
+	 * @param array  $config
+	 * @return bool
+	 */
+	public function save_migration_config( string $job_id, array $config ): bool;
+
+	/**
+	 * Retrieve migration configuration for a job.
+	 *
+	 * @param string $job_id
+	 * @return array
+	 */
+	public function get_migration_config( string $job_id ): array;
+
+	/**
+	 * Cleanup job entries older than given number of days.
+	 *
+	 * @param int $days
+	 * @return int Number of jobs removed.
+	 */
+	public function cleanup_old_jobs( int $days = 7 ): int;
 }

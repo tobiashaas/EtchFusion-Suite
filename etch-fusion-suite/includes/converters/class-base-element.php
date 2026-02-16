@@ -27,10 +27,26 @@ abstract class EFS_Base_Element {
 	protected $style_map;
 
 	/**
+	 * Dynamic data converter instance (injected by factory).
+	 *
+	 * @var \Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter|null
+	 */
+	protected $dynamic_data_converter;
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( $style_map = array() ) {
 		$this->style_map = $style_map;
+	}
+
+	/**
+	 * Set the dynamic data converter instance.
+	 *
+	 * @param \Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter $converter Converter instance.
+	 */
+	public function set_dynamic_data_converter( $converter ) {
+		$this->dynamic_data_converter = $converter;
 	}
 
 	/**
@@ -169,6 +185,11 @@ abstract class EFS_Base_Element {
 	 * @return string Gutenberg block HTML.
 	 */
 	protected function generate_etch_text_block( $content ) {
+		// Convert dynamic data tags if converter is available.
+		if ( $this->dynamic_data_converter ) {
+			$content = $this->dynamic_data_converter->convert_content( $content );
+		}
+
 		$attrs = array(
 			'content' => (string) $content,
 		);

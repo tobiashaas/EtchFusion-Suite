@@ -36,6 +36,7 @@ spl_autoload_register(
 			'Parsers\\'                  => '',
 			'Templates\\Interfaces\\'    => 'templates/interfaces/',
 			'Templates\\'                => 'templates/',
+			'Models\\'                   => 'models/',
 			'Migrators\\Interfaces\\'    => 'migrators/interfaces/',
 			'Migrators\\'                => '',
 			'Converters\\Elements\\'     => 'converters/elements/',

@@ -654,7 +654,7 @@ class EFS_Gutenberg_Generator {
 
 		// Initialize element factory with style map (NEW - v0.5.0)
 		$style_map             = get_option( 'efs_style_map', array() );
-		$this->element_factory = new EFS_Element_Factory( $style_map );
+		$this->element_factory = new EFS_Element_Factory( $style_map, $this->dynamic_data_converter );
 		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
 
 		// Build element lookup map (id => element)
@@ -876,6 +876,11 @@ class EFS_Gutenberg_Generator {
 	 * Generate HTML for a single block
 	 */
 	private function generate_block_html( $element, $element_map = array() ) {
+		// Skip hidden elements — produces no output in either path.
+		if ( ! empty( $element['settings']['_hidden'] ) && true === $element['settings']['_hidden'] ) {
+			return '';
+		}
+
 		// NEW v0.5.0: Use Element Factory for conversion
 		if ( $this->element_factory ) {
 			// Get children for this element

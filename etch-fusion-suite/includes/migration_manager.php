@@ -24,6 +24,7 @@ use Bricks2Etch\Services\EFS_CSS_Service;
 use Bricks2Etch\Services\EFS_Media_Service;
 use Bricks2Etch\Services\EFS_Migration_Service;
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
+use Bricks2Etch\Models\EFS_Migration_Config;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -100,8 +101,8 @@ class EFS_Migration_Manager {
 	/**
 	 * Start migration process
 	 */
-	public function start_migration( $migration_key, $target_url = null, $batch_size = null ) {
-		return $this->migration_service->start_migration( $migration_key, $target_url, $batch_size );
+	public function start_migration( $migration_key, $target_url = null, $batch_size = null, EFS_Migration_Config $config = null ) {
+		return $this->migration_service->start_migration( $migration_key, $target_url, $batch_size, $config );
 	}
 
 	/**

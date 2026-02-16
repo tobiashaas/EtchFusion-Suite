@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use Exception;
 
 // Prevent direct access
@@ -59,8 +60,8 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $jwt_token ) {
-		return $this->migrate_metabox_configs( $target_url, $jwt_token );
+	public function migrate( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+		return $this->migrate_metabox_configs( $target_url, $jwt_token, $config );
 	}
 
 	/** @inheritDoc */
@@ -272,8 +273,15 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate MetaBox configurations
 	 */
-	public function migrate_metabox_configs( $target_url, $jwt_token ) {
+	public function migrate_metabox_configs( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
 		$configs = $this->export_metabox_configs();
+
+		if ( $config ) {
+			$selected = $config->get_selected_post_types();
+			if ( ! empty( $selected ) ) {
+				$configs = $this->filter_metabox_configs_by_post_types( $configs, $selected );
+			}
+		}
 
 		if ( empty( $configs ) ) {
 			return true; // No configurations to migrate
@@ -495,5 +503,42 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 		);
 
 		return $mapping[ $metabox_type ] ?? 'text';
+	}
+
+	/**
+	 * Filter MetaBox configurations by selected post types.
+	 */
+	private function filter_metabox_configs_by_post_types( array $configs, array $selected_post_types ): array {
+		return array_values(
+			array_filter(
+				$configs,
+				function ( $config ) use ( $selected_post_types ) {
+					$target_post_types = $this->get_metabox_post_types( $config );
+
+					if ( empty( $target_post_types ) ) {
+						return true;
+					}
+
+					return ! empty( array_intersect( $target_post_types, $selected_post_types ) );
+				}
+			)
+		);
+	}
+
+	private function get_metabox_post_types( $config ): array {
+		$post_types = get_post_meta( $config->ID, 'meta-box_post_types', true );
+		if ( empty( $post_types ) ) {
+			$post_types = get_post_meta( $config->ID, 'meta-box_post_type', true );
+		}
+
+		if ( is_string( $post_types ) ) {
+			$post_types = array( $post_types );
+		}
+
+		if ( ! is_array( $post_types ) ) {
+			return array();
+		}
+
+		return array_map( 'sanitize_key', $post_types );
 	}
 }

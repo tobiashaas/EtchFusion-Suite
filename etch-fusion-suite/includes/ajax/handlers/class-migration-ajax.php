@@ -13,6 +13,7 @@ namespace Bricks2Etch\Ajax\Handlers;
 use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
 use Bricks2Etch\Controllers\EFS_Migration_Controller;
 use Bricks2Etch\Controllers\EFS_Settings_Controller;
+use Bricks2Etch\Services\EFS_Migration_Job_Runner;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -34,6 +35,13 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	private $settings_controller;
 
 	/**
+	 * Job runner instance.
+	 *
+	 * @var EFS_Migration_Job_Runner|null
+	 */
+	private $migration_job_runner;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param EFS_Migration_Controller|null $migration_controller Migration controller.
@@ -45,6 +53,16 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	public function __construct( $migration_controller = null, $settings_controller = null, $rate_limiter = null, $input_validator = null, $audit_logger = null ) {
 		$this->migration_controller = $migration_controller;
 		$this->settings_controller  = $settings_controller;
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			try {
+				$container = etch_fusion_suite_container();
+				if ( $container->has( 'migration_job_runner' ) ) {
+					$this->migration_job_runner = $container->get( 'migration_job_runner' );
+				}
+			} catch ( \Exception $exception ) {
+				$this->migration_job_runner = null;
+			}
+		}
 		parent::__construct( $rate_limiter, $input_validator, $audit_logger );
 	}
 
@@ -54,7 +72,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	protected function register_hooks() {
 		add_action( 'wp_ajax_efs_start_migration', array( $this, 'start_migration' ) );
 		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
-		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
+		add_action( 'wp_ajax_efs_process_job_batch', array( $this, 'process_migration_job_batch' ) );
 		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
 		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
 		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
@@ -85,10 +103,19 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		$raw_target = $this->get_post( 'target_url', '', 'url' );
+		$include_media = $this->get_post( 'include_media', null, 'bool' );
+		if ( null === $include_media ) {
+			$include_media = true;
+		}
+
 		$payload    = array(
-			'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
-			'target_url'    => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
-			'batch_size'    => $this->get_post( 'batch_size', 50, 'int' ),
+			'migration_key'       => $this->get_post( 'migration_key', '', 'raw' ),
+			'target_url'          => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
+			'batch_size'          => $this->get_post( 'batch_size', 50, 'int' ),
+			'selected_post_types' => $this->get_post( 'selected_post_types', array(), 'array' ),
+			'post_type_mappings'  => $this->get_post( 'post_type_mappings', array(), 'array' ),
+			'include_media'       => $include_media,
+			'config'              => $this->get_post( 'config', array(), 'array' ),
 		);
 
 		$result = $this->migration_controller->start_migration( $payload );
@@ -133,7 +160,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	/**
 	 * Process migration batch.
 	 */
-	public function process_batch() {
+	public function process_migration_job_batch() {
 		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
@@ -142,26 +169,33 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration batch aborted: controller unavailable.' );
+		if ( ! $this->migration_job_runner instanceof EFS_Migration_Job_Runner ) {
+			$this->log_security_event( 'ajax_action', 'Migration job batch aborted: job runner unavailable.' );
 			wp_send_json_error(
 				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
+					'message' => __( 'Migration job runner unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'job_runner_unavailable',
 				),
 				503
 			);
 			return;
 		}
 
-		$payload = array(
-			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
-			'batch'       => $this->get_post( 'batch', array(), 'array' ),
-		);
+		$job_id = $this->get_post( 'job_id', '', 'text' );
+		if ( empty( $job_id ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Job ID is required.', 'etch-fusion-suite' ),
+					'code'    => 'missing_job_id',
+				),
+				400
+			);
+			return;
+		}
 
-		$result = $this->migration_controller->process_batch( $payload );
+		$result = $this->migration_job_runner->execute_next_batch( $job_id );
 
-		$this->send_controller_response( $result, 'migration_batch_failed' );
+		$this->send_controller_response( $result, 'migration_job_batch_failed' );
 	}
 
 	/**

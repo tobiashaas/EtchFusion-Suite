@@ -173,79 +173,60 @@ async function checkCommercialPlugins() {
   return true;
 }
 
-async function detectBricksCliContainer() {
-  const result = await runCommandQuiet('docker', ['ps', '--format', '{{.Names}}']);
-  if (result.code !== 0) {
-    throw new Error(result.stderr || result.stdout || 'Could not list Docker containers.');
+
+async function ensurePermalinks() {
+  log('▶ Setting up permalinks and .htaccess...');
+
+  // Use chr(37) to build the percent sign so Git Bash on Windows does not
+  // expand %postname% as an environment variable reference.
+  const phpSetPermalinks = "update_option('permalink_structure', chr(37).'postname'.chr(37));";
+
+  for (const env of ['cli', 'tests-cli']) {
+    const result = await runCommandQuiet(WP_ENV_CMD, ['run', env, 'wp', 'eval', phpSetPermalinks]);
+    if (result.code !== 0) {
+      log(`⚠ Could not set permalink structure on ${env}: ${(result.stderr || result.stdout || '').trim()}`);
+    }
   }
 
-  const names = result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  // Write .htaccess into both Apache containers so /wp-json/ works without ?rest_route=
+  const htaccess = [
+    '# BEGIN WordPress',
+    '<IfModule mod_rewrite.c>',
+    'RewriteEngine On',
+    'RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]',
+    'RewriteBase /',
+    'RewriteRule ^index\\.php$ - [L]',
+    'RewriteCond %{REQUEST_FILENAME} !-f',
+    'RewriteCond %{REQUEST_FILENAME} !-d',
+    'RewriteRule . /index.php [L]',
+    '</IfModule>',
+    '# END WordPress',
+    ''
+  ].join('\\n');
 
-  if (names.includes('bricks-cli')) {
-    return 'bricks-cli';
+  for (const container of ['wordpress', 'tests-wordpress']) {
+    const writeResult = await runCommandQuiet(
+      'docker',
+      ['exec', container, 'sh', '-c', `printf '${htaccess}' > /var/www/html/.htaccess && chown www-data:www-data /var/www/html/.htaccess`]
+    );
+    if (writeResult.code !== 0) {
+      log(`⚠ Could not write .htaccess in ${container}: ${(writeResult.stderr || writeResult.stdout || '').trim()}`);
+    }
   }
 
-  const fallback = names.find((name) => /bricks.*cli/i.test(name));
-  if (fallback) {
-    return fallback;
+  // Flush rewrite rules so WordPress picks up the new structure
+  for (const env of ['cli', 'tests-cli']) {
+    await runCommandQuiet(WP_ENV_CMD, ['run', env, 'wp', 'rewrite', 'flush']);
   }
 
-  throw new Error('Could not detect Bricks CLI container.');
-}
-
-async function ensureWpvividOnBricks() {
-  log('▶ Installing WPvivid Free + Pro on Bricks...');
-
-  const freeInstalled = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-installed', 'wpvivid-backuprestore']);
-  if (freeInstalled.code === 0) {
-    await runCommandWithRetry(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'activate', 'wpvivid-backuprestore']);
-  } else {
-    await runCommandWithRetry(WP_ENV_CMD, [
-      'run',
-      'cli',
-      'wp',
-      'plugin',
-      'install',
-      'https://downloads.wordpress.org/plugin/wpvivid-backuprestore.latest-stable.zip',
-      '--activate'
-    ]);
-  }
-
-  const proZipPath = join(__dirname, '..', 'local-plugins', 'wpvivid-latest.zip');
-  if (!fs.existsSync(proZipPath)) {
-    throw new Error(`Missing file: ${proZipPath}`);
-  }
-
-  const bricksCli = await detectBricksCliContainer();
-  await runCommandWithRetry('docker', ['cp', proZipPath, `${bricksCli}:/tmp/wpvivid-latest.zip`]);
-  await runCommandWithRetry(WP_ENV_CMD, [
-    'run',
-    'cli',
-    'wp',
-    'plugin',
-    'install',
-    '/tmp/wpvivid-latest.zip',
-    '--activate',
-    '--force'
-  ]);
-
-  const freeActive = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-active', 'wpvivid-backuprestore']);
-  const proActive = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-active', 'wpvivid-backup-pro']);
-
-  if (freeActive.code !== 0 || proActive.code !== 0) {
-    throw new Error('WPvivid activation verification failed on Bricks.');
-  }
-
-  log('✓ WPvivid Free + Pro are active on Bricks');
+  log('✓ Permalinks and .htaccess configured');
 }
 
 async function main() {
   const args = process.argv.slice(2);
   const skipComposer = args.includes('--skip-composer');
   const skipActivation = args.includes('--skip-activation');
+  const skipLicenses = args.includes('--skip-licenses');
   
   log('▶ Starting WordPress environments via wp-env...');
   
@@ -279,62 +260,82 @@ async function main() {
   
   log(`⏳ Waiting for Etch instance (port ${config.testsPort})...`);
   await waitForWordPress({ port: config.testsPort, timeout: 120 });
-  await ensureWpvividOnBricks();
-  
-  if (!skipComposer) {
-    log('▶ Installing Composer dependencies...');
-    const hasComposer = await checkComposerInContainer();
 
-    if (hasComposer) {
-      const envs = ['cli', 'tests-cli'];
-      for (const env of envs) {
-        log(`✓ Composer found in container, installing dependencies in ${env}...`);
-        await runCommandWithRetry(WP_ENV_CMD, [
-          'run',
-          env,
-          '--env-cwd=wp-content/plugins/etch-fusion-suite',
-          'composer',
-          'install',
-          '--no-dev',
-          '--optimize-autoloader'
-        ]);
-        const verify = await runCommandQuiet(WP_ENV_CMD, [
-          'run',
-          env,
-          'test',
-          '-f',
-          'wp-content/plugins/etch-fusion-suite/vendor/autoload.php'
-        ]);
-        if (verify.code !== 0) {
-          log(`Missing autoload.php in ${env} - Run \`npm run composer:install\` manually`);
-          process.exit(1);
+  // --- Post-start steps: each wrapped so one failure doesn't kill the rest ---
+
+  try {
+    await ensurePermalinks();
+  } catch (error) {
+    log(`⚠ Permalink setup failed (non-fatal): ${error.message}`);
+  }
+
+  if (!skipComposer) {
+    try {
+      log('▶ Installing Composer dependencies...');
+      const hasComposer = await checkComposerInContainer();
+
+      if (hasComposer) {
+        const envs = ['cli', 'tests-cli'];
+        for (const env of envs) {
+          log(`✓ Composer found in container, installing dependencies in ${env}...`);
+          await runCommandWithRetry(WP_ENV_CMD, [
+            'run',
+            env,
+            '--env-cwd=wp-content/plugins/etch-fusion-suite',
+            'composer',
+            'install',
+            '--no-dev',
+            '--optimize-autoloader'
+          ]);
+          const verify = await runCommandQuiet(WP_ENV_CMD, [
+            'run',
+            env,
+            'test',
+            '-f',
+            'wp-content/plugins/etch-fusion-suite/vendor/autoload.php'
+          ]);
+          if (verify.code !== 0) {
+            log(`⚠ Missing autoload.php in ${env} - Run \`npm run composer:install\` manually`);
+          }
+        }
+      } else {
+        log('⚠ Composer not found in container, attempting host installation...');
+        const pluginDir = join(__dirname, '..');
+
+        try {
+          await runCommandWithRetry('composer', ['install', '--no-dev', '--optimize-autoloader'], { cwd: pluginDir });
+          log('✓ Composer dependencies installed from host (may not propagate to containers)');
+        } catch (error) {
+          log('⚠ Composer install failed (non-fatal): ' + error.message);
         }
       }
-    } else {
-      log('⚠ Composer not found in container, attempting host installation...');
-      const { join } = require('path');
-      const pluginDir = join(__dirname, '..');
-
-      try {
-        await runCommandWithRetry('composer', ['install', '--no-dev', '--optimize-autoloader'], { cwd: pluginDir });
-        log('✓ Composer dependencies installed from host (may not propagate to containers)');
-      } catch (error) {
-        throw new Error(
-          'Composer is not available in the wp-env container or on the host.\n' +
-          'Please install Composer locally or bootstrap it in the container.\n' +
-          'See README for details.'
-        );
-      }
+    } catch (error) {
+      log(`⚠ Composer step failed (non-fatal): ${error.message}`);
     }
   } else {
     log('⏭ Skipping Composer installation');
   }
-  
+
   if (!skipActivation) {
-    log('▶ Activating required plugins and themes...');
-    await runCommand('node', [join('scripts', 'activate-plugins.js')]);
+    try {
+      log('▶ Activating required plugins and themes...');
+      await runCommand('node', [join('scripts', 'activate-plugins.js')]);
+    } catch (error) {
+      log(`⚠ Plugin activation failed (non-fatal): ${error.message}`);
+    }
   } else {
     log('⏭ Skipping plugin activation');
+  }
+  
+  if (!skipLicenses) {
+    try {
+      log('▶ Activating commercial licenses...');
+      await runCommand('node', [join('scripts', 'activate-licenses.js')]);
+    } catch (error) {
+      log(`⚠ License activation failed (non-fatal): ${error.message}`);
+    }
+  } else {
+    log('⏭ Skipping license activation');
   }
   
   // Display summary

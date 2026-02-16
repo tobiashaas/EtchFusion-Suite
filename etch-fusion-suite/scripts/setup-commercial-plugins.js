@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { parseDotEnv } = require('./lib/dotenv');
 
 const ROOT_DIR = path.join(__dirname, '..');
 const LOCAL_PLUGINS_DIR = path.join(ROOT_DIR, 'local-plugins');
@@ -41,33 +42,6 @@ function ok(message) {
 
 function fail(message) {
   console.error(`${color('[FAIL]', 'red')} ${message}`);
-}
-
-function parseDotEnv(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-
-  const content = fs.readFileSync(filePath, 'utf8');
-  const lines = content.split(/\r?\n/);
-  const env = {};
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
-    }
-    const idx = trimmed.indexOf('=');
-    if (idx === -1) {
-      continue;
-    }
-    const key = trimmed.slice(0, idx).trim();
-    let value = trimmed.slice(idx + 1).trim();
-    value = value.replace(/^['"]|['"]$/g, '');
-    env[key] = value;
-  }
-
-  return env;
 }
 
 function bytesToHuman(bytes) {
@@ -239,16 +213,6 @@ const PLUGINS = [
     matches: (fileName) =>
       /^bricks-child.*\.zip$/i.test(fileName) &&
       !/^bricks-child-latest\.zip$/i.test(fileName)
-  },
-  {
-    id: 'wpvivid',
-    label: 'WPvivid',
-    required: false,
-    latestFile: 'wpvivid-latest.zip',
-    envVar: null,
-    matches: (fileName) =>
-      /^wpvivid.*\.zip$/i.test(fileName) &&
-      !/^wpvivid-latest\.zip$/i.test(fileName)
   }
 ];
 

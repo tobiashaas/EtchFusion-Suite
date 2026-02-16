@@ -2,8 +2,11 @@
 /**
  * Security Headers
  *
- * Adds security headers to HTTP responses including CSP, X-Frame-Options, etc.
- * Protects against XSS, clickjacking, and other common web vulnerabilities.
+ * Adds basic security headers to EFS admin pages only.
+ * CSP is intentionally omitted — a migration plugin cannot predict which
+ * external resources other plugins, themes, or page builders will load.
+ * Site-wide CSP should be managed at the server/hosting level or by a
+ * dedicated security plugin.
  *
  * @package    Bricks2Etch
  * @subpackage Security
@@ -15,406 +18,64 @@ namespace Bricks2Etch\Security;
 /**
  * Security Headers Class
  *
- * Manages HTTP security headers with environment-aware CSP policies.
+ * Sends hardening headers for EFS-owned admin screens.
  */
 class EFS_Security_Headers {
 
 	/**
-	 * Add security headers to response
+	 * EFS admin page slugs that receive security headers.
 	 *
-	 * Sets all security headers via header() function.
-	 * Called via WordPress send_headers action.
+	 * @var string[]
+	 */
+	private const EFS_PAGE_SLUGS = array(
+		'etch-fusion-suite',
+		'efs-migration',
+		'efs-settings',
+		'efs-templates',
+	);
+
+	/**
+	 * Add security headers to response.
+	 *
+	 * Only fires on EFS admin pages. Never touches the frontend or
+	 * other admin screens to avoid breaking third-party plugins/builders.
 	 *
 	 * @return void
 	 */
 	public function add_security_headers() {
-		// Don't add headers if we shouldn't
-		if ( ! $this->should_add_headers() ) {
+		if ( ! $this->is_efs_admin_page() ) {
 			return;
 		}
 
-		// X-Frame-Options: Prevent clickjacking
+		if ( headers_sent() ) {
+			return;
+		}
+
+		// Prevent clickjacking of our admin UI.
 		header( 'X-Frame-Options: SAMEORIGIN' );
 
-		// X-Content-Type-Options: Prevent MIME sniffing
+		// Prevent MIME-type sniffing.
 		header( 'X-Content-Type-Options: nosniff' );
 
-		// X-XSS-Protection: Enable XSS filter
-		header( 'X-XSS-Protection: 1; mode=block' );
-
-		// Referrer-Policy: Control referrer information
+		// Control referrer information.
 		header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-
-		// Permissions-Policy: Disable unnecessary browser features
-		header( 'Permissions-Policy: geolocation=(), microphone=(), camera=()' );
-
-		// Content-Security-Policy: Comprehensive XSS protection
-		$csp = $this->get_csp_policy();
-		if ( ! empty( $csp ) ) {
-			header( 'Content-Security-Policy: ' . $csp );
-		}
 	}
 
 	/**
-	 * Get Content Security Policy
-	 *
-	 * Returns CSP string based on current page context.
-	 * Uses relaxed policy for admin pages and frontend to accommodate WordPress behavior.
-	 *
-	 * @return string CSP policy string.
-	 */
-	public function get_csp_policy() {
-		$context    = $this->is_admin_page() ? 'admin' : 'frontend';
-		$directives = $this->is_admin_page() ? $this->get_admin_csp_directives() : $this->get_frontend_csp_directives();
-
-		/**
-		 * Filter the CSP directives before they are compiled into a header string.
-		 *
-		 * @since 0.5.1
-		 *
-		 * @param array  $directives Directive map.
-		 * @param string $context    Either "admin" or "frontend".
-		 */
-		$directives = apply_filters( 'efs_security_headers_csp_directives', $directives, $context );
-		$directives = $this->apply_bricks_builder_overrides( $directives );
-		$directives = $this->apply_etch_editor_overrides( $directives );
-
-		return $this->compile_csp_directives( $directives );
-	}
-
-	/**
-	 * Retrieve CSP directives for admin-facing requests.
-	 *
-	 * @return array
-	 */
-	protected function get_admin_csp_directives() {
-		return array(
-			'default-src'     => array( "'self'" ),
-			'script-src'      => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_admin_script_sources() ),
-			'style-src'       => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_admin_style_sources() ),
-			'img-src'         => array( "'self'", 'data:', 'https:' ),
-			'font-src'        => array( "'self'", 'data:' ),
-			'connect-src'     => $this->get_default_connect_sources(),
-			'frame-ancestors' => array( "'self'" ),
-			'form-action'     => array( "'self'" ),
-			'base-uri'        => array( "'self'" ),
-			'object-src'      => array( "'none'" ),
-		);
-	}
-
-	/**
-	 * Retrieve CSP directives for frontend requests.
-	 *
-	 * @return array
-	 */
-	protected function get_frontend_csp_directives() {
-		return array(
-			'default-src'     => array( "'self'" ),
-			'script-src'      => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_frontend_script_sources() ),
-			'style-src'       => array_merge( array( "'self'", "'unsafe-inline'" ), $this->get_frontend_style_sources() ),
-			'img-src'         => array( "'self'", 'data:', 'https:' ),
-			'font-src'        => array( "'self'", 'data:' ),
-			'connect-src'     => $this->get_default_connect_sources(),
-			'frame-ancestors' => array( "'self'" ),
-			'form-action'     => array( "'self'" ),
-			'base-uri'        => array( "'self'" ),
-			'object-src'      => array( "'none'" ),
-		);
-	}
-
-	/**
-	 * Get default connect-src values shared by contexts.
-	 *
-	 * @return array
-	 */
-	protected function get_default_connect_sources() {
-		/**
-		 * Filter the default connect-src hosts applied to the CSP.
-		 *
-		 * @since 0.5.1
-		 *
-		 * @param array $sources Default connect-src values.
-		 */
-		return apply_filters( 'efs_security_headers_csp_connect_src', array( "'self'" ) );
-	}
-
-	/**
-	 * Allow additional admin script sources such as WordPress dashicons or CDN endpoints.
-	 *
-	 * @return array
-	 */
-	protected function get_admin_script_sources() {
-		/**
-		 * Filter additional admin script sources.
-		 *
-		 * @since 0.5.2
-		 *
-		 * @param array $sources Additional script-src values.
-		 */
-		return apply_filters( 'efs_security_headers_admin_script_sources', array() );
-	}
-
-	/**
-	 * Allow additional admin style sources such as Google Fonts in dev environments.
-	 *
-	 * @return array
-	 */
-	protected function get_admin_style_sources() {
-		/**
-		 * Filter additional admin style sources.
-		 *
-		 * @since 0.5.2
-		 *
-		 * @param array $sources Additional style-src values.
-		 */
-		return apply_filters( 'efs_security_headers_admin_style_sources', array() );
-	}
-
-	/**
-	 * Additional frontend script sources.
-	 *
-	 * @return array
-	 */
-	protected function get_frontend_script_sources() {
-		/**
-		 * Filter additional frontend script sources.
-		 *
-		 * @since 0.5.2
-		 *
-		 * @param array $sources Additional script-src values.
-		 */
-		return apply_filters( 'efs_security_headers_frontend_script_sources', array() );
-	}
-
-	/**
-	 * Additional frontend style sources.
-	 *
-	 * @return array
-	 */
-	protected function get_frontend_style_sources() {
-		/**
-		 * Filter additional frontend style sources.
-		 *
-		 * @since 0.5.2
-		 *
-		 * @param array $sources Additional style-src values.
-		 */
-		return apply_filters( 'efs_security_headers_frontend_style_sources', array() );
-	}
-
-	/**
-	 * Apply CSP overrides required by the Bricks visual builder.
-	 *
-	 * Bricks loads parts of its builder UI on the frontend (e.g. ?bricks=run) and relies on
-	 * eval-based helpers plus CDN-hosted font assets. Without explicitly allowing these
-	 * sources the builder fails to boot and throws repeated CSP violations.
-	 *
-	 * @param array $directives Current directive map.
-	 * @return array Directive map including Bricks adjustments when applicable.
-	 */
-	protected function apply_bricks_builder_overrides( array $directives ) {
-		if ( ! $this->is_bricks_builder_request() ) {
-			return $directives;
-		}
-
-		$directives = $this->ensure_csp_values( $directives, 'script-src', array( "'unsafe-eval'" ) );
-		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
-
-		return $directives;
-	}
-
-	/**
-	 * Apply CSP overrides required by the Etch visual editor.
-	 *
-	 * The Etch editor (e.g. ?etch=magic) uses eval-based code (Main-Db-*.js), creates
-	 * workers from blob URLs, loads fonts from the same CDN as Bricks, and fetches icons
-	 * from Iconify/UniSVG/SimpleSVG APIs. Without these allowances the editor throws
-	 * CSP violations and fails to load.
-	 *
-	 * @param array $directives Current directive map.
-	 * @return array Directive map including Etch editor adjustments when applicable.
-	 */
-	protected function apply_etch_editor_overrides( array $directives ) {
-		if ( ! $this->is_etch_editor_request() ) {
-			return $directives;
-		}
-
-		$directives = $this->ensure_csp_values( $directives, 'script-src', array( "'unsafe-eval'" ) );
-		$directives = $this->ensure_csp_values( $directives, 'worker-src', array( "'self'", 'blob:' ) );
-		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
-		$directives = $this->ensure_csp_values(
-			$directives,
-			'connect-src',
-			array(
-				'https://api.iconify.design',
-				'https://api.unisvg.com',
-				'https://api.simplesvg.com',
-			)
-		);
-
-		return $directives;
-	}
-
-	/**
-	 * Determine whether the current request is loading the Etch visual editor.
+	 * Check whether the current request is an EFS admin page.
 	 *
 	 * @return bool
 	 */
-	private function is_etch_editor_request() {
-		$etch_param = filter_input( INPUT_GET, 'etch', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
-
-		if ( null === $etch_param || '' === trim( (string) $etch_param ) ) {
+	private function is_efs_admin_page() {
+		if ( ! is_admin() ) {
 			return false;
 		}
 
-		$etch_param = sanitize_text_field( (string) $etch_param );
-
-		return 'magic' === $etch_param || 'editor' === $etch_param;
-	}
-
-	/**
-	 * Append unique values to a CSP directive.
-	 *
-	 * @param array  $directives Directive map.
-	 * @param string $directive  Directive key (e.g. script-src).
-	 * @param array  $values     Values to ensure.
-	 * @return array Updated directives map.
-	 */
-	private function ensure_csp_values( array $directives, $directive, array $values ) {
-		if ( ! isset( $directives[ $directive ] ) ) {
-			$directives[ $directive ] = array();
+		$page = '';
+		if ( isset( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$page = sanitize_text_field( wp_unslash( $_GET['page'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		}
 
-		$directives[ $directive ] = array_values(
-			array_unique(
-				array_merge( $directives[ $directive ], $values )
-			)
-		);
-
-		return $directives;
-	}
-
-	/**
-	 * Determine whether the current request is loading a Bricks builder surface.
-	 *
-	 * @return bool
-	 */
-	private function is_bricks_builder_request() {
-		if ( function_exists( '\\bricks_is_builder' ) && \call_user_func( '\\bricks_is_builder' ) ) {
-			return true;
-		}
-
-		$bricks_action = filter_input( INPUT_GET, 'bricks', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
-
-		if ( null === $bricks_action || '' === trim( (string) $bricks_action ) ) {
-			$bricks_post = filter_input( INPUT_POST, 'bricks', FILTER_UNSAFE_RAW, FILTER_NULL_ON_FAILURE );
-			if ( null !== $bricks_post && '' !== trim( (string) $bricks_post ) ) {
-				$bricks_action = $bricks_post;
-			}
-		}
-
-		if ( null === $bricks_action || '' === trim( (string) $bricks_action ) ) {
-			return false;
-		}
-
-		$bricks_action = sanitize_text_field( (string) $bricks_action );
-
-		$builder_actions = array( 'run', 'preview', 'iframe' );
-
-		return in_array( $bricks_action, $builder_actions, true );
-	}
-
-	/**
-	 * Compile directive map into CSP header string.
-	 *
-	 * @param array $directives Directive map.
-	 * @return string
-	 */
-	protected function compile_csp_directives( array $directives ) {
-		$segments = array();
-
-		foreach ( $directives as $directive => $values ) {
-			$values = array_filter( array_map( 'trim', (array) $values ) );
-
-			if ( empty( $values ) ) {
-				continue;
-			}
-
-			$segments[] = sprintf( '%s %s', $directive, implode( ' ', $values ) );
-		}
-
-		return implode( '; ', $segments );
-	}
-
-	/**
-	 * Check if current request is admin page
-	 *
-	 * @return bool True if admin page, false otherwise.
-	 */
-	public function is_admin_page() {
-		// Check if we're in admin area
-		if ( is_admin() ) {
-			return true;
-		}
-
-		// Check if this is an AJAX request from admin
-		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
-			// Check referer to determine if it's from admin
-			$referer = wp_get_referer();
-			if ( $referer && strpos( $referer, admin_url() ) === 0 ) {
-				return true;
-			}
-		}
-
-		// Check request URI
-		$request_uri = '';
-		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
-			$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
-		}
-		if ( strpos( $request_uri, '/wp-admin/' ) !== false ) {
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Check if headers should be added
-	 *
-	 * Determines if security headers should be added to current request.
-	 *
-	 * @return bool True if headers should be added, false otherwise.
-	 */
-	public function should_add_headers() {
-		// Don't add headers if already sent
-		if ( headers_sent() ) {
-			return false;
-		}
-
-		// Don't add headers for wp-login.php (can interfere with login)
-		$request_uri = '';
-		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
-			$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
-		}
-		if ( strpos( $request_uri, 'wp-login.php' ) !== false ) {
-			return false;
-		}
-
-		// Don't add headers for wp-cron.php
-		if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
-			return false;
-		}
-
-		// Don't add headers for REST API OPTIONS requests (handled by CORS)
-		$request_method = '';
-		if ( isset( $_SERVER['REQUEST_METHOD'] ) ) {
-			$request_method = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) );
-		}
-
-		if ( 'OPTIONS' === $request_method ) {
-			return false;
-		}
-
-		return true;
+		return in_array( $page, self::EFS_PAGE_SLUGS, true );
 	}
 }

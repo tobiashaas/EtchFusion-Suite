@@ -515,6 +515,17 @@ function etch_fusion_suite() {
 // Start the plugin
 etch_fusion_suite();
 
+// Background job runner cron hook
+add_action( 'efs_execute_migration_batch', 'efs_handle_migration_batch_cron', 10, 1 );
+function efs_handle_migration_batch_cron( $job_id ) {
+	$container = etch_fusion_suite_container();
+	if ( ! $container || ! $container->has( 'migration_job_runner' ) ) {
+		return;
+	}
+
+	$container->get( 'migration_job_runner' )->execute_next_batch( $job_id );
+}
+
 // Plugin activation/deactivation hooks
 register_activation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'deactivate' ) );

@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Api\EFS_API_Client;
+use Bricks2Etch\Models\EFS_Migration_Config;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -38,7 +39,19 @@ class EFS_Media_Migrator {
 	/**
 	 * Migrate all media files from source to target site
 	 */
-	public function migrate_media( $target_url, $jwt_token ) {
+	public function migrate_media( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+		if ( $config && ! $config->should_include_media() ) {
+			$this->error_handler->log_info( 'Media Migration: Skipped because configuration disables media.' );
+
+			return array(
+				'total_media'    => 0,
+				'migrated_media' => 0,
+				'skipped_media'  => 0,
+				'failed_media'   => 0,
+				'skipped'        => true,
+			);
+		}
+
 		$this->error_handler->log_info( 'Media Migration: Starting' );
 		$media_files = $this->get_media_files();
 		$this->error_handler->log_info( 'Media Migration: Found ' . count( $media_files ) . ' media files' );

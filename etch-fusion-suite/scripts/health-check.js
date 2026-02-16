@@ -335,7 +335,7 @@ async function checkComposerDependencies(environment, name) {
 }
 
 async function checkRestApi(environment, name) {
-  const codeScript = "$response = wp_remote_get(rest_url()); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } $code = (int) wp_remote_retrieve_response_code($response); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
+  const codeScript = "$response = wp_remote_get(home_url('/?rest_route=/')); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } $code = (int) wp_remote_retrieve_response_code($response); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
   const result = await runWpEnv(['run', environment, 'wp', 'eval', codeScript]);
 
   if (result.code === 0) {
@@ -468,12 +468,6 @@ async function runHealthCheck(environmentFilter = null) {
       }));
     }
 
-    if (env.environment === 'cli') {
-      checkPromises.push(checkPluginStatus(env.environment, env.name, 'wpvivid-backuprestore', {
-        required: false,
-        label: `${env.name} plugin wpvivid-backuprestore`
-      }));
-    }
   }
 
   const checks = await Promise.all(checkPromises);

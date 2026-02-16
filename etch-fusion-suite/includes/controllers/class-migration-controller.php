@@ -3,6 +3,7 @@ namespace Bricks2Etch\Controllers;
 
 use Bricks2Etch\Core\EFS_Migration_Manager;
 use Bricks2Etch\Api\EFS_API_Client;
+use Bricks2Etch\Models\EFS_Migration_Config;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -55,7 +56,9 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from the migration key.', 'etch-fusion-suite' ) );
 		}
 
-		$result = $this->manager->start_migration( $migration_key, $target_url, $batch );
+		$config = $this->resolve_migration_config( $data, $batch );
+
+		$result = $this->manager->start_migration( $migration_key, $target_url, $batch, $config );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -155,5 +158,26 @@ class EFS_Migration_Controller {
 		}
 
 		return null;
+	}
+
+	private function resolve_migration_config( array $data, int $batch_size ): EFS_Migration_Config {
+		if ( ! empty( $data['config'] ) && is_array( $data['config'] ) ) {
+			return EFS_Migration_Config::from_array( $data['config'] );
+		}
+
+		$selected_post_types = isset( $data['selected_post_types'] ) && is_array( $data['selected_post_types'] ) ? $data['selected_post_types'] : array();
+		$post_type_mappings  = isset( $data['post_type_mappings'] ) && is_array( $data['post_type_mappings'] ) ? $data['post_type_mappings'] : array();
+		$include_media       = isset( $data['include_media'] ) ? filter_var( $data['include_media'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE ) : null;
+
+		if ( null === $include_media ) {
+			$include_media = true;
+		}
+
+		return new EFS_Migration_Config(
+			$selected_post_types,
+			$post_type_mappings,
+			$include_media,
+			$batch_size
+		);
 	}
 }

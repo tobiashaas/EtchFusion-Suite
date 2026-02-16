@@ -8,6 +8,7 @@
     "dev": "node scripts/dev.js",
     "setup": "npm run dev",
     "setup:commercial-plugins": "node scripts/setup-commercial-plugins.js",
+    "licenses": "node scripts/activate-licenses.js",
     "wp-env": "wp-env",
     "wp": "wp-env run cli wp",
     "wp:tests": "wp-env run tests-cli wp",

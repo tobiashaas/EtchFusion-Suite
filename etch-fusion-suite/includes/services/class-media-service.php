@@ -3,6 +3,7 @@ namespace Bricks2Etch\Services;
 
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use Bricks2Etch\Migrators\EFS_Media_Migrator;
 
 class EFS_Media_Service {
@@ -25,12 +26,13 @@ class EFS_Media_Service {
 	/**
 	 * @param string $target_url
 	 * @param string $jwt_token
+	 * @param EFS_Migration_Config|null $config
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_media( $target_url, $jwt_token ) {
+	public function migrate_media( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
 		try {
-			$result = $this->media_migrator->migrate_media( $target_url, $jwt_token );
+			$result = $this->media_migrator->migrate_media( $target_url, $jwt_token, $config );
 
 			if ( is_wp_error( $result ) ) {
 				$this->error_handler->log_error(

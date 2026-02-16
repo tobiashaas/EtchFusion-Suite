@@ -493,7 +493,6 @@ async function main() {
   // Ensure required commercial packages are installed from local ZIP archives.
   await ensurePluginFromZip('cli', 'frames-latest.zip', ['frames']);
   await ensurePluginFromZip('cli', 'acss-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
-  await ensurePluginFromZip('cli', 'wpvivid-latest.zip', ['wpvivid-backup-pro']);
   await ensureThemeFromZip('cli', 'bricks-latest.zip', ['bricks']);
   await ensureThemeFromZip('cli', 'bricks-child-latest.zip', ['bricks-child']);
 
@@ -540,22 +539,6 @@ async function main() {
     expectedActivations.cli.push(acssDevSlug);
   } else {
     console.warn('WARNING Automatic.css plugin not found in development environment');
-  }
-
-  const wpvividFreeSlug = findPluginSlug(devPlugins, ['wpvivid-backuprestore']);
-  if (wpvividFreeSlug) {
-    tasks.push({ label: 'Activate WPvivid Free on development', args: ['run', 'cli', 'wp', 'plugin', 'activate', wpvividFreeSlug], env: 'cli', slug: wpvividFreeSlug });
-    expectedActivations.cli.push(wpvividFreeSlug);
-  } else {
-    console.warn('WARNING WPvivid Free plugin not found in development environment');
-  }
-
-  const wpvividProSlug = findPluginSlug(devPlugins, ['wpvivid-backup-pro']);
-  if (wpvividProSlug) {
-    tasks.push({ label: 'Activate WPvivid Pro on development', args: ['run', 'cli', 'wp', 'plugin', 'activate', wpvividProSlug], env: 'cli', slug: wpvividProSlug });
-    expectedActivations.cli.push(wpvividProSlug);
-  } else {
-    console.warn('WARNING WPvivid Pro plugin not found in development environment');
   }
 
   const etchSlug = findPluginSlug(testPlugins, ['etch']);

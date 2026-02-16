@@ -79,6 +79,8 @@ cp .env.example .env
 # Edit .env and add your license keys
 ```
 
+When you run `npm run dev`, the environment now reads those keys and automatically activates the commercial licenses inside the wp-env containers (Bricks/Frames/Automatic.css in the `cli` environment plus Automatic.css/Etch in the `tests-cli` environment). If you ever need to skip that step (for example while debugging WPvivid imports or when you don't yet have a key), append `--skip-licenses` to the `npm run dev` call: `npm run dev -- --skip-licenses`.
+
 ### WPvivid Custom Content Backup Import
 
 Import real Bricks site data for testing without affecting users, plugins, or themes.

@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use Exception;
 
 // Prevent direct access
@@ -71,8 +72,8 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $jwt_token ) {
-		return $this->migrate_custom_post_types( $target_url, $jwt_token );
+	public function migrate( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+		return $this->migrate_custom_post_types( $target_url, $jwt_token, $config );
 	}
 
 	/** @inheritDoc */
@@ -299,8 +300,32 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate custom post types
 	 */
-	public function migrate_custom_post_types( $target_url, $jwt_token ) {
+	public function migrate_custom_post_types( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
 		$cpts = $this->export_custom_post_types();
+
+		if ( ! empty( $config ) ) {
+			$selected = $config->get_selected_post_types();
+			if ( ! empty( $selected ) ) {
+				$cpts = array_values(
+					array_filter(
+						$cpts,
+						function ( $cpt ) use ( $selected ) {
+							return isset( $cpt['name'] ) && in_array( $cpt['name'], $selected, true );
+						}
+					)
+				);
+			}
+
+			$mappings = $config->get_post_type_mappings();
+			if ( ! empty( $mappings ) ) {
+				foreach ( $cpts as &$cpt ) {
+					if ( isset( $cpt['name'] ) && isset( $mappings[ $cpt['name'] ] ) ) {
+						$cpt['name'] = $mappings[ $cpt['name'] ];
+					}
+				}
+				unset( $cpt );
+			}
+		}
 
 		if ( empty( $cpts ) ) {
 			return true; // No CPTs to migrate

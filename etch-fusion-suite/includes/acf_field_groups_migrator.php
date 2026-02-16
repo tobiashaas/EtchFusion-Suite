@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
+use Bricks2Etch\Models\EFS_Migration_Config;
 use Exception;
 
 // Prevent direct access
@@ -66,8 +67,8 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
-	public function migrate( $target_url, $jwt_token ) {
-		return $this->migrate_acf_field_groups( $target_url, $jwt_token );
+	public function migrate( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
+		return $this->migrate_acf_field_groups( $target_url, $jwt_token, $config );
 	}
 
 	/** @inheritDoc */
@@ -419,8 +420,15 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 	/**
 	 * Migrate ACF field groups
 	 */
-	public function migrate_acf_field_groups( $target_url, $jwt_token ) {
+	public function migrate_acf_field_groups( $target_url, $jwt_token, EFS_Migration_Config $config = null ) {
 		$field_groups = $this->export_field_groups();
+
+		if ( $config ) {
+			$selected = $config->get_selected_post_types();
+			if ( ! empty( $selected ) ) {
+				$field_groups = $this->filter_field_groups_by_post_types( $field_groups, $selected );
+			}
+		}
 
 		if ( empty( $field_groups ) ) {
 			return true; // No field groups to migrate
@@ -473,5 +481,41 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 			'total_fields' => $total_fields,
 			'field_types'  => $field_types,
 		);
+	}
+
+	/**
+	 * Filter field groups based on selected post types.
+	 */
+	private function filter_field_groups_by_post_types( array $groups, array $selected_post_types ): array {
+		$selected_post_types = array_map( 'sanitize_key', $selected_post_types );
+
+		return array_values(
+			array_filter(
+				$groups,
+				function ( $group ) use ( $selected_post_types ) {
+					return $this->field_group_targets_selected_types( $group, $selected_post_types );
+				}
+			)
+		);
+	}
+
+	private function field_group_targets_selected_types( array $group, array $selected_post_types ): bool {
+		if ( empty( $group['location'] ) || ! is_array( $group['location'] ) ) {
+			return true;
+		}
+
+		foreach ( $group['location'] as $rule_group ) {
+			if ( ! is_array( $rule_group ) ) {
+				continue;
+			}
+
+			foreach ( $rule_group as $rule ) {
+				if ( ! empty( $rule['param'] ) && 'post_type' === $rule['param'] && in_array( $rule['value'], $selected_post_types, true ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

@@ -64,6 +64,13 @@ class EFS_Element_Factory {
 	private $style_map;
 
 	/**
+	 * Dynamic data converter instance.
+	 *
+	 * @var \Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter|null
+	 */
+	private $dynamic_data_converter;
+
+	/**
 	 * Element converters cache
 	 */
 	private $converters = array();
@@ -71,10 +78,12 @@ class EFS_Element_Factory {
 	/**
 	 * Constructor
 	 *
-	 * @param array $style_map Style map for CSS classes
+	 * @param array                                              $style_map              Style map for CSS classes.
+	 * @param \Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter|null $dynamic_data_converter Optional dynamic data converter.
 	 */
-	public function __construct( $style_map = array() ) {
-		$this->style_map = $style_map;
+	public function __construct( $style_map = array(), $dynamic_data_converter = null ) {
+		$this->style_map              = $style_map;
+		$this->dynamic_data_converter = $dynamic_data_converter;
 		$this->load_converters();
 	}
 
@@ -114,7 +123,14 @@ class EFS_Element_Factory {
 
 		// Create converter instance (with caching)
 		if ( ! isset( $this->converters[ $converter_class ] ) ) {
-			$this->converters[ $converter_class ] = new $converter_class( $this->style_map );
+			$instance = new $converter_class( $this->style_map );
+
+			// Inject dynamic data converter if available.
+			if ( $this->dynamic_data_converter ) {
+				$instance->set_dynamic_data_converter( $this->dynamic_data_converter );
+			}
+
+			$this->converters[ $converter_class ] = $instance;
 		}
 
 		return $this->converters[ $converter_class ];
@@ -129,6 +145,11 @@ class EFS_Element_Factory {
 	 * @return string|null Gutenberg block HTML
 	 */
 	public function convert_element( $element, $children = array(), $context = array() ) {
+		// Skip hidden elements early — produces no output.
+		if ( ! empty( $element['settings']['_hidden'] ) && true === $element['settings']['_hidden'] ) {
+			return null;
+		}
+
 		$element_type = $element['name'] ?? '';
 
 		if ( empty( $element_type ) ) {
@@ -145,6 +166,168 @@ class EFS_Element_Factory {
 			return null;
 		}
 
-		return $converter->convert( $element, $children, $context );
+		$result = $converter->convert( $element, $children, $context );
+
+		if ( null === $result || '' === $result ) {
+			return $result;
+		}
+
+		// Wrap in loop block if element has hasLoop setting.
+		if ( ! empty( $element['settings']['hasLoop'] ) ) {
+			$result = $this->wrap_in_loop_block( $result, $element );
+		}
+
+		// Wrap in condition block if element has _conditions setting.
+		// Conditions wrap outside loops: "if condition, show the loop".
+		if ( ! empty( $element['settings']['_conditions'] ) && is_array( $element['settings']['_conditions'] ) ) {
+			$result = $this->wrap_in_condition_block( $result, $element );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Wrap block output in an etch/loop block.
+	 *
+	 * @param string $block_html Converted block HTML.
+	 * @param array  $element    Bricks element with query settings.
+	 * @return string Wrapped block HTML.
+	 */
+	private function wrap_in_loop_block( $block_html, $element ) {
+		$loop_params = $this->build_loop_params( $element );
+		$attrs_json  = wp_json_encode( $loop_params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return '<!-- wp:etch/loop ' . $attrs_json . ' -->' . "\n" .
+			$block_html . "\n" .
+			'<!-- /wp:etch/loop -->';
+	}
+
+	/**
+	 * Build Etch loop parameters from Bricks query config.
+	 *
+	 * @param array $element Bricks element.
+	 * @return array Etch loop params.
+	 */
+	private function build_loop_params( $element ) {
+		$settings = $element['settings'] ?? array();
+		$query    = $settings['query'] ?? array();
+
+		$params = array();
+
+		// Object type (post, term, user).
+		if ( ! empty( $query['objectType'] ) ) {
+			$params['objectType'] = (string) $query['objectType'];
+		} else {
+			$params['objectType'] = 'post';
+		}
+
+		// Post type.
+		if ( ! empty( $query['post_type'] ) ) {
+			$params['postType'] = is_array( $query['post_type'] ) ? $query['post_type'] : array( (string) $query['post_type'] );
+		}
+
+		// Posts per page.
+		if ( isset( $query['posts_per_page'] ) ) {
+			$params['postsPerPage'] = (int) $query['posts_per_page'];
+		}
+
+		// Order by.
+		if ( ! empty( $query['orderby'] ) ) {
+			$params['orderBy'] = is_array( $query['orderby'] ) ? implode( ' ', $query['orderby'] ) : (string) $query['orderby'];
+		}
+
+		// Order direction.
+		if ( ! empty( $query['order'] ) ) {
+			$params['order'] = is_array( $query['order'] ) ? implode( ' ', $query['order'] ) : (string) $query['order'];
+		}
+
+		// Taxonomy query.
+		if ( ! empty( $query['tax_query'] ) && is_array( $query['tax_query'] ) ) {
+			$params['taxQuery'] = $query['tax_query'];
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Wrap block output in an etch/condition block.
+	 *
+	 * @param string $block_html Converted block HTML.
+	 * @param array  $element    Bricks element with _conditions settings.
+	 * @return string Wrapped block HTML.
+	 */
+	private function wrap_in_condition_block( $block_html, $element ) {
+		$conditions = $element['settings']['_conditions'];
+		$ast        = $this->build_condition_ast( $conditions );
+
+		if ( empty( $ast ) ) {
+			return $block_html;
+		}
+
+		$attrs      = array( 'conditions' => $ast );
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return '<!-- wp:etch/condition ' . $attrs_json . ' -->' . "\n" .
+			$block_html . "\n" .
+			'<!-- /wp:etch/condition -->';
+	}
+
+	/**
+	 * Build Etch condition AST from Bricks _conditions array.
+	 *
+	 * Supported Bricks conditions are mapped to Etch AST nodes.
+	 * Unsupported/WooCommerce conditions are silently skipped.
+	 *
+	 * @param array $conditions Bricks conditions array.
+	 * @return array Etch condition AST nodes.
+	 */
+	private function build_condition_ast( $conditions ) {
+		$ast = array();
+
+		$condition_map = array(
+			'user_logged_in' => array(
+				'leftHand'  => 'user.loggedIn',
+				'operator'  => 'isTruthy',
+				'rightHand' => null,
+			),
+			'featured_image' => array(
+				'leftHand'  => 'this.featuredImage',
+				'operator'  => 'isTruthy',
+				'rightHand' => null,
+			),
+			'has_children'   => array(
+				'leftHand'  => 'this.children',
+				'operator'  => 'isNotEmpty',
+				'rightHand' => null,
+			),
+			'post_parent'    => array(
+				'leftHand'  => 'this.parent',
+				'operator'  => 'isTruthy',
+				'rightHand' => null,
+			),
+		);
+
+		foreach ( $conditions as $condition ) {
+			$type = $condition['type'] ?? '';
+
+			// Skip WooCommerce conditions.
+			if ( 0 === strpos( $type, 'woo_' ) ) {
+				continue;
+			}
+
+			if ( isset( $condition_map[ $type ] ) ) {
+				$node = $condition_map[ $type ];
+
+				// Handle negation (compare === 'not_equal' or '!=').
+				$compare = $condition['compare'] ?? '';
+				if ( 'not_equal' === $compare || '!=' === $compare ) {
+					$node['negate'] = true;
+				}
+
+				$ast[] = $node;
+			}
+		}
+
+		return $ast;
 	}
 }

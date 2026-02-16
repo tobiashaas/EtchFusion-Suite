@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+// DEPRECATED: WPvivid is no longer part of the standard dev environment.
+// This script is kept for users who still have WPvivid backups to import.
+// It will be removed in a future release.
+console.warn('[DEPRECATED] import-wpvivid-backup.js — WPvivid has been removed from the dev environment.');
+console.warn('This script is provided for legacy backup imports only.\n');
+
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
