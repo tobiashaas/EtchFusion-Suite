@@ -315,6 +315,17 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'discovery_service',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Discovery_Service(
+					$c->get( 'plugin_detector' ),
+					$c->get( 'dynamic_data_converter' ),
+					$c->get( 'error_handler' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'migration_service',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Service(
@@ -329,6 +340,22 @@ class EFS_Service_Provider {
 					$c->get( 'migration_repository' ),
 					$c->get( 'token_manager' )
 				);
+			}
+		);
+
+		$container->singleton(
+			'migration_job_runner',
+			function ( $c ) {
+				$runner = new \Bricks2Etch\Services\EFS_Migration_Job_Runner(
+					$c->get( 'migration_service' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'migrator_registry' )
+				);
+
+				$c->get( 'migration_service' )->set_job_runner( $runner );
+
+				return $runner;
 			}
 		);
 
@@ -484,6 +511,19 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'discovery_ajax',
+			function ( $c ) {
+				return new \Bricks2Etch\Ajax\Handlers\EFS_Discovery_Ajax_Handler(
+					$c->get( 'discovery_service' ),
+					$c->get( 'api_client' ),
+					$c->get( 'rate_limiter' ),
+					$c->get( 'input_validator' ),
+					$c->get( 'audit_logger' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'ajax_handler',
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\EFS_Ajax_Handler(
@@ -494,6 +534,7 @@ class EFS_Service_Provider {
 					$c->get( 'logs_ajax' ),
 					$c->get( 'connection_ajax' ),
 					$c->get( 'cleanup_ajax' ),
+					$c->get( 'discovery_ajax' ),
 					$c->get( 'template_ajax' ),
 					$c->get( 'migration_ajax' )
 				);
@@ -555,7 +596,9 @@ class EFS_Service_Provider {
 			'css_service',
 			'media_service',
 			'content_service',
+			'discovery_service',
 			'migration_service',
+			'migration_job_runner',
 			'settings_controller',
 			'migration_controller',
 			'dashboard_controller',
@@ -567,6 +610,7 @@ class EFS_Service_Provider {
 			'logs_ajax',
 			'connection_ajax',
 			'cleanup_ajax',
+			'discovery_ajax',
 			'template_ajax',
 			'ajax_handler',
 			'admin_interface',
