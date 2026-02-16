@@ -343,7 +343,15 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 					'action' => 'ACF plugin not active, skipping field groups import',
 				)
 			);
-			return new \WP_Error( 'acf_not_active', 'ACF plugin is not active' );
+			$skipped_count = is_array( $field_groups_data ) ? count( $field_groups_data ) : 0;
+
+			return array(
+				'imported_count' => 0,
+				'skipped'        => true,
+				'skipped_count'  => $skipped_count,
+				'warnings'       => array( 'ACF plugin is not active; field groups import was skipped.' ),
+				'errors'         => array(),
+			);
 		}
 
 		if ( empty( $field_groups_data ) || ! is_array( $field_groups_data ) ) {
