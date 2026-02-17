@@ -9,26 +9,9 @@ import {
 } from './migration.js';
 import { initLogs, startAutoRefreshLogs, stopAutoRefreshLogs } from './logs.js';
 import { serializeForm } from './api.js';
-import { init as initTemplateExtractor } from './template-extractor.js';
-
-let templateExtractorInitialized = false;
-
-const ensureTemplateExtractor = () => {
-    if (!window.efsData?.framer_enabled) {
-        return;
-    }
-    if (templateExtractorInitialized) {
-        return;
-    }
-
-    const panel = document.querySelector('[data-efs-tab-panel="templates"]');
-    if (!panel) {
-        return;
-    }
-
-    initTemplateExtractor();
-    templateExtractorInitialized = true;
-};
+import { initEtchDashboard } from './etch-dashboard.js';
+import { initBricksWizard } from './bricks-wizard.js';
+import { initReceivingStatus } from './receiving-status.js';
 
 const bindMigrationForm = () => {
     const form = document.querySelector('[data-efs-migration-form]');
@@ -68,9 +51,6 @@ const bindTabs = () => {
     const tabs = Array.from(tabsRoot.querySelectorAll('[data-efs-tab]'));
     const panels = Array.from(tabsRoot.querySelectorAll('.efs-tab__panel'));
 
-    const isFeatureDisabled = (tab) => tab?.hasAttribute('data-efs-feature-disabled')
-        || tab?.hasAttribute('aria-disabled');
-
     const activateTab = (targetKey) => {
         tabs.forEach((tab) => {
             const isTarget = tab.dataset.efsTab === targetKey;
@@ -86,27 +66,10 @@ const bindTabs = () => {
             panel.classList.toggle('is-active', isTarget);
             panel.toggleAttribute('hidden', !isTarget);
         });
-
-        if (targetKey === 'templates') {
-            ensureTemplateExtractor();
-        }
     };
 
     tabs.forEach((tab) => {
         tab.addEventListener('click', () => {
-            if (isFeatureDisabled(tab)) {
-                tab.setAttribute('aria-disabled', 'true');
-                const targetNotice = document.querySelector('[data-efs-feature-disabled-message]');
-                if (targetNotice) {
-                    targetNotice.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-                showToast(
-                    window.efsData?.i18n?.featureDisabled
-                        || 'This feature is currently disabled. Enable it via EFS_ENABLE_FRAMER or the efs_enable_framer filter.',
-                    'info',
-                );
-                return;
-            }
             activateTab(tab.dataset.efsTab);
         });
     });
@@ -146,6 +109,9 @@ const bootstrap = () => {
     bindMigrationForm();
     initLogs();
     bindTabs();
+    initEtchDashboard();
+    initBricksWizard();
+    initReceivingStatus();
 
     // Resume migration if in progress
     const progress = window.efsData?.progress_data || {};

@@ -2,20 +2,20 @@
   "cookies": [
     {
       "name": "wordpress_23778236db82f19306f247e20a353a99",
-      "value": "admin%7C1763577961%7C2nQx1eZF7ODSNIaqBYRHYnc9F7nxAMyEwithjaJCrbq%7Ccd20805bd70149b49f37b17cb6ab3284a8e6d65f412236428a7f93a06467a4f2",
+      "value": "admin%7C1772493257%7Cc7roG0ybXLoMS7JdK8rNPm8s5Hto4nFonUqXjdpbEe9%7C54eeb479b430a9f68ea2fbe5df3758dd7cb49e2b1f7fdf70feb211e79292524c",
       "domain": "localhost",
       "path": "/wp-content/plugins",
-      "expires": 1763621161.543,
+      "expires": 1772536458.126,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "wordpress_23778236db82f19306f247e20a353a99",
-      "value": "admin%7C1763577961%7C2nQx1eZF7ODSNIaqBYRHYnc9F7nxAMyEwithjaJCrbq%7Ccd20805bd70149b49f37b17cb6ab3284a8e6d65f412236428a7f93a06467a4f2",
+      "value": "admin%7C1772493257%7Cc7roG0ybXLoMS7JdK8rNPm8s5Hto4nFonUqXjdpbEe9%7C54eeb479b430a9f68ea2fbe5df3758dd7cb49e2b1f7fdf70feb211e79292524c",
       "domain": "localhost",
       "path": "/wp-admin",
-      "expires": 1763621161.543,
+      "expires": 1772536458.126,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
@@ -32,30 +32,30 @@
     },
     {
       "name": "wordpress_logged_in_23778236db82f19306f247e20a353a99",
-      "value": "admin%7C1763577961%7C2nQx1eZF7ODSNIaqBYRHYnc9F7nxAMyEwithjaJCrbq%7Ca97a88e22a38364006e1acdc5b4adb887649d842b2a97533b544b25156b53fdb",
+      "value": "admin%7C1772493257%7Cc7roG0ybXLoMS7JdK8rNPm8s5Hto4nFonUqXjdpbEe9%7C2f1e86c22fbfc874103095e000b8d55d33b726a570f8b7c950c2252a967d23ef",
       "domain": "localhost",
       "path": "/",
-      "expires": 1763621161.543,
+      "expires": 1772536458.126,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "wp-settings-1",
-      "value": "libraryContent%3Dbrowse%26editor%3Dtinymce%26posts_list_mode%3Dlist%26mfold%3Do",
+      "value": "posts_list_mode%3Dlist%26editor%3Dtinymce%26libraryContent%3Dbrowse",
       "domain": "localhost",
       "path": "/",
-      "expires": 1793904362.077,
+      "expires": 1802819661.343,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "wp-settings-time-1",
-      "value": "1762368362",
+      "value": "1771283661",
       "domain": "localhost",
       "path": "/",
-      "expires": 1793904362.077,
+      "expires": 1802819661.343,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"

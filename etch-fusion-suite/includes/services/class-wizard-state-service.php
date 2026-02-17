@@ -50,7 +50,17 @@ class EFS_Wizard_State_Service {
 		$key    = $this->get_transient_key( $user_id, $nonce );
 		$stored = set_transient( $key, $merged, self::EXPIRATION );
 
-		return $stored ? $merged : false;
+		if ( $stored ) {
+			return $merged;
+		}
+
+		// set_transient() can return false when the value is unchanged; treat that as success.
+		$existing = get_transient( $key );
+		if ( is_array( $existing ) && $this->normalize_state( $existing ) === $merged ) {
+			return $merged;
+		}
+
+		return false;
 	}
 
 	/**
@@ -169,6 +179,14 @@ class EFS_Wizard_State_Service {
 			$merged['migration_url'] = $incoming['migration_url'];
 		}
 
+		if ( array_key_exists( 'migration_key', $incoming ) ) {
+			$merged['migration_key'] = $incoming['migration_key'];
+		}
+
+		if ( array_key_exists( 'target_url', $incoming ) ) {
+			$merged['target_url'] = $incoming['target_url'];
+		}
+
 		if ( array_key_exists( 'discovery_data', $incoming ) ) {
 			$merged['discovery_data'] = is_array( $incoming['discovery_data'] ) ? $incoming['discovery_data'] : array();
 		}
@@ -210,6 +228,8 @@ class EFS_Wizard_State_Service {
 		}
 
 		$migration_url = isset( $state['migration_url'] ) ? esc_url_raw( (string) $state['migration_url'] ) : '';
+		$migration_key = isset( $state['migration_key'] ) ? sanitize_text_field( (string) $state['migration_key'] ) : '';
+		$target_url    = isset( $state['target_url'] ) ? esc_url_raw( (string) $state['target_url'] ) : '';
 		$discovery     = isset( $state['discovery_data'] ) && is_array( $state['discovery_data'] ) ? $this->sanitize_recursive( $state['discovery_data'] ) : array();
 		$selected      = isset( $state['selected_post_types'] ) && is_array( $state['selected_post_types'] ) ? array_values( array_map( 'sanitize_key', $state['selected_post_types'] ) ) : array();
 		$mappings      = isset( $state['post_type_mappings'] ) && is_array( $state['post_type_mappings'] ) ? $this->sanitize_recursive( $state['post_type_mappings'] ) : array();
@@ -225,6 +245,8 @@ class EFS_Wizard_State_Service {
 
 		$normalized['current_step']        = $current_step;
 		$normalized['migration_url']       = $migration_url;
+		$normalized['migration_key']       = $migration_key;
+		$normalized['target_url']          = $target_url;
 		$normalized['discovery_data']      = $discovery;
 		$normalized['selected_post_types'] = $selected;
 		$normalized['post_type_mappings']  = $mappings;
@@ -243,6 +265,8 @@ class EFS_Wizard_State_Service {
 		return array(
 			'current_step'        => 1,
 			'migration_url'       => '',
+			'migration_key'       => '',
+			'target_url'          => '',
 			'discovery_data'      => array(),
 			'selected_post_types' => array(),
 			'post_type_mappings'  => array(),

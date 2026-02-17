@@ -43,11 +43,18 @@ class EFS_Dashboard_Controller {
 			'is_etch_site'   => $this->plugin_detector->is_etch_active(),
 			'site_url'       => home_url(),
 			'is_https'       => is_ssl(),
+			'wp_version'     => get_bloginfo( 'version' ),
+			'php_version'    => phpversion(),
 		);
 	}
 
 	public function get_dashboard_context() {
 		$env = $this->detect_environment();
+		$env['etch_version'] = '';
+		if ( ! empty( $env['is_etch_site'] ) && method_exists( $this->plugin_detector, 'get_plugin_versions' ) ) {
+			$versions = $this->plugin_detector->get_plugin_versions();
+			$env['etch_version'] = isset( $versions['etch'] ) ? sanitize_text_field( (string) $versions['etch'] ) : '';
+		}
 
 		$progress_context = $this->get_progress();
 
@@ -71,12 +78,16 @@ class EFS_Dashboard_Controller {
 		return array(
 			'is_bricks_site'             => $env['is_bricks_site'],
 			'is_etch_site'               => $env['is_etch_site'],
+			'etch_version'               => isset( $env['etch_version'] ) ? $env['etch_version'] : '',
 			'site_url'                   => $env['site_url'],
 			'is_https'                   => $env['is_https'],
+			'wp_version'                 => isset( $env['wp_version'] ) ? $env['wp_version'] : '',
+			'php_version'                => isset( $env['php_version'] ) ? $env['php_version'] : '',
 			'logs'                       => $this->get_logs(),
 			'progress_data'              => $progress_context['progress'],
 			'progress_steps'             => $progress_context['steps'],
 			'migration_id'               => isset( $progress_context['migrationId'] ) ? $progress_context['migrationId'] : '',
+			'completed'                  => isset( $progress_context['completed'] ) ? (bool) $progress_context['completed'] : false,
 			'in_progress_migration'      => $this->detect_in_progress_migration(),
 			'settings'                   => $this->get_settings(),
 			'nonce'                      => wp_create_nonce( 'efs_nonce' ),
@@ -205,12 +216,20 @@ class EFS_Dashboard_Controller {
 		return array(
 			'is_bricks_site'             => isset( $data['is_bricks_site'] ) ? (bool) $data['is_bricks_site'] : false,
 			'is_etch_site'               => isset( $data['is_etch_site'] ) ? (bool) $data['is_etch_site'] : false,
+			'etch_version'               => isset( $data['etch_version'] ) ? sanitize_text_field( $data['etch_version'] ) : '',
 			'site_url'                   => isset( $data['site_url'] ) ? esc_url( $data['site_url'] ) : home_url(),
 			'is_https'                   => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
+			'wp_version'                 => isset( $data['wp_version'] ) ? sanitize_text_field( $data['wp_version'] ) : get_bloginfo( 'version' ),
+			'php_version'                => isset( $data['php_version'] ) ? sanitize_text_field( $data['php_version'] ) : phpversion(),
 			'logs'                       => isset( $data['logs'] ) && is_array( $data['logs'] ) ? $data['logs'] : array(),
 			'progress_data'              => isset( $data['progress_data'] ) && is_array( $data['progress_data'] ) ? $data['progress_data'] : $this->get_default_progress(),
 			'progress_steps'             => isset( $data['progress_steps'] ) && is_array( $data['progress_steps'] ) ? $data['progress_steps'] : array(),
 			'migration_id'               => isset( $data['migration_id'] ) ? sanitize_text_field( $data['migration_id'] ) : '',
+			'completed'                  => isset( $data['completed'] ) ? (bool) $data['completed'] : false,
+			'in_progress_migration'      => isset( $data['in_progress_migration'] ) && is_array( $data['in_progress_migration'] ) ? $data['in_progress_migration'] : array(
+				'migrationId' => '',
+				'resumable'   => false,
+			),
 			'settings'                   => isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array(),
 			'nonce'                      => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
 			'saved_templates'            => isset( $data['saved_templates'] ) && is_array( $data['saved_templates'] ) ? $data['saved_templates'] : array(),
@@ -297,6 +316,9 @@ class EFS_Dashboard_Controller {
 			'nonce'              => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
 			'is_https'           => isset( $data['is_https'] ) ? (bool) $data['is_https'] : is_ssl(),
 			'site_url'           => esc_url( $site_url ),
+			'etch_version'       => isset( $data['etch_version'] ) ? sanitize_text_field( $data['etch_version'] ) : '',
+			'php_version'        => isset( $data['php_version'] ) ? sanitize_text_field( $data['php_version'] ) : phpversion(),
+			'wp_version'         => isset( $data['wp_version'] ) ? sanitize_text_field( $data['wp_version'] ) : get_bloginfo( 'version' ),
 			'key_context'        => 'etch',
 			'migration_key_args' => array(
 				'context'  => 'etch',

@@ -55,17 +55,50 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from the migration key.', 'etch-fusion-suite' ) );
 		}
 
-		$result = $this->manager->start_migration( $migration_key, $target_url, $batch );
+		$options = array(
+			'selected_post_types' => array(),
+			'post_type_mappings'  => array(),
+		);
+		if ( ! empty( $data['selected_post_types'] ) && is_array( $data['selected_post_types'] ) ) {
+			$options['selected_post_types'] = array_map( 'sanitize_key', $data['selected_post_types'] );
+		}
+		if ( ! empty( $data['post_type_mappings'] ) && is_array( $data['post_type_mappings'] ) ) {
+			foreach ( $data['post_type_mappings'] as $source => $target ) {
+				$options['post_type_mappings'][ sanitize_key( (string) $source ) ] = sanitize_key( (string) $target );
+			}
+		}
+
+		$nonce = isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : '';
+		$result = $this->manager->start_migration_async( $migration_key, $target_url, $batch, $options, $nonce );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 		return array(
-			'message'    => __( 'Migration started.', 'etch-fusion-suite' ),
+			'message'    => isset( $result['message'] ) ? $result['message'] : __( 'Migration started.', 'etch-fusion-suite' ),
 			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
 			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
 			'token'       => $migration_key,
 		);
+	}
+
+	/**
+	 * Run migration execution in background (called by efs_run_migration_background).
+	 *
+	 * @param string $migration_id
+	 * @param string $bg_token One-time token from transient.
+	 * @return array|\WP_Error
+	 */
+	public function run_migration_execution( $migration_id = '', $bg_token = '' ) {
+		if ( '' === $migration_id || '' === $bg_token ) {
+			return new \WP_Error( 'invalid_request', __( 'Missing migration ID or token.', 'etch-fusion-suite' ) );
+		}
+		$stored = get_transient( 'efs_bg_' . $migration_id );
+		if ( false === $stored || $stored !== $bg_token ) {
+			return new \WP_Error( 'invalid_token', __( 'Invalid or expired background token.', 'etch-fusion-suite' ) );
+		}
+		delete_transient( 'efs_bg_' . $migration_id );
+		return $this->manager->run_migration_execution( $migration_id );
 	}
 
 	public function get_progress( array $data = array() ) {

@@ -1,7 +1,20 @@
 import { FullConfig } from '@playwright/test';
-import { saveLogs } from '../../scripts/save-logs.js';
 import path from 'path';
 import fs from 'fs';
+
+type SavedLogFile = {
+  path: string;
+};
+
+type SaveLogsReport = {
+  totalSize: string;
+  timestamp: string;
+  files: SavedLogFile[];
+};
+
+const { saveLogs } = require('../../scripts/save-logs.js') as {
+  saveLogs: (lines?: number, compress?: boolean) => Promise<SaveLogsReport>;
+};
 
 async function globalTeardown(config: FullConfig) {
   console.log('\\n🧹 Playwright Global Teardown - Cleaning up after tests...');

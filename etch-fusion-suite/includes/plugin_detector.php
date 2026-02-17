@@ -290,7 +290,7 @@ class EFS_Plugin_Detector {
 
 		// Etch version
 		if ( $this->is_etch_active() ) {
-			$versions['etch'] = defined( 'ETCH_VERSION' ) ? ETCH_VERSION : 'Unknown';
+			$versions['etch'] = $this->get_etch_version();
 		}
 
 		// ACF version
@@ -309,6 +309,53 @@ class EFS_Plugin_Detector {
 		}
 
 		return $versions;
+	}
+
+	/**
+	 * Get Etch PageBuilder version with fallbacks when ETCH_VERSION is not defined.
+	 *
+	 * @return string Version string or 'Unknown'.
+	 */
+	private function get_etch_version() {
+		if ( defined( 'ETCH_VERSION' ) && ETCH_VERSION !== '' ) {
+			return ETCH_VERSION;
+		}
+
+		if ( class_exists( 'Etch\Plugin' ) ) {
+			try {
+				$ref = new \ReflectionClass( 'Etch\Plugin' );
+				if ( $ref->hasConstant( 'VERSION' ) ) {
+					$v = $ref->getConstant( 'VERSION' );
+					if ( is_string( $v ) && $v !== '' ) {
+						return $v;
+					}
+				}
+			} catch ( \Exception $e ) {
+				// Fall through to next method.
+			}
+		}
+
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$all_plugins = get_plugins();
+		foreach ( $all_plugins as $file => $info ) {
+			$name = isset( $info['Name'] ) ? $info['Name'] : '';
+			if ( stripos( $name, 'Etch' ) === false ) {
+				continue;
+			}
+			$path = WP_PLUGIN_DIR . '/' . $file;
+			if ( ! is_readable( $path ) ) {
+				continue;
+			}
+			$data = get_plugin_data( $path, false, false );
+			if ( ! empty( $data['Version'] ) ) {
+				return $data['Version'];
+			}
+		}
+
+		return 'Unknown';
 	}
 
 	/**

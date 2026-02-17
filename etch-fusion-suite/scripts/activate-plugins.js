@@ -495,7 +495,6 @@ async function main() {
   await ensurePluginFromZip('cli', 'acss-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
   await ensurePluginFromZip('cli', 'wpvivid-latest.zip', ['wpvivid-backup-pro']);
   await ensureThemeFromZip('cli', 'bricks-latest.zip', ['bricks']);
-  await ensureThemeFromZip('cli', 'bricks-child-latest.zip', ['bricks-child']);
 
   await ensurePluginFromZip('tests-cli', 'etch-latest.zip', ['etch']);
   await ensurePluginFromZip('tests-cli', 'acss-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
@@ -512,8 +511,7 @@ async function main() {
   const expectedActivations = { cli: [], 'tests-cli': [] };
 
   const bricksThemeSlug = findThemeSlug(devThemes, ['bricks']);
-  const bricksChildSlug = findThemeSlug(devThemes, ['bricks-child']);
-  const preferredDevTheme = bricksChildSlug || bricksThemeSlug;
+  const preferredDevTheme = bricksThemeSlug;
 
   if (preferredDevTheme) {
     tasks.push({
@@ -661,7 +659,7 @@ async function main() {
     console.log('\nCleaning defaults (themes/plugins/demo content)...');
     await removeDefaultPlugins('cli');
     await removeDefaultPlugins('tests-cli');
-    await removeUnneededThemes('cli', ['bricks', 'bricks-child']);
+    await removeUnneededThemes('cli', ['bricks']);
     await removeUnneededThemes('tests-cli', ['etch-theme']);
     await removeDemoContentIfFresh('cli');
     await removeDemoContentIfFresh('tests-cli');

@@ -76,6 +76,38 @@ class EFS_Admin_Interface {
 			);
 		}
 
+		$etch_css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin/etch-dashboard.css';
+		if ( file_exists( $etch_css_path ) ) {
+			$etch_css_version = ETCH_FUSION_SUITE_VERSION;
+			$etch_css_mtime   = filemtime( $etch_css_path );
+			if ( false !== $etch_css_mtime ) {
+				$etch_css_version = $etch_css_mtime;
+			}
+
+			wp_enqueue_style(
+				'efs-admin-etch-dashboard',
+				ETCH_FUSION_SUITE_URL . 'assets/css/admin/etch-dashboard.css',
+				array( 'efs-admin-css' ),
+				$etch_css_version
+			);
+		}
+
+		$bricks_wizard_css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin/bricks-wizard.css';
+		if ( file_exists( $bricks_wizard_css_path ) ) {
+			$bricks_wizard_css_version = ETCH_FUSION_SUITE_VERSION;
+			$bricks_wizard_css_mtime   = filemtime( $bricks_wizard_css_path );
+			if ( false !== $bricks_wizard_css_mtime ) {
+				$bricks_wizard_css_version = $bricks_wizard_css_mtime;
+			}
+
+			wp_enqueue_style(
+				'efs-admin-bricks-wizard',
+				ETCH_FUSION_SUITE_URL . 'assets/css/admin/bricks-wizard.css',
+				array( 'efs-admin-css' ),
+				$bricks_wizard_css_version
+			);
+		}
+
 		// Enqueue admin JavaScript (ES6 module)
 		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
 		if ( file_exists( $js_path ) ) {

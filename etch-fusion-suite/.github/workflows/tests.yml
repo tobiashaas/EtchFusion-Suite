@@ -108,12 +108,26 @@ jobs:
             package-lock.json
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm install
         working-directory: etch-fusion-suite
 
-      - name: Skip Playwright tests in CI/CD
-        run: |
-          echo "🤖 CI/CD environment detected - skipping Playwright tests"
-          echo "🎯 CI/CD focuses on code quality (PHPCS + PHPUnit)"
-          echo "🧪 Run WordPress integration tests locally with: npm run e2e:start && npm run test:migration"
+      - name: Install Playwright browsers
+        run: npm run playwright:install
+        working-directory: etch-fusion-suite
+
+      - name: Start wp-env for Playwright
+        run: npm run e2e:start
+        working-directory: etch-fusion-suite
+
+      - name: Wait for wp-env readiness
+        run: npm run e2e:wait
+        working-directory: etch-fusion-suite
+
+      - name: Run admin dashboard Playwright specs
+        run: npm run test:playwright:admin-dashboard
+        working-directory: etch-fusion-suite
+
+      - name: Stop wp-env
+        if: always()
+        run: npm run e2e:stop
         working-directory: etch-fusion-suite

@@ -99,9 +99,39 @@ class EFS_Migration_Manager {
 
 	/**
 	 * Start migration process
+	 *
+	 * @param string       $migration_key Migration key (JWT).
+	 * @param string|null  $target_url    Target site URL.
+	 * @param int|null     $batch_size    Batch size.
+	 * @param array        $options       Optional. selected_post_types, post_type_mappings, etc.
+	 * @return array|\WP_Error
 	 */
-	public function start_migration( $migration_key, $target_url = null, $batch_size = null ) {
-		return $this->migration_service->start_migration( $migration_key, $target_url, $batch_size );
+	public function start_migration( $migration_key, $target_url = null, $batch_size = null, $options = array() ) {
+		return $this->migration_service->start_migration( $migration_key, $target_url, $batch_size, $options );
+	}
+
+	/**
+	 * Start migration asynchronously (returns immediately; execution runs in background).
+	 *
+	 * @param string       $migration_key Migration key (JWT).
+	 * @param string|null  $target_url    Target site URL.
+	 * @param int|null     $batch_size    Batch size.
+	 * @param array        $options       selected_post_types, post_type_mappings, etc.
+	 * @param string       $nonce         Nonce for spawning background request (optional).
+	 * @return array|\WP_Error
+	 */
+	public function start_migration_async( $migration_key, $target_url = null, $batch_size = null, $options = array(), $nonce = '' ) {
+		return $this->migration_service->start_migration_async( $migration_key, $target_url, $batch_size, $options, $nonce );
+	}
+
+	/**
+	 * Run the long-running migration steps (called by background AJAX).
+	 *
+	 * @param string $migration_id
+	 * @return array|\WP_Error
+	 */
+	public function run_migration_execution( $migration_id = '' ) {
+		return $this->migration_service->run_migration_execution( $migration_id );
 	}
 
 	/**

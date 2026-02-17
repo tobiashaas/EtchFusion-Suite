@@ -366,10 +366,29 @@ tests/playwright/
 
 ```bash
 npm run test:playwright              # Run all tests
+npm run test:playwright:admin-dashboard # Run wizard + receiving integration specs
 npm run test:playwright -- --headed  # Run with browser UI
 npm run test:playwright -- --debug   # Debug mode
 npm run test:playwright:ui          # Open Playwright UI
 ```
+
+#### Admin Dashboard Redesign Integration
+
+The redesign-specific integration specs are:
+
+- `tests/playwright/admin-dashboard-wizard.spec.ts`
+- `tests/playwright/admin-dashboard-receiving.spec.ts`
+
+Coverage focus:
+
+- Bricks wizard state progression and validation
+- Discovery/mapping preview transitions
+- Migration progress completion rendering
+- Etch receiving-state takeover transitions (`receiving`, `completed`, `stale`)
+
+Release gating and rollback steps are documented in:
+
+- `docs/admin-dashboard-deployment-checklist.md`
 
 #### Test Projects
 
