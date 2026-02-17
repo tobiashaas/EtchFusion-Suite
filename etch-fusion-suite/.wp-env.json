@@ -11,7 +11,7 @@
     "WP_DEBUG_LOG": true,
     "WP_DEBUG_DISPLAY": false,
     "SCRIPT_DEBUG": true,
-    "SAVEQUERIES": true,
+    "SAVEQUERIES": false,
     "WP_MEMORY_LIMIT": "512M",
     "WP_MAX_MEMORY_LIMIT": "512M"
   },
@@ -23,7 +23,7 @@
       "config": {
         "WP_ENVIRONMENT_TYPE": "local",
         "SCRIPT_DEBUG": true,
-        "SAVEQUERIES": true,
+        "SAVEQUERIES": false,
         "WP_MEMORY_LIMIT": "512M"
       }
     },
@@ -31,7 +31,7 @@
       "config": {
         "WP_ENVIRONMENT_TYPE": "test",
         "SCRIPT_DEBUG": true,
-        "SAVEQUERIES": true,
+        "SAVEQUERIES": false,
         "WP_MEMORY_LIMIT": "512M"
       }
     }

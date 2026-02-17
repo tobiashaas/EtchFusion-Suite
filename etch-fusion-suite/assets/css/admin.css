@@ -44,28 +44,24 @@
 	--e-content-gap: var(--e-space-m);
 	--e-panel-gap: var(--e-space-s);
 
-	/* New colors */
-	--e-primary: oklch(85.19% 0.0856 186.39);
-	--e-primary-dark: color-mix(in srgb, var(--e-primary) 30%, black);
+	/* Dashboard colors (screenshot-aligned) */
+	--e-page-background: #1a1a1a;
+	--e-primary: hsl(165, 48%, 42%);
+	--e-primary-dark: hsl(165, 48%, 32%);
 	--e-secondary: #a4917d;
-	/* Generic Light */
-	--e-light: hsl(240, 7%, 89%);
-	/* Highlight */
+	/* Text */
+	--e-light: #ffffff;
+	--e-foreground-color: var(--e-light);
+	--e-foreground-color-muted: #b0b0b0;
+	/* Surfaces */
 	--e-highlight: #252525;
 	--e-highlight-light: #191919;
-	/* Base */
-	--e-base: hsl(240, 5%, 16%);
-	--e-base-ultra-light: hsl(240, 3%, 30%);
-	--e-base-light: hsl(240, 4%, 22%);
-	--e-base-dark: hsl(240, 6%, 12%);
+	--e-base: #2c2c2c;
+	--e-base-ultra-light: #444444;
+	--e-base-light: #333333;
+	--e-base-dark: #222222;
 	/* Contextual */
 	--e-panel-background-color: var(--e-base);
-	--e-foreground-color: var(--e-light);
-	--e-foreground-color-muted: color-mix(
-		in lab,
-		var(--e-light),
-		transparent 35%
-	);
 
 	--e-success: #46b450;
 	--e-success-soft: color-mix(in srgb, var(--e-success) 12%, white 88%);
@@ -89,26 +85,29 @@
 	--e-dynamic: hsl(231, 67%, 73%);
 	--e-dynamic-dark: hsl(231, 32%, 40%);
 
-	--e-surface-subtle: color-mix(in srgb, var(--e-base) 80%, black 20%);
-	--e-surface-soft: color-mix(in srgb, var(--e-base) 70%, white 30%);
-	--e-divider-soft: color-mix(in srgb, var(--e-base-light) 30%, transparent);
+	--e-surface-subtle: #2a2a2a;
+	--e-surface-soft: #383838;
+	--e-divider-soft: rgba(255, 255, 255, 0.08);
+	--e-divider-color: #444444;
 
 	/* Borders & Dividers */
 	--e-border: var(--e-border-width) var(--e-border-style)
 		var(--e-border-color);
 	--e-border-ultra-light: var(--e-border-width) var(--e-border-style)
-		var(--e-base-ultra-light);
-	--e-border-color: var(--e-base-light);
-	--e-border-color-ultra-light: var(--e-base-ultra-light);
-	--e-border-color-muted: color-mix(
-		in lab,
-		var(--e-base-ultra-light),
-		transparent 50%
-	);
+		rgba(255, 255, 255, 0.2);
+	--e-border-color: #444444;
+	--e-border-color-ultra-light: rgba(255, 255, 255, 0.2);
+	--e-border-color-muted: rgba(255, 255, 255, 0.15);
 	--e-border-style: solid;
 	--e-border-width: 1px;
 	--e-border-radius: 6px;
-	--e-divider-color: hsl(240, 2%, 25%);
+
+	/* Unified card design (match Etch dashboard) */
+	--e-card-bg: #2a2a2a;
+	--e-card-radius: 8px;
+	--e-card-padding: 32px;
+	--e-card-border: #3a3a3a;
+	--e-text-secondary: #a0a0a0;
 }
 
 h1 {
@@ -145,56 +144,78 @@ h1 {
     flex: 1;
 }
 
-/* Cards - Etch Dark Theme */
+/* Cards - unified design (match Etch dashboard) */
 .efs-card {
-    display: flex;
-    inline-size: 100%;
-    gap: var(--e-content-gap);
-    flex-direction: column;
-    background: var(--e-base);
-    border: var(--e-border-width) var(--e-border-style) var(--e-border-color);
-    border-radius: var(--e-border-radius);
-    padding: var(--e-space-m) var(--e-space-l);
-    color: var(--e-light);
+	display: flex;
+	flex-direction: column;
+	gap: var(--e-content-gap);
+	inline-size: 100%;
+	background: var(--e-card-bg);
+	border: 1px solid var(--e-card-border);
+	border-radius: var(--e-card-radius);
+	padding: var(--e-card-padding);
+	color: var(--e-light);
 }
 
-.efs-card h2, .efs-card h3 {
-    margin-top: 0;
-    color: var(--e-light);
-    font-family: 'Inter', sans-serif;
-    font-weight: 300;
+.efs-card p,
+.efs-card h1,
+.efs-card h2,
+.efs-card h3,
+.efs-card h4,
+.efs-card label,
+.efs-card dt,
+.efs-card dd,
+.efs-card .description,
+.efs-card .efs-card__subtitle {
+	margin: 0;
+}
+
+.efs-card h2,
+.efs-card h3 {
+	font-size: 20px;
+	font-weight: 600;
+	color: #ffffff;
+}
+
+.efs-card h3 {
+	font-size: 16px;
+}
+
+.efs-card__header {
+	display: flex;
+	flex-direction: column;
+	gap: var(--e-space-s);
+	padding-bottom: var(--e-space-l);
+	border-bottom: 1px solid var(--e-card-border);
+}
+
+.efs-card__header p,
+.efs-card .efs-card__subtitle {
+	font-size: 14px;
+	color: var(--e-text-secondary);
+	line-height: 1.4;
 }
 
 .efs-card__section {
-	display: grid;
+	display: flex;
+	flex-direction: column;
 	gap: var(--e-space-m);
-	margin-bottom: var(--e-space-l);
-	padding-bottom: var(--e-space-l);
-	border-bottom: var(--e-border-width) var(--e-border-style) var(--e-border-color-muted);
-}
-
-.efs-card__section:last-child {
-	margin-bottom: 0;
 	padding-bottom: 0;
 	border-bottom: none;
 }
 
-.efs-card__section h3 {
-	margin: 0;
-	font-size: 16px;
-	font-weight: 400;
-	color: var(--e-light);
+.efs-card__section:last-child {
+	padding-bottom: 0;
 }
 
 /* Progress Bar - Etch Style */
 .efs-progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--e-base-ultra-light);
-    border-radius: var(--e-border-radius);
-    overflow: hidden;
-    margin: var(--e-space-m) 0;
-    border: var(--e-border-width) var(--e-border-style)  var(--e-border-color-ultra-light);
+	width: 100%;
+	height: 8px;
+	background: var(--e-base-ultra-light);
+	border-radius: 4px;
+	overflow: hidden;
+	border: 1px solid var(--e-card-border);
 }
 
 .efs-progress-fill {
@@ -223,19 +244,18 @@ h1 {
     100% { transform: translateX(100%); }
 }
 
-/* Card spacing */
-.efs-card__header,
+.efs-card__header:has(.efs-card__actions) {
+	flex-direction: row;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+}
+
 .efs-card__footer {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	gap: var(--e-space-m);
-}
-
-.efs-card__subtitle {
-	margin: 0;
-	color: var(--e-foreground-color-muted);
-	font-size: 13px;
 }
 
 .efs-card__actions {
@@ -244,44 +264,46 @@ h1 {
 	gap: var(--e-space-s);
 }
 
-/* Tabs */
-.efs-dashboard-tabs {
-	margin-top: var(--e-space-l);
+/* Tabs - unified design */
+.efs-admin-wrap .efs-dashboard-tabs {
+	display: flex;
+	flex-direction: column;
+	gap: var(--e-space-l);
 }
 
 .efs-tabs__nav {
 	display: inline-flex;
 	flex-wrap: wrap;
 	gap: var(--e-space-s);
-	margin-bottom: var(--e-space-m);
 }
 
 .efs-tab {
-	padding: var(--e-space-s) var(--e-space-m);
-	border-radius: var(--e-border-radius);
-	border: var(--e-border);
-	background: var(--e-base-dark);
-	color: var(--e-light);
+	padding: 10px 20px;
+	border-radius: 4px;
+	border: none;
+	background: #3a3a3a;
+	color: #e0e0e0;
 	font-size: 14px;
+	font-weight: 500;
 	cursor: pointer;
-	transition: background 0.2s ease, color 0.2s ease;
+	transition: background 0.2s, color 0.2s;
 }
 
 .efs-tab:hover {
-	background: var(--e-base-light);
+	background: #4a4a4a;
+	color: #ffffff;
 }
 
 .efs-tab.is-active {
-	background: var(--e-primary);
-	color: var(--e-base-dark);
-	border-color: transparent;
+	background: #4a9d8f;
+	color: #ffffff;
 }
 
 .efs-tab__panel {
-	border-radius: var(--e-border-radius);
-	background: var(--e-base);
-	border: var(--e-border);
-	padding: var(--e-space-l);
+	border-radius: var(--e-card-radius);
+	background: var(--e-card-bg);
+	border: 1px solid var(--e-card-border);
+	padding: var(--e-card-padding);
 	transition: opacity 0.2s ease;
 }
 
@@ -319,26 +341,23 @@ h1 {
 }
 
 .efs-empty-state h3 {
-	margin: 0;
+	color: var(--e-light);
 }
 
 .efs-empty-state p {
-	margin: 0;
-	color: var(--e-foreground-color-muted);
+	color: var(--e-text-secondary);
 }
 
 /* Progress Text */
 [data-efs-current-step] {
-	color: var(--e-foreground-color-muted);
+	color: var(--e-text-secondary);
 	font-style: italic;
-	margin: 0;
 }
 
 /* Migration Steps */
 .efs-steps {
 	list-style: none;
 	padding: 0;
-	margin: var(--e-space-m) 0 0;
 	display: grid;
 	gap: var(--e-space-xs);
 }
@@ -386,10 +405,9 @@ h1 {
 	display: grid;
 	gap: var(--e-space-s);
 	padding: var(--e-space-m);
-	margin-bottom: var(--e-space-s);
-	border-radius: var(--e-border-radius);
+	border-radius: 4px;
 	background: var(--e-base-dark);
-	border: var(--e-border-width) var(--e-border-style) var(--e-border-color-ultra-light);
+	border: 1px solid var(--e-card-border);
 	color: var(--e-light);
 }
 
@@ -506,6 +524,44 @@ h1 {
 	margin: 0;
 }
 
+/* Unified button styles in admin (match Etch dashboard) */
+.efs-admin-wrap .button-primary,
+.efs-admin-wrap .efs-button {
+	background: #4a9d8f;
+	color: #ffffff;
+	border: none;
+	border-radius: 4px;
+	padding: 10px 20px;
+	font-size: 14px;
+	font-weight: 500;
+	transition: background 0.2s;
+}
+
+.efs-admin-wrap .button-primary:hover,
+.efs-admin-wrap .button-primary:focus,
+.efs-admin-wrap .efs-button:hover,
+.efs-admin-wrap .efs-button:focus {
+	background: #3d8577;
+	color: #ffffff;
+}
+
+.efs-admin-wrap .button-secondary,
+.efs-admin-wrap .button:not(.button-primary) {
+	background: #3a3a3a;
+	color: #e0e0e0;
+	border: none;
+	border-radius: 4px;
+	padding: 10px 20px;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+.efs-admin-wrap .button-secondary:hover,
+.efs-admin-wrap .button:not(.button-primary):hover {
+	background: #4a4a4a;
+	color: #ffffff;
+}
+
 /* Migration key component */
 .efs-migration-key {
 	display: grid;
@@ -570,7 +626,7 @@ h1 {
     background-color: var(--e-primary);
     border-radius: var(--e-border-radius);
     border: var(--e-border);
-    color: var(--e-base-dark);
+    color: #ffffff;
     padding: var(--e-space-m) var(--e-space-l);
     cursor: pointer;
     text-decoration: none;
@@ -757,22 +813,21 @@ h1 {
 
 /* WordPress Admin Integration */
 #wpwrap {
-	background-color: var(--e-base);
+	background-color: var(--e-page-background);
 }
 
 .wrap {
 	color: var(--e-light);
 }
 
-.wrap h1 {
-	font-size: 23px;
-	font-weight: 400;
+.wrap h1,
+.efs-page-title {
+	font-size: 28px;
+	font-weight: 600;
 	margin: 0;
-	padding: 9px 0 4px;
+	padding: 0;
 	line-height: 1.3;
-	font-family: 'Inter', monospace;
-	color: var(--e-light);
-	font-weight: 300;
+	color: #ffffff;
 }
 
 .efs-card *,
@@ -816,12 +871,18 @@ textarea[readonly] {
 	border: 1px solid var(--e-border-color-ultra-light);
 }
 
-/* Admin Wrap & Header */
+/* Admin Wrap — boxed/centered layout (ref: Etch Site Setup, max-width 800px) */
 .efs-admin-wrap {
-    max-width: 1200px;
-    margin: 0;
-    padding: var(--e-space-l);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    max-width: 800px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 40px var(--e-space-l);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .efs-header {
@@ -962,7 +1023,7 @@ textarea {
 
 .efs-toast.info {
     background: var(--e-primary);
-    color: var(--e-base-dark);
+    color: #ffffff;
 }
 
 /* Key Display */
@@ -978,14 +1039,67 @@ textarea {
     margin: var(--e-space-s) 0;
 }
 
+/* Standalone Environment Summary (Bricks-only) - match Etch card design */
+.efs-environment--standalone {
+	display: flex;
+	flex-direction: column;
+	gap: var(--e-space-s);
+	background: var(--e-card-bg);
+	border: 1px solid var(--e-card-border);
+	border-radius: var(--e-card-radius);
+	padding: var(--e-card-padding);
+}
+
+.efs-environment--standalone h2,
+.efs-environment--standalone p {
+	margin: 0;
+}
+
+.efs-environment--standalone h2 {
+	font-size: 20px;
+	font-weight: 600;
+	color: #ffffff;
+}
+
+.efs-status-list {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: var(--e-space-s) var(--e-space-m);
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.efs-status-list li {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 4px var(--e-space-s);
+	align-items: baseline;
+}
+
+.efs-status-label {
+	font-size: 13px;
+	color: var(--e-text-secondary);
+}
+
+.efs-status-value {
+	font-size: 13px;
+	color: var(--e-light);
+}
+
+@media (max-width: 782px) {
+	.efs-status-list {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
 /* Status Badges */
 .efs-status {
-    padding: var(--e-space-s) var(--e-space-m);
-    border-radius: var(--e-border-radius);
-    font-size: 12px;
-    font-weight: 500;
-    display: inline-block;
-    margin-top: var(--e-space-s);
+	padding: var(--e-space-s) var(--e-space-m);
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+	display: inline-block;
 }
 
 .efs-status.success {
@@ -1003,12 +1117,12 @@ textarea {
     color: var(--e-warning);
 }
 
-/* Override WordPress default styles */
+/* Override WordPress default styles (exclude overlay popup inner so its background is not overridden) */
 .wrap,
 .wrap h2,
 .wrap h3,
 .wrap p,
-.wrap div,
+.wrap div:not(.efs-etch-receiving-takeover__inner),
 .wrap span {
     background: transparent;
 }

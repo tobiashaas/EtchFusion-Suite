@@ -103,10 +103,11 @@ class EFS_Migration_Service {
 	 * @param string $migration_key
 	 * @param string|null $target_url
 	 * @param int|null    $batch_size
+	 * @param array       $options       Optional. selected_post_types, post_type_mappings.
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function start_migration( $migration_key, $target_url = null, $batch_size = null ) {
+	public function start_migration( $migration_key, $target_url = null, $batch_size = null, $options = array() ) {
 		try {
 			$in_progress = $this->detect_in_progress_migration();
 			if ( ! empty( $in_progress['migrationId'] ) && empty( $in_progress['is_stale'] ) ) {
@@ -147,6 +148,7 @@ class EFS_Migration_Service {
 					'batch_size'    => $batch_size,
 					'issued_at'     => $payload['iat'] ?? time(),
 					'expires_at'    => $expires,
+					'options'       => $options,
 				)
 			);
 
@@ -202,7 +204,9 @@ class EFS_Migration_Service {
 			}
 
 			$this->update_progress( 'posts', 80, __( 'Migrating posts and content...', 'etch-fusion-suite' ) );
-			$posts_result = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client );
+			$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+			$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+			$posts_result        = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client, $post_type_mappings, $selected_post_types );
 			if ( is_wp_error( $posts_result ) ) {
 				return $posts_result;
 			}
@@ -258,6 +262,215 @@ class EFS_Migration_Service {
 
 			return new \WP_Error( 'migration_failed', $error_message );
 		}
+	}
+
+	/**
+	 * Start migration asynchronously: prepare state, spawn background request, return immediately.
+	 *
+	 * @param string $migration_key
+	 * @param string|null $target_url
+	 * @param int|null    $batch_size
+	 * @param array       $options  selected_post_types, post_type_mappings, include_media.
+	 * @param string      $nonce    Nonce for the background AJAX request.
+	 * @return array|\WP_Error
+	 */
+	public function start_migration_async( $migration_key, $target_url = null, $batch_size = null, $options = array(), $nonce = '' ) {
+		try {
+			$in_progress = $this->detect_in_progress_migration();
+			if ( ! empty( $in_progress['migrationId'] ) && empty( $in_progress['is_stale'] ) ) {
+				return new \WP_Error( 'migration_in_progress', __( 'A migration is already in progress.', 'etch-fusion-suite' ) );
+			}
+
+			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
+			if ( is_wp_error( $decoded ) ) {
+				return $decoded;
+			}
+
+			$payload = $decoded['payload'];
+			$target  = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
+			if ( empty( $target ) ) {
+				return new \WP_Error( 'missing_target_url', __( 'Migration key does not contain a target URL.', 'etch-fusion-suite' ) );
+			}
+
+			$target = str_replace( 'http://localhost:8889', 'http://tests-wordpress', $target );
+			$target = str_replace( 'https://localhost:8889', 'http://tests-wordpress', $target );
+
+			$expires = isset( $payload['exp'] ) ? (int) $payload['exp'] : 0;
+			if ( ! $expires || time() > $expires ) {
+				return new \WP_Error( 'token_expired', __( 'Migration key has expired.', 'etch-fusion-suite' ) );
+			}
+
+			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
+			$migration_id = $this->generate_migration_id();
+			$this->init_progress( $migration_id );
+			$this->store_active_migration(
+				array(
+					'migration_id'  => $migration_id,
+					'migration_key' => $migration_key,
+					'target_url'    => $target,
+					'batch_size'    => $batch_size,
+					'issued_at'     => $payload['iat'] ?? time(),
+					'expires_at'    => $expires,
+					'options'       => $options,
+				)
+			);
+
+			$this->spawn_migration_background_request( $migration_id, $nonce );
+
+			return array(
+				'progress'    => $this->get_progress_data(),
+				'steps'       => $this->get_steps_state(),
+				'migrationId' => $migration_id,
+				'completed'   => false,
+				'message'     => __( 'Migration started.', 'etch-fusion-suite' ),
+			);
+		} catch ( \Exception $exception ) {
+			$error_message = sprintf(
+				'Migration start failed: %s (File: %s, Line: %d)',
+				$exception->getMessage(),
+				basename( $exception->getFile() ),
+				$exception->getLine()
+			);
+			$this->error_handler->log_error( 'E201', array( 'message' => $exception->getMessage(), 'action' => 'start_migration_async' ) );
+			return new \WP_Error( 'migration_start_failed', $error_message );
+		}
+	}
+
+	/**
+	 * Run the long-running migration steps (called by background AJAX request).
+	 *
+	 * @param string $migration_id
+	 * @return array|\WP_Error
+	 */
+	public function run_migration_execution( $migration_id = '' ) {
+		$active = $this->migration_repository->get_active_migration();
+		if ( ! is_array( $active ) || empty( $active['migration_id'] ) || (string) $active['migration_id'] !== (string) $migration_id ) {
+			return new \WP_Error( 'migration_not_found', __( 'No active migration found for this ID.', 'etch-fusion-suite' ) );
+		}
+
+		$target        = isset( $active['target_url'] ) ? $active['target_url'] : '';
+		$migration_key = isset( $active['migration_key'] ) ? $active['migration_key'] : '';
+		$batch_size    = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
+		$options       = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+
+		try {
+			$this->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
+			$validation_result = $this->validate_target_site_requirements();
+			if ( ! $validation_result['valid'] ) {
+				$error_message = 'Migration validation failed: ' . implode( ', ', $validation_result['errors'] );
+				$this->error_handler->log_error( 'E103', array( 'validation_errors' => $validation_result['errors'], 'action' => 'Target site validation failed' ) );
+				$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
+				$this->update_progress( 'error', $current_percentage, $error_message );
+				$this->store_active_migration( array() );
+				return new \WP_Error( 'validation_failed', $error_message );
+			}
+
+			$this->update_progress( 'analyzing', 20, __( 'Analyzing content...', 'etch-fusion-suite' ) );
+			$analysis = $this->content_service->analyze_content();
+			$this->update_progress(
+				'analyzing',
+				25,
+				sprintf(
+					/* translators: 1: Bricks post count, 2: Gutenberg post count, 3: media file count, 4: total items. */
+					__( 'Found %1$d Bricks posts, %2$d Gutenberg posts, %3$d media files (%4$d total)', 'etch-fusion-suite' ),
+					$analysis['bricks_posts'],
+					$analysis['gutenberg_posts'],
+					$analysis['media'],
+					$analysis['total']
+				)
+			);
+
+			$migrator_result = $this->execute_migrators( $target, $migration_key );
+			if ( is_wp_error( $migrator_result ) ) {
+				return $migrator_result;
+			}
+
+			$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
+			$media_result = $this->media_service->migrate_media( $target, $migration_key );
+			if ( is_wp_error( $media_result ) ) {
+				return $media_result;
+			}
+
+			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
+			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
+			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
+				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
+			}
+
+			$this->update_progress( 'posts', 80, __( 'Migrating posts and content...', 'etch-fusion-suite' ) );
+			$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+			$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+			$posts_result        = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client, $post_type_mappings, $selected_post_types );
+			if ( is_wp_error( $posts_result ) ) {
+				return $posts_result;
+			}
+
+			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
+			$finalization_result = $this->finalize_migration( $posts_result );
+			if ( is_wp_error( $finalization_result ) ) {
+				return $finalization_result;
+			}
+
+			$this->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
+			$this->store_active_migration( array() );
+
+			$migration_stats                   = $this->migration_repository->get_stats();
+			$migration_stats['last_migration']  = current_time( 'mysql' );
+			$migration_stats['status']         = 'completed';
+			$this->migration_repository->save_stats( $migration_stats );
+
+			return array(
+				'progress'    => $this->get_progress_data(),
+				'steps'       => $this->get_steps_state(),
+				'migrationId' => $migration_id,
+				'completed'   => true,
+				'message'     => __( 'Migration completed successfully!', 'etch-fusion-suite' ),
+				'details'     => array(
+					'media' => $media_result,
+					'css'   => $css_result,
+					'posts' => $posts_result,
+				),
+			);
+		} catch ( \Exception $exception ) {
+			$error_message = sprintf(
+				'Migration process failed: %s (File: %s, Line: %d)',
+				$exception->getMessage(),
+				basename( $exception->getFile() ),
+				$exception->getLine()
+			);
+			$this->error_handler->log_error( 'E201', array( 'message' => $exception->getMessage(), 'action' => 'run_migration_execution' ) );
+			$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
+			$this->update_progress( 'error', $current_percentage, $error_message );
+			$this->store_active_migration( array() );
+			return new \WP_Error( 'migration_failed', $error_message );
+		}
+	}
+
+	/**
+	 * Trigger a non-blocking request to run the migration in the background.
+	 *
+	 * @param string $migration_id
+	 * @param string $nonce Unused; kept for API. Background auth is via short-lived token.
+	 */
+	private function spawn_migration_background_request( $migration_id, $nonce ) {
+		$bg_token = function_exists( 'wp_generate_password' ) ? wp_generate_password( 32, true ) : bin2hex( random_bytes( 16 ) );
+		set_transient( 'efs_bg_' . $migration_id, $bg_token, 120 );
+
+		$url  = admin_url( 'admin-ajax.php' );
+		$body = array(
+			'action'       => 'efs_run_migration_background',
+			'migration_id' => $migration_id,
+			'bg_token'     => $bg_token,
+		);
+
+		wp_remote_post(
+			$url,
+			array(
+				'timeout'  => 0.01,
+				'blocking' => false,
+				'body'     => $body,
+			)
+		);
 	}
 
 	/**

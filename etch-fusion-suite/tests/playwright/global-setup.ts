@@ -1,7 +1,23 @@
 import { FullConfig } from '@playwright/test';
-import { runHealthCheck } from '../../scripts/health-check.js';
 import path from 'path';
 import fs from 'fs';
+
+type HealthSummary = {
+  failed: number;
+  warnings: number;
+  passed: number;
+};
+
+type HealthReport = {
+  summary: HealthSummary;
+};
+
+const { runHealthCheck } = require('../../scripts/health-check.js') as {
+  runHealthCheck: (
+    environmentFilter?: string | null | boolean,
+    saveReportEnabled?: boolean,
+  ) => Promise<HealthReport>;
+};
 
 async function globalSetup(config: FullConfig) {
   console.log('🚀 Playwright Global Setup - Starting test environment verification...');

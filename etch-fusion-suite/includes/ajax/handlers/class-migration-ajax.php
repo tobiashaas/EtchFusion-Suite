@@ -53,6 +53,8 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 */
 	protected function register_hooks() {
 		add_action( 'wp_ajax_efs_start_migration', array( $this, 'start_migration' ) );
+		add_action( 'wp_ajax_nopriv_efs_run_migration_background', array( $this, 'run_migration_background' ) );
+		add_action( 'wp_ajax_efs_run_migration_background', array( $this, 'run_migration_background' ) );
 		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
 		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
 		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
@@ -86,15 +88,38 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$raw_target = $this->get_post( 'target_url', '', 'url' );
 		$payload    = array(
-			'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
-			'target_url'    => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
-			'batch_size'    => $this->get_post( 'batch_size', 50, 'int' ),
+			'migration_key'       => $this->get_post( 'migration_key', '', 'raw' ),
+			'target_url'          => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
+			'batch_size'          => $this->get_post( 'batch_size', 50, 'int' ),
+			'selected_post_types' => $this->get_post( 'selected_post_types', array(), 'array' ),
+			'post_type_mappings'  => $this->get_post( 'post_type_mappings', array(), 'array' ),
+			'include_media'       => $this->get_post( 'include_media', '1', 'text' ),
+			'nonce'               => $this->get_post( 'nonce', '', 'raw' ),
 		);
 
 		$result = $this->migration_controller->start_migration( $payload );
 
 		$extra_data = is_wp_error( $result ) ? array() : array( 'migration_id' => $result['migrationId'] ?? null );
 		$this->send_controller_response( $result, 'migration_start_failed', 'Migration started successfully.', $extra_data );
+	}
+
+	/**
+	 * Run migration in background (invoked by spawn; no user context).
+	 */
+	public function run_migration_background() {
+		$migration_id = isset( $_POST['migration_id'] ) ? sanitize_text_field( wp_unslash( $_POST['migration_id'] ) ) : '';
+		$bg_token     = isset( $_POST['bg_token'] ) ? sanitize_text_field( wp_unslash( $_POST['bg_token'] ) ) : '';
+
+		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
+			wp_die( '0', 503 );
+		}
+
+		$result = $this->migration_controller->run_migration_execution( $migration_id, $bg_token );
+		if ( is_wp_error( $result ) ) {
+			wp_die( '0', 400 );
+		}
+
+		wp_send_json_success( array( 'completed' => true ) );
 	}
 
 	/**

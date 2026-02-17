@@ -918,6 +918,53 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Export list of post types available on this site (for mapping dropdown on source).
+	 * GET, requires Bearer token. Returns slug + label for post, page, and public/UI CPTs (e.g. etch_template).
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function export_post_types( $request ) {
+		$rate = self::check_rate_limit( 'export_post_types', 60, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$post_types = get_post_types(
+			array(
+				'public'  => true,
+				'show_ui' => true,
+			),
+			'objects'
+		);
+
+		$exclude = array( 'attachment', 'revision', 'nav_menu_item', 'custom_css', 'customize_changeset', 'oembed_cache', 'user_request', 'wp_block', 'acf-field-group', 'acf-field' );
+		$list    = array();
+
+		foreach ( $post_types as $post_type ) {
+			if ( in_array( $post_type->name, $exclude, true ) ) {
+				continue;
+			}
+			$list[] = array(
+				'slug'  => $post_type->name,
+				'label' => $post_type->label,
+			);
+		}
+
+		return new \WP_REST_Response(
+			array(
+				'post_types' => $list,
+			),
+			200
+		);
+	}
+
+	/**
 	 * Import custom post types.
 	 *
 	 * @param \WP_REST_Request $request REST request.
@@ -1448,6 +1495,16 @@ class EFS_API_Endpoints {
 				'callback'            => array( __CLASS__, 'validate_connection' ),
 				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/export/post-types',
+			array(
+				'callback'            => array( __CLASS__, 'export_post_types' ),
+				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'methods'             => \WP_REST_Server::READABLE,
 			)
 		);
 

@@ -54,7 +54,7 @@ class EFS_Content_Service {
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_posts( $target_url, $jwt_token, EFS_API_Client $api_client ) {
+	public function migrate_posts( $target_url, $jwt_token, EFS_API_Client $api_client, $post_type_mappings = array(), $selected_post_types = array() ) {
 		$bricks_posts    = $this->content_parser->get_bricks_posts();
 		$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
 		$media           = $this->content_parser->get_media();
@@ -64,6 +64,12 @@ class EFS_Content_Service {
 			is_array( $gutenberg_posts ) ? $gutenberg_posts : array()
 		);
 
+		if ( ! empty( $selected_post_types ) ) {
+			$all_posts = array_filter( $all_posts, function ( $post ) use ( $selected_post_types ) {
+				return in_array( $post->post_type, $selected_post_types, true );
+			} );
+		}
+
 		if ( empty( $all_posts ) ) {
 			return array(
 				'migrated_posts' => 0,
@@ -72,7 +78,7 @@ class EFS_Content_Service {
 		}
 
 		$batch_size = 10;
-		$batches    = array_chunk( $all_posts, $batch_size );
+		$batches    = array_chunk( array_values( $all_posts ), $batch_size );
 		$summary    = array(
 			'total'    => count( $all_posts ),
 			'migrated' => 0,
@@ -82,7 +88,7 @@ class EFS_Content_Service {
 
 		foreach ( $batches as $batch_index => $batch ) {
 			foreach ( $batch as $post ) {
-				$result = $this->convert_bricks_to_gutenberg( $post->ID, $api_client, $target_url, $jwt_token );
+				$result = $this->convert_bricks_to_gutenberg( $post->ID, $api_client, $target_url, $jwt_token, $post_type_mappings );
 
 				if ( is_wp_error( $result ) ) {
 					++$summary['failed'];
@@ -103,10 +109,11 @@ class EFS_Content_Service {
 	 * @param EFS_API_Client  $api_client
 	 * @param string|null     $target_url
 	 * @param string|null     $jwt_token
+	 * @param array           $post_type_mappings Source post type => target post type (from wizard).
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function convert_bricks_to_gutenberg( $post_id, EFS_API_Client $api_client, $target_url = null, $jwt_token = null ) {
+	public function convert_bricks_to_gutenberg( $post_id, EFS_API_Client $api_client, $target_url = null, $jwt_token = null, $post_type_mappings = array() ) {
 		$bricks_content = $this->content_parser->parse_bricks_content( $post_id );
 
 		if ( ! $bricks_content || ! isset( $bricks_content['elements'] ) ) {
@@ -115,7 +122,7 @@ class EFS_Content_Service {
 				? $post->post_content
 				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 
-			return $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token );
+			return $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token, $post_type_mappings );
 		}
 
 		$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks( $bricks_content['elements'] );
@@ -137,7 +144,7 @@ class EFS_Content_Service {
 			return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
 		}
 
-		return $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $jwt_token );
+		return $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $jwt_token, $post_type_mappings );
 	}
 
 	/**
@@ -201,10 +208,11 @@ class EFS_Content_Service {
 	 * @param EFS_API_Client  $api_client
 	 * @param string|null     $target_url
 	 * @param string|null     $jwt_token
+	 * @param array           $post_type_mappings Source => target post type (from wizard).
 	 *
 	 * @return array|\WP_Error
 	 */
-	private function send_post_to_target( $post, $content, EFS_API_Client $api_client, $target_url = null, $jwt_token = null ) {
+	private function send_post_to_target( $post, $content, EFS_API_Client $api_client, $target_url = null, $jwt_token = null, $post_type_mappings = array() ) {
 		if ( ! $target_url || ! $jwt_token ) {
 			return array(
 				'post_id' => $post->ID,
@@ -212,20 +220,11 @@ class EFS_Content_Service {
 			);
 		}
 
-		$post_data = array(
-			'title'   => $post->post_title,
-			'content' => $content,
-			'excerpt' => $post->post_excerpt,
-			'status'  => $post->post_status,
-			'type'    => $post->post_type,
-			'meta'    => array(
-				'_b2e_migrated_from_bricks' => true,
-				'_b2e_original_post_id'     => $post->ID,
-				'_b2e_migration_date'       => current_time( 'mysql' ),
-			),
-		);
+		$target_post_type = isset( $post_type_mappings[ $post->post_type ] ) && is_string( $post_type_mappings[ $post->post_type ] ) && $post_type_mappings[ $post->post_type ] !== ''
+			? $post_type_mappings[ $post->post_type ]
+			: ( 'bricks_template' === $post->post_type ? 'page' : $post->post_type );
 
-		$response = $api_client->send_post( $target_url, $jwt_token, $post, $content );
+		$response = $api_client->send_post( $target_url, $jwt_token, $post, $content, $target_post_type );
 
 		if ( is_wp_error( $response ) ) {
 			$this->error_handler->log_error(

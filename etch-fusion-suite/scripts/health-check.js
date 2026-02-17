@@ -231,7 +231,7 @@ async function checkThemeConfiguration(environment, name) {
 
   const activeTheme = themes.find((theme) => theme.status === 'active');
   const themeNames = themes.map((theme) => theme.name);
-  const hasBricks = themeNames.includes('bricks') || themeNames.includes('bricks-child');
+  const hasBricks = themeNames.includes('bricks');
 
   if (environment === 'tests-cli') {
     if (!activeTheme || activeTheme.name !== 'etch-theme') {
@@ -278,13 +278,13 @@ async function checkThemeConfiguration(environment, name) {
     };
   }
 
-  if (!activeTheme || !['bricks', 'bricks-child'].includes(activeTheme.name)) {
+  if (!activeTheme || activeTheme.name !== 'bricks') {
     return {
       environment,
       category: 'theme',
       status: 'fail',
       label: `${name} theme configuration`,
-      message: `Expected active theme bricks or bricks-child, found ${activeTheme ? activeTheme.name : 'none'}.`,
+      message: `Expected active theme bricks, found ${activeTheme ? activeTheme.name : 'none'}.`,
       details: {
         environment,
         activeTheme: activeTheme ? activeTheme.name : null,
@@ -335,7 +335,8 @@ async function checkComposerDependencies(environment, name) {
 }
 
 async function checkRestApi(environment, name) {
-  const codeScript = "$response = wp_remote_get(rest_url()); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } $code = (int) wp_remote_retrieve_response_code($response); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
+  // Use internal REST dispatch to avoid container-localhost networking issues.
+  const codeScript = "$request = new WP_REST_Request('GET', '/'); $response = rest_do_request($request); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } if (!($response instanceof WP_REST_Response)) { $response = rest_ensure_response($response); } $code = (int) $response->get_status(); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
   const result = await runWpEnv(['run', environment, 'wp', 'eval', codeScript]);
 
   if (result.code === 0) {

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Admin Dashboard Integration & Polish (2026-02-16)**
+  - Added focused Playwright coverage for Bricks wizard integration flow in `tests/playwright/admin-dashboard-wizard.spec.ts`
+  - Added focused Playwright coverage for Etch receiving-status transitions in `tests/playwright/admin-dashboard-receiving.spec.ts`
+  - Added `npm run test:playwright:admin-dashboard` for redesign regression runs
+  - Added deployment and rollback runbook in `docs/admin-dashboard-deployment-checklist.md`
+  - Updated `README.md` and `DOCUMENTATION.md` with redesign integration test guidance
+
 - **Code Converter:** Maximale native Etch-Integration statt pauschalem `etch/raw-html` Dump — **2026-02-16**
   - JS aus `javascriptCode` Feld und `<script>` Tags im HTML-Feld wird extrahiert und als `wp:etch/element` mit `script.code` base64 ausgegeben (Etch-nativ)
   - CSS aus `cssCode` Feld und `<style>` Tags im HTML-Feld wird extrahiert und als `wp:etch/raw-html` mit `<style>` ausgegeben (separater Block mit `(CSS)` Label)
@@ -128,3 +135,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project inception
 - Basic concept implementation
 - Development environment setup
+

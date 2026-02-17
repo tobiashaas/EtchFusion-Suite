@@ -60,6 +60,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_wizard_get_state', array( $this, 'get_state' ) );
 		add_action( 'wp_ajax_efs_wizard_clear_state', array( $this, 'clear_state' ) );
 		add_action( 'wp_ajax_efs_wizard_validate_url', array( $this, 'validate_url' ) );
+		add_action( 'wp_ajax_efs_get_target_post_types', array( $this, 'get_target_post_types' ) );
 	}
 
 	/**
@@ -404,5 +405,84 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Get post types available on the Etch (target) site for mapping dropdown.
+	 * Requires target_url and migration_key (or migration_url) in request.
+	 */
+	public function get_target_post_types() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'get_target_post_types', 30, 60 ) ) {
+			return;
+		}
+
+		$migration_key = $this->get_post( 'migration_key', '', 'raw' );
+		$target_url   = $this->get_post( 'target_url', '', 'url' );
+		$migration_url = $this->get_post( 'migration_url', '', 'url' );
+
+		if ( '' !== $migration_url && ( '' === $target_url || '' === $migration_key ) ) {
+			$parsed = wp_parse_url( $migration_url );
+			if ( is_array( $parsed ) && ! empty( $parsed['host'] ) ) {
+				$target_url = ( isset( $parsed['scheme'] ) ? $parsed['scheme'] . '://' : 'https://' ) . $parsed['host'];
+				if ( ! empty( $parsed['port'] ) && 80 !== (int) $parsed['port'] && 443 !== (int) $parsed['port'] ) {
+					$target_url .= ':' . $parsed['port'];
+				}
+				$target_url = untrailingslashit( $target_url );
+				if ( '' === $migration_key && ! empty( $parsed['query'] ) ) {
+					parse_str( $parsed['query'], $query );
+					$migration_key = isset( $query['token'] ) ? $query['token'] : ( isset( $query['migration_key'] ) ? $query['migration_key'] : ( isset( $query['key'] ) ? $query['key'] : '' ) );
+				}
+			}
+		}
+
+		if ( '' === $target_url || '' === $migration_key ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Target URL and migration key are required.', 'etch-fusion-suite' ),
+					'code'    => 'missing_params',
+				),
+				400
+			);
+			return;
+		}
+
+		if ( function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
+			$target_url = etch_fusion_suite_convert_to_internal_url( $target_url );
+		}
+
+		$api_client = function_exists( 'etch_fusion_suite_container' ) && etch_fusion_suite_container()->has( 'api_client' )
+			? etch_fusion_suite_container()->get( 'api_client' )
+			: null;
+
+		if ( ! $api_client || ! method_exists( $api_client, 'get_target_post_types' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'API client unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$result = $api_client->get_target_post_types( $target_url, $migration_key );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $result->get_error_code() ?: 'api_error',
+				),
+				502
+			);
+			return;
+		}
+
+		$post_types = isset( $result['post_types'] ) && is_array( $result['post_types'] ) ? $result['post_types'] : array();
+		wp_send_json_success( array( 'post_types' => $post_types ) );
 	}
 }

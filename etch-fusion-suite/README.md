@@ -49,7 +49,7 @@ The project supports commercial plugins for local testing without committing the
 - **Frames Plugin**: Download from https://getframes.io/
 - **Automatic.css**: Download from https://automaticcss.com/
 
-Optional add-ons (including `frames-latest.zip`, `acss-latest.zip`, `wpvivid-latest.zip`, and `bricks-child-latest.zip`) are not referenced by default in `.wp-env.json`. Add them in `.wp-env.override.json` if you want `wp-env` to auto-install them.
+Optional add-ons (including `frames-latest.zip`, `acss-latest.zip`, and `wpvivid-latest.zip`) are not referenced by default in `.wp-env.json`. Add them in `.wp-env.override.json` if you want `wp-env` to auto-install them.
 
 #### Setup Process
 
@@ -151,7 +151,6 @@ test-environment/
     etch-1.0.0-alpha-5.zip
     automatic.css-4.0.0-dev-27.zip
   themes/
-    bricks-child.zip
     etch-theme-0.0.2.zip
 ```
 
@@ -168,7 +167,6 @@ Add local ZIP paths or remote URLs to `.wp-env.override.json`:
     "https://downloads.wordpress.org/plugin/query-monitor.latest-stable.zip"
   ],
   "themes": [
-    "test-environment/themes/bricks-child.zip",
     "test-environment/themes/etch-theme-0.0.2.zip"
   ]
 }
@@ -666,6 +664,9 @@ Tests use storage state authentication to avoid logging in for every test:
 # Run all tests
 npm run test:playwright
 
+# Run admin dashboard redesign integration tests only
+npm run test:playwright:admin-dashboard
+
 # Run in headed mode (see browser)
 npx playwright test --headed
 
@@ -742,6 +743,13 @@ Reference existing test files in `tests/playwright/` for examples:
 - **Migration Tests**: End-to-end migration workflows
 - **API Tests**: Cross-site communication
 - **Authentication Tests**: JWT-based login flows
+
+**Admin Dashboard Redesign Integration Specs**:
+- `tests/playwright/admin-dashboard-wizard.spec.ts`
+- `tests/playwright/admin-dashboard-receiving.spec.ts`
+
+These cover the Bricks 4-step wizard flow and Etch receiving-status states (receiving, completed, stale), including minimize/expand and dismiss controls.
+Use `docs/admin-dashboard-deployment-checklist.md` for rollout and rollback verification.
 
 ### Production Installation
 

@@ -231,16 +231,6 @@ const PLUGINS = [
       !/^etch-theme-latest\.zip$/i.test(fileName)
   },
   {
-    id: 'bricks-child',
-    label: 'Bricks Child Theme',
-    required: false,
-    latestFile: 'bricks-child-latest.zip',
-    envVar: null,
-    matches: (fileName) =>
-      /^bricks-child.*\.zip$/i.test(fileName) &&
-      !/^bricks-child-latest\.zip$/i.test(fileName)
-  },
-  {
     id: 'wpvivid',
     label: 'WPvivid',
     required: false,

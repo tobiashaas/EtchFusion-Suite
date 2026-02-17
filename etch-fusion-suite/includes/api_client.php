@@ -228,15 +228,26 @@ class EFS_API_Client {
 	}
 
 	/**
-	 * Send post
+	 * Send post to target site.
+	 *
+	 * @param string       $url             Target base URL.
+	 * @param string       $jwt_token       Migration token.
+	 * @param \WP_Post     $post             Source post.
+	 * @param string|null  $etch_content    Gutenberg/Etch content.
+	 * @param string|null  $target_post_type Optional. Target post type (from wizard mapping). If not set, source post_type is used.
+	 * @return array|\WP_Error
 	 */
-	public function send_post( $url, $jwt_token, $post, $etch_content = null ) {
+	public function send_post( $url, $jwt_token, $post, $etch_content = null, $target_post_type = null ) {
+		$post_type = ( null !== $target_post_type && '' !== $target_post_type )
+			? $target_post_type
+			: $post->post_type;
+
 		$post_data = array(
 			'post'         => array(
 				'ID'          => $post->ID,
 				'post_title'  => $post->post_title,
-				'post_name'   => $post->post_name, // Add slug for duplicate checking
-				'post_type'   => $post->post_type,
+				'post_name'   => $post->post_name,
+				'post_type'   => $post_type,
 				'post_date'   => $post->post_date,
 				'post_status' => $post->post_status,
 			),
@@ -318,10 +329,22 @@ class EFS_API_Client {
 	}
 
 	/**
-	 * Get custom post types from target site
+	 * Get custom post types from target site (full CPT definitions for import).
 	 */
 	public function get_custom_post_types( $url, $jwt_token ) {
 		return $this->send_request( $url, $jwt_token, '/export/cpts' );
+	}
+
+	/**
+	 * Get list of post types available on target site (for mapping dropdown).
+	 * Returns array with key 'post_types' => [ ['slug' => ..., 'label' => ...], ... ].
+	 *
+	 * @param string $url       Target site base URL.
+	 * @param string $jwt_token Migration token.
+	 * @return array|\WP_Error Decoded response or error.
+	 */
+	public function get_target_post_types( $url, $jwt_token ) {
+		return $this->send_request( $url, $jwt_token, '/export/post-types' );
 	}
 
 	/**
