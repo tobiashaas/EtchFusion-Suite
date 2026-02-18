@@ -216,6 +216,119 @@ These checks cover the restructured dashboard rendered at `http://localhost:8888
 - Playwright actions: @etch-fusion-suite/tests/playwright/dashboard-tabs.spec.ts#391-441.
 - PHPUnit assertions: @etch-fusion-suite/tests/ui/AdminUITest.php#206-233.
 
+## 7.5. Cross-Site E2E Migration Tests
+
+These suites validate the complete Bricks -> Etch migration journey across both local WordPress instances.
+
+### Purpose
+
+- Validate full wizard flow from connection through migration progress.
+- Validate post type mapping behavior and guardrails (frontend + backend + service-level outcomes).
+- Validate Etch receiving status behavior (auto-expand, stale/completed states, dismiss behavior).
+- Validate progress takeover/banner/chip/title transitions and recovery behavior.
+- Validate actionable error handling and retry paths.
+
+### Prerequisites
+
+- Start both sites with `npm run dev` (`http://localhost:8888` Bricks, `http://localhost:8889` Etch).
+- Ensure Playwright auth states exist at `.playwright-auth/bricks.json` and `.playwright-auth/etch.json`.
+
+### Run New Migration E2E Suites
+
+```bash
+npm run test:playwright -- wizard-flow.spec.ts post-type-mapping.spec.ts receiving-status.spec.ts progress-ui.spec.ts error-handling.spec.ts
+```
+
+### Run A Single Suite
+
+```bash
+npm run test:playwright -- wizard-flow.spec.ts --project=chromium
+```
+
+### Shared Utilities
+
+- Utilities: `etch-fusion-suite/tests/playwright/migration-test-utils.ts`
+- Fixtures/data helpers: `etch-fusion-suite/tests/playwright/fixtures.ts`, `etch-fusion-suite/tests/playwright/test-data.ts`
+
+### Key Assertions Covered
+
+- Wizard state transitions and step indicator states.
+- Cross-site migration setup and orchestration behavior.
+- Mapping validation (invalid/unavailable/missing mappings).
+- Receiving and progress UI state transitions (takeover, banner, chip, completion).
+- Error visibility, retry behavior, and graceful polling recovery.
+
+## 7.6. True End-to-End Migration Tests (No Mocking)
+
+These tests validate the full migration pipeline with real API requests, real WordPress state changes, and direct Etch database verification.
+
+### Purpose
+
+- Validate end-to-end Bricks -> Etch migration behavior without `page.route()` mocks.
+- Confirm mapped `post_type` values are persisted correctly in `wp_posts`.
+- Catch regression cases where `bricks_template` could silently fall back to `page`.
+
+### Prerequisites
+
+- Both local sites are running (`http://localhost:8888` Bricks and `http://localhost:8889` Etch).
+- Playwright auth states exist in `.playwright-auth/bricks.json` and `.playwright-auth/etch.json`.
+- No AJAX mocking enabled in the suite under test.
+
+### Run Command
+
+```bash
+npm run test:playwright -- true-e2e.spec.ts --project=chromium
+```
+
+Dedicated shortcut:
+
+```bash
+npm run test:playwright:true-e2e
+```
+
+### Expected Duration
+
+- Approximately 2-5 minutes per test (intentionally slower than mocked suites).
+
+### What Is Validated
+
+- Real migration URL generation and token validation.
+- Real discovery, mapping selection, preview, and migration execution.
+- Real progress polling via `efs_get_migration_progress`.
+- Direct database assertions of migrated records (including `post_type` correctness).
+- Cross-site integrity for metadata, featured images, and taxonomy relationships.
+
+### Cleanup Behavior
+
+- Tests create uniquely prefixed `E2E Test ...` content.
+- Cleanup runs in `finally` blocks for both Bricks and Etch, including migrated artifacts.
+- Cleanup is attempted even when assertions fail.
+
+### Selective Execution
+
+- Run all slow tests:
+  ```bash
+  npm run test:playwright -- true-e2e.spec.ts --grep @slow
+  ```
+- Run true end-to-end tests:
+  ```bash
+  npm run test:playwright -- true-e2e.spec.ts --grep @e2e
+  ```
+
+### Example Output
+
+```text
+Running 4 tests using 1 worker
+[chromium] true-e2e.spec.ts: Real Migration Flow @slow @e2e
+  ✓ completes full migration with real API calls and verifies database records (92s)
+[chromium] true-e2e.spec.ts: Post Type Mapping Validation @slow @e2e
+  ✓ verifies bricks_template maps to etch_template in database, not page (71s)
+  ✓ rejects invalid mappings with clear error message (46s)
+[chromium] true-e2e.spec.ts: Cross-Site Data Integrity @slow @e2e
+  ✓ preserves custom fields, featured images, and categories (103s)
+4 passed (5.3m)
+```
+
 ## 8. Accessibility Testing
 
 The accessibility suite exercises aria roles, keyboard navigation, and automated axe-core audits.

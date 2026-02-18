@@ -220,9 +220,20 @@ class EFS_Content_Service {
 			);
 		}
 
-		$target_post_type = isset( $post_type_mappings[ $post->post_type ] ) && is_string( $post_type_mappings[ $post->post_type ] ) && $post_type_mappings[ $post->post_type ] !== ''
-			? $post_type_mappings[ $post->post_type ]
-			: ( 'bricks_template' === $post->post_type ? 'page' : $post->post_type );
+		if ( ! isset( $post_type_mappings[ $post->post_type ] ) || '' === $post_type_mappings[ $post->post_type ] ) {
+			$this->error_handler->log_error(
+				'E108',
+				array(
+					'post_id'   => $post->ID,
+					'post_type' => $post->post_type,
+					'action'    => 'Missing post type mapping - migration cannot proceed',
+				)
+			);
+			/* translators: %s is the post type slug */
+			return new \WP_Error( 'missing_post_type_mapping', sprintf( __( 'No mapping found for post type: %s', 'etch-fusion-suite' ), $post->post_type ) );
+		}
+
+		$target_post_type = $post_type_mappings[ $post->post_type ];
 
 		$response = $api_client->send_post( $target_url, $jwt_token, $post, $content, $target_post_type );
 

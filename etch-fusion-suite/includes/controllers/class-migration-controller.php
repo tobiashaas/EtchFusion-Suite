@@ -58,13 +58,33 @@ class EFS_Migration_Controller {
 		$options = array(
 			'selected_post_types' => array(),
 			'post_type_mappings'  => array(),
+			'include_media'       => true,
 		);
+		if ( isset( $data['include_media'] ) ) {
+			$options['include_media'] = filter_var( $data['include_media'], FILTER_VALIDATE_BOOLEAN );
+		}
 		if ( ! empty( $data['selected_post_types'] ) && is_array( $data['selected_post_types'] ) ) {
 			$options['selected_post_types'] = array_map( 'sanitize_key', $data['selected_post_types'] );
 		}
 		if ( ! empty( $data['post_type_mappings'] ) && is_array( $data['post_type_mappings'] ) ) {
 			foreach ( $data['post_type_mappings'] as $source => $target ) {
 				$options['post_type_mappings'][ sanitize_key( (string) $source ) ] = sanitize_key( (string) $target );
+			}
+		}
+		if ( ! empty( $options['selected_post_types'] ) && ! empty( $options['post_type_mappings'] ) ) {
+			$validation_errors = $this->validate_post_type_mappings(
+				$options['selected_post_types'],
+				$options['post_type_mappings'],
+				$target_url,
+				$migration_key
+			);
+
+			if ( ! empty( $validation_errors ) ) {
+				return new \WP_Error(
+					'invalid_post_type_mappings',
+					__( 'Invalid post type mappings: ', 'etch-fusion-suite' ) . implode( '; ', $validation_errors ),
+					array( 'status' => 400 )
+				);
 			}
 		}
 
@@ -209,6 +229,59 @@ class EFS_Migration_Controller {
 		}
 
 		return isset( $decoded['payload']['target_url'] ) ? esc_url_raw( $decoded['payload']['target_url'] ) : '';
+	}
+
+	/**
+	 * Validate post type mappings against available target post types.
+	 *
+	 * @param array  $selected_post_types Source post types selected for migration.
+	 * @param array  $post_type_mappings  Source => target post type mappings.
+	 * @param string $target_url          Target site URL.
+	 * @param string $migration_key       Migration key for API auth.
+	 * @return array
+	 */
+	private function validate_post_type_mappings( $selected_post_types, $post_type_mappings, $target_url, $migration_key ) {
+		$errors = array();
+
+		if ( empty( $selected_post_types ) ) {
+			return $errors;
+		}
+
+		$available_result = $this->api_client->get_target_post_types( $target_url, $migration_key );
+		if ( is_wp_error( $available_result ) ) {
+			$errors[] = 'Unable to fetch target post types: ' . $available_result->get_error_message();
+			return $errors;
+		}
+
+		$available_slugs = array();
+		if ( isset( $available_result['post_types'] ) && is_array( $available_result['post_types'] ) ) {
+			foreach ( $available_result['post_types'] as $pt ) {
+				if ( isset( $pt['slug'] ) ) {
+					$available_slugs[] = $pt['slug'];
+				}
+			}
+		}
+
+		if ( empty( $available_slugs ) ) {
+			$errors[] = 'No post types available on target site';
+			return $errors;
+		}
+
+		foreach ( $selected_post_types as $source_type ) {
+			if ( ! isset( $post_type_mappings[ $source_type ] ) || '' === $post_type_mappings[ $source_type ] ) {
+				/* translators: %s is the source post type slug */
+				$errors[] = sprintf( __( 'Missing mapping for post type: %s', 'etch-fusion-suite' ), $source_type );
+				continue;
+			}
+
+			$target_type = $post_type_mappings[ $source_type ];
+			if ( ! in_array( $target_type, $available_slugs, true ) ) {
+				/* translators: 1: source post type, 2: target post type */
+				$errors[] = sprintf( __( 'Invalid target post type "%2$s" for source type "%1$s" (not available on target)', 'etch-fusion-suite' ), $source_type, $target_type );
+			}
+		}
+
+		return $errors;
 	}
 
 	private function settings_controller() {

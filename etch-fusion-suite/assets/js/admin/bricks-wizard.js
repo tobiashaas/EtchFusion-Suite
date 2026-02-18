@@ -1,5 +1,8 @@
 import { post } from './api.js';
 import { showToast } from './ui.js';
+import { perfMetrics } from './utilities/perf-metrics.js';
+import { updateTabTitle, resetTabTitle } from './utilities/tab-title.js';
+import { createProgressChip, updateProgressChip, removeProgressChip } from './utilities/progress-chip.js';
 
 const ACTION_VALIDATE_URL = 'efs_wizard_validate_url';
 const ACTION_VALIDATE_TOKEN = 'efs_validate_migration_token';
@@ -39,14 +42,14 @@ const humanize = (value) => String(value || '')
 
 const parseMigrationUrl = (rawUrl) => {
 	if (!rawUrl || typeof rawUrl !== 'string') {
-		throw new Error('Migration URL is required.');
+		throw new Error('Migration key is required.');
 	}
 
 	let parsed;
 	try {
 		parsed = new URL(rawUrl.trim());
 	} catch (error) {
-		throw new Error('Migration URL format is invalid.');
+		throw new Error('Migration key format is invalid.');
 	}
 
 	const token = parsed.searchParams.get('token')
@@ -55,7 +58,7 @@ const parseMigrationUrl = (rawUrl) => {
 		|| '';
 
 	if (!token) {
-		throw new Error('Migration URL does not contain a token.');
+		throw new Error('Migration key does not contain a token.');
 	}
 
 	return {
@@ -89,6 +92,7 @@ const createWizard = (root) => {
 		nextButton: root.querySelector('[data-efs-wizard-next]'),
 		cancelButton: root.querySelector('[data-efs-wizard-cancel]'),
 		urlInput: root.querySelector('[data-efs-wizard-url]'),
+		pasteButton: root.querySelector('[data-efs-paste-migration-url]'),
 		keyInput: root.querySelector('[data-efs-wizard-migration-key]'),
 		connectMessage: root.querySelector('[data-efs-connect-message]'),
 		selectMessage: root.querySelector('[data-efs-select-message]'),
@@ -96,6 +100,7 @@ const createWizard = (root) => {
 		discoverySummary: root.querySelector('[data-efs-discovery-summary]'),
 		summaryGrade: root.querySelector('[data-efs-summary-grade]'),
 		summaryBreakdown: root.querySelector('[data-efs-summary-breakdown]'),
+		progressChipContainer: root.querySelector('[data-efs-progress-chip-container]'),
 		runFullAnalysis: root.querySelector('[data-efs-run-full-analysis]'),
 		rowsBody: root.querySelector('[data-efs-post-type-rows]'),
 		includeMedia: root.querySelector('[data-efs-include-media]'),
@@ -135,6 +140,10 @@ const createWizard = (root) => {
 		validatingConnect: false,
 		pollingTimer: null,
 		migrationRunning: false,
+		progressChip: null,
+		lastProgressPercentage: 0,
+		lastProcessedCount: undefined,
+		lastPollTime: undefined,
 	};
 
 	const setMessage = (el, message, level = 'info') => {
@@ -167,6 +176,26 @@ const createWizard = (root) => {
 		}
 
 		return state.selectedPostTypes.some((slug) => Boolean(state.postTypeMappings[slug]));
+	};
+
+	const validatePostTypeMappings = () => {
+		const errors = [];
+		const availableTargetSlugs = state.targetPostTypes.map((pt) => pt.slug);
+
+		state.selectedPostTypes.forEach((sourceSlug) => {
+			const targetSlug = state.postTypeMappings[sourceSlug];
+
+			if (!targetSlug || targetSlug === '') {
+				errors.push(`Missing mapping for "${humanize(sourceSlug)}"`);
+				return;
+			}
+
+			if (!availableTargetSlugs.includes(targetSlug)) {
+				errors.push(`Invalid mapping for "${humanize(sourceSlug)}" -> "${humanize(targetSlug)}" (not available on target)`);
+			}
+		});
+
+		return errors;
 	};
 
 	const updateNavigationState = () => {
@@ -265,9 +294,13 @@ const createWizard = (root) => {
 
 		refs.summaryBreakdown.innerHTML = '';
 		(summary.breakdown || []).forEach((item) => {
-			const li = document.createElement('li');
-			li.textContent = `${item.label}: ${item.value}`;
-			refs.summaryBreakdown.appendChild(li);
+			const entry = document.createElement('div');
+			entry.className = 'efs-wizard-summary__item';
+			entry.innerHTML = `
+				<span class="efs-wizard-summary__label">${item.label}</span>
+				<span class="efs-wizard-summary__value">${item.value}</span>
+			`;
+			refs.summaryBreakdown.appendChild(entry);
 		});
 	};
 
@@ -310,9 +343,10 @@ const createWizard = (root) => {
 
 			const disabled = checked ? '' : ' disabled';
 			const checkedAttr = checked ? ' checked' : '';
+			const rowStateClass = checked ? 'is-active' : 'is-inactive';
 
 			return `
-				<tr data-efs-post-type-row="${postType.slug}">
+				<tr class="${rowStateClass}" data-efs-post-type-row="${postType.slug}">
 					<td><input type="checkbox" data-efs-post-type-check="${postType.slug}"${checkedAttr}></td>
 					<td>${postType.label}</td>
 					<td>${postType.count}</td>
@@ -499,6 +533,7 @@ const createWizard = (root) => {
 		if (runtime.discoveryLoaded) {
 			return;
 		}
+		perfMetrics.startDiscovery();
 
 		if (refs.discoveryLoading) {
 			refs.discoveryLoading.hidden = false;
@@ -513,7 +548,9 @@ const createWizard = (root) => {
 			applyDefaultSelections();
 			renderSummary();
 			renderPostTypeTable();
+			showToast('Discovery complete', 'success');
 			runtime.discoveryLoaded = true;
+			perfMetrics.endDiscovery();
 			if (refs.discoveryLoading) {
 				refs.discoveryLoading.hidden = true;
 			}
@@ -556,14 +593,14 @@ const createWizard = (root) => {
 		`;
 
 		const warnings = [];
-		const mappingTargets = Object.values(state.postTypeMappings)
-			.filter(Boolean)
-			.filter((target, index, all) => all.indexOf(target) !== index);
+		// Only consider selected items: same destination used by multiple *selected* source types?
+		const selectedTargets = selected.map((item) => state.postTypeMappings[item.slug]).filter(Boolean);
+		const duplicateTargets = selectedTargets.filter((target, index, all) => all.indexOf(target) !== index);
 
-		if (mappingTargets.length > 0) {
+		if (duplicateTargets.length > 0) {
 			warnings.push({
-				level: 'warning',
-				text: 'Multiple source post types map to the same destination post type.',
+				level: 'info',
+				text: 'More than one source post type maps to the same destination (e.g. Bricks Template and Post → Posts). This is valid; all selected content will be migrated into that type.',
 			});
 		}
 
@@ -601,6 +638,12 @@ const createWizard = (root) => {
 		const status = progress?.current_phase_name || progress?.status || progress?.current_step || 'Running migration...';
 		const itemsProcessed = Number(progress?.items_processed || 0);
 		const itemsTotal = Number(progress?.items_total || 0);
+		runtime.lastProgressPercentage = percentage;
+
+		updateTabTitle(percentage, status);
+		if (runtime.progressChip) {
+			updateProgressChip(runtime.progressChip, percentage);
+		}
 
 		if (refs.progressFill) {
 			refs.progressFill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
@@ -639,6 +682,10 @@ const createWizard = (root) => {
 	};
 
 	const showResult = (type, subtitle) => {
+		resetTabTitle();
+		removeProgressChip(runtime.progressChip);
+		runtime.progressChip = null;
+
 		if (type === 'success') {
 			showToast(subtitle || 'Migration complete.', 'success');
 			resetWizard();
@@ -663,18 +710,53 @@ const createWizard = (root) => {
 		refs.result.classList.remove('is-error', 'is-success');
 	};
 
-	const toggleProgressMinimized = (minimized) => {
-		state.progressMinimized = Boolean(minimized);
-		root.classList.toggle('is-progress-minimized', state.progressMinimized);
-		const takeoverVisible = runtime.migrationRunning && !state.progressMinimized;
-		const bannerVisible = runtime.migrationRunning && state.progressMinimized;
-
+	const reopenProgress = () => {
+		state.progressMinimized = false;
+		root.classList.remove('is-progress-minimized');
 		if (refs.progressTakeover) {
-			refs.progressTakeover.hidden = !takeoverVisible;
+			if (refs.progressTakeover.parentNode !== document.body) {
+				document.body.appendChild(refs.progressTakeover);
+			}
+			refs.progressTakeover.hidden = !runtime.migrationRunning;
+		}
+		if (refs.progressBanner) {
+			refs.progressBanner.hidden = true;
+		}
+		removeProgressChip(runtime.progressChip);
+		runtime.progressChip = null;
+	};
+
+	const dismissProgress = () => {
+		state.progressMinimized = true;
+		root.classList.add('is-progress-minimized');
+		if (refs.progressTakeover) {
+			refs.progressTakeover.hidden = true;
+		}
+		if (refs.progressBanner) {
+			refs.progressBanner.hidden = false;
+		}
+		if (refs.bannerText) {
+			refs.bannerText.textContent = `Migration in progress: ${Math.round(runtime.lastProgressPercentage)}%`;
+		}
+		if (refs.expandButton) {
+			refs.expandButton.hidden = false;
 		}
 
-		if (refs.progressBanner) {
-			refs.progressBanner.hidden = !bannerVisible;
+		if (!runtime.progressChip && refs.progressChipContainer) {
+			runtime.progressChip = createProgressChip(refs.progressChipContainer);
+			if (runtime.progressChip) {
+				runtime.progressChip.addEventListener('click', reopenProgress);
+				runtime.progressChip.addEventListener('keydown', (event) => {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						reopenProgress();
+					}
+				});
+			}
+		}
+
+		if (runtime.progressChip) {
+			updateProgressChip(runtime.progressChip, runtime.lastProgressPercentage);
 		}
 	};
 
@@ -692,12 +774,24 @@ const createWizard = (root) => {
 
 		stopPolling();
 		runtime.migrationRunning = true;
+		runtime.pollingFailCount = 0;
 
 		const poll = async () => {
 			try {
 				const payload = await post(ACTION_GET_PROGRESS, {
 					migration_id: migrationId,
 				});
+				runtime.pollingFailCount = 0;
+				const progress = payload?.progress || {};
+				const itemsProcessed = Number(progress?.items_processed || 0);
+
+				if (runtime.lastProcessedCount !== undefined && itemsProcessed > runtime.lastProcessedCount) {
+					const batchSize = itemsProcessed - runtime.lastProcessedCount;
+					const batchDuration = performance.now() - (runtime.lastPollTime || performance.now());
+					perfMetrics.recordBatch(batchSize, batchDuration);
+				}
+				runtime.lastProcessedCount = itemsProcessed;
+				runtime.lastPollTime = performance.now();
 
 				state.migrationId = payload?.migrationId || migrationId;
 				renderProgress(payload);
@@ -705,23 +799,48 @@ const createWizard = (root) => {
 				const status = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
 
 				if (payload?.completed || status === 'completed') {
+					perfMetrics.endMigration();
+					const hints = perfMetrics.getBottleneckHints();
+					if (hints && hints.length > 0) {
+						console.warn('[EFS][Perf] Bottleneck hints:', hints);
+					}
 					runtime.migrationRunning = false;
-					toggleProgressMinimized(false);
+					reopenProgress();
 					showResult('success', 'Migration finished successfully.');
 					return;
 				}
 
-				if (status === 'error') {
+				if (status === 'error' || payload?.error) {
 					runtime.migrationRunning = false;
 					if (refs.retryButton) {
 						refs.retryButton.hidden = false;
 					}
-					showResult('error', payload?.progress?.message || 'Migration stopped due to an error.');
+					showResult('error', payload?.progress?.message || payload?.message || payload?.error || 'Migration stopped due to an error.');
+					return;
+				}
+
+				const isStale = Boolean(payload?.is_stale || payload?.progress?.is_stale || status === 'stale');
+				const percentage = Number(payload?.progress?.percentage ?? 0);
+				if (isStale && percentage === 0) {
+					runtime.migrationRunning = false;
+					if (refs.retryButton) {
+						refs.retryButton.hidden = false;
+					}
+					showResult('error', 'Migration did not start (e.g. background request could not reach the server). Try again or check server configuration.');
 					return;
 				}
 
 				runtime.pollingTimer = window.setTimeout(poll, POLL_INTERVAL_MS);
 			} catch (error) {
+				runtime.pollingFailCount = (runtime.pollingFailCount || 0) + 1;
+				if (runtime.pollingFailCount >= 3) {
+					runtime.migrationRunning = false;
+					if (refs.retryButton) {
+						refs.retryButton.hidden = false;
+					}
+					showResult('error', error?.message || 'Progress check failed. Migration may still be running on the server.');
+					return;
+				}
 				runtime.pollingTimer = window.setTimeout(poll, POLL_INTERVAL_MS);
 			}
 		};
@@ -747,7 +866,7 @@ const createWizard = (root) => {
 		}
 
 		if (nextStep < 4) {
-			toggleProgressMinimized(false);
+			reopenProgress();
 		}
 
 		if (!options.skipSave) {
@@ -785,7 +904,7 @@ const createWizard = (root) => {
 		state.migrationUrl = url;
 
 		if (!url) {
-			throw new Error('Please paste a migration URL before continuing.');
+			throw new Error('Please paste a migration key before continuing.');
 		}
 
 		runtime.validatingConnect = true;
@@ -872,17 +991,28 @@ const createWizard = (root) => {
 			if (!state.migrationId) {
 				throw new Error('Migration did not return an ID.');
 			}
+			const totalItems = getDiscoveryPostTypes(state.discoveryData)
+				.filter((pt) => state.selectedPostTypes.includes(pt.slug))
+				.reduce((sum, pt) => sum + pt.count, 0);
+			perfMetrics.startMigration(totalItems);
+			runtime.lastProcessedCount = undefined;
+			runtime.lastPollTime = undefined;
 
-			toggleProgressMinimized(false);
+			reopenProgress();
 			await setStep(4);
 			if (refs.progressTakeover) {
+				if (refs.progressTakeover.parentNode !== document.body) {
+					document.body.appendChild(refs.progressTakeover);
+				}
 				refs.progressTakeover.hidden = false;
 			}
 			renderProgress(payload);
 			await saveWizardState();
 			startPolling(state.migrationId);
-		} finally {
+		} catch (error) {
 			runtime.migrationRunning = false;
+			throw error;
+		} finally {
 			updateNavigationState();
 		}
 	};
@@ -892,6 +1022,10 @@ const createWizard = (root) => {
 		runtime.migrationRunning = false;
 		runtime.discoveryLoaded = false;
 		runtime.validatedMigrationUrl = '';
+		runtime.lastProgressPercentage = 0;
+		resetTabTitle();
+		removeProgressChip(runtime.progressChip);
+		runtime.progressChip = null;
 
 		Object.assign(state, defaultState());
 
@@ -916,7 +1050,7 @@ const createWizard = (root) => {
 			refs.progressBanner.hidden = true;
 		}
 
-		toggleProgressMinimized(false);
+		reopenProgress();
 		root.classList.remove('is-progress-minimized');
 		hideResult();
 		await clearWizardState();
@@ -955,6 +1089,29 @@ const createWizard = (root) => {
 			updateNavigationState();
 		});
 
+		refs.pasteButton?.addEventListener('click', async () => {
+			try {
+				const text = navigator.clipboard?.readText ? await navigator.clipboard.readText() : '';
+				if (!text || typeof text !== 'string') {
+					showToast('Clipboard is empty or paste is not supported.', 'info');
+					return;
+				}
+				const trimmed = text.trim();
+				if (refs.urlInput) {
+					refs.urlInput.value = trimmed;
+					if (trimmed !== state.migrationUrl) {
+						resetDiscoveryState({ clearConnection: true });
+					}
+					state.migrationUrl = trimmed;
+					setMessage(refs.connectMessage, '');
+					updateNavigationState();
+					showToast('Key pasted.', 'success');
+				}
+			} catch (err) {
+				showToast('Could not read clipboard. Paste manually.', 'error');
+			}
+		});
+
 		refs.backButton?.addEventListener('click', async () => {
 			if (state.currentStep > 1 && state.currentStep < 4) {
 				await setStep(state.currentStep - 1);
@@ -972,6 +1129,11 @@ const createWizard = (root) => {
 				if (state.currentStep === 2) {
 					if (!hasValidStep2Selection()) {
 						setMessage(refs.selectMessage, 'Select at least one post type and mapping to continue.', 'error');
+						return;
+					}
+					const mappingErrors = validatePostTypeMappings();
+					if (mappingErrors.length > 0) {
+						setMessage(refs.selectMessage, mappingErrors.join('; '), 'error');
 						return;
 					}
 					await setStep(3);
@@ -1006,8 +1168,8 @@ const createWizard = (root) => {
 			}
 		});
 
-		refs.minimizeButton?.addEventListener('click', () => toggleProgressMinimized(true));
-		refs.expandButton?.addEventListener('click', () => toggleProgressMinimized(false));
+		refs.minimizeButton?.addEventListener('click', dismissProgress);
+		refs.expandButton?.addEventListener('click', reopenProgress);
 
 		refs.runFullAnalysis?.addEventListener('click', () => {
 			showToast('Full analysis endpoint is not available yet. Showing sampled discovery data.', 'info');
@@ -1170,6 +1332,9 @@ const createWizard = (root) => {
 		if (!resumed) {
 			if (state.currentStep >= 4) {
 				state.currentStep = hasValidStep2Selection() ? 3 : 1;
+				resetTabTitle();
+				removeProgressChip(runtime.progressChip);
+				runtime.progressChip = null;
 				if (refs.progressTakeover) {
 					refs.progressTakeover.hidden = true;
 				}

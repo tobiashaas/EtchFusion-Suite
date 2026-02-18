@@ -105,6 +105,13 @@ class EFS_Content_Parser {
 
 			// Process element based on type
 			$processed_element = $this->process_element_by_type( $processed_element, $post_id );
+			$custom_attributes = $this->extract_custom_attributes( $processed_element['settings'] ?? array() );
+			if ( ! empty( $custom_attributes ) ) {
+				if ( ! isset( $processed_element['etch_data'] ) || ! is_array( $processed_element['etch_data'] ) ) {
+					$processed_element['etch_data'] = array();
+				}
+				$processed_element['etch_data'] = array_merge( $processed_element['etch_data'], $custom_attributes );
+			}
 
 			$processed_elements[] = $processed_element;
 		}
@@ -404,6 +411,42 @@ class EFS_Content_Parser {
 		}
 
 		return implode( ' ', array_filter( $classes ) );
+	}
+
+	/**
+	 * Extract custom HTML attributes from Bricks settings._attributes.
+	 *
+	 * @param array $settings Element settings.
+	 * @return array<string, string>
+	 */
+	private function extract_custom_attributes( $settings ) {
+		$normalized = array();
+
+		if ( ! is_array( $settings ) || empty( $settings['_attributes'] ) || ! is_array( $settings['_attributes'] ) ) {
+			return $normalized;
+		}
+
+		foreach ( $settings['_attributes'] as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+
+			$name = isset( $entry['name'] ) ? strtolower( trim( (string) $entry['name'] ) ) : '';
+			if ( '' === $name ) {
+				continue;
+			}
+
+			if ( ! preg_match( '/^[a-z_:][a-z0-9:._-]*$/', $name ) ) {
+				continue;
+			}
+
+			$value = isset( $entry['value'] ) && is_scalar( $entry['value'] )
+				? (string) $entry['value']
+				: '';
+			$normalized[ $name ] = $value;
+		}
+
+		return $normalized;
 	}
 
 	/**

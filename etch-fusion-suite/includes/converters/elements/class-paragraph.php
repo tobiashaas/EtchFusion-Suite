@@ -35,13 +35,14 @@ class EFS_Element_Paragraph extends EFS_Base_Element {
 		$text            = $element['settings']['text'] ?? '';
 		$text            = is_string( $text ) ? $text : '';
 		$text            = wp_kses_post( $text );
+		$text            = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', $text );
 		$etch_attributes = array();
 
 		if ( ! empty( $css_classes ) ) {
 			$etch_attributes['class'] = $css_classes;
 		}
 
-		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag );
+		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
 
 		return $this->generate_etch_element_block(
 			$attrs,

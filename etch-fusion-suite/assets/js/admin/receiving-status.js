@@ -135,6 +135,7 @@ export const initReceivingStatus = () => {
 
     let inFlight = false;
     let collapsed = true;
+    let hasAutoExpanded = false;
     let currentModel = createUiModel();
 
     const readDismissedKeys = () => {
@@ -188,7 +189,21 @@ export const initReceivingStatus = () => {
             elements.source.textContent = model.source;
         }
         if (elements.phase) {
-            elements.phase.textContent = model.phase;
+            const phaseBadge = elements.phase.querySelector('.status-badge');
+            if (phaseBadge) {
+                phaseBadge.classList.toggle('is-active', model.status === 'receiving' || model.status === 'completed');
+                phaseBadge.classList.toggle('is-warning', model.status === 'stale');
+                phaseBadge.classList.toggle('is-error', model.status === 'idle');
+
+                const textNode = Array.from(phaseBadge.childNodes).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
+                if (textNode) {
+                    textNode.textContent = ` ${model.phase}`;
+                } else {
+                    phaseBadge.append(document.createTextNode(` ${model.phase}`));
+                }
+            } else {
+                elements.phase.textContent = model.phase;
+            }
         }
         if (elements.items) {
             elements.items.textContent = `${model.items}`;
@@ -214,6 +229,12 @@ export const initReceivingStatus = () => {
             takeover.hidden = true;
             banner.hidden = true;
             return;
+        }
+
+        // Auto-expand on first detection
+        if (!hasAutoExpanded && isVisibleState) {
+            collapsed = false;
+            hasAutoExpanded = true;
         }
 
         takeover.hidden = collapsed;

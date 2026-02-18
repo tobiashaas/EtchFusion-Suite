@@ -887,9 +887,10 @@ class EFS_API_Endpoints {
 	 * @param array  $token_payload Validated token payload.
 	 * @param string $phase Current import phase.
 	 * @param int    $items_increment How much to increment items received.
+	 * @param \WP_REST_Request|null $request Optional. Request object to read X-EFS-Source-Origin (real source site).
 	 * @return void
 	 */
-	private static function touch_receiving_state( array $token_payload, string $phase, int $items_increment = 0 ): void {
+	private static function touch_receiving_state( array $token_payload, string $phase, int $items_increment = 0, $request = null ): void {
 		$repository = self::resolve_migration_repository();
 		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
 			return;
@@ -902,10 +903,21 @@ class EFS_API_Endpoints {
 		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
 		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
 
+		$source_site = '';
+		if ( $request instanceof \WP_REST_Request ) {
+			$header = $request->get_header( 'X-EFS-Source-Origin' );
+			if ( is_string( $header ) && '' !== trim( $header ) ) {
+				$source_site = esc_url_raw( trim( $header ) );
+			}
+		}
+		if ( '' === $source_site && isset( $token_payload['domain'] ) ) {
+			$source_site = esc_url_raw( (string) $token_payload['domain'] );
+		}
+
 		$repository->save_receiving_state(
 			array(
 				'status'         => 'receiving',
-				'source_site'    => isset( $token_payload['domain'] ) ? esc_url_raw( (string) $token_payload['domain'] ) : '',
+				'source_site'    => $source_site,
 				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
 				'started_at'     => $started_at,
 				'last_activity'  => $now,
@@ -985,7 +997,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'cpts' );
+		self::touch_receiving_state( $token, 'cpts', 0, $request );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1030,7 +1042,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'acf' );
+		self::touch_receiving_state( $token, 'acf', 0, $request );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1075,7 +1087,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'metabox' );
+		self::touch_receiving_state( $token, 'metabox', 0, $request );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1120,7 +1132,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'css' );
+		self::touch_receiving_state( $token, 'css', 0, $request );
 
 		$data = $request->get_json_params();
 		$data = is_array( $data ) ? $data : array();
@@ -1165,7 +1177,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'posts', 1 );
+		self::touch_receiving_state( $token, 'posts', 1, $request );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();
@@ -1193,6 +1205,12 @@ class EFS_API_Endpoints {
 			$etch_content = '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->';
 		}
 
+		// Preserve Gutenberg/Etch block-comment payloads verbatim.
+		// wp_kses_post() escapes portions of valid block comments when labels contain
+		// angle brackets (e.g. "<ul>", "<li>"), which breaks structure/order.
+		$is_block_content = false !== strpos( $etch_content, '<!-- wp:' );
+		$post_content     = $is_block_content ? $etch_content : wp_kses_post( $etch_content );
+
 		$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
 		$postarr  = array(
 			'post_title'   => $post_title,
@@ -1200,7 +1218,7 @@ class EFS_API_Endpoints {
 			'post_type'    => $post_type,
 			'post_status'  => $post_status,
 			'post_date'    => $post_date,
-			'post_content' => wp_kses_post( $etch_content ),
+			'post_content' => $post_content,
 		);
 		if ( $existing instanceof \WP_Post ) {
 			$postarr['ID'] = $existing->ID;
@@ -1254,7 +1272,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'posts' );
+		self::touch_receiving_state( $token, 'posts', 0, $request );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();
@@ -1329,7 +1347,7 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
-		self::touch_receiving_state( $token, 'media', 1 );
+		self::touch_receiving_state( $token, 'media', 1, $request );
 
 		$payload = $request->get_json_params();
 		$payload = is_array( $payload ) ? $payload : array();

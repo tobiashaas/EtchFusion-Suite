@@ -237,7 +237,7 @@ class EFS_Element_Code extends EFS_Base_Element {
 		$label     = $this->get_label( $element );
 		$style_ids = $this->get_style_ids( $element );
 
-		$attrs = $this->build_attributes( $label, $style_ids, array(), 'div' );
+		$attrs = $this->build_attributes( $label, $style_ids, array(), 'div', $element );
 
 		// Attach JS as base64 — Etch native format.
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Required: Etch stores element JS as base64.
@@ -273,7 +273,7 @@ class EFS_Element_Code extends EFS_Base_Element {
 			),
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$attrs_json = $this->encode_block_comment_attrs( $attrs );
 
 		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" .
 			'<!-- /wp:etch/raw-html -->';
@@ -303,7 +303,7 @@ class EFS_Element_Code extends EFS_Base_Element {
 			),
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$attrs_json = $this->encode_block_comment_attrs( $attrs );
 
 		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" .
 			'<!-- /wp:etch/raw-html -->';
@@ -335,9 +335,27 @@ class EFS_Element_Code extends EFS_Base_Element {
 			),
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$attrs_json = $this->encode_block_comment_attrs( $attrs );
 
 		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" .
 			'<!-- /wp:etch/raw-html -->';
+	}
+
+	/**
+	 * Encode block attributes for safe use inside HTML comment delimiters.
+	 *
+	 * Gutenberg block comments can be destabilized by raw "--" sequences in JSON
+	 * values (common in CSS custom properties). Replace them with Unicode escapes
+	 * at the JSON text layer so parsing remains stable while semantic content stays
+	 * equivalent after JSON decode.
+	 *
+	 * @param array $attrs Block attributes.
+	 * @return string
+	 */
+	private function encode_block_comment_attrs( array $attrs ) {
+		$json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		// Keep block comment payload parse-safe when content includes CSS vars/comments.
+		return str_replace( '--', '\u002d\u002d', (string) $json );
 	}
 }

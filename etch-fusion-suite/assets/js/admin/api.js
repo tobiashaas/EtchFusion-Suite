@@ -16,10 +16,19 @@ const appendValue = (params, key, value) => {
     if (value === undefined || value === null) {
         return;
     }
+
     if (Array.isArray(value)) {
-        value.forEach((item) => params.append(`${key}[]`, item));
+        value.forEach((item) => appendValue(params, `${key}[]`, item));
         return;
     }
+
+    if (typeof value === 'object' && !(value instanceof Date) && !(value instanceof File) && !(value instanceof Blob)) {
+        Object.entries(value).forEach(([childKey, childValue]) => {
+            appendValue(params, `${key}[${childKey}]`, childValue);
+        });
+        return;
+    }
+
     params.append(key, value);
 };
 

@@ -139,7 +139,7 @@ class EFS_Migration_Service {
 
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
 			$migration_id = $this->generate_migration_id();
-			$this->init_progress( $migration_id );
+			$this->init_progress( $migration_id, $options );
 			$this->store_active_migration(
 				array(
 					'migration_id'  => $migration_id,
@@ -191,10 +191,15 @@ class EFS_Migration_Service {
 				return $migrator_result;
 			}
 
-			$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
-			$media_result = $this->media_service->migrate_media( $target, $migration_key );
-			if ( is_wp_error( $media_result ) ) {
-				return $media_result;
+			$steps        = $this->get_steps_state();
+			$media_result = array( 'skipped' => true );
+			if ( isset( $steps['media'] ) ) {
+				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+				$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
+				$media_result = $this->media_service->migrate_media( $target, $migration_key, $selected_post_types );
+				if ( is_wp_error( $media_result ) ) {
+					return $media_result;
+				}
 			}
 
 			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
@@ -209,6 +214,16 @@ class EFS_Migration_Service {
 			$posts_result        = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client, $post_type_mappings, $selected_post_types );
 			if ( is_wp_error( $posts_result ) ) {
 				return $posts_result;
+			}
+			$posts_total_sync   = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
+			$posts_migrated_sync = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
+			if ( $posts_total_sync > 0 && $posts_migrated_sync === 0 ) {
+				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
+				$this->store_active_migration( array() );
+				return new \WP_Error(
+					'posts_migration_failed',
+					__( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' )
+				);
 			}
 
 			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
@@ -302,7 +317,7 @@ class EFS_Migration_Service {
 
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
 			$migration_id = $this->generate_migration_id();
-			$this->init_progress( $migration_id );
+			$this->init_progress( $migration_id, $options );
 			$this->store_active_migration(
 				array(
 					'migration_id'  => $migration_id,
@@ -385,10 +400,15 @@ class EFS_Migration_Service {
 				return $migrator_result;
 			}
 
-			$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
-			$media_result = $this->media_service->migrate_media( $target, $migration_key );
-			if ( is_wp_error( $media_result ) ) {
-				return $media_result;
+			$steps        = $this->get_steps_state();
+			$media_result = array( 'skipped' => true );
+			if ( isset( $steps['media'] ) ) {
+				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+				$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
+				$media_result = $this->media_service->migrate_media( $target, $migration_key, $selected_post_types );
+				if ( is_wp_error( $media_result ) ) {
+					return $media_result;
+				}
 			}
 
 			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
@@ -403,6 +423,16 @@ class EFS_Migration_Service {
 			$posts_result        = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client, $post_type_mappings, $selected_post_types );
 			if ( is_wp_error( $posts_result ) ) {
 				return $posts_result;
+			}
+			$posts_total    = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
+			$posts_migrated  = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
+			if ( $posts_total > 0 && $posts_migrated === 0 ) {
+				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
+				$this->store_active_migration( array() );
+				return new \WP_Error(
+					'posts_migration_failed',
+					__( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' )
+				);
 			}
 
 			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
@@ -452,11 +482,28 @@ class EFS_Migration_Service {
 	 * @param string $migration_id
 	 * @param string $nonce Unused; kept for API. Background auth is via short-lived token.
 	 */
+	/**
+	 * Build URL for the background self-request (spawn). In Docker, admin_url() may use
+	 * localhost:8888 which is not reachable from inside the container; use internal host.
+	 *
+	 * @return string URL to admin-ajax.php for efs_run_migration_background.
+	 */
+	private function get_spawn_url() {
+		$url = admin_url( 'admin-ajax.php' );
+		if ( function_exists( 'etch_fusion_suite_resolve_bricks_internal_host' ) ) {
+			$internal = etch_fusion_suite_resolve_bricks_internal_host();
+			if ( ! empty( $internal ) && is_string( $internal ) ) {
+				$url = untrailingslashit( $internal ) . '/wp-admin/admin-ajax.php';
+			}
+		}
+		return (string) apply_filters( 'etch_fusion_suite_spawn_url', $url );
+	}
+
 	private function spawn_migration_background_request( $migration_id, $nonce ) {
 		$bg_token = function_exists( 'wp_generate_password' ) ? wp_generate_password( 32, true ) : bin2hex( random_bytes( 16 ) );
 		set_transient( 'efs_bg_' . $migration_id, $bg_token, 120 );
 
-		$url  = admin_url( 'admin-ajax.php' );
+		$url  = $this->get_spawn_url();
 		$body = array(
 			'action'       => 'efs_run_migration_background',
 			'migration_id' => $migration_id,
@@ -655,8 +702,11 @@ class EFS_Migration_Service {
 
 	/**
 	 * Initialize progress state.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $options      Optional. selected_post_types, post_type_mappings, include_media. Used to build only relevant steps.
 	 */
-	public function init_progress( $migration_id ) {
+	public function init_progress( $migration_id, array $options = array() ) {
 		$progress = array(
 			'migrationId'               => sanitize_text_field( $migration_id ),
 			'status'                    => 'running',
@@ -673,7 +723,7 @@ class EFS_Migration_Service {
 		);
 
 		$this->migration_repository->save_progress( $progress );
-		$this->set_steps_state( $this->initialize_steps() );
+		$this->set_steps_state( $this->initialize_steps( $options ) );
 	}
 
 	/**
@@ -763,7 +813,7 @@ class EFS_Migration_Service {
 			unset( $step_data );
 
 			if ( 'completed' !== $step && 'error' !== $step ) {
-				$next_phase = $this->get_next_phase_key( $step );
+				$next_phase = $this->get_next_phase_key( $step, $steps );
 				if ( $next_phase && isset( $steps[ $next_phase ] ) && empty( $steps[ $next_phase ]['completed'] ) ) {
 					$steps[ $next_phase ]['status']  = 'active';
 					$steps[ $next_phase ]['active']  = true;
@@ -855,15 +905,38 @@ class EFS_Migration_Service {
 	}
 
 	/**
-	 * Initialize default steps.
+	 * Initialize steps for progress UI and execution. Only includes phases that are relevant
+	 * (e.g. no ACF/MetaBox/Custom Fields if no such plugins; no Media if not selected).
 	 *
+	 * @param array $options Optional. include_media (bool). Plugin presence drives ACF/MetaBox/custom_fields.
 	 * @return array
 	 */
-	private function initialize_steps() {
+	private function initialize_steps( array $options = array() ) {
+		$include_media = ! isset( $options['include_media'] ) || ! empty( $options['include_media'] );
+		$has_acf       = $this->plugin_detector->is_acf_active();
+		$has_metabox   = $this->plugin_detector->is_metabox_active();
+		$has_custom_fields = $has_acf || $has_metabox;
+
+		$phases_to_include = array(
+			'validation'    => true,
+			'analyzing'     => true,
+			'cpts'          => true,
+			'acf'           => $has_acf,
+			'metabox'       => $has_metabox,
+			'custom_fields' => $has_custom_fields,
+			'media'         => $include_media,
+			'css'           => true,
+			'posts'         => true,
+			'finalization'  => true,
+		);
+
 		$steps     = array();
 		$index     = 0;
 		$timestamp = current_time( 'mysql' );
 		foreach ( self::PHASES as $phase_key => $label ) {
+			if ( empty( $phases_to_include[ $phase_key ] ) ) {
+				continue;
+			}
 			$steps[ $phase_key ] = array(
 				'label'           => $label,
 				'status'          => 0 === $index ? 'active' : 'pending',
@@ -908,6 +981,7 @@ class EFS_Migration_Service {
 	 */
 	private function execute_migrators( $target_url, $jwt_token ) {
 		$supported_migrators = $this->migrator_registry->get_supported();
+		$steps               = $this->get_steps_state();
 
 		if ( empty( $supported_migrators ) ) {
 			$this->error_handler->log_warning(
@@ -921,14 +995,22 @@ class EFS_Migration_Service {
 			return true;
 		}
 
-		$count           = count( $supported_migrators );
+		$enabled_migrators = array();
+		foreach ( $supported_migrators as $migrator ) {
+			$step_key = $this->get_migrator_step_key( $migrator );
+			if ( isset( $steps[ $step_key ] ) ) {
+				$enabled_migrators[] = $migrator;
+			}
+		}
+
+		$count           = count( $enabled_migrators );
 		$base_percentage = 30;
 		$end_percentage  = 60;
 		$range           = max( 1, $end_percentage - $base_percentage );
-		$increment       = $range / $count;
+		$increment       = $count > 0 ? $range / $count : 0;
 		$index           = 0;
 
-		foreach ( $supported_migrators as $migrator ) {
+		foreach ( $enabled_migrators as $migrator ) {
 			$progress = (int) floor( $base_percentage + ( $increment * $index ) );
 			$step_key = $this->get_migrator_step_key( $migrator );
 			$this->update_progress(
@@ -993,12 +1075,13 @@ class EFS_Migration_Service {
 	}
 
 	/**
-	 * Get next phase key in canonical order.
+	 * Get next phase key in canonical order. If $steps is provided, returns the next key that exists in steps.
 	 *
 	 * @param string $phase Current phase.
+	 * @param array  $steps Optional. Current steps state; if provided, next key must be in this set.
 	 * @return string
 	 */
-	private function get_next_phase_key( $phase ) {
+	private function get_next_phase_key( $phase, array $steps = array() ) {
 		$keys  = array_keys( self::PHASES );
 		$index = array_search( $phase, $keys, true );
 
@@ -1006,8 +1089,15 @@ class EFS_Migration_Service {
 			return '';
 		}
 
-		$next = $index + 1;
-		return isset( $keys[ $next ] ) ? $keys[ $next ] : '';
+		$start = $index + 1;
+		for ( $i = $start; $i < count( $keys ); $i++ ) {
+			$key = $keys[ $i ];
+			if ( empty( $steps ) || isset( $steps[ $key ] ) ) {
+				return $key;
+			}
+		}
+
+		return '';
 	}
 
 	/**

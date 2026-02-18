@@ -25,12 +25,13 @@ class EFS_Media_Service {
 	/**
 	 * @param string $target_url
 	 * @param string $jwt_token
+	 * @param array  $selected_post_types Optional selected source post types.
 	 *
 	 * @return array|\WP_Error
 	 */
-	public function migrate_media( $target_url, $jwt_token ) {
+	public function migrate_media( $target_url, $jwt_token, $selected_post_types = array() ) {
 		try {
-			$result = $this->media_migrator->migrate_media( $target_url, $jwt_token );
+			$result = $this->media_migrator->migrate_media( $target_url, $jwt_token, $selected_post_types );
 
 			if ( is_wp_error( $result ) ) {
 				$this->error_handler->log_error(

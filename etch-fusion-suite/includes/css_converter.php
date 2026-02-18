@@ -28,6 +28,20 @@ class EFS_CSS_Converter {
 	private $style_repository;
 
 	/**
+	 * ACSS class style declarations keyed by Bricks class ID and class name.
+	 *
+	 * @var array<string,string>
+	 */
+	private $acss_inline_style_map = array();
+
+	/**
+	 * Tracks whether Bricks content was scanned while collecting class references.
+	 *
+	 * @var bool
+	 */
+	private $has_scanned_bricks_content = false;
+
+	/**
 	 * Constructor
 	 *
 	 * @param EFS_Error_Handler $error_handler
@@ -155,6 +169,23 @@ class EFS_CSS_Converter {
 			}
 		}
 
+		// Explicit class exclusions:
+		// Keep classes on content elements, but do not migrate their style rules.
+		$normalized_class_name = ltrim( preg_replace( '/^acss_import_/', '', $class_name ), '.' );
+		$excluded_classes      = array(
+			'bg--ultra-light',
+			'bg--ultra-dark',
+			'fr-lede',
+			'fr-intro',
+			'fr-note',
+			'fr-notes',
+			'text--l',
+		);
+		if ( in_array( $normalized_class_name, $excluded_classes, true ) ) {
+			$this->error_handler->log_info( 'CSS Converter: Excluding class ' . $class_name . ' (explicit utility exclusion)' );
+			return true;
+		}
+
 		return false;
 	}
 
@@ -165,6 +196,7 @@ class EFS_CSS_Converter {
 	 */
 	public function convert_bricks_classes_to_etch() {
 		$this->log_debug_info( 'CSS Converter: Starting conversion' );
+		$this->acss_inline_style_map = array();
 
 		$bricks_classes = get_option( 'bricks_global_classes', array() );
 		if ( is_string( $bricks_classes ) ) {
@@ -183,6 +215,23 @@ class EFS_CSS_Converter {
 			'CSS Converter: Loaded Bricks classes',
 			array(
 				'count' => count( $bricks_classes ),
+			)
+		);
+
+		$selected_post_types = $this->get_selected_post_types_from_active_migration();
+		$referenced_class_ids = $this->collect_referenced_global_class_ids( $selected_post_types );
+		$restrict_to_referenced_classes = (bool) apply_filters(
+			'etch_fusion_suite_css_restrict_to_referenced_classes',
+			true,
+			$selected_post_types,
+			$referenced_class_ids
+		);
+		$this->log_debug_info(
+			'CSS Converter: Referenced global classes collected',
+			array(
+				'referenced_count'               => count( $referenced_class_ids ),
+				'selected_post_types'            => $selected_post_types,
+				'restrict_to_referenced_classes' => $restrict_to_referenced_classes,
 			)
 		);
 
@@ -210,6 +259,17 @@ class EFS_CSS_Converter {
 				continue;
 			}
 
+			// Optional optimization: when enabled, migrate only referenced classes.
+			if ( $restrict_to_referenced_classes && ! $this->is_referenced_global_class( $class, $referenced_class_ids ) ) {
+				continue;
+			}
+
+			// ACSS utilities: keep styling via inline mapping, but do not migrate class selectors.
+			if ( $this->is_acss_class( $class ) ) {
+				$this->register_acss_inline_style( $class );
+				continue;
+			}
+
 			// Skip excluded classes
 			if ( $this->should_exclude_class( $class ) ) {
 				continue;
@@ -223,6 +283,7 @@ class EFS_CSS_Converter {
 			// Collect main custom CSS
 			if ( ! empty( $settings['_cssCustom'] ) ) {
 				$custom_css             = str_replace( '%root%', '.' . $class_name, $settings['_cssCustom'] );
+				$custom_css             = $this->normalize_deprecated_hsl_references( $custom_css );
 				$custom_css_stylesheet .= "\n" . $custom_css . "\n";
 			}
 
@@ -238,6 +299,7 @@ class EFS_CSS_Converter {
 					if ( $media_query ) {
 						// Extract just the CSS properties (remove the class wrapper)
 						$custom_css = str_replace( '%root%', '.' . $class_name, $value );
+						$custom_css = $this->normalize_deprecated_hsl_references( $custom_css );
 
 						// Extract content from .class-name { content }
 						if ( preg_match( '/\.' . preg_quote( $class_name, '/' ) . '\s*\{([^}]*)\}/s', $custom_css, $match ) ) {
@@ -279,6 +341,18 @@ class EFS_CSS_Converter {
 		$converted_count = 0;
 		$excluded_count  = 0;
 		foreach ( $bricks_classes as $class ) {
+			// Optional optimization: when enabled, migrate only referenced classes.
+			if ( $restrict_to_referenced_classes && ! $this->is_referenced_global_class( $class, $referenced_class_ids ) ) {
+				continue;
+			}
+
+			// ACSS utilities: keep styling via inline mapping, but do not migrate class selectors.
+			if ( $this->is_acss_class( $class ) ) {
+				$this->register_acss_inline_style( $class );
+				++$excluded_count;
+				continue;
+			}
+
 			// Skip excluded classes
 			if ( $this->should_exclude_class( $class ) ) {
 				++$excluded_count;
@@ -406,7 +480,16 @@ class EFS_CSS_Converter {
 		}
 
 		// Save style map for use during content migration
+		foreach ( $etch_styles as $style_key => $style_data ) {
+			if ( ! is_array( $style_data ) || empty( $style_data['css'] ) || ! is_string( $style_data['css'] ) ) {
+				continue;
+			}
+			$etch_styles[ $style_key ]['css'] = $this->normalize_deprecated_hsl_references( $style_data['css'] );
+		}
+
+		// Save style map for use during content migration
 		$this->style_repository->save_style_map( $style_map );
+		update_option( 'efs_acss_inline_style_map', $this->acss_inline_style_map );
 
 		$total_styles = count( $etch_styles );
 		$this->log_debug_info(
@@ -436,6 +519,337 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Detect whether class belongs to ACSS utilities.
+	 *
+	 * @param array $class_data Bricks global class data.
+	 * @return bool
+	 */
+	private function is_acss_class( $class_data ) {
+		if ( ! is_array( $class_data ) ) {
+			return false;
+		}
+
+		$category = isset( $class_data['category'] ) ? strtolower( trim( (string) $class_data['category'] ) ) : '';
+		if ( 'acss' === $category ) {
+			return true;
+		}
+
+		$class_name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+		return 0 === strpos( $class_name, 'acss_import_' );
+	}
+
+	/**
+	 * Cache ACSS class declarations from automatic.css for inline transfer.
+	 *
+	 * @param array $class_data Bricks class data.
+	 * @return void
+	 */
+	private function register_acss_inline_style( $class_data ) {
+		$class_name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+		$class_id   = isset( $class_data['id'] ) ? trim( (string) $class_data['id'] ) : '';
+
+		if ( '' === $class_name ) {
+			return;
+		}
+
+		$normalized_class_name = ltrim( preg_replace( '/^acss_import_/', '', $class_name ), '.' );
+		if ( '' === $normalized_class_name ) {
+			return;
+		}
+
+		$declarations = $this->get_acss_declarations_for_class( $normalized_class_name );
+		if ( '' === $declarations ) {
+			return;
+		}
+
+		if ( '' !== $class_id ) {
+			$this->acss_inline_style_map[ $class_id ] = $declarations;
+		}
+		$this->acss_inline_style_map[ $normalized_class_name ] = $declarations;
+		$this->acss_inline_style_map[ $class_name ]            = $declarations;
+	}
+
+	/**
+	 * Fetch declaration block for an ACSS class from automatic.css.
+	 *
+	 * @param string $class_name Class selector name without leading dot.
+	 * @return string
+	 */
+	private function get_acss_declarations_for_class( $class_name ) {
+		static $stylesheet = null;
+		static $cache      = array();
+
+		if ( isset( $cache[ $class_name ] ) ) {
+			return $cache[ $class_name ];
+		}
+
+		if ( null === $stylesheet ) {
+			$upload_dir = wp_upload_dir();
+			$css_path   = trailingslashit( $upload_dir['basedir'] ) . 'automatic-css/automatic.css';
+			if ( ! file_exists( $css_path ) || ! is_readable( $css_path ) ) {
+				$stylesheet = '';
+			} else {
+				$contents = file_get_contents( $css_path );
+				$stylesheet = false !== $contents ? (string) $contents : '';
+			}
+		}
+
+		if ( '' === $stylesheet ) {
+			$cache[ $class_name ] = '';
+			return '';
+		}
+
+		$pattern = '/\.' . preg_quote( $class_name, '/' ) . '\s*\{([^}]*)\}/';
+		if ( ! preg_match( $pattern, $stylesheet, $match ) ) {
+			$cache[ $class_name ] = '';
+			return '';
+		}
+
+		$declarations = trim( (string) $match[1] );
+		$declarations = $this->normalize_acss_deprecated_hsl_tokens( $declarations );
+		$cache[ $class_name ] = $declarations;
+		return $declarations;
+	}
+
+	/**
+	 * Translate deprecated ACSS v3 color-token references to the v4 channel format.
+	 *
+	 * Example:
+	 * var(--primary-hsl) -> var(--primary)
+	 *
+	 * @param string $declarations CSS declaration block.
+	 * @return string
+	 */
+	private function normalize_acss_deprecated_hsl_tokens( $declarations ) {
+		if ( '' === $declarations || false === strpos( $declarations, '-hsl' ) ) {
+			return $declarations;
+		}
+
+		$normalized = preg_replace_callback(
+			'/var\(\s*--([a-z0-9_-]+)-hsl\s*\)/i',
+			static function ( $matches ) {
+				$token = strtolower( (string) $matches[1] );
+				return 'var(--' . $token . ')';
+			},
+			$declarations
+		);
+
+		return is_string( $normalized ) ? $normalized : $declarations;
+	}
+
+	/**
+	 * Normalize deprecated *-hsl variable usage to migration-safe alternatives.
+	 *
+	 * - hsl(var(--token-hsl) / a) => color-mix(in oklab, var(--token) X%, transparent)
+	 * - hsl(var(--token-hsl))     => var(--token)
+	 * - var(--token-hsl)          => var(--token)
+	 *
+	 * @param string $css CSS fragment.
+	 * @return string
+	 */
+	private function normalize_deprecated_hsl_references( $css ) {
+		if ( '' === $css || false === strpos( $css, '-hsl' ) ) {
+			return $css;
+		}
+
+		$normalized = preg_replace_callback(
+			'/hsl\(\s*var\(\s*--([a-z0-9_-]+)-hsl\s*\)\s*(?:\/\s*([^)]+))?\)/i',
+			function ( $matches ) {
+				$token = strtolower( (string) $matches[1] );
+				$alpha = isset( $matches[2] ) ? trim( (string) $matches[2] ) : '';
+				if ( '' !== $alpha ) {
+					return 'color-mix(in oklab, var(--' . $token . ') ' . $this->normalize_alpha_to_percentage( $alpha ) . ', transparent)';
+				}
+				return 'var(--' . $token . ')';
+			},
+			$css
+		);
+
+		if ( ! is_string( $normalized ) ) {
+			$normalized = $css;
+		}
+
+		$normalized_parts = preg_replace_callback(
+			'/var\(\s*--([a-z0-9_-]+)-hsl\s*\)/i',
+			static function ( $matches ) {
+				$token = strtolower( (string) $matches[1] );
+				return 'var(--' . $token . ')';
+			},
+			$normalized
+		);
+
+		return is_string( $normalized_parts ) ? $normalized_parts : $normalized;
+	}
+
+	/**
+	 * Convert alpha values from hsl(... / a) to a percentage for color-mix().
+	 *
+	 * @param string $alpha Alpha token (e.g. ".08", "0.8", "80%", "var(--x)").
+	 * @return string
+	 */
+	private function normalize_alpha_to_percentage( $alpha ) {
+		$value = trim( (string) $alpha );
+		if ( '' === $value ) {
+			return '100%';
+		}
+
+		if ( preg_match( '/^\d+(\.\d+)?%$/', $value ) ) {
+			return $value;
+		}
+
+		if ( is_numeric( $value ) ) {
+			$float_value = (float) $value;
+			if ( $float_value <= 1 ) {
+				$float_value *= 100;
+			}
+			$float_value = max( 0, min( 100, $float_value ) );
+			$formatted   = rtrim( rtrim( sprintf( '%.4f', $float_value ), '0' ), '.' );
+			return $formatted . '%';
+		}
+
+		// Keep dynamic expressions usable in color-mix.
+		return 'calc(' . $value . ' * 100%)';
+	}
+
+	/**
+	 * Read selected post types from active migration option.
+	 *
+	 * @return array<int,string>
+	 */
+	private function get_selected_post_types_from_active_migration() {
+		$active = get_option( 'efs_active_migration', array() );
+		if ( ! is_array( $active ) || empty( $active['options'] ) || ! is_array( $active['options'] ) ) {
+			return array();
+		}
+
+		$selected = isset( $active['options']['selected_post_types'] ) && is_array( $active['options']['selected_post_types'] )
+			? $active['options']['selected_post_types']
+			: array();
+
+		$selected = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $selected ),
+				static function ( $value ) {
+					return '' !== $value;
+				}
+			)
+		);
+
+		return $selected;
+	}
+
+	/**
+	 * Collect referenced Bricks global class identifiers from selected Bricks content.
+	 *
+	 * @param array<int,string> $selected_post_types Selected post types from wizard.
+	 * @return array<string,bool> Map of class identifiers used in content.
+	 */
+	private function collect_referenced_global_class_ids( array $selected_post_types = array() ) {
+		$this->has_scanned_bricks_content = false;
+
+		$post_types = ! empty( $selected_post_types ) ? $selected_post_types : array( 'post', 'page', 'bricks_template' );
+		$post_types = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $post_types ),
+				static function ( $value ) {
+					return '' !== $value;
+				}
+			)
+		);
+
+		if ( empty( $post_types ) ) {
+			return array();
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'   => $post_types,
+				'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
+				'numberposts' => -1,
+				'meta_query'  => array(
+					'relation' => 'OR',
+					array(
+						'key'     => '_bricks_page_content_2',
+						'compare' => 'EXISTS',
+					),
+					array(
+						'key'     => '_bricks_page_content',
+						'compare' => 'EXISTS',
+					),
+				),
+			)
+		);
+
+		$referenced = array();
+		foreach ( $posts as $post ) {
+			$elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
+			if ( empty( $elements ) ) {
+				$elements = get_post_meta( $post->ID, '_bricks_page_content', true );
+			}
+			if ( is_string( $elements ) ) {
+				$elements = maybe_unserialize( $elements );
+			}
+			if ( ! is_array( $elements ) ) {
+				continue;
+			}
+			$this->has_scanned_bricks_content = true;
+
+			foreach ( $elements as $element ) {
+				if ( ! is_array( $element ) ) {
+					continue;
+				}
+				$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+				if ( empty( $settings['_cssGlobalClasses'] ) || ! is_array( $settings['_cssGlobalClasses'] ) ) {
+					continue;
+				}
+				foreach ( $settings['_cssGlobalClasses'] as $class_id ) {
+					if ( ! is_scalar( $class_id ) ) {
+						continue;
+					}
+					$key = trim( (string) $class_id );
+					if ( '' !== $key ) {
+						$referenced[ $key ] = true;
+					}
+				}
+			}
+		}
+
+		return $referenced;
+	}
+
+	/**
+	 * Check whether a global class is referenced by migrated content.
+	 *
+	 * @param array             $class_data Bricks global class data.
+	 * @param array<string,bool> $referenced_ids Referenced class identifiers.
+	 * @return bool
+	 */
+	private function is_referenced_global_class( $class_data, array $referenced_ids ) {
+		// If no Bricks content was available, keep previous behavior.
+		if ( empty( $referenced_ids ) ) {
+			return ! $this->has_scanned_bricks_content;
+		}
+
+		$class_id   = isset( $class_data['id'] ) ? trim( (string) $class_data['id'] ) : '';
+		$class_name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+
+		if ( '' !== $class_id && isset( $referenced_ids[ $class_id ] ) ) {
+			return true;
+		}
+		if ( '' !== $class_name && isset( $referenced_ids[ $class_name ] ) ) {
+			return true;
+		}
+		if ( '' !== $class_name ) {
+			$prefixed = 'acss_import_' . $class_name;
+			if ( isset( $referenced_ids[ $prefixed ] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Convert single Bricks class to Etch format
 	 */
 	public function convert_bricks_class_to_etch( $bricks_class ) {
@@ -458,6 +872,9 @@ class EFS_CSS_Converter {
 			}
 		}
 
+		$css = $this->normalize_css_variables( $css );
+		$css = $this->move_image_fit_properties_to_nested_img( $class_name, $css );
+
 		// Create entry even for empty classes (utility classes from CSS frameworks)
 		return array(
 			'type'       => 'class',
@@ -466,6 +883,74 @@ class EFS_CSS_Converter {
 			'css'        => trim( $css ),
 			'readonly'   => false,
 		);
+	}
+
+	/**
+	 * Move image fitting declarations from wrapper classes into nested img selector.
+	 *
+	 * Bricks often assigns image-class styles to a figure wrapper while the actual
+	 * rendered image is an inner <img>. For these classes we migrate:
+	 * - object-fit
+	 * - aspect-ratio
+	 * into:
+	 * img { ... }
+	 *
+	 * @param string $class_name Class name without leading dot.
+	 * @param string $css        CSS declarations generated for this class.
+	 * @return string
+	 */
+	private function move_image_fit_properties_to_nested_img( $class_name, $css ) {
+		$class_name = strtolower( trim( (string) $class_name ) );
+		$css        = (string) $css;
+
+		// Keep behavior scoped to image-like class selectors.
+		if ( '' === $class_name || false === strpos( $class_name, 'image' ) ) {
+			return $css;
+		}
+
+		$media_pos = strpos( $css, '@media' );
+		$base_css  = false === $media_pos ? $css : substr( $css, 0, $media_pos );
+		$media_css = false === $media_pos ? '' : substr( $css, $media_pos );
+
+		if ( '' === trim( $base_css ) || preg_match( '/\bimg\s*\{/i', $base_css ) ) {
+			return $css;
+		}
+
+		if ( ! preg_match_all( '/\b(object-fit|aspect-ratio)\s*:\s*([^;{}]+)\s*;/i', $base_css, $matches, PREG_SET_ORDER ) ) {
+			return $css;
+		}
+
+		$img_declarations = array();
+		foreach ( $matches as $match ) {
+			$prop  = strtolower( trim( (string) $match[1] ) );
+			$value = trim( (string) $match[2] );
+			if ( '' === $value ) {
+				continue;
+			}
+			$img_declarations[] = $prop . ': ' . $value . ';';
+		}
+
+		if ( empty( $img_declarations ) ) {
+			return $css;
+		}
+
+		$base_css = preg_replace( '/\b(object-fit|aspect-ratio)\s*:\s*[^;{}]+\s*;/i', '', $base_css );
+		$base_css = preg_replace( '/;{2,}/', ';', (string) $base_css );
+		$base_css = trim( (string) $base_css );
+
+		$nested_img_css = "img {\n  " . implode( "\n  ", array_values( array_unique( $img_declarations ) ) ) . "\n}";
+
+		if ( '' !== $base_css ) {
+			$base_css = rtrim( $base_css );
+			if ( ';' !== substr( $base_css, -1 ) && '}' !== substr( $base_css, -1 ) ) {
+				$base_css .= ';';
+			}
+			$base_css .= "\n\n" . $nested_img_css;
+		} else {
+			$base_css = $nested_img_css;
+		}
+
+		return trim( $base_css . ( '' !== $media_css ? "\n" . ltrim( $media_css ) : '' ) );
 	}
 
 	/**
@@ -488,9 +973,9 @@ class EFS_CSS_Converter {
 
 			// Extract all properties for this breakpoint
 			foreach ( $settings as $key => $value ) {
-				if ( 0 === strpos( $key, ':' . $breakpoint ) ) {
-					// Remove breakpoint suffix to get base property name
-					$base_key                         = str_replace( ':' . $breakpoint, '', $key );
+				if ( preg_match( '/:' . preg_quote( $breakpoint, '/' ) . '$/', (string) $key ) ) {
+					// Remove breakpoint suffix to get base property name.
+					$base_key                         = preg_replace( '/:' . preg_quote( $breakpoint, '/' ) . '$/', '', (string) $key );
 					$breakpoint_settings[ $base_key ] = $value;
 				}
 			}
@@ -524,8 +1009,10 @@ class EFS_CSS_Converter {
 		// Sizing
 		$css_properties = array_merge( $css_properties, $this->convert_sizing( $settings ) );
 
-		// Background
-		if ( ! empty( $settings['background'] ) ) {
+		// Background (Bricks stores this mostly in _background)
+		if ( ! empty( $settings['_background'] ) ) {
+			$css_properties = array_merge( $css_properties, $this->convert_background( $settings['_background'] ) );
+		} elseif ( ! empty( $settings['background'] ) ) {
 			$css_properties = array_merge( $css_properties, $this->convert_background( $settings['background'] ) );
 		}
 
@@ -631,7 +1118,7 @@ class EFS_CSS_Converter {
 
 			// Add stop position if available
 			if ( ! empty( $color_data['stop'] ) ) {
-				$color_stops[] = $color_value . ' ' . $color_data['stop'];
+				$color_stops[] = $color_value . ' ' . $this->normalize_gradient_stop( $color_data['stop'] );
 			} else {
 				$color_stops[] = $color_value;
 			}
@@ -651,6 +1138,28 @@ class EFS_CSS_Converter {
 			// Linear gradient (default)
 			return 'background-image: linear-gradient(' . implode( ', ', $color_stops ) . ');';
 		}
+	}
+
+	/**
+	 * Normalize Bricks gradient stop values.
+	 *
+	 * Bricks can store plain numbers (e.g. "50") for stop positions.
+	 * CSS color-stop positions require units, so we convert numeric values to percentages.
+	 *
+	 * @param mixed $stop Raw stop value from Bricks.
+	 * @return string
+	 */
+	private function normalize_gradient_stop( $stop ) {
+		$stop = trim( (string) $stop );
+		if ( '' === $stop ) {
+			return $stop;
+		}
+
+		if ( preg_match( '/^-?\d+(?:\.\d+)?$/', $stop ) ) {
+			return $stop . '%';
+		}
+
+		return $stop;
 	}
 
 	/**
@@ -858,40 +1367,56 @@ class EFS_CSS_Converter {
 	 */
 	private function convert_flexbox( $settings ) {
 		$css = array();
+		$has_flex_container_property = false;
+		$has_display_defined         = ! empty( $settings['_display'] );
 
 		// Flex container properties
 		// _direction is an alias for _flexDirection in Bricks
 		$flex_direction = $settings['_flexDirection'] ?? $settings['_direction'] ?? '';
 		if ( ! empty( $flex_direction ) ) {
 			$css[] = 'flex-direction: ' . $flex_direction . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_flexWrap'] ) ) {
 			$css[] = 'flex-wrap: ' . $settings['_flexWrap'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_justifyContent'] ) ) {
 			$css[] = 'justify-content: ' . $settings['_justifyContent'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_alignItems'] ) ) {
 			$css[] = 'align-items: ' . $settings['_alignItems'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_alignContent'] ) ) {
 			$css[] = 'align-content: ' . $settings['_alignContent'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_rowGap'] ) ) {
 			$css[] = 'row-gap: ' . $settings['_rowGap'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_columnGap'] ) ) {
 			$css[] = 'column-gap: ' . $settings['_columnGap'] . ';';
+			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_gap'] ) ) {
 			$css[] = 'gap: ' . $settings['_gap'] . ';';
+			$has_flex_container_property = true;
+		}
+
+		// Bricks "block" wrappers often carry flex-* props without an explicit display value.
+		// Preserve expected behavior unless layout display is explicitly set elsewhere.
+		if ( $has_flex_container_property && ! $has_display_defined ) {
+			$css = array_merge( array( 'display: flex;' ), $css );
 		}
 
 		// Flex item properties
@@ -1039,21 +1564,25 @@ class EFS_CSS_Converter {
 		$css = array();
 
 		// Margin - convert to logical properties
+		$margin_top    = null;
+		$margin_right  = null;
+		$margin_bottom = null;
+		$margin_left   = null;
+
 		if ( ! empty( $settings['_margin'] ) ) {
 			$margin = $settings['_margin'];
 			if ( is_array( $margin ) ) {
-				// Individual sides using logical properties
-				if ( isset( $margin['top'] ) ) {
-					$css[] = 'margin-block-start: ' . $margin['top'] . ';';
+				if ( array_key_exists( 'top', $margin ) ) {
+					$margin_top = $margin['top'];
 				}
-				if ( isset( $margin['right'] ) ) {
-					$css[] = 'margin-inline-end: ' . $margin['right'] . ';';
+				if ( array_key_exists( 'right', $margin ) ) {
+					$margin_right = $margin['right'];
 				}
-				if ( isset( $margin['bottom'] ) ) {
-					$css[] = 'margin-block-end: ' . $margin['bottom'] . ';';
+				if ( array_key_exists( 'bottom', $margin ) ) {
+					$margin_bottom = $margin['bottom'];
 				}
-				if ( isset( $margin['left'] ) ) {
-					$css[] = 'margin-inline-start: ' . $margin['left'] . ';';
+				if ( array_key_exists( 'left', $margin ) ) {
+					$margin_left = $margin['left'];
 				}
 			} else {
 				$css[] = 'margin: ' . $margin . ';';
@@ -1062,34 +1591,75 @@ class EFS_CSS_Converter {
 
 		// Individual margin properties (e.g., _marginTop, _marginBottom)
 		if ( isset( $settings['_marginTop'] ) ) {
-			$css[] = 'margin-block-start: ' . $settings['_marginTop'] . ';';
+			$margin_top = $settings['_marginTop'];
 		}
 		if ( isset( $settings['_marginRight'] ) ) {
-			$css[] = 'margin-inline-end: ' . $settings['_marginRight'] . ';';
+			$margin_right = $settings['_marginRight'];
 		}
 		if ( isset( $settings['_marginBottom'] ) ) {
-			$css[] = 'margin-block-end: ' . $settings['_marginBottom'] . ';';
+			$margin_bottom = $settings['_marginBottom'];
 		}
 		if ( isset( $settings['_marginLeft'] ) ) {
-			$css[] = 'margin-inline-start: ' . $settings['_marginLeft'] . ';';
+			$margin_left = $settings['_marginLeft'];
+		}
+
+		$margin_block_value  = null;
+		$margin_inline_value = null;
+
+		if ( null !== $margin_top && null !== $margin_bottom && (string) $margin_top === (string) $margin_bottom ) {
+			$margin_block_value = (string) $margin_top;
+		}
+
+		if ( null !== $margin_left && null !== $margin_right && (string) $margin_left === (string) $margin_right ) {
+			$margin_inline_value = (string) $margin_left;
+		}
+
+		if ( null !== $margin_block_value && null !== $margin_inline_value && $margin_block_value === $margin_inline_value ) {
+			$css[] = 'margin: ' . $margin_block_value . ';';
+		} else {
+			if ( null !== $margin_block_value ) {
+				$css[] = 'margin-block: ' . $margin_block_value . ';';
+			} else {
+				if ( null !== $margin_top ) {
+					$css[] = 'margin-block-start: ' . $margin_top . ';';
+				}
+				if ( null !== $margin_bottom ) {
+					$css[] = 'margin-block-end: ' . $margin_bottom . ';';
+				}
+			}
+
+			if ( null !== $margin_inline_value ) {
+				$css[] = 'margin-inline: ' . $margin_inline_value . ';';
+			} else {
+				if ( null !== $margin_right ) {
+					$css[] = 'margin-inline-end: ' . $margin_right . ';';
+				}
+				if ( null !== $margin_left ) {
+					$css[] = 'margin-inline-start: ' . $margin_left . ';';
+				}
+			}
 		}
 
 		// Padding - convert to logical properties
+		$padding_top    = null;
+		$padding_right  = null;
+		$padding_bottom = null;
+		$padding_left   = null;
+
 		if ( ! empty( $settings['_padding'] ) ) {
 			$padding = $settings['_padding'];
 			if ( is_array( $padding ) ) {
-				// Individual sides using logical properties
-				if ( isset( $padding['top'] ) ) {
-					$css[] = 'padding-block-start: ' . $padding['top'] . ';';
+				if ( array_key_exists( 'top', $padding ) ) {
+					$padding_top = $padding['top'];
 				}
-				if ( isset( $padding['right'] ) ) {
-					$css[] = 'padding-inline-end: ' . $padding['right'] . ';';
+				if ( array_key_exists( 'right', $padding ) ) {
+					$padding_right = $padding['right'];
 				}
-				if ( isset( $padding['bottom'] ) ) {
-					$css[] = 'padding-block-end: ' . $padding['bottom'] . ';';
+				if ( array_key_exists( 'bottom', $padding ) ) {
+					$padding_bottom = $padding['bottom'];
 				}
-				if ( isset( $padding['left'] ) ) {
-					$css[] = 'padding-inline-start: ' . $padding['left'] . ';';
+				if ( array_key_exists( 'left', $padding ) ) {
+					$padding_left = $padding['left'];
 				}
 			} else {
 				$css[] = 'padding: ' . $padding . ';';
@@ -1098,16 +1668,57 @@ class EFS_CSS_Converter {
 
 		// Individual padding properties
 		if ( isset( $settings['_paddingTop'] ) ) {
-			$css[] = 'padding-block-start: ' . $settings['_paddingTop'] . ';';
+			$padding_top = $settings['_paddingTop'];
 		}
 		if ( isset( $settings['_paddingRight'] ) ) {
-			$css[] = 'padding-inline-end: ' . $settings['_paddingRight'] . ';';
+			$padding_right = $settings['_paddingRight'];
 		}
 		if ( isset( $settings['_paddingBottom'] ) ) {
-			$css[] = 'padding-block-end: ' . $settings['_paddingBottom'] . ';';
+			$padding_bottom = $settings['_paddingBottom'];
 		}
 		if ( isset( $settings['_paddingLeft'] ) ) {
-			$css[] = 'padding-inline-start: ' . $settings['_paddingLeft'] . ';';
+			$padding_left = $settings['_paddingLeft'];
+		}
+
+		$padding_block_value  = null;
+		$padding_inline_value = null;
+
+		// Prefer shorthand when block-start and block-end are identical.
+		if ( null !== $padding_top && null !== $padding_bottom && (string) $padding_top === (string) $padding_bottom ) {
+			$padding_block_value = (string) $padding_top;
+		}
+
+		// Prefer shorthand when inline-start and inline-end are identical.
+		if ( null !== $padding_left && null !== $padding_right && (string) $padding_left === (string) $padding_right ) {
+			$padding_inline_value = (string) $padding_left;
+		}
+
+		// If all four values are equal, emit full shorthand.
+		if ( null !== $padding_block_value && null !== $padding_inline_value && $padding_block_value === $padding_inline_value ) {
+			$css[] = 'padding: ' . $padding_block_value . ';';
+			return $css;
+		}
+
+		if ( null !== $padding_block_value ) {
+			$css[] = 'padding-block: ' . $padding_block_value . ';';
+		} else {
+			if ( null !== $padding_top ) {
+				$css[] = 'padding-block-start: ' . $padding_top . ';';
+			}
+			if ( null !== $padding_bottom ) {
+				$css[] = 'padding-block-end: ' . $padding_bottom . ';';
+			}
+		}
+
+		if ( null !== $padding_inline_value ) {
+			$css[] = 'padding-inline: ' . $padding_inline_value . ';';
+		} else {
+			if ( null !== $padding_right ) {
+				$css[] = 'padding-inline-end: ' . $padding_right . ';';
+			}
+			if ( null !== $padding_left ) {
+				$css[] = 'padding-inline-start: ' . $padding_left . ';';
+			}
 		}
 
 		return $css;
@@ -1313,6 +1924,8 @@ class EFS_CSS_Converter {
 	 * IMPORTANT: Does NOT convert media queries - only CSS properties!
 	 */
 	private function convert_to_logical_properties( $css ) {
+		$css = $this->normalize_css_variables( $css );
+
 		// Map of physical to logical properties
 		$property_map = array(
 			// Margin
@@ -1373,6 +1986,165 @@ class EFS_CSS_Converter {
 		}
 
 		return $css;
+	}
+
+	/**
+	 * Normalize known Bricks/Framer variable aliases to Etch variables.
+	 *
+	 * @param string $css Raw CSS.
+	 * @return string
+	 */
+	private function normalize_css_variables( $css ) {
+		if ( '' === (string) $css ) {
+			return $css;
+		}
+
+		$css = preg_replace( '/row-gap:\s*([^;{}]+);\s*column-gap:\s*\1\s*;/i', 'gap: $1;', $css );
+		$css = preg_replace( '/column-gap:\s*([^;{}]+);\s*row-gap:\s*\1\s*;/i', 'gap: $1;', $css );
+		$css = $this->normalize_identical_shorthands( $css );
+		$css = preg_replace( '/var\(\s*--fr-container-gap\s*\)/i', 'var(--container-gap)', $css );
+		$css = preg_replace( '/var\(\s*--fr-card-gap\s*\)/i', 'var(--card-gap, var(--content-gap))', $css );
+		$css = preg_replace_callback(
+			'/var\(\s*--([a-z0-9_-]+?)-trans-([0-9]{1,3})\s*\)/i',
+			static function ( $matches ) {
+				$base_color = strtolower( (string) $matches[1] );
+				$percent    = (int) $matches[2];
+				$percent    = max( 0, min( 100, $percent ) );
+
+				return 'color-mix(in oklch, var(--' . $base_color . ') ' . $percent . '%, transparent)';
+			},
+			$css
+		);
+
+		return $css;
+	}
+
+	/**
+	 * Collapse logical longhands to shorthand only when all four side values are identical.
+	 *
+	 * @param string $css Raw CSS.
+	 * @return string
+	 */
+	private function normalize_identical_shorthands( $css ) {
+		if ( '' === (string) $css ) {
+			return $css;
+		}
+
+		$css = preg_replace_callback(
+			'/\{([^{}]*)\}/s',
+			function ( $matches ) {
+				$decls = $matches[1];
+
+				$decls = $this->collapse_quad_shorthand(
+					$decls,
+					array(
+						'inset-block-start',
+						'inset-inline-end',
+						'inset-block-end',
+						'inset-inline-start',
+					),
+					'inset'
+				);
+
+				$decls = $this->collapse_quad_shorthand(
+					$decls,
+					array(
+						'padding-block-start',
+						'padding-inline-end',
+						'padding-block-end',
+						'padding-inline-start',
+					),
+					'padding'
+				);
+
+				$decls = $this->collapse_quad_shorthand(
+					$decls,
+					array(
+						'margin-block-start',
+						'margin-inline-end',
+						'margin-block-end',
+						'margin-inline-start',
+					),
+					'margin'
+				);
+
+				$decls = $this->collapse_quad_shorthand(
+					$decls,
+					array(
+						'border-start-start-radius',
+						'border-start-end-radius',
+						'border-end-end-radius',
+						'border-end-start-radius',
+					),
+					'border-radius'
+				);
+
+				$decls = $this->collapse_quad_shorthand(
+					$decls,
+					array(
+						'border-top-left-radius',
+						'border-top-right-radius',
+						'border-bottom-right-radius',
+						'border-bottom-left-radius',
+					),
+					'border-radius'
+				);
+
+				return '{' . $decls . '}';
+			},
+			$css
+		);
+
+		return $css;
+	}
+
+	/**
+	 * Collapse four longhand declarations into one shorthand when all values match.
+	 *
+	 * @param string             $decls Declaration block without braces.
+	 * @param array<int,string>  $properties Ordered list of four longhand properties.
+	 * @param string             $shorthand Target shorthand property.
+	 * @return string
+	 */
+	private function collapse_quad_shorthand( $decls, array $properties, $shorthand ) {
+		$values = array();
+
+		foreach ( $properties as $property ) {
+			$pattern = '/(?:^|;)\s*' . preg_quote( $property, '/' ) . '\s*:\s*([^;{}]+)\s*;/i';
+			if ( ! preg_match( $pattern, $decls, $match ) ) {
+				return $decls;
+			}
+			$values[] = trim( (string) $match[1] );
+		}
+
+		$top    = $values[0];
+		$right  = $values[1];
+		$bottom = $values[2];
+		$left   = $values[3];
+
+		if ( $top === $right && $top === $bottom && $top === $left ) {
+			$shorthand_value = $top;
+		} elseif ( $top === $bottom && $right === $left ) {
+			$shorthand_value = $top . ' ' . $right;
+		} elseif ( $right === $left ) {
+			$shorthand_value = $top . ' ' . $right . ' ' . $bottom;
+		} else {
+			return $decls;
+		}
+
+		foreach ( $properties as $property ) {
+			$decls = preg_replace( '/(?:^|;)\s*' . preg_quote( $property, '/' ) . '\s*:\s*[^;{}]+\s*;/i', ';', $decls );
+		}
+
+		$decls = rtrim( preg_replace( '/\s+/', ' ', $decls ) );
+		$decls = preg_replace( '/;{2,}/', ';', $decls );
+		$decls = trim( (string) $decls );
+
+		if ( '' !== $decls && ';' !== substr( $decls, -1 ) ) {
+			$decls .= ';';
+		}
+
+		return trim( $decls . ' ' . $shorthand . ': ' . $shorthand_value . ';' );
 	}
 
 	/**
@@ -1522,6 +2294,8 @@ class EFS_CSS_Converter {
 	 */
 	private function extract_css_for_class( $stylesheet, $class_name ) {
 		$escaped_class = preg_quote( $class_name, '/' );
+		$class_token   = '/\.' . $escaped_class . '(?![a-zA-Z0-9_-])/';
+		$rule_start    = '/\.' . $escaped_class . '(?![a-zA-Z0-9_-])([^{]*?)\{/';
 		$css_parts     = array();
 
 		// Split stylesheet into lines for easier processing
@@ -1550,7 +2324,7 @@ class EFS_CSS_Converter {
 				$brace_count -= substr_count( $line, '}' );
 
 				// Check if this line contains our class
-				if ( preg_match( '/\.' . $escaped_class . '/', $line ) ) {
+				if ( preg_match( $class_token, $line ) ) {
 					$media_content .= $line . "\n";
 				} else {
 					$media_content .= $line . "\n";
@@ -1559,7 +2333,7 @@ class EFS_CSS_Converter {
 				// Media query ended
 				if ( 0 === $brace_count ) {
 					// Check if media query contains our class
-					if ( preg_match( '/\.' . $escaped_class . '/', $media_content ) ) {
+					if ( preg_match( $class_token, $media_content ) ) {
 						$css_parts[] = $current_media . " {\n" . trim( $media_content ) . "\n}";
 					}
 					$in_media      = false;
@@ -1570,7 +2344,7 @@ class EFS_CSS_Converter {
 			}
 
 			// Not in media query - check for direct class rules
-			if ( preg_match( '/\.' . $escaped_class . '([^{]*?)\{/', $line ) ) {
+			if ( preg_match( $rule_start, $line ) ) {
 				// Start of a rule for our class
 				$rule        = $line . "\n";
 				$brace_count = substr_count( $line, '{' ) - substr_count( $line, '}' );
@@ -1630,32 +2404,22 @@ class EFS_CSS_Converter {
 		// Pattern to match CSS rules: .selector { ... }
 		// This handles multi-line rules properly
 		// Capture everything between class name and opening brace
-		$pattern = '/\.' . $escaped_class . '([^{]*?)\{([^}]*)\}/s';
+		$pattern = '/\.' . $escaped_class . '(?![a-zA-Z0-9_-])([^{]*?)\{([^}]*)\}/s';
 
 		if ( preg_match_all( $pattern, $css, $matches, PREG_SET_ORDER ) ) {
 			foreach ( $matches as $match ) {
 				$selector_suffix = $match[1]; // e.g., " > *", ":hover", " .child", ""
 				$rule_content    = trim( $match[2] );
 
+				$selector_suffix = $this->normalize_selector_suffix_with_ampersand( $selector_suffix, $class_name );
+
 				// Check if this is the main selector (no suffix or only whitespace)
 				if ( empty( trim( $selector_suffix ) ) ) {
 					// This is the main selector (.my-class { ... })
 					$main_css .= $rule_content . "\n";
 				} else {
-					// This is a nested selector (.my-class > *, .my-class:hover, etc.)
-					// Convert to & syntax
-					$trimmed_suffix = trim( $selector_suffix );
-
-					// Add space after & for combinators (>, +, ~) and descendant selectors
-					if ( preg_match( '/^[>+~]/', $trimmed_suffix ) || preg_match( '/^[.#\[]/', $trimmed_suffix ) ) {
-						$nested_selector = '& ' . $trimmed_suffix;
-					} else {
-						// Pseudo-classes/elements (:hover, ::before) - no space
-						$nested_selector = '&' . $trimmed_suffix;
-					}
-
 					$rules[] = array(
-						'selector' => $nested_selector,
+						'selector' => $selector_suffix,
 						'css'      => $rule_content,
 					);
 				}
@@ -1707,6 +2471,7 @@ class EFS_CSS_Converter {
 		$media_queries = array();
 		$pos           = 0;
 		$length        = strlen( $css );
+		$class_token   = '/\.' . preg_quote( $class_name, '/' ) . '(?![a-zA-Z0-9_-])/';
 
 		while ( $pos < $length ) {
 			// Find next @media
@@ -1743,7 +2508,7 @@ class EFS_CSS_Converter {
 				$media_content = substr( $css, $content_start, $i - $content_start - 1 );
 
 				// Check if this media query contains our class
-				if ( strpos( $media_content, '.' . $class_name ) !== false ) {
+				if ( preg_match( $class_token, $media_content ) ) {
 					// Convert selectors to & syntax
 					$converted_content = $this->convert_selectors_in_media_query( $media_content, $class_name );
 
@@ -1777,7 +2542,7 @@ class EFS_CSS_Converter {
 		);
 
 		// Pattern to match CSS rules inside media query
-		$pattern = '/\.' . $escaped_class . '([^{]*?)\{([^}]*)\}/s';
+		$pattern = '/\.' . $escaped_class . '(?![a-zA-Z0-9_-])([^{]*?)\{([^}]*)\}/s';
 
 		if ( preg_match_all( $pattern, $media_content, $matches, PREG_SET_ORDER ) ) {
 			$this->log_debug_info(
@@ -1797,13 +2562,8 @@ class EFS_CSS_Converter {
 					)
 				);
 
-				// Convert to & syntax
-				if ( preg_match( '/^[>+~]/', $selector_suffix ) || preg_match( '/^[.#\[]/', $selector_suffix ) ) {
-					$nested_selector = '& ' . $selector_suffix;
-				} elseif ( ! empty( $selector_suffix ) ) {
-					$nested_selector = '&' . $selector_suffix;
-				} else {
-					// Main selector inside media query - just use &
+				$nested_selector = $this->normalize_selector_suffix_with_ampersand( $selector_suffix, $class_name );
+				if ( '' === trim( $nested_selector ) ) {
 					$nested_selector = '&';
 				}
 
@@ -1827,6 +2587,56 @@ class EFS_CSS_Converter {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Normalize selector suffixes for nested output.
+	 *
+	 * Converts duplicate source-class selectors in comma lists, e.g.
+	 * "::before, .my-class::after" => "&::before, &::after"
+	 *
+	 * @param string $selector_suffix Selector part captured after ".class".
+	 * @param string $class_name Base class name.
+	 * @return string
+	 */
+	private function normalize_selector_suffix_with_ampersand( $selector_suffix, $class_name ) {
+		$suffix = trim( (string) $selector_suffix );
+		if ( '' === $suffix ) {
+			return '';
+		}
+
+		$class_pattern = '/\.' . preg_quote( $class_name, '/' ) . '\b/i';
+		$suffix        = preg_replace( $class_pattern, '&', $suffix );
+		$suffix        = is_string( $suffix ) ? $suffix : trim( (string) $selector_suffix );
+
+		$parts = array_map( 'trim', explode( ',', $suffix ) );
+		$parts = array_filter(
+			$parts,
+			static function ( $part ) {
+				return '' !== $part;
+			}
+		);
+
+		if ( empty( $parts ) ) {
+			return '';
+		}
+
+		$normalized_parts = array();
+		foreach ( $parts as $part ) {
+			if ( 0 === strpos( $part, '&' ) ) {
+				$normalized_parts[] = $part;
+				continue;
+			}
+
+			// Add space after & for combinators and descendant selectors.
+			if ( preg_match( '/^[>+~]/', $part ) || preg_match( '/^[.#\[]/', $part ) ) {
+				$normalized_parts[] = '& ' . $part;
+			} else {
+				$normalized_parts[] = '&' . $part;
+			}
+		}
+
+		return implode( ', ', $normalized_parts );
 	}
 
 	/**

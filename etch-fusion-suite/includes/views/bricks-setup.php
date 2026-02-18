@@ -16,6 +16,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	<header class="efs-card__header">
 		<h2><?php esc_html_e( 'Bricks Migration Wizard', 'etch-fusion-suite' ); ?></h2>
 		<p><?php esc_html_e( 'Connect to your Etch site, choose what to migrate, preview the plan, and run migration.', 'etch-fusion-suite' ); ?></p>
+		<div class="efs-wizard-progress-chip-container" data-efs-progress-chip-container></div>
 	</header>
 
 	<nav class="efs-wizard-steps" aria-label="<?php esc_attr_e( 'Migration steps', 'etch-fusion-suite' ); ?>">
@@ -38,18 +39,22 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	</nav>
 
 	<div class="efs-wizard-panels">
-		<section class="efs-wizard-panel is-active" data-efs-step-panel="1">
+		<section class="is-active" data-efs-step-panel="1">
 			<h3><?php esc_html_e( 'Connect to Etch Site', 'etch-fusion-suite' ); ?></h3>
-			<p><?php esc_html_e( 'Paste the migration URL from your Etch site. We will validate the URL and token before you continue.', 'etch-fusion-suite' ); ?></p>
-			<div class="efs-wizard-migration-url-block efs-field">
-				<h4 class="efs-wizard-migration-url-block__title"><?php esc_html_e( 'Migration URL', 'etch-fusion-suite' ); ?></h4>
-				<label for="efs-wizard-migration-url" class="efs-wizard-migration-url-block__desc"><?php esc_html_e( 'Paste the URL from your Etch target site here.', 'etch-fusion-suite' ); ?></label>
+			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'Paste the migration key from your Etch site here. We will validate the key and token before you continue.', 'etch-fusion-suite' ); ?></p>
+			<div class="efs-wizard-connect-key">
 				<textarea
 					id="efs-wizard-migration-url"
 					rows="8"
 					data-efs-wizard-url
-					aria-label="<?php esc_attr_e( 'Migration URL from Etch site', 'etch-fusion-suite' ); ?>"
+					aria-label="<?php esc_attr_e( 'Migration key from Etch site', 'etch-fusion-suite' ); ?>"
+					placeholder="<?php esc_attr_e( 'Paste the key from your Etch target site here.', 'etch-fusion-suite' ); ?>"
 				><?php echo esc_textarea( $etch_fusion_suite_url ); ?></textarea>
+				<div class="efs-actions efs-actions--inline efs-wizard-connect-key__actions">
+					<button type="button" class="button" data-efs-paste-migration-url aria-label="<?php esc_attr_e( 'Paste key from clipboard', 'etch-fusion-suite' ); ?>">
+						<?php esc_html_e( 'Paste Key', 'etch-fusion-suite' ); ?>
+					</button>
+				</div>
 			</div>
 			<input type="hidden" data-efs-wizard-migration-key value="<?php echo esc_attr( $etch_fusion_suite_key ); ?>" />
 			<p class="efs-wizard-message" data-efs-connect-message hidden></p>
@@ -60,22 +65,21 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p><?php esc_html_e( 'Discovery runs automatically when this step opens. Choose post types and map each one to a target post type.', 'etch-fusion-suite' ); ?></p>
 
 			<div class="efs-wizard-loading" data-efs-discovery-loading hidden>
-				<span class="status-indicator running" aria-hidden="true"></span>
-				<span><?php esc_html_e( 'Discovering content...', 'etch-fusion-suite' ); ?></span>
+				<span class="efs-wizard-loading__spinner" aria-hidden="true"></span>
+				<span class="efs-wizard-loading__text"><?php esc_html_e( 'Discovering content...', 'etch-fusion-suite' ); ?></span>
 			</div>
 
 			<div class="efs-wizard-summary" data-efs-discovery-summary hidden>
-				<div class="efs-wizard-summary__header">
+				<div class="efs-wizard-summary__content">
 					<h4><?php esc_html_e( 'Dynamic Data Summary', 'etch-fusion-suite' ); ?></h4>
+					<p class="efs-wizard-summary__grade" data-efs-summary-grade></p>
+					<div class="efs-wizard-summary__breakdown" data-efs-summary-breakdown></div>
+				</div>
+				<div class="efs-wizard-summary__actions">
 					<button type="button" class="button button-secondary" data-efs-run-full-analysis>
 						<?php esc_html_e( 'Run Full Analysis', 'etch-fusion-suite' ); ?>
 					</button>
 				</div>
-				<p class="efs-wizard-summary__grade" data-efs-summary-grade></p>
-				<details>
-					<summary><?php esc_html_e( 'View Breakdown', 'etch-fusion-suite' ); ?></summary>
-					<ul data-efs-summary-breakdown></ul>
-				</details>
 			</div>
 
 			<div class="efs-actions efs-actions--inline">
@@ -111,7 +115,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p class="efs-wizard-message" data-efs-select-message hidden></p>
 		</section>
 
-		<section class="efs-wizard-panel" data-efs-step-panel="3" hidden>
+		<section data-efs-step-panel="3" hidden>
 			<h3><?php esc_html_e( 'Preview Migration', 'etch-fusion-suite' ); ?></h3>
 			<p><?php esc_html_e( 'Review your migration breakdown and warnings before starting.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-wizard-preview" data-efs-preview-breakdown></div>
@@ -130,7 +134,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	<footer class="efs-wizard-footer">
 		<div class="efs-actions efs-actions--inline">
 			<button type="button" class="button" data-efs-wizard-back><?php esc_html_e( 'Back', 'etch-fusion-suite' ); ?></button>
-			<button type="button" class="button button-primary" data-efs-wizard-next><?php esc_html_e( 'Next', 'etch-fusion-suite' ); ?></button>
+			<button type="button" class="efs-btn--primary" data-efs-wizard-next><?php esc_html_e( 'Next', 'etch-fusion-suite' ); ?></button>
 			<button type="button" class="button" data-efs-wizard-cancel><?php esc_html_e( 'Cancel', 'etch-fusion-suite' ); ?></button>
 		</div>
 	</footer>
@@ -158,5 +162,27 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	<div class="efs-wizard-banner" data-efs-progress-banner hidden>
 		<span data-efs-banner-text><?php esc_html_e( 'Migration in progress: 0%', 'etch-fusion-suite' ); ?></span>
 		<button type="button" class="button button-secondary" data-efs-expand-progress><?php esc_html_e( 'Expand', 'etch-fusion-suite' ); ?></button>
+	</div>
+
+	<div class="efs-etch-environment efs-card__section">
+		<h3 class="efs-etch-environment__title"><?php esc_html_e( 'System Status', 'etch-fusion-suite' ); ?></h3>
+		<dl class="efs-etch-environment__list">
+			<div class="efs-etch-environment__row">
+				<dt class="efs-etch-environment__label"><?php esc_html_e( 'Bricks Builder', 'etch-fusion-suite' ); ?></dt>
+				<dd class="efs-etch-environment__value"><?php echo isset( $is_bricks_site ) && $is_bricks_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></dd>
+			</div>
+			<div class="efs-etch-environment__row">
+				<dt class="efs-etch-environment__label"><?php esc_html_e( 'Etch PageBuilder', 'etch-fusion-suite' ); ?></dt>
+				<dd class="efs-etch-environment__value"><?php echo isset( $is_etch_site ) && $is_etch_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></dd>
+			</div>
+			<div class="efs-etch-environment__row">
+				<dt class="efs-etch-environment__label"><?php esc_html_e( 'WordPress Version', 'etch-fusion-suite' ); ?></dt>
+				<dd class="efs-etch-environment__value"><?php echo isset( $wp_version ) ? esc_html( $wp_version ) : ''; ?></dd>
+			</div>
+			<div class="efs-etch-environment__row">
+				<dt class="efs-etch-environment__label"><?php esc_html_e( 'PHP Version', 'etch-fusion-suite' ); ?></dt>
+				<dd class="efs-etch-environment__value"><?php echo isset( $php_version ) ? esc_html( $php_version ) : ''; ?></dd>
+			</div>
+		</dl>
 	</div>
 </section>

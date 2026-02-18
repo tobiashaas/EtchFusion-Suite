@@ -27,6 +27,13 @@ abstract class EFS_Base_Element {
 	protected $style_map;
 
 	/**
+	 * Pending inline CSS assembled from ACSS utility classes for current element.
+	 *
+	 * @var string
+	 */
+	protected $pending_acss_inline_css = '';
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( $style_map = array() ) {
@@ -51,6 +58,7 @@ abstract class EFS_Base_Element {
 	 */
 	protected function get_style_ids( $element ) {
 		$style_ids = array();
+		$this->pending_acss_inline_css = $this->build_acss_inline_css( $element );
 
 		// Get Global Classes from settings
 		if ( isset( $element['settings']['_cssGlobalClasses'] ) && is_array( $element['settings']['_cssGlobalClasses'] ) ) {
@@ -83,7 +91,10 @@ abstract class EFS_Base_Element {
 			foreach ( $this->style_map as $bricks_id => $etch_data ) {
 				if ( $etch_data['id'] === $style_id && isset( $etch_data['selector'] ) ) {
 					// Remove leading dot from selector
-					$class     = ltrim( $etch_data['selector'], '.' );
+					$class = ltrim( $etch_data['selector'], '.' );
+					if ( $this->is_acss_selector_name( $class ) ) {
+						break;
+					}
 					$classes[] = $class;
 					break;
 				}
@@ -100,7 +111,8 @@ abstract class EFS_Base_Element {
 	 * @return string Label
 	 */
 	protected function get_label( $element ) {
-		return $element['label'] ?? ucfirst( $this->element_type );
+		$raw_label = $element['label'] ?? ucfirst( $this->element_type );
+		return $this->sanitize_label( $raw_label, ucfirst( $this->element_type ) );
 	}
 
 	/**
@@ -111,9 +123,19 @@ abstract class EFS_Base_Element {
 	 * @return string HTML tag
 	 */
 	protected function get_tag( $element, $fallback_tag = 'div' ) {
-		$tag = $element['settings']['tag'] ?? $fallback_tag;
+		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$tag      = $settings['tag'] ?? $fallback_tag;
 
-		if ( ! is_string( $tag ) || '' === $tag ) {
+		if ( ! is_string( $tag ) || '' === trim( $tag ) ) {
+			return (string) $fallback_tag;
+		}
+
+		$tag = strtolower( trim( $tag ) );
+		if ( 'custom' === $tag && ! empty( $settings['customTag'] ) && is_string( $settings['customTag'] ) ) {
+			$tag = strtolower( trim( $settings['customTag'] ) );
+		}
+
+		if ( '' === $tag || ! preg_match( '/^[a-z][a-z0-9-]*$/', $tag ) ) {
 			return (string) $fallback_tag;
 		}
 
@@ -129,7 +151,14 @@ abstract class EFS_Base_Element {
 	 * @param string $tag HTML tag
 	 * @return array Block attributes
 	 */
-	protected function build_attributes( $label, $style_ids, $etch_attributes, $tag = 'div' ) {
+	protected function build_attributes( $label, $style_ids, $etch_attributes, $tag = 'div', $element = array() ) {
+		$etch_attributes = $this->merge_pending_acss_inline_style( $etch_attributes, $element );
+		$label           = $this->sanitize_label( $label, ucfirst( $this->element_type ) );
+		$custom_attributes = $this->extract_custom_attributes( $element );
+		if ( ! empty( $custom_attributes ) ) {
+			$etch_attributes = array_merge( $custom_attributes, (array) $etch_attributes );
+		}
+
 		return array(
 			'metadata'   => array(
 				'name' => (string) $label,
@@ -138,6 +167,291 @@ abstract class EFS_Base_Element {
 			'attributes' => $this->normalize_attributes( $etch_attributes ),
 			'styles'     => $this->normalize_style_ids( $style_ids ),
 		);
+	}
+
+	/**
+	 * Extract custom attributes from Bricks settings._attributes.
+	 *
+	 * @param array $element Bricks element.
+	 * @return array<string, string>
+	 */
+	protected function extract_custom_attributes( $element ) {
+		$normalized = array();
+
+		if ( ! is_array( $element ) || empty( $element['settings'] ) || ! is_array( $element['settings'] ) ) {
+			return $normalized;
+		}
+
+		$raw_attributes = isset( $element['settings']['_attributes'] ) && is_array( $element['settings']['_attributes'] )
+			? $element['settings']['_attributes']
+			: array();
+
+		foreach ( $raw_attributes as $entry ) {
+			if ( ! is_array( $entry ) ) {
+				continue;
+			}
+
+			$name = isset( $entry['name'] ) ? strtolower( trim( (string) $entry['name'] ) ) : '';
+			if ( '' === $name ) {
+				continue;
+			}
+
+			// Allow standard HTML attribute tokens, including aria-*/data-* and namespaced variants.
+			if ( ! preg_match( '/^[a-z_:][a-z0-9:._-]*$/', $name ) ) {
+				continue;
+			}
+
+			$value = isset( $entry['value'] ) && is_scalar( $entry['value'] )
+				? (string) $entry['value']
+				: '';
+
+			$normalized[ $name ] = $value;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Merge pending ACSS inline declarations into element attributes.
+	 *
+	 * @param array $etch_attributes Raw attributes.
+	 * @return array
+	 */
+	protected function merge_pending_acss_inline_style( $etch_attributes, $element = array() ) {
+		if ( empty( $this->pending_acss_inline_css ) ) {
+			return $etch_attributes;
+		}
+
+		if ( ! is_array( $etch_attributes ) ) {
+			$etch_attributes = array();
+		}
+
+		$existing = isset( $etch_attributes['style'] ) && is_scalar( $etch_attributes['style'] )
+			? trim( (string) $etch_attributes['style'] )
+			: '';
+		$pending = trim( (string) $this->pending_acss_inline_css );
+
+		if ( '' !== $existing && ';' !== substr( $existing, -1 ) ) {
+			$existing .= ';';
+		}
+		if ( '' !== $pending && ';' !== substr( $pending, -1 ) ) {
+			$pending .= ';';
+		}
+
+		$target_style_id = $this->resolve_single_neighbor_style_id( $element );
+		if ( '' !== $target_style_id && $this->append_declarations_to_style_id( $target_style_id, $pending ) ) {
+			$this->pending_acss_inline_css = '';
+			return $etch_attributes;
+		}
+
+		$etch_attributes['style'] = trim( $existing . ' ' . $pending );
+		$this->pending_acss_inline_css = '';
+
+		return $etch_attributes;
+	}
+
+	/**
+	 * Resolve exactly one non-utility neighbor style ID for declaration merge.
+	 *
+	 * @param array $element Bricks element data.
+	 * @return string
+	 */
+	protected function resolve_single_neighbor_style_id( $element ) {
+		if ( ! is_array( $element ) || empty( $element['settings'] ) || ! is_array( $element['settings'] ) ) {
+			return '';
+		}
+
+		$candidate_style_ids = array();
+		$settings            = $element['settings'];
+
+		if ( ! empty( $settings['_cssGlobalClasses'] ) && is_array( $settings['_cssGlobalClasses'] ) ) {
+			foreach ( $settings['_cssGlobalClasses'] as $class_id ) {
+				$key = is_scalar( $class_id ) ? trim( (string) $class_id ) : '';
+				if ( '' === $key || empty( $this->style_map[ $key ]['id'] ) ) {
+					continue;
+				}
+
+				$selector = isset( $this->style_map[ $key ]['selector'] ) ? ltrim( (string) $this->style_map[ $key ]['selector'], '.' ) : '';
+				if ( '' === $selector || $this->is_utility_like_selector( $selector ) || $this->is_acss_selector_name( $selector ) ) {
+					continue;
+				}
+
+				$candidate_style_ids[] = (string) $this->style_map[ $key ]['id'];
+			}
+		}
+
+		if ( isset( $settings['_cssClasses'] ) && is_string( $settings['_cssClasses'] ) ) {
+			$tokens = array_values( array_filter( preg_split( '/\s+/', trim( $settings['_cssClasses'] ) ) ) );
+			foreach ( $tokens as $token ) {
+				if ( $this->is_utility_like_selector( $token ) || $this->is_acss_selector_name( $token ) ) {
+					continue;
+				}
+
+				foreach ( $this->style_map as $style_data ) {
+					if ( ! is_array( $style_data ) ) {
+						continue;
+					}
+					$selector = isset( $style_data['selector'] ) ? ltrim( (string) $style_data['selector'], '.' ) : '';
+					if ( $selector !== $token || empty( $style_data['id'] ) ) {
+						continue;
+					}
+					$candidate_style_ids[] = (string) $style_data['id'];
+					break;
+				}
+			}
+		}
+
+		$candidate_style_ids = array_values( array_unique( array_filter( $candidate_style_ids ) ) );
+		return 1 === count( $candidate_style_ids ) ? $candidate_style_ids[0] : '';
+	}
+
+	/**
+	 * Identify utility classes that should not become merge targets.
+	 *
+	 * @param string $selector Class name without dot.
+	 * @return bool
+	 */
+	protected function is_utility_like_selector( $selector ) {
+		$name = trim( (string) $selector );
+		if ( '' === $name ) {
+			return true;
+		}
+
+		if ( 0 === strpos( $name, 'brxe-' ) || 0 === strpos( $name, 'brx-' ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Append declarations to Etch style option; returns true when merged.
+	 *
+	 * @param string $style_id Etch style ID.
+	 * @param string $declarations CSS declaration string.
+	 * @return bool
+	 */
+	protected function append_declarations_to_style_id( $style_id, $declarations ) {
+		$style_id     = trim( (string) $style_id );
+		$declarations = trim( (string) $declarations );
+		if ( '' === $style_id || '' === $declarations ) {
+			return false;
+		}
+
+		static $writes = array();
+		$key           = $style_id . '|' . md5( $declarations );
+		if ( isset( $writes[ $key ] ) ) {
+			return true;
+		}
+
+		$styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $styles ) || empty( $styles[ $style_id ] ) || ! is_array( $styles[ $style_id ] ) ) {
+			return false;
+		}
+
+		$current_css = isset( $styles[ $style_id ]['css'] ) && is_scalar( $styles[ $style_id ]['css'] )
+			? trim( (string) $styles[ $style_id ]['css'] )
+			: '';
+
+		if ( false !== stripos( $current_css, trim( $declarations, ';' ) ) ) {
+			$writes[ $key ] = true;
+			return true;
+		}
+
+		if ( '' !== $current_css && ';' !== substr( $current_css, -1 ) ) {
+			$current_css .= ';';
+		}
+		$styles[ $style_id ]['css'] = trim( $current_css . ' ' . $declarations );
+		update_option( 'etch_styles', $styles );
+		$writes[ $key ] = true;
+
+		return true;
+	}
+
+	/**
+	 * Build inline CSS declarations for ACSS classes attached to this element.
+	 *
+	 * @param array $element Bricks element data.
+	 * @return string
+	 */
+	protected function build_acss_inline_css( $element ) {
+		if ( ! isset( $element['settings']['_cssGlobalClasses'] ) || ! is_array( $element['settings']['_cssGlobalClasses'] ) ) {
+			return '';
+		}
+
+		static $acss_inline_map = null;
+		if ( null === $acss_inline_map ) {
+			$acss_inline_map = get_option( 'efs_acss_inline_style_map', array() );
+			if ( ! is_array( $acss_inline_map ) ) {
+				$acss_inline_map = array();
+			}
+		}
+
+		if ( empty( $acss_inline_map ) ) {
+			return '';
+		}
+
+		$declarations = array();
+		foreach ( $element['settings']['_cssGlobalClasses'] as $class_id ) {
+			if ( ! is_scalar( $class_id ) ) {
+				continue;
+			}
+			$key = trim( (string) $class_id );
+			if ( '' === $key || empty( $acss_inline_map[ $key ] ) ) {
+				continue;
+			}
+			$declarations[] = trim( (string) $acss_inline_map[ $key ] );
+		}
+
+		if ( empty( $declarations ) ) {
+			return '';
+		}
+
+		return implode( ' ', array_unique( array_filter( $declarations ) ) );
+	}
+
+	/**
+	 * Determine whether a selector name belongs to ACSS utility namespace.
+	 *
+	 * @param string $selector_name Selector without leading dot.
+	 * @return bool
+	 */
+	protected function is_acss_selector_name( $selector_name ) {
+		$selector_name = trim( (string) $selector_name );
+		if ( '' === $selector_name ) {
+			return false;
+		}
+
+		static $acss_names = null;
+		if ( null === $acss_names ) {
+			$acss_names      = array();
+			$global_classes = get_option( 'bricks_global_classes', array() );
+			if ( is_string( $global_classes ) ) {
+				$decoded = json_decode( $global_classes, true );
+				if ( is_array( $decoded ) ) {
+					$global_classes = $decoded;
+				}
+			}
+
+			if ( is_array( $global_classes ) ) {
+				foreach ( $global_classes as $class_data ) {
+					if ( ! is_array( $class_data ) ) {
+						continue;
+					}
+					$category = isset( $class_data['category'] ) ? strtolower( trim( (string) $class_data['category'] ) ) : '';
+					if ( 'acss' !== $category ) {
+						continue;
+					}
+					$name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+					$name = ltrim( preg_replace( '/^acss_import_/', '', $name ), '.' );
+					if ( '' !== $name ) {
+						$acss_names[ $name ] = true;
+					}
+				}
+			}
+		}
+
+		return isset( $acss_names[ $selector_name ] );
 	}
 
 	/**
@@ -252,5 +566,39 @@ abstract class EFS_Base_Element {
 		}
 
 		return $children_html;
+	}
+
+	/**
+	 * Normalize Bricks structure labels for Etch metadata names.
+	 *
+	 * Removes technical suffixes like "(CSS Tab)" and inline tag markers
+	 * like "<ul>", "<li>", etc. before block JSON serialization.
+	 *
+	 * @param mixed  $label Label candidate.
+	 * @param string $fallback Fallback label.
+	 * @return string
+	 */
+	protected function sanitize_label( $label, $fallback = 'Element' ) {
+		if ( ! is_scalar( $label ) ) {
+			return (string) $fallback;
+		}
+
+		$normalized = trim( (string) $label );
+		if ( '' === $normalized ) {
+			return (string) $fallback;
+		}
+
+		$normalized = html_entity_decode( $normalized, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$normalized = preg_replace( '/\(\s*css(?:\s+tab)?\s*\)/i', '', $normalized );
+		$normalized = preg_replace( '/<[^>]*>/', '', $normalized );
+		$normalized = str_replace( array( '<', '>' ), '', $normalized );
+		$normalized = preg_replace( '/\s{2,}/', ' ', $normalized );
+		$normalized = trim( $normalized, " \t\n\r\0\x0B-:|" );
+
+		if ( '' === $normalized ) {
+			return (string) $fallback;
+		}
+
+		return $normalized;
 	}
 }

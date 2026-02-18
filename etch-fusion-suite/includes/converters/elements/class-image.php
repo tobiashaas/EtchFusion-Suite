@@ -56,20 +56,9 @@ class EFS_Element_Image extends EFS_Base_Element {
 			$figure_attrs['class'] = $css_classes;
 		}
 
-		$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure' );
+		$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element );
 
-		$img_attrs = array(
-			'src' => $image_url,
-			'alt' => $alt_text,
-		);
-
-		if ( $image_id > 0 ) {
-			$img_attrs['data-id'] = (string) $image_id;
-		}
-
-		$img_block = $this->generate_etch_element_block(
-			$this->build_attributes( 'Image', array(), $img_attrs, 'img' )
-		);
+		$img_block = $this->generate_dynamic_image_block( $image_id, $image_url, $alt_text );
 
 		$inner_blocks = array( $img_block );
 
@@ -82,5 +71,58 @@ class EFS_Element_Image extends EFS_Base_Element {
 		}
 
 		return $this->generate_etch_element_block( $figure_block_attrs, $inner_blocks );
+	}
+
+	/**
+	 * Build Etch dynamic-image block for migrated images.
+	 *
+	 * Prefers mapped target media ID (from media migration) and falls back to src/alt.
+	 *
+	 * @param int    $source_image_id Source attachment ID from Bricks.
+	 * @param string $image_url       Source image URL.
+	 * @param string $alt_text        Image alt text.
+	 * @return string
+	 */
+	private function generate_dynamic_image_block( $source_image_id, $image_url, $alt_text ) {
+		$attributes = array();
+
+		$mapped_media_id = $this->get_mapped_target_media_id( (int) $source_image_id );
+		if ( $mapped_media_id > 0 ) {
+			$attributes['mediaId'] = (string) $mapped_media_id;
+		} else {
+			$attributes['src'] = (string) $image_url;
+			$attributes['alt'] = (string) $alt_text;
+		}
+
+		$dynamic_attrs = array(
+			'metadata'   => array(
+				'name' => 'Image',
+			),
+			'tag'        => 'img',
+			'attributes' => $attributes,
+		);
+
+		$json = wp_json_encode( $dynamic_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+
+		return '<!-- wp:etch/dynamic-image ' . $json . " -->\n\n<!-- /wp:etch/dynamic-image -->";
+	}
+
+	/**
+	 * Resolve mapped target media ID from migration mapping option.
+	 *
+	 * @param int $source_image_id Source attachment ID.
+	 * @return int
+	 */
+	private function get_mapped_target_media_id( $source_image_id ) {
+		if ( $source_image_id <= 0 ) {
+			return 0;
+		}
+
+		$mappings = get_option( 'b2e_media_mappings', array() );
+		if ( ! is_array( $mappings ) || ! isset( $mappings[ $source_image_id ] ) ) {
+			return 0;
+		}
+
+		return (int) $mappings[ $source_image_id ];
 	}
 }

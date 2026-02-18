@@ -35,6 +35,7 @@
     "analyze:elements": "node scripts/analyze-elements.js",
     "report:migration-quality": "node scripts/migration-quality-report.js",
     "test:playwright": "playwright test",
+    "test:playwright:true-e2e": "playwright test tests/playwright/true-e2e.spec.ts --project=chromium --reporter=line",
     "test:playwright:admin-dashboard": "playwright test tests/playwright/admin-dashboard-wizard.spec.ts tests/playwright/admin-dashboard-receiving.spec.ts",
     "test:playwright:ci": "echo '🤖 CI/CD environment detected - skipping Playwright tests' && echo '🎯 CI/CD focuses on code quality (PHPCS + PHPUnit)' && echo '🧪 Run WordPress integration tests locally with: npm run e2e:start && npm run test:migration' && exit 0",
     "playwright:install": "playwright install --with-deps chromium firefox webkit",

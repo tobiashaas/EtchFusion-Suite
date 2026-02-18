@@ -56,7 +56,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 					$style_ids,
 					$css_classes,
 					$width,
-					$height
+					$height,
+					$element
 				);
 
 			case 'vimeo':
@@ -71,7 +72,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 					$style_ids,
 					$css_classes,
 					$width,
-					$height
+					$height,
+					$element
 				);
 
 			case 'media':
@@ -94,7 +96,7 @@ class EFS_Element_Video extends EFS_Base_Element {
 	 * @param string $height Frame height.
 	 * @return string
 	 */
-	private function convert_embed_video( $label, $embed_url, $style_ids, $css_classes, $width, $height ) {
+	private function convert_embed_video( $label, $embed_url, $style_ids, $css_classes, $width, $height, $element = array() ) {
 		$iframe_attrs = array(
 			'data-etch-element' => 'iframe',
 			'src'               => $embed_url,
@@ -113,7 +115,7 @@ class EFS_Element_Video extends EFS_Base_Element {
 		array_unshift( $iframe_styles, 'etch-iframe-style' );
 		$iframe_styles = array_values( array_unique( $iframe_styles ) );
 
-		$attrs = $this->build_attributes( $label, $iframe_styles, $iframe_attrs, 'iframe' );
+		$attrs = $this->build_attributes( $label, $iframe_styles, $iframe_attrs, 'iframe', $element );
 
 		return $this->generate_etch_element_block( $attrs );
 	}
@@ -171,7 +173,7 @@ class EFS_Element_Video extends EFS_Base_Element {
 		);
 
 		return $this->generate_etch_element_block(
-			$this->build_attributes( $label, $style_ids, $figure_attrs, 'figure' ),
+			$this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element ),
 			array( $figcaption_block, $video_block )
 		);
 	}
