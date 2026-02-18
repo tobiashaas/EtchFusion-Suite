@@ -811,6 +811,20 @@ class EFS_CSS_Converter {
 						$referenced[ $key ] = true;
 					}
 				}
+
+				// Bricks also stores direct class names in _cssClasses (space-separated).
+				// Include these so class-restricted migration does not drop referenced globals.
+				if ( ! empty( $settings['_cssClasses'] ) && is_string( $settings['_cssClasses'] ) ) {
+					$tokens = preg_split( '/\s+/', trim( $settings['_cssClasses'] ) );
+					if ( is_array( $tokens ) ) {
+						foreach ( $tokens as $token ) {
+							$name = trim( (string) $token );
+							if ( '' !== $name ) {
+								$referenced[ $name ] = true;
+							}
+						}
+					}
+				}
 			}
 		}
 

@@ -343,18 +343,19 @@ class EFS_Gutenberg_Generator {
 		}
 
 		$current_style = isset( $attributes['style'] ) && is_scalar( $attributes['style'] ) ? (string) $attributes['style'] : '';
-		if ( preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $current_style ) ) {
+		$current_layout = $this->get_layout_profile_from_css( $current_style );
+		if ( $current_layout['is_grid'] ) {
 			return $attributes;
 		}
 
 		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
 		$display  = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
-		if ( in_array( $display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true ) ) {
+		if ( in_array( $display, array( 'grid', 'inline-grid' ), true ) ) {
 			return $attributes;
 		}
-
-		if ( $this->styles_define_layout_display( $style_ids ) ) {
-			return $attributes;
+		$settings_direction = isset( $settings['_flexDirection'] ) ? trim( (string) $settings['_flexDirection'] ) : '';
+		if ( '' === $settings_direction ) {
+			$settings_direction = isset( $settings['_direction'] ) ? trim( (string) $settings['_direction'] ) : '';
 		}
 
 		$neighbor_classes = array_values(
@@ -373,16 +374,53 @@ class EFS_Gutenberg_Generator {
 
 		if ( 1 === count( $neighbor_classes ) ) {
 			$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
-			if ( $target_style_id && ! $this->style_id_defines_layout_display( $target_style_id ) ) {
-				$this->append_declarations_to_style_id( $target_style_id, 'display: flex; flex-direction: column;' );
+			if ( $target_style_id ) {
+				$target_layout = $this->get_layout_profile_for_style_id( $target_style_id );
+				if ( $target_layout['is_grid'] ) {
+					return $attributes;
+				}
+
+				$declarations = '';
+				if ( ! $target_layout['is_flex'] ) {
+					$declarations .= 'display: flex;';
+				}
+				if ( ! $target_layout['has_flex_direction'] ) {
+					$declarations .= ( '' !== $declarations ? ' ' : '' ) . 'flex-direction: column;';
+				}
+
+				if ( '' !== $declarations ) {
+					$this->append_declarations_to_style_id( $target_style_id, $declarations );
+				}
+
 				return $attributes;
 			}
+		}
+
+		$style_layout = $this->get_layout_profile_for_style_ids( $style_ids );
+		if ( $style_layout['is_grid'] ) {
+			return $attributes;
+		}
+		if ( $style_layout['is_flex'] && $style_layout['has_flex_direction'] ) {
+			return $attributes;
+		}
+
+		$inline_declarations = '';
+		if ( $current_layout['is_flex'] || in_array( $display, array( 'flex', 'inline-flex' ), true ) || $style_layout['is_flex'] ) {
+			if ( ! $current_layout['has_flex_direction'] && ! $style_layout['has_flex_direction'] && '' === $settings_direction ) {
+				$inline_declarations = 'flex-direction: column;';
+			}
+		} else {
+			$inline_declarations = 'display: flex; flex-direction: column;';
+		}
+
+		if ( '' === $inline_declarations ) {
+			return $attributes;
 		}
 
 		if ( '' !== trim( $current_style ) && ';' !== substr( rtrim( $current_style ), -1 ) ) {
 			$current_style .= ';';
 		}
-		$attributes['style'] = trim( $current_style . ' display: flex; flex-direction: column;' );
+		$attributes['style'] = trim( $current_style . ' ' . $inline_declarations );
 
 		return $attributes;
 	}
@@ -422,27 +460,35 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Check one style ID for layout display declarations.
+	 * Get layout profile for one style ID.
 	 *
 	 * @param string $style_id Etch style ID.
-	 * @return bool
+	 * @return array<string,bool>
 	 */
-	private function style_id_defines_layout_display( $style_id ) {
+	private function get_layout_profile_for_style_id( $style_id ) {
 		$style_id = trim( (string) $style_id );
 		if ( '' === $style_id ) {
-			return false;
+			return array(
+				'is_grid'            => false,
+				'is_flex'            => false,
+				'has_flex_direction' => false,
+			);
 		}
 
 		$etch_styles = get_option( 'etch_styles', array() );
 		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
-			return false;
+			return array(
+				'is_grid'            => false,
+				'is_flex'            => false,
+				'has_flex_direction' => false,
+			);
 		}
 
 		$css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
 			? (string) $etch_styles[ $style_id ]['css']
 			: '';
 
-		return '' !== $css && (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $css );
+		return $this->get_layout_profile_from_css( $css );
 	}
 
 	/**
@@ -488,14 +534,20 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Detect whether any resolved style already defines a flex/grid display.
+	 * Aggregate layout profile across style IDs.
 	 *
 	 * @param array $style_ids Etch style IDs.
-	 * @return bool
+	 * @return array<string,bool>
 	 */
-	private function styles_define_layout_display( array $style_ids ) {
+	private function get_layout_profile_for_style_ids( array $style_ids ) {
+		$profile = array(
+			'is_grid'            => false,
+			'is_flex'            => false,
+			'has_flex_direction' => false,
+		);
+
 		if ( empty( $style_ids ) ) {
-			return false;
+			return $profile;
 		}
 
 		static $etch_styles = null;
@@ -520,12 +572,28 @@ class EFS_Gutenberg_Generator {
 				? (string) $etch_styles[ $key ]['css']
 				: '';
 
-			if ( '' !== $css && preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $css ) ) {
-				return true;
-			}
+			$item_profile                    = $this->get_layout_profile_from_css( $css );
+			$profile['is_grid']             = $profile['is_grid'] || $item_profile['is_grid'];
+			$profile['is_flex']             = $profile['is_flex'] || $item_profile['is_flex'];
+			$profile['has_flex_direction']  = $profile['has_flex_direction'] || $item_profile['has_flex_direction'];
 		}
 
-		return false;
+		return $profile;
+	}
+
+	/**
+	 * Read flex/grid/flex-direction state from a CSS string.
+	 *
+	 * @param string $css Raw CSS.
+	 * @return array<string,bool>
+	 */
+	private function get_layout_profile_from_css( $css ) {
+		$css = (string) $css;
+		return array(
+			'is_grid'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?grid\b/i', $css ),
+			'is_flex'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?flex\b/i', $css ),
+			'has_flex_direction' => (bool) preg_match( '/\bflex-direction\s*:/i', $css ),
+		);
 	}
 
 	/**
