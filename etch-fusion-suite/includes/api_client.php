@@ -111,6 +111,11 @@ class EFS_API_Client {
 			// Mirror the token in a custom header as a fallback transport.
 			$args['headers']['X-EFS-Migration-Key'] = $jwt_token;
 		}
+		// So the target (Etch) can show the real source site in "Receiving Migration" UI.
+		$source_origin = is_string( home_url() ) && '' !== home_url() ? esc_url_raw( home_url() ) : '';
+		if ( '' !== $source_origin ) {
+			$args['headers']['X-EFS-Source-Origin'] = $source_origin;
+		}
 
 		if ( $data && in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) {
 			$args['body'] = wp_json_encode( $data );

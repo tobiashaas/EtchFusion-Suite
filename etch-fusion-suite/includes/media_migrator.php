@@ -38,9 +38,9 @@ class EFS_Media_Migrator {
 	/**
 	 * Migrate all media files from source to target site
 	 */
-	public function migrate_media( $target_url, $jwt_token ) {
+	public function migrate_media( $target_url, $jwt_token, $selected_post_types = array() ) {
 		$this->error_handler->log_info( 'Media Migration: Starting' );
-		$media_files = $this->get_media_files();
+		$media_files = $this->get_media_files( $selected_post_types );
 		$this->error_handler->log_info( 'Media Migration: Found ' . count( $media_files ) . ' media files' );
 
 		if ( empty( $media_files ) ) {
@@ -60,7 +60,7 @@ class EFS_Media_Migrator {
 
 		// Process in batches to avoid memory issues
 		$batch_size = 5; // Process 5 media files at a time
-		$batches    = array_chunk( $media_files, $batch_size );
+		$batches    = array_chunk( $media_files, $batch_size, true );
 
 		$api_client = $this->api_client;
 		if ( null === $api_client ) {
@@ -69,22 +69,25 @@ class EFS_Media_Migrator {
 
 		foreach ( $batches as $batch_index => $batch ) {
 			foreach ( $batch as $media_id => $media_data ) {
+				$source_media_id = isset( $media_data['id'] ) ? (int) $media_data['id'] : (int) $media_id;
+
 				// Check if media was already migrated (deduplication)
-				$existing_mapping = $this->get_media_mapping( $media_id );
+				$existing_mapping = $this->get_media_mapping( $source_media_id );
 				if ( null !== $existing_mapping ) {
-					$this->error_handler->log_info( 'Media Migration: Skipped media ID ' . $media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
+					$this->error_handler->log_info( 'Media Migration: Skipped media ID ' . $source_media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
 					++$skipped_media;
 					continue;
 				}
 
-				$this->error_handler->log_info( 'Media Migration: Migrating media ID ' . $media_id . ' (' . $media_data['title'] . ')' );
-				$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $jwt_token );
+				$this->error_handler->log_info( 'Media Migration: Migrating media ID ' . $source_media_id . ' (' . $media_data['title'] . ')' );
+				$result = $this->migrate_single_media( $source_media_id, $media_data, $target_url, $jwt_token );
 
 				if ( is_wp_error( $result ) ) {
 					$this->error_handler->log_error(
 						'E401',
 						array(
 							'media_id'    => $media_id,
+							'source_id'   => $source_media_id,
 							'media_title' => $media_data['title'],
 							'error'       => $result->get_error_message(),
 							'action'      => 'Failed to migrate media file',
@@ -93,7 +96,7 @@ class EFS_Media_Migrator {
 					continue;
 				}
 
-				$this->error_handler->log_info( 'Media Migration: Success for media ID ' . $media_id );
+				$this->error_handler->log_info( 'Media Migration: Success for media ID ' . $source_media_id );
 
 				++$migrated_media;
 
@@ -120,19 +123,30 @@ class EFS_Media_Migrator {
 	/**
 	 * Get all media files from the source site
 	 */
-	private function get_media_files() {
-		$media_query = new \WP_Query(
-			array(
-				'post_type'      => 'attachment',
-				'post_status'    => 'inherit',
-				'posts_per_page' => -1,
-				'meta_query'     => array(
-					array(
-						'key'     => '_wp_attached_file',
-						'compare' => 'EXISTS',
-					),
+	private function get_media_files( $selected_post_types = array() ) {
+		$query_args = array(
+			'post_type'      => 'attachment',
+			'post_status'    => 'inherit',
+			'posts_per_page' => -1,
+			'meta_query'     => array(
+				array(
+					'key'     => '_wp_attached_file',
+					'compare' => 'EXISTS',
 				),
-			)
+			),
+		);
+
+		$selected_post_types = is_array( $selected_post_types ) ? array_values( array_filter( array_map( 'sanitize_key', $selected_post_types ) ) ) : array();
+		if ( ! empty( $selected_post_types ) ) {
+			$scoped_ids = $this->get_media_ids_for_selected_post_types( $selected_post_types );
+			if ( empty( $scoped_ids ) ) {
+				return array();
+			}
+			$query_args['post__in'] = $scoped_ids;
+		}
+
+		$media_query = new \WP_Query(
+			$query_args
 		);
 
 		$media_files = array();
@@ -162,6 +176,130 @@ class EFS_Media_Migrator {
 		wp_reset_postdata();
 
 		return $media_files;
+	}
+
+	/**
+	 * Resolve attachment IDs that are relevant for selected source post types.
+	 *
+	 * @param array $selected_post_types Selected post types from wizard.
+	 * @return array<int>
+	 */
+	private function get_media_ids_for_selected_post_types( array $selected_post_types ) {
+		$posts = get_posts(
+			array(
+				'post_type'      => $selected_post_types,
+				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+			)
+		);
+
+		if ( empty( $posts ) ) {
+			return array();
+		}
+
+		$media_ids = array();
+		foreach ( $posts as $post_id ) {
+			$post_id = (int) $post_id;
+			if ( $post_id <= 0 ) {
+				continue;
+			}
+
+			$thumbnail_id = (int) get_post_thumbnail_id( $post_id );
+			if ( $thumbnail_id > 0 ) {
+				$media_ids[] = $thumbnail_id;
+			}
+
+			$attachments = get_children(
+				array(
+					'post_parent'    => $post_id,
+					'post_type'      => 'attachment',
+					'post_status'    => 'inherit',
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+				)
+			);
+			if ( is_array( $attachments ) ) {
+				$media_ids = array_merge( $media_ids, array_map( 'intval', $attachments ) );
+			}
+
+			$post_content = (string) get_post_field( 'post_content', $post_id );
+			if ( '' !== $post_content ) {
+				$from_content = $this->find_media_in_content( $post_content );
+				if ( is_array( $from_content ) ) {
+					$media_ids = array_merge( $media_ids, array_map( 'intval', $from_content ) );
+				}
+			}
+
+			$bricks_content = get_post_meta( $post_id, '_bricks_page_content_2', true );
+			if ( empty( $bricks_content ) ) {
+				$bricks_content = get_post_meta( $post_id, '_bricks_page_content', true );
+			}
+			if ( is_string( $bricks_content ) ) {
+				$decoded = json_decode( $bricks_content, true );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					$bricks_content = $decoded;
+				} else {
+					$bricks_content = maybe_unserialize( $bricks_content );
+				}
+			}
+			$this->collect_attachment_ids_from_value( $bricks_content, $media_ids );
+		}
+
+		$media_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'intval', $media_ids ),
+					static function ( $value ) {
+						return $value > 0 && 'attachment' === get_post_type( $value );
+					}
+				)
+			)
+		);
+
+		return $media_ids;
+	}
+
+	/**
+	 * Recursively collect attachment IDs from arbitrary Bricks data payloads.
+	 *
+	 * @param mixed $value Input payload.
+	 * @param array $media_ids Destination ID list (by reference).
+	 * @return void
+	 */
+	private function collect_attachment_ids_from_value( $value, array &$media_ids ) {
+		if ( is_array( $value ) ) {
+			foreach ( $value as $item ) {
+				$this->collect_attachment_ids_from_value( $item, $media_ids );
+			}
+			return;
+		}
+
+		if ( is_object( $value ) ) {
+			foreach ( get_object_vars( $value ) as $item ) {
+				$this->collect_attachment_ids_from_value( $item, $media_ids );
+			}
+			return;
+		}
+
+		if ( is_numeric( $value ) ) {
+			$attachment_id = (int) $value;
+			if ( $attachment_id > 0 && 'attachment' === get_post_type( $attachment_id ) ) {
+				$media_ids[] = $attachment_id;
+			}
+			return;
+		}
+
+		if ( is_string( $value ) && strpos( $value, '/wp-content/uploads/' ) !== false ) {
+			if ( preg_match_all( '/wp-content\/uploads\/[^"\s)]+/', $value, $matches ) ) {
+				foreach ( $matches[0] as $url_path ) {
+					$attachment_id = attachment_url_to_postid( home_url( '/' . ltrim( $url_path, '/' ) ) );
+					if ( $attachment_id ) {
+						$media_ids[] = (int) $attachment_id;
+					}
+				}
+			}
+		}
 	}
 
 	/**

@@ -60,7 +60,7 @@ class EFS_Button_Converter extends EFS_Base_Element {
 			$etch_attributes['rel']    = 'noopener noreferrer';
 		}
 
-		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, 'a' );
+		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, 'a', $element );
 
 		return $this->generate_etch_element_block(
 			$attrs,

@@ -22,30 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</p>
 		</div>
 	<?php else : ?>
-		<?php if ( $is_bricks_site && ! $is_etch_site ) : ?>
-		<section class="efs-environment efs-environment--standalone">
-			<h2><?php esc_html_e( 'Environment Summary', 'etch-fusion-suite' ); ?></h2>
-			<ul class="efs-status-list">
-				<li class="<?php echo $is_bricks_site ? 'is-active' : 'is-inactive'; ?>">
-					<span class="efs-status-label"><?php esc_html_e( 'Bricks Builder', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-status-value"><?php echo $is_bricks_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></span>
-				</li>
-				<li class="<?php echo $is_etch_site ? 'is-active' : 'is-inactive'; ?>">
-					<span class="efs-status-label"><?php esc_html_e( 'Etch PageBuilder', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-status-value"><?php echo $is_etch_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></span>
-				</li>
-				<li>
-					<span class="efs-status-label"><?php esc_html_e( 'WordPress Version', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-status-value"><?php echo isset( $wp_version ) ? esc_html( $wp_version ) : ''; ?></span>
-				</li>
-				<li>
-					<span class="efs-status-label"><?php esc_html_e( 'PHP Version', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-status-value"><?php echo isset( $php_version ) ? esc_html( $php_version ) : ''; ?></span>
-				</li>
-			</ul>
-		</section>
-		<?php endif; ?>
-
 		<div class="efs-dashboard">
 			<?php if ( $is_bricks_site ) : ?>
 				<?php require __DIR__ . '/bricks-setup.php'; ?>

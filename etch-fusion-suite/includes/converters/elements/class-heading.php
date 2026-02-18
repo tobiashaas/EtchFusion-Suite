@@ -35,6 +35,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		$text        = $element['settings']['text'] ?? 'Heading';
 		$text        = is_string( $text ) ? $text : 'Heading';
 		$text        = wp_kses_post( $text );
+		$text        = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', $text );
 		$valid_tags  = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' );
 		$inner_block = '';
 
@@ -47,7 +48,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 			$etch_attributes['class'] = $css_classes;
 		}
 
-		$attrs       = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag );
+		$attrs       = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
 		$inner_block = $this->generate_etch_text_block( $text );
 
 		return $this->generate_etch_element_block( $attrs, $inner_block );

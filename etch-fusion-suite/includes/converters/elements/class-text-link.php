@@ -70,7 +70,7 @@ class EFS_Element_TextLink extends EFS_Base_Element {
 			$label = 'Text Link';
 		}
 
-		$attrs = $this->build_attributes( $label, $style_ids, $attributes, 'a' );
+		$attrs = $this->build_attributes( $label, $style_ids, $attributes, 'a', $element );
 
 		return $this->generate_etch_element_block(
 			$attrs,

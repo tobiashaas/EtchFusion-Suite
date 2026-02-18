@@ -53,7 +53,7 @@ class EFS_Element_Section extends EFS_Base_Element {
 		}
 
 		// Build block attributes
-		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag );
+		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
 
 		// Build children HTML
 		$children_html = is_array( $children ) ? implode( "\n", $children ) : $children;

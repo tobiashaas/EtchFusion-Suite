@@ -60,7 +60,7 @@ export const showSecurityGuidance = (elements, response = {}) => {
     const httpsWarning = elements?.httpsWarning;
 
     if (securityNote) {
-        const serverNote = response?.treat_as_password_note || 'Treat this URL like a password.';
+        const serverNote = response?.treat_as_password_note || 'Treat this key like a password.';
         securityNote.textContent = serverNote;
     }
 
@@ -91,7 +91,8 @@ const revealGeneratedUrl = (elements, expiration = {}) => {
     }
 
     if (elements?.generateButton) {
-        elements.generateButton.textContent = 'Regenerate Migration URL';
+        const regenLabel = elements.generateButton.getAttribute('data-efs-regenerate-label') || 'Regenerate';
+        elements.generateButton.textContent = regenLabel;
     }
 };
 
@@ -101,20 +102,21 @@ export const generateMigrationUrl = async (form, elements) => {
     const existingUrl = output?.value?.trim();
 
     if (existingUrl) {
-        const confirmed = window.confirm('Generate a new migration URL? Previous URLs will be invalidated.');
+        const confirmed = window.confirm('Generate a new migration key? Previous keys will be invalidated.');
         if (!confirmed) {
             return;
         }
     }
 
     setLoading(button, true);
+    button?.classList.add('is-loading');
     try {
         const targetUrl = form.querySelector('input[name="target_url"]')?.value?.trim() || window.efsData?.site_url || '';
         const response = await post(ACTION_GENERATE_KEY, { target_url: targetUrl, context: 'etch' });
         const migrationUrl = response?.migration_url || '';
 
         if (!migrationUrl) {
-            throw new Error('Migration URL generation failed.');
+            throw new Error('Migration key generation failed.');
         }
 
         if (output) {
@@ -125,13 +127,14 @@ export const generateMigrationUrl = async (form, elements) => {
         showSecurityGuidance(elements, response);
 
         if (response?.invalidated_previous_key) {
-            showToast(response?.message || 'New URL generated. Previous URLs are now invalid.', 'success');
+            showToast(response?.message || 'New key generated. Previous keys are now invalid.', 'success');
             return;
         }
 
-        showToast(response?.message || 'Migration URL generated.', 'success');
+        showToast(response?.message || 'Migration key generated.', 'success');
     } finally {
         setLoading(button, false);
+        button?.classList.remove('is-loading');
     }
 };
 
@@ -146,13 +149,13 @@ const bindCopyButton = (elements) => {
     copyButton.addEventListener('click', async () => {
         const copied = await copyToClipboard(output.value);
         if (!copied) {
-            showToast('Unable to copy migration URL. Copy it manually.', 'error');
+            showToast('Unable to copy key. Copy it manually.', 'error');
             return;
         }
 
         const originalLabel = copyButton.textContent;
         copyButton.textContent = 'Copied';
-        showToast('Migration URL copied to clipboard.', 'success');
+        showToast('Key copied to clipboard.', 'success');
         window.setTimeout(() => {
             copyButton.textContent = originalLabel;
         }, 1200);
@@ -192,7 +195,7 @@ export const initEtchDashboard = () => {
         try {
             await generateMigrationUrl(form, elements);
         } catch (error) {
-            showToast(error?.message || 'Unable to generate migration URL.', 'error');
+            showToast(error?.message || 'Unable to generate migration key.', 'error');
         }
     });
 };

@@ -10,7 +10,7 @@ $etch_fusion_suite_host        = isset( $etch_fusion_suite_url_parts['host'] ) ?
 $etch_fusion_suite_local_hosts = array( 'localhost', '127.0.0.1', '::1', '[::1]' );
 $etch_fusion_suite_is_local    = in_array( $etch_fusion_suite_host, $etch_fusion_suite_local_hosts, true );
 $etch_fusion_suite_show_https_warning = ! $etch_fusion_suite_is_https && ! $etch_fusion_suite_is_local;
-$etch_fusion_suite_security_note      = __( 'Treat this URL like a password.', 'etch-fusion-suite' );
+$etch_fusion_suite_security_note      = __( 'Treat this key like a password.', 'etch-fusion-suite' );
 $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. Use HTTPS in production to protect migration credentials in transit.', 'etch-fusion-suite' );
 $etch_fusion_suite_generated_url       = '';
 $etch_fusion_suite_generation_message  = '';
@@ -39,7 +39,7 @@ if (
 			$etch_fusion_suite_generation_error = $etch_fusion_suite_generation_result->get_error_message();
 		} else {
 			$etch_fusion_suite_generated_url      = isset( $etch_fusion_suite_generation_result['migration_url'] ) ? (string) $etch_fusion_suite_generation_result['migration_url'] : '';
-			$etch_fusion_suite_generation_message = isset( $etch_fusion_suite_generation_result['message'] ) ? (string) $etch_fusion_suite_generation_result['message'] : __( 'Migration URL generated.', 'etch-fusion-suite' );
+			$etch_fusion_suite_generation_message = isset( $etch_fusion_suite_generation_result['message'] ) ? (string) $etch_fusion_suite_generation_result['message'] : __( 'Migration key generated.', 'etch-fusion-suite' );
 
 			if ( isset( $etch_fusion_suite_generation_result['treat_as_password_note'] ) && is_string( $etch_fusion_suite_generation_result['treat_as_password_note'] ) && '' !== $etch_fusion_suite_generation_result['treat_as_password_note'] ) {
 				$etch_fusion_suite_security_note = $etch_fusion_suite_generation_result['treat_as_password_note'];
@@ -71,6 +71,34 @@ if (
 			}
 		}
 	}
+
+	// When no key was just generated (e.g. on page load/refresh), show the current stored key if still valid.
+	if ( '' === $etch_fusion_suite_generated_url
+		&& function_exists( 'etch_fusion_suite_container' )
+		&& etch_fusion_suite_container()->has( 'token_manager' )
+	) {
+		$etch_fusion_suite_token_manager = etch_fusion_suite_container()->get( 'token_manager' );
+		$etch_fusion_suite_current       = $etch_fusion_suite_token_manager->get_current_migration_display_data();
+		if ( ! empty( $etch_fusion_suite_current['migration_url'] ) ) {
+			$etch_fusion_suite_generated_url = (string) $etch_fusion_suite_current['migration_url'];
+			$etch_fusion_suite_expires_at    = isset( $etch_fusion_suite_current['expires_at'] ) ? (string) $etch_fusion_suite_current['expires_at'] : '';
+			$etch_fusion_suite_secs          = isset( $etch_fusion_suite_current['expiration_seconds'] ) ? (int) $etch_fusion_suite_current['expiration_seconds'] : 0;
+			$etch_fusion_suite_hours         = max( 1, (int) round( $etch_fusion_suite_secs / 3600 ) );
+			$etch_fusion_suite_relative_expiry = sprintf(
+				/* translators: %d: hour count */
+				_n( 'Expires in %d hour.', 'Expires in %d hours.', $etch_fusion_suite_hours, 'etch-fusion-suite' ),
+				$etch_fusion_suite_hours
+			);
+			$etch_fusion_suite_expires_label = '' !== $etch_fusion_suite_expires_at
+				? sprintf(
+					/* translators: 1: relative expiry label, 2: expiration date/time text from server */
+					__( '%1$s (at %2$s).', 'etch-fusion-suite' ),
+					$etch_fusion_suite_relative_expiry,
+					$etch_fusion_suite_expires_at
+				)
+				: $etch_fusion_suite_relative_expiry;
+		}
+	}
 }
 ?>
 <section class="efs-card efs-card--target efs-etch-dashboard" data-efs-etch-dashboard>
@@ -89,8 +117,8 @@ if (
 		<?php endif; ?>
 
 		<div class="efs-etch-dashboard__block">
-			<h3 class="efs-etch-dashboard__block-title"><?php esc_html_e( 'Generate Migration URL', 'etch-fusion-suite' ); ?></h3>
-			<p class="efs-etch-dashboard__block-desc"><?php esc_html_e( 'Create a secure migration URL to share with the Bricks site administrator.', 'etch-fusion-suite' ); ?></p>
+			<h3 class="efs-etch-dashboard__block-title"><?php esc_html_e( 'Generate Migration Key', 'etch-fusion-suite' ); ?></h3>
+			<p class="efs-etch-dashboard__block-desc"><?php esc_html_e( 'Create a secure migration key to share with the Bricks site administrator.', 'etch-fusion-suite' ); ?></p>
 			<form method="post" class="efs-inline-form efs-etch-dashboard__actions" data-efs-etch-generate-url>
 				<input type="hidden" name="nonce" value="<?php echo esc_attr( $etch_fusion_suite_nonce ); ?>" />
 				<input type="hidden" name="context" value="etch" />
@@ -100,9 +128,10 @@ if (
 					type="submit"
 					class="button button-primary"
 					data-efs-generate-migration-url
-					aria-label="<?php esc_attr_e( 'Generate migration URL', 'etch-fusion-suite' ); ?>"
+					data-efs-regenerate-label="<?php esc_attr_e( 'Regenerate', 'etch-fusion-suite' ); ?>"
+					aria-label="<?php esc_attr_e( 'Generate migration key', 'etch-fusion-suite' ); ?>"
 				>
-					<?php esc_html_e( 'Generate Migration URL', 'etch-fusion-suite' ); ?>
+					<?php echo '' !== $etch_fusion_suite_generated_url ? esc_html__( 'Regenerate', 'etch-fusion-suite' ) : esc_html__( 'Generate', 'etch-fusion-suite' ); ?>
 				</button>
 			</form>
 			<?php if ( '' !== $etch_fusion_suite_generation_error ) : ?>
@@ -117,24 +146,24 @@ if (
 		</div>
 
 		<div class="efs-etch-dashboard__block efs-field efs-etch-dashboard__generated-url" data-efs-generated-url-wrapper<?php echo '' === $etch_fusion_suite_generated_url ? ' hidden' : ''; ?>>
-			<h3 class="efs-etch-dashboard__block-title"><?php esc_html_e( 'Migration URL', 'etch-fusion-suite' ); ?></h3>
-			<label for="efs-generated-migration-url" class="efs-etch-dashboard__block-desc"><?php esc_html_e( 'Share this URL with the Bricks site', 'etch-fusion-suite' ); ?></label>
+			<h3 class="efs-etch-dashboard__block-title"><?php esc_html_e( 'Migration Key', 'etch-fusion-suite' ); ?></h3>
+			<label for="efs-generated-migration-url" class="efs-etch-dashboard__block-desc"><?php esc_html_e( 'Share this key with the Bricks site', 'etch-fusion-suite' ); ?></label>
 			<textarea
 				id="efs-generated-migration-url"
 				rows="8"
 				readonly
 				data-efs-generated-migration-url
 				aria-live="polite"
-				aria-label="<?php esc_attr_e( 'Generated migration URL', 'etch-fusion-suite' ); ?>"
+				aria-label="<?php esc_attr_e( 'Generated migration key', 'etch-fusion-suite' ); ?>"
 			><?php echo esc_textarea( $etch_fusion_suite_generated_url ); ?></textarea>
 			<div class="efs-actions efs-actions--inline efs-etch-dashboard__copy-actions" data-efs-copy-url-actions>
 				<button
 					type="button"
 					class="button"
 					data-efs-copy-migration-url
-					aria-label="<?php esc_attr_e( 'Copy migration URL', 'etch-fusion-suite' ); ?>"
+					aria-label="<?php esc_attr_e( 'Copy migration key', 'etch-fusion-suite' ); ?>"
 				>
-					<?php esc_html_e( 'Copy URL', 'etch-fusion-suite' ); ?>
+					<?php esc_html_e( 'Copy Key', 'etch-fusion-suite' ); ?>
 				</button>
 			</div>
 			<p class="efs-etch-dashboard__url-note" data-efs-security-note>
@@ -149,7 +178,7 @@ if (
 				echo wp_kses(
 					sprintf(
 						/* translators: %s: highlighted phrase "until it expires" */
-						__( 'Anyone with this URL can start migration into this site %s.', 'etch-fusion-suite' ),
+						__( 'Anyone with this key can start migration into this site %s.', 'etch-fusion-suite' ),
 						'<span class="efs-security-highlight">until it expires</span>'
 					),
 					array( 'span' => array( 'class' => true ) )
@@ -163,7 +192,7 @@ if (
 	</div>
 
 	<div class="efs-etch-environment efs-card__section">
-		<h3 class="efs-etch-environment__title"><?php esc_html_e( 'Environment Summary', 'etch-fusion-suite' ); ?></h3>
+		<h3 class="efs-etch-environment__title"><?php esc_html_e( 'System Status', 'etch-fusion-suite' ); ?></h3>
 		<dl class="efs-etch-environment__list">
 			<div class="efs-etch-environment__row">
 				<dt class="efs-etch-environment__label"><?php esc_html_e( 'Etch', 'etch-fusion-suite' ); ?></dt>
@@ -222,7 +251,12 @@ if (
 				</div>
 				<div>
 					<dt><?php esc_html_e( 'Phase', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-phase><?php esc_html_e( 'Initializing', 'etch-fusion-suite' ); ?></dd>
+					<dd data-efs-receiving-phase>
+						<span class="status-badge is-active">
+							<span class="status-dot"></span>
+							<?php esc_html_e( 'Initializing', 'etch-fusion-suite' ); ?>
+						</span>
+					</dd>
 				</div>
 				<div>
 					<dt><?php esc_html_e( 'Items Received', 'etch-fusion-suite' ); ?></dt>
@@ -256,7 +290,7 @@ if (
 
 	<noscript>
 		<p class="description">
-			<?php esc_html_e( 'JavaScript is disabled. You can still generate a migration URL using the button above and copy it manually from the field once generated.', 'etch-fusion-suite' ); ?>
+			<?php esc_html_e( 'JavaScript is disabled. You can still generate a migration key using the button above and copy it manually from the field once generated.', 'etch-fusion-suite' ); ?>
 		</p>
 	</noscript>
 </section>

@@ -209,6 +209,32 @@ class EFS_Migration_Token_Manager {
 	}
 
 	/**
+	 * Get current migration key display data if a valid token is stored.
+	 * Used to show the key and expiry on the Etch setup page after reload.
+	 *
+	 * @return array Empty if no valid token; else keys: migration_url, expires_at, expiration_seconds.
+	 */
+	public function get_current_migration_display_data() {
+		$token_data = $this->get_token_data();
+		$token      = isset( $token_data['token'] ) ? $token_data['token'] : '';
+		$expires_ts = isset( $token_data['expires_timestamp'] ) ? (int) $token_data['expires_timestamp'] : 0;
+
+		if ( '' === $token || $expires_ts <= 0 || time() >= $expires_ts ) {
+			return array();
+		}
+
+		$domain = isset( $token_data['domain'] ) ? $token_data['domain'] : home_url();
+		$url    = $this->build_migration_url( $domain, $token );
+		$expires_at = isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '';
+
+		return array(
+			'migration_url'       => $url,
+			'expires_at'          => $expires_at,
+			'expiration_seconds'  => max( 0, $expires_ts - time() ),
+		);
+	}
+
+	/**
 	 * Generate migration QR code data
 	 */
 	public function generate_qr_data( $target_domain = null ) {

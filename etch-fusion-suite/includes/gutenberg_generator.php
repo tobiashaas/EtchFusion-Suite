@@ -153,18 +153,22 @@ class EFS_Gutenberg_Generator {
 
 		// Get CSS classes from style IDs for attributes.class
 		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
+		$source_classes = $this->merge_class_names( ...$this->get_element_classes( $element ) );
 
 		// Build Etch-compatible attributes (flat schema)
 		$etch_attributes = array(
 			'data-etch-element' => 'section',
 		);
+		$etch_attributes = array_merge( $etch_attributes, $this->extract_custom_etch_attributes( $element['etch_data'] ?? array() ) );
 
-		// Add CSS classes if available
-		if ( ! empty( $css_classes ) ) {
-			$etch_attributes['class'] = $css_classes;
+		// Keep source classes even when style migration for a class is excluded.
+		$merged_classes = $this->merge_class_names( $css_classes, $source_classes );
+		if ( ! empty( $merged_classes ) ) {
+			$etch_attributes['class'] = $merged_classes;
 		}
+		$etch_attributes = $this->apply_brxe_block_display_fallback( $etch_attributes, $element, $style_ids, $merged_classes );
 
-		$section_name = ! empty( $label ) ? $label : 'Section';
+		$section_name = $this->sanitize_element_label( $label, 'Section' );
 
 		$attrs = array(
 			'metadata'   => array(
@@ -201,9 +205,10 @@ class EFS_Gutenberg_Generator {
 
 		// Get CSS classes from style IDs for attributes.class
 		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
+		$source_classes = $this->merge_class_names( ...$this->get_element_classes( $element ) );
 
-		// Get custom tag from element (e.g., ul, ol)
-		$tag = $element['etch_data']['tag'] ?? ( $element['settings']['tag'] ?? 'div' );
+		// Resolve tag from Bricks settings, including "custom" + customTag.
+		$tag = $this->resolve_element_tag( $element, 'div' );
 
 		$this->error_handler->log_info( 'Gutenberg Generator: convert_etch_container element ID ' . $element['id'] . ' using tag ' . $tag );
 
@@ -211,13 +216,16 @@ class EFS_Gutenberg_Generator {
 		$etch_attributes = array(
 			'data-etch-element' => 'container',
 		);
+		$etch_attributes = array_merge( $etch_attributes, $this->extract_custom_etch_attributes( $element['etch_data'] ?? array() ) );
 
-		// Add CSS classes if available
-		if ( ! empty( $css_classes ) ) {
-			$etch_attributes['class'] = $css_classes;
+		// Keep source classes even when style migration for a class is excluded.
+		$merged_classes = $this->merge_class_names( $css_classes, $source_classes );
+		if ( ! empty( $merged_classes ) ) {
+			$etch_attributes['class'] = $merged_classes;
 		}
+		$etch_attributes = $this->apply_brxe_block_display_fallback( $etch_attributes, $element, $style_ids, $merged_classes );
 
-		$container_name = ! empty( $label ) ? $label : 'Container';
+		$container_name = $this->sanitize_element_label( $label, 'Container' );
 
 		$attrs = array(
 			'metadata'   => array(
@@ -257,15 +265,19 @@ class EFS_Gutenberg_Generator {
 		// Get style IDs for this element
 		$style_ids   = $this->get_element_style_ids( $element );
 		$css_classes = $this->get_css_classes_from_style_ids( $style_ids );
-		$tag         = $element['etch_data']['tag'] ?? ( $element['settings']['tag'] ?? 'div' );
+		$source_classes = $this->merge_class_names( ...$this->get_element_classes( $element ) );
+		$tag         = $this->resolve_element_tag( $element, 'div' );
 
 		$attributes = array();
-		if ( ! empty( $css_classes ) ) {
-			$attributes['class'] = $css_classes;
+		$attributes = array_merge( $attributes, $this->extract_custom_etch_attributes( $element['etch_data'] ?? array() ) );
+		$merged_classes = $this->merge_class_names( $css_classes, $source_classes );
+		if ( ! empty( $merged_classes ) ) {
+			$attributes['class'] = $merged_classes;
 		}
+		$attributes = $this->apply_brxe_block_display_fallback( $attributes, $element, $style_ids, $merged_classes );
 
 		// Build flat attrs for a simple div/semantic wrapper (without flex-div markers).
-		$div_name = ! empty( $label ) ? $label : 'Div';
+		$div_name = $this->sanitize_element_label( $label, 'Div' );
 
 		$attrs = array(
 			'metadata'   => array(
@@ -280,10 +292,289 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
+	 * Extract transferable scalar attributes from etch_data.
+	 *
+	 * @param array $etch_data Etch data payload.
+	 * @return array<string, string>
+	 */
+	private function extract_custom_etch_attributes( $etch_data ) {
+		$attributes = array();
+		if ( ! is_array( $etch_data ) ) {
+			return $attributes;
+		}
+
+		foreach ( $etch_data as $key => $value ) {
+			if ( ! is_string( $key ) ) {
+				continue;
+			}
+
+			if ( in_array( $key, array( 'class', 'tag', 'content' ), true ) ) {
+				continue;
+			}
+
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+
+			$value = trim( (string) $value );
+			if ( '' === $value ) {
+				continue;
+			}
+
+			$attributes[ $key ] = $value;
+		}
+
+		return $attributes;
+	}
+
+	/**
+	 * Ensure `.brxe-block` keeps Bricks' flex-container behavior when no layout class defines it.
+	 *
+	 * @param array  $attributes Current Etch attributes.
+	 * @param array  $element    Source Bricks element.
+	 * @param array  $style_ids  Resolved Etch style IDs.
+	 * @param string $classes    Merged class string.
+	 * @return array
+	 */
+	private function apply_brxe_block_display_fallback( array $attributes, array $element, array $style_ids, $classes ) {
+		$class_list = array_values( array_filter( preg_split( '/\s+/', trim( (string) $classes ) ) ) );
+		if ( empty( $class_list ) || ! in_array( 'brxe-block', $class_list, true ) ) {
+			return $attributes;
+		}
+
+		$current_style = isset( $attributes['style'] ) && is_scalar( $attributes['style'] ) ? (string) $attributes['style'] : '';
+		if ( preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $current_style ) ) {
+			return $attributes;
+		}
+
+		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$display  = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
+		if ( in_array( $display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true ) ) {
+			return $attributes;
+		}
+
+		if ( $this->styles_define_layout_display( $style_ids ) ) {
+			return $attributes;
+		}
+
+		$neighbor_classes = array_values(
+			array_filter(
+				$class_list,
+				static function ( $name ) {
+					$name = trim( (string) $name );
+					if ( '' === $name || 'brxe-block' === $name ) {
+						return false;
+					}
+					return true;
+				}
+			)
+		);
+		$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
+
+		if ( 1 === count( $neighbor_classes ) ) {
+			$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
+			if ( $target_style_id && ! $this->style_id_defines_layout_display( $target_style_id ) ) {
+				$this->append_declarations_to_style_id( $target_style_id, 'display: flex; flex-direction: column;' );
+				return $attributes;
+			}
+		}
+
+		if ( '' !== trim( $current_style ) && ';' !== substr( rtrim( $current_style ), -1 ) ) {
+			$current_style .= ';';
+		}
+		$attributes['style'] = trim( $current_style . ' display: flex; flex-direction: column;' );
+
+		return $attributes;
+	}
+
+	/**
+	 * Resolve style ID by class selector from style map.
+	 *
+	 * @param string $class_name Class name without leading dot.
+	 * @return string
+	 */
+	private function find_style_id_by_class_name( $class_name ) {
+		$class_name = trim( (string) $class_name );
+		if ( '' === $class_name ) {
+			return '';
+		}
+
+		$style_map = get_option( 'efs_style_map', array() );
+		if ( ! is_array( $style_map ) ) {
+			return '';
+		}
+
+		foreach ( $style_map as $style_data ) {
+			if ( ! is_array( $style_data ) ) {
+				continue;
+			}
+			$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
+			if ( $selector !== $class_name ) {
+				continue;
+			}
+			$style_id = isset( $style_data['id'] ) ? trim( (string) $style_data['id'] ) : '';
+			if ( '' !== $style_id ) {
+				return $style_id;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Check one style ID for layout display declarations.
+	 *
+	 * @param string $style_id Etch style ID.
+	 * @return bool
+	 */
+	private function style_id_defines_layout_display( $style_id ) {
+		$style_id = trim( (string) $style_id );
+		if ( '' === $style_id ) {
+			return false;
+		}
+
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
+			return false;
+		}
+
+		$css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
+			? (string) $etch_styles[ $style_id ]['css']
+			: '';
+
+		return '' !== $css && (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $css );
+	}
+
+	/**
+	 * Append declarations to a style ID once per request.
+	 *
+	 * @param string $style_id Etch style ID.
+	 * @param string $declarations CSS declarations to append.
+	 * @return void
+	 */
+	private function append_declarations_to_style_id( $style_id, $declarations ) {
+		$style_id     = trim( (string) $style_id );
+		$declarations = trim( (string) $declarations );
+		if ( '' === $style_id || '' === $declarations ) {
+			return;
+		}
+
+		static $writes = array();
+		$write_key     = $style_id . '|' . md5( $declarations );
+		if ( isset( $writes[ $write_key ] ) ) {
+			return;
+		}
+
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
+			return;
+		}
+
+		$current_css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
+			? trim( (string) $etch_styles[ $style_id ]['css'] )
+			: '';
+
+		if ( false !== stripos( $current_css, trim( $declarations, ';' ) ) ) {
+			$writes[ $write_key ] = true;
+			return;
+		}
+
+		if ( '' !== $current_css && ';' !== substr( $current_css, -1 ) ) {
+			$current_css .= ';';
+		}
+		$etch_styles[ $style_id ]['css'] = trim( $current_css . ' ' . $declarations );
+		update_option( 'etch_styles', $etch_styles );
+		$writes[ $write_key ] = true;
+	}
+
+	/**
+	 * Detect whether any resolved style already defines a flex/grid display.
+	 *
+	 * @param array $style_ids Etch style IDs.
+	 * @return bool
+	 */
+	private function styles_define_layout_display( array $style_ids ) {
+		if ( empty( $style_ids ) ) {
+			return false;
+		}
+
+		static $etch_styles = null;
+		if ( null === $etch_styles ) {
+			$etch_styles = get_option( 'etch_styles', array() );
+			if ( ! is_array( $etch_styles ) ) {
+				$etch_styles = array();
+			}
+		}
+
+		foreach ( $style_ids as $style_id ) {
+			if ( ! is_scalar( $style_id ) ) {
+				continue;
+			}
+
+			$key = trim( (string) $style_id );
+			if ( '' === $key || empty( $etch_styles[ $key ] ) || ! is_array( $etch_styles[ $key ] ) ) {
+				continue;
+			}
+
+			$css = isset( $etch_styles[ $key ]['css'] ) && is_scalar( $etch_styles[ $key ]['css'] )
+				? (string) $etch_styles[ $key ]['css']
+				: '';
+
+			if ( '' !== $css && preg_match( '/\bdisplay\s*:\s*(?:inline-)?(?:flex|grid)\b/i', $css ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Convert unsupported structural elements via simple Etch element wrapper.
 	 */
 	private function convert_etch_div( $element, $children, $element_map ) {
 		return $this->convert_etch_simple_div( $element, $children, $element_map );
+	}
+
+	/**
+	 * Resolve the output tag for structural elements.
+	 *
+	 * Supports Bricks "custom" tag mode via settings.customTag.
+	 *
+	 * @param array  $element Element payload.
+	 * @param string $default_tag Fallback tag.
+	 * @return string
+	 */
+	private function resolve_element_tag( $element, $default_tag = 'div' ) {
+		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$raw_tag  = $element['etch_data']['tag'] ?? ( $settings['tag'] ?? $default_tag );
+
+		if ( 'custom' === strtolower( trim( (string) $raw_tag ) ) && ! empty( $settings['customTag'] ) ) {
+			$raw_tag = $settings['customTag'];
+		}
+
+		return $this->normalize_structural_tag( $raw_tag );
+	}
+
+	/**
+	 * Normalize structural tag names from Bricks settings.
+	 *
+	 * Prevents invalid placeholders like "custom" from being emitted as real tags.
+	 *
+	 * @param mixed $tag Candidate tag value.
+	 * @return string
+	 */
+	private function normalize_structural_tag( $tag ) {
+		$tag = strtolower( trim( (string) $tag ) );
+		if ( '' === $tag || 'custom' === $tag ) {
+			return 'div';
+		}
+
+		// Accept standard/custom tag names when valid.
+		if ( ! preg_match( '/^[a-z][a-z0-9-]*$/', $tag ) ) {
+			return 'div';
+		}
+
+		return $tag;
 	}
 
 	/**
@@ -383,7 +674,7 @@ class EFS_Gutenberg_Generator {
 		$icon_library = $element['settings']['icon']['library'] ?? '';
 		$icon_value   = $element['settings']['icon']['icon'] ?? '';
 		$svg_code     = $element['settings']['icon']['svg'] ?? '';
-		$label        = ! empty( $element['label'] ) ? (string) $element['label'] : 'Icon';
+		$label        = $this->sanitize_element_label( $element['label'] ?? '', 'Icon' );
 		$classes      = implode( ' ', $this->get_element_classes( $element ) );
 		$style_ids    = $this->get_element_style_ids( $element );
 
@@ -413,20 +704,17 @@ class EFS_Gutenberg_Generator {
 				'<!-- /wp:etch/svg -->';
 		}
 
-		$fallback_element              = $element;
-		$fallback_element['etch_type'] = 'icon';
-		$fallback_element['etch_data'] = array(
-			'class' => $classes,
+		// For font icon libraries, output an empty SVG block to avoid transferring
+		// icon-font specific classes/attributes (e.g. data-icon-library).
+		$fallback_svg_attrs = array(
+			'tag'        => 'svg',
+			'attributes' => array(),
+			'styles'     => $style_ids,
 		);
-		$attrs                         = $this->build_flat_fallback_attrs(
-			$fallback_element,
-			'i',
-			array(
-				'class' => (string) $icon_value,
-			)
-		);
+		$fallback_json      = wp_json_encode( $fallback_svg_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
-		return $this->serialize_etch_element_block( $attrs );
+		return '<!-- wp:etch/svg ' . $fallback_json . ' -->' . "\n" .
+			'<!-- /wp:etch/svg -->';
 	}
 
 	/**
@@ -647,10 +935,7 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
-		// Add timestamp comment to verify new content is generated
-		$generation_timestamp = wp_date( 'Y-m-d H:i:s' );
-		$timestamp            = '<!-- B2E Generated: ' . $generation_timestamp . ' | v0.5.0: Modular Element Converters -->';
-		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks at ' . $generation_timestamp . ' with modular converters' );
+		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
 		$style_map             = get_option( 'efs_style_map', array() );
@@ -673,8 +958,7 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Generate blocks for top-level elements (recursively includes children)
-		$gutenberg_blocks   = array();
-		$gutenberg_blocks[] = $timestamp; // Add timestamp at the beginning
+		$gutenberg_blocks = array();
 		foreach ( $top_level_elements as $element ) {
 			$block_html = $this->generate_block_html( $element, $element_map );
 			if ( $block_html ) {
@@ -904,7 +1188,8 @@ class EFS_Gutenberg_Generator {
 			$result = $this->element_factory->convert_element( $element, $children, $context );
 
 			if ( $result ) {
-				return $result;
+				$result = $this->dynamic_data_converter->convert_content( $result );
+				return $this->wrap_loop_block_if_needed( $element, $result );
 			}
 
 			// Fallback to old method if factory doesn't support this element
@@ -960,6 +1245,76 @@ class EFS_Gutenberg_Generator {
 			default:
 				return $this->generate_generic_block( $element );
 		}
+	}
+
+	/**
+	 * Wrap converted element markup in an Etch loop block when Bricks hasLoop/query is configured.
+	 *
+	 * @param array  $element Element payload.
+	 * @param string $inner_markup Converted inner element block markup.
+	 * @return string
+	 */
+	private function wrap_loop_block_if_needed( $element, $inner_markup ) {
+		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		if ( empty( $settings['hasLoop'] ) || empty( $settings['query'] ) || ! is_array( $settings['query'] ) ) {
+			return $inner_markup;
+		}
+
+		$loop_id = $this->ensure_etch_loop_preset( $settings['query'], $element );
+		if ( '' === $loop_id ) {
+			return $inner_markup;
+		}
+
+		$attrs_json = wp_json_encode(
+			array(
+				'loopId' => $loop_id,
+			),
+			JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+		);
+
+		return '<!-- wp:etch/loop ' . $attrs_json . ' -->' . "\n" .
+			trim( (string) $inner_markup ) . "\n" .
+			'<!-- /wp:etch/loop -->';
+	}
+
+	/**
+	 * Ensure the standard Etch posts loop preset exists and return its ID.
+	 *
+	 * @param array $bricks_query Bricks query settings.
+	 * @param array $element      Source element (for naming).
+	 * @return string
+	 */
+	private function ensure_etch_loop_preset( $bricks_query, $element = array() ) {
+		// Bricks query parameters are intentionally ignored:
+		// always map to Etch's standard "posts" loop preset.
+		$loop_id = 'posts';
+
+		$loops = get_option( 'etch_loops', array() );
+		$loops = is_array( $loops ) ? $loops : array();
+		if ( isset( $loops[ $loop_id ] ) && is_array( $loops[ $loop_id ] ) ) {
+			return $loop_id;
+		}
+
+		// Defensive fallback: recreate standard posts loop when missing.
+		$loops[ $loop_id ] = array(
+			'name'   => 'Posts',
+			'key'    => 'posts',
+			'global' => true,
+			'config' => array(
+				'type' => 'wp-query',
+				'args' => array(
+					'post_type'      => 'post',
+					'posts_per_page' => '-1',
+					'orderby'        => 'date',
+					'order'          => 'DESC',
+					'post_status'    => 'publish',
+				),
+			),
+		);
+
+		update_option( 'etch_loops', $loops );
+
+		return $loop_id;
 	}
 
 	/**
@@ -1067,7 +1422,7 @@ class EFS_Gutenberg_Generator {
 
 		$attrs = array(
 			'metadata' => array(
-				'name' => ! empty( $element['label'] ) ? (string) $element['label'] : 'HTML',
+				'name' => $this->sanitize_element_label( $element['label'] ?? '', 'HTML' ),
 			),
 			'content'  => (string) $content,
 			'unsafe'   => false,
@@ -1146,11 +1501,15 @@ class EFS_Gutenberg_Generator {
 			unset( $attributes['class'] );
 		}
 
-		$element_name = 'Element';
+		$element_name = '';
 		if ( ! empty( $element['label'] ) ) {
-			$element_name = (string) $element['label'];
-		} elseif ( '' !== $resolved_etch_type ) {
+			$element_name = $this->sanitize_element_label( $element['label'], '' );
+		}
+		if ( '' === $element_name && '' !== $resolved_etch_type ) {
 			$element_name = ucfirst( $resolved_etch_type );
+		}
+		if ( '' === $element_name ) {
+			$element_name = 'Element';
 		}
 
 		return array(
@@ -1203,6 +1562,40 @@ class EFS_Gutenberg_Generator {
 		}
 
 		return array_values( array_unique( $normalized ) );
+	}
+
+	/**
+	 * Normalize Bricks structure-panel labels for Etch metadata names.
+	 *
+	 * Removes technical suffixes (e.g. "(CSS Tab)") and HTML-like tag markers
+	 * such as "<ul>", "<li>", etc. before migration.
+	 *
+	 * @param mixed  $label Raw label value.
+	 * @param string $fallback Fallback label when cleaned value is empty.
+	 * @return string
+	 */
+	private function sanitize_element_label( $label, $fallback = 'Element' ) {
+		if ( ! is_scalar( $label ) ) {
+			return (string) $fallback;
+		}
+
+		$normalized = trim( (string) $label );
+		if ( '' === $normalized ) {
+			return (string) $fallback;
+		}
+
+		$normalized = html_entity_decode( $normalized, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$normalized = preg_replace( '/\(\s*css(?:\s+tab)?\s*\)/i', '', $normalized );
+		$normalized = preg_replace( '/<[^>]*>/', '', $normalized );
+		$normalized = str_replace( array( '<', '>' ), '', $normalized );
+		$normalized = preg_replace( '/\s{2,}/', ' ', $normalized );
+		$normalized = trim( $normalized, " \t\n\r\0\x0B-:|" );
+
+		if ( '' === $normalized ) {
+			return (string) $fallback;
+		}
+
+		return $normalized;
 	}
 
 	/**
@@ -1262,6 +1655,10 @@ class EFS_Gutenberg_Generator {
 					continue;
 				}
 
+				if ( $this->should_exclude_transferred_class( $class_name ) ) {
+					continue;
+				}
+
 				$classes[] = $class_name;
 			}
 		}
@@ -1271,6 +1668,29 @@ class EFS_Gutenberg_Generator {
 		}
 
 		return implode( ' ', array_values( array_unique( $classes ) ) );
+	}
+
+	/**
+	 * Exclude specific utility classes from being transferred to target markup.
+	 *
+	 * @param string $class_name Raw class token.
+	 * @return bool
+	 */
+	private function should_exclude_transferred_class( $class_name ) {
+		$normalized = ltrim( preg_replace( '/^acss_import_/', '', trim( (string) $class_name ) ), '.' );
+		if ( '' === $normalized ) {
+			return true;
+		}
+
+		$excluded = array(
+			'fr-lede',
+			'fr-intro',
+			'fr-note',
+			'fr-notes',
+			'text--l',
+		);
+
+		return in_array( $normalized, $excluded, true );
 	}
 
 	/**

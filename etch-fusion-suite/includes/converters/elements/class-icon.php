@@ -30,43 +30,19 @@ class EFS_Icon_Converter extends EFS_Base_Element {
 	 * @return string Gutenberg block HTML.
 	 */
 	public function convert( $element, $children = array(), $context = array() ) {
-		$settings     = $element['settings'] ?? array();
-		$icon_data    = isset( $settings['icon'] ) && is_array( $settings['icon'] ) ? $settings['icon'] : array();
-		$icon_library = isset( $icon_data['library'] ) ? (string) $icon_data['library'] : '';
-		$icon_value   = '';
-		$style_ids    = $this->get_style_ids( $element );
-		$css_classes  = $this->get_css_classes( $style_ids );
-		$label        = $this->get_label( $element );
-		$etch_attrs   = array(
-			'aria-hidden' => 'true',
+		$style_ids = $this->get_style_ids( $element );
+
+		// Intentionally emit empty etch/svg blocks for font-icon based Bricks icons.
+		// This avoids carrying icon-font specific attributes/classes (e.g. data-icon-library).
+		$attrs = array(
+			'tag'        => 'svg',
+			'attributes' => array(),
+			'styles'     => $this->normalize_style_ids( $style_ids ),
 		);
-		$class_tokens = array();
 
-		if ( isset( $icon_data['value'] ) && is_string( $icon_data['value'] ) ) {
-			$icon_value = trim( $icon_data['value'] );
-		} elseif ( isset( $icon_data['icon'] ) && is_string( $icon_data['icon'] ) ) {
-			$icon_value = trim( $icon_data['icon'] );
-		}
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
-		if ( '' !== $icon_value ) {
-			$class_tokens = array_merge( $class_tokens, (array) preg_split( '/\s+/', $icon_value ) );
-		}
-
-		if ( '' !== trim( $css_classes ) ) {
-			$class_tokens = array_merge( $class_tokens, (array) preg_split( '/\s+/', trim( $css_classes ) ) );
-		}
-
-		$class_tokens = array_values( array_filter( array_unique( $class_tokens ) ) );
-		if ( ! empty( $class_tokens ) ) {
-			$etch_attrs['class'] = implode( ' ', $class_tokens );
-		}
-
-		if ( '' !== $icon_library ) {
-			$etch_attrs['data-icon-library'] = $icon_library;
-		}
-
-		$attrs = $this->build_attributes( $label, $style_ids, $etch_attrs, 'i' );
-
-		return $this->generate_etch_element_block( $attrs );
+		return '<!-- wp:etch/svg ' . $attrs_json . ' -->' . "\n" .
+			'<!-- /wp:etch/svg -->';
 	}
 }

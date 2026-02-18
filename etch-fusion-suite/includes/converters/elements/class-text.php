@@ -166,6 +166,7 @@ class EFS_Element_Text extends EFS_Base_Element {
 	 * @return string
 	 */
 	private function generate_block( $tag, $content, $element, $node = null ) {
+		$content = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', (string) $content );
 		$style_ids      = $this->get_style_ids( $element );
 		$style_classes  = $this->get_css_classes( $style_ids );
 		$merged_classes = $this->merge_classes( $style_classes, $node );
@@ -175,7 +176,7 @@ class EFS_Element_Text extends EFS_Base_Element {
 			$etch_attrs['class'] = $merged_classes;
 		}
 
-		$attrs = $this->build_attributes( $this->get_label( $element ), $style_ids, $etch_attrs, $tag );
+		$attrs = $this->build_attributes( $this->get_label( $element ), $style_ids, $etch_attrs, $tag, $element );
 
 		if ( in_array( $tag, array( 'hr' ), true ) || '' === trim( $content ) ) {
 			return $this->generate_etch_element_block( $attrs );
