@@ -1,5 +1,7 @@
 /vendor/
 composer.lock
+build/
+.phpunit-cache/
 node_modules/
 .wp-env/
 .wp-env.override.json

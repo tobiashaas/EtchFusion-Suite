@@ -277,8 +277,8 @@ Backup files:
 - `backups/manifest.json` (metadata and index)
 
 Environment Mapping:
-- Logical names: `bricks` → wp-env target: `cli`
-- Logical names: `etch` → wp-env target: `tests-cli`
+- Logical names: `bricks` -> wp-env target: `cli`
+- Logical names: `etch` -> wp-env target: `tests-cli`
 - Both logical names and direct targets are accepted for robustness
 - Use `--verbose` flag or `EFS_DEBUG=1` environment variable to see target mapping debug output
 
@@ -349,10 +349,10 @@ The project uses Playwright for end-to-end testing with enhanced setup:
 #### Test Structure
 ```
 tests/playwright/
-├── global-setup.ts      # Environment health checks
-├── global-teardown.ts   # Log capture and cleanup
-├── auth.setup.ts        # Authentication setup
-└── *.spec.ts           # Test files
+|-- global-setup.ts      # Environment health checks
+|-- global-teardown.ts   # Log capture and cleanup
+|-- auth.setup.ts        # Authentication setup
+\-- *.spec.ts           # Test files
 ```
 
 #### Environment Variables
