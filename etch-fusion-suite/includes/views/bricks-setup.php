@@ -72,6 +72,9 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<div class="efs-wizard-summary" data-efs-discovery-summary hidden>
 				<div class="efs-wizard-summary__content">
 					<h4><?php esc_html_e( 'Dynamic Data Summary', 'etch-fusion-suite' ); ?></h4>
+					<p class="description">
+						<?php esc_html_e( 'Available Keys: Templates use this.key. Taxonomies use taxonomy.key and term.key. Loops use item.key by default (but you control the key).', 'etch-fusion-suite' ); ?>
+					</p>
 					<p class="efs-wizard-summary__grade" data-efs-summary-grade></p>
 					<div class="efs-wizard-summary__breakdown" data-efs-summary-breakdown></div>
 				</div>
@@ -155,6 +158,15 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<div class="efs-actions efs-actions--inline">
 				<button type="button" class="button" data-efs-retry-migration hidden><?php esc_html_e( 'Retry Migration', 'etch-fusion-suite' ); ?></button>
 				<button type="button" class="button" data-efs-progress-cancel><?php esc_html_e( 'Cancel', 'etch-fusion-suite' ); ?></button>
+			</div>
+		</div>
+		<div class="efs-wizard-result" data-efs-wizard-result hidden>
+			<span class="efs-wizard-result__icon" data-efs-result-icon aria-hidden="true"></span>
+			<h3 class="efs-wizard-result__title" data-efs-result-title><?php esc_html_e( 'Migration complete', 'etch-fusion-suite' ); ?></h3>
+			<p data-efs-result-subtitle><?php esc_html_e( 'The migration has finished.', 'etch-fusion-suite' ); ?></p>
+			<div class="efs-actions efs-actions--inline">
+				<button type="button" class="efs-btn--primary" data-efs-start-new><?php esc_html_e( 'Finish', 'etch-fusion-suite' ); ?></button>
+				<button type="button" class="button" data-efs-open-logs><?php esc_html_e( 'View logs', 'etch-fusion-suite' ); ?></button>
 			</div>
 		</div>
 	</div>

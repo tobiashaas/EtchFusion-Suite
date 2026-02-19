@@ -120,7 +120,10 @@ const bootstrap = () => {
 
     if (localizedMigrationId && !completed) {
         const { percentage = 0, status = '' } = progress;
-        const isRunning = percentage > 0 || (status && status !== 'completed' && status !== 'error');
+        const numericProgress = Number(percentage || 0);
+        const normalizedStatus = String(status || '').toLowerCase();
+        const isRunningStatus = normalizedStatus === 'running' || normalizedStatus === 'receiving';
+        const isRunning = (numericProgress > 0 && numericProgress < 100) || isRunningStatus;
         
         if (isRunning) {
             console.log('[EFS] Resuming migration polling:', localizedMigrationId);

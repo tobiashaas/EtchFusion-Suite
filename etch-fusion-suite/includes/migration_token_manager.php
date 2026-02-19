@@ -235,6 +235,20 @@ class EFS_Migration_Token_Manager {
 	}
 
 	/**
+	 * Revoke the currently stored migration key immediately.
+	 *
+	 * @return bool True when revocation state was persisted.
+	 */
+	public function revoke_current_migration_key(): bool {
+		$current_token = $this->migration_repository->get_token_value();
+		if ( '' !== $current_token ) {
+			$this->invalidate_token_transient( (string) $current_token );
+		}
+
+		return $this->migration_repository->delete_token_data();
+	}
+
+	/**
 	 * Generate migration QR code data
 	 */
 	public function generate_qr_data( $target_domain = null ) {

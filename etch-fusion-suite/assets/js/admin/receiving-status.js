@@ -1,6 +1,8 @@
 import { post } from './api.js';
 
 const ACTION_GET_RECEIVING_STATUS = 'efs_get_receiving_status';
+const ACTION_DISMISS_MIGRATION_RUN = 'efs_dismiss_migration_run';
+const ACTION_GET_DISMISSED_MIGRATION_RUNS = 'efs_get_dismissed_migration_runs';
 const POLL_INTERVAL_MS = 3000;
 const DISMISSIBLE_STATUSES = new Set(['receiving', 'completed', 'stale']);
 const STORAGE_KEY_DISMISSED = 'efsReceivingDismissedKeys';
@@ -134,6 +136,7 @@ export const initReceivingStatus = () => {
     };
 
     let inFlight = false;
+    let pollingActive = true;
     let collapsed = true;
     let hasAutoExpanded = false;
     let currentModel = createUiModel();
@@ -242,10 +245,16 @@ export const initReceivingStatus = () => {
     };
 
     const schedulePoll = () => {
-        window.setTimeout(runPoll, POLL_INTERVAL_MS);
+        if (pollingActive) {
+            window.setTimeout(runPoll, POLL_INTERVAL_MS);
+        }
     };
 
     const runPoll = async () => {
+        if (!pollingActive) {
+            return;
+        }
+
         if (inFlight) {
             schedulePoll();
             return;
@@ -260,7 +269,25 @@ export const initReceivingStatus = () => {
             console.warn('[EFS] Receiving status polling failed.', error);
         } finally {
             inFlight = false;
-            schedulePoll();
+            if (pollingActive) {
+                schedulePoll();
+            }
+        }
+    };
+
+    const loadDismissedRuns = async () => {
+        try {
+            const response = await post(ACTION_GET_DISMISSED_MIGRATION_RUNS);
+            const dismissed = Array.isArray(response?.dismissed) ? response.dismissed : [];
+            dismissed.forEach((value) => {
+                const key = String(value || '').trim();
+                if (key) {
+                    dismissedKeys.add(`migration:${key}`);
+                }
+            });
+            writeDismissedKeys(dismissedKeys);
+        } catch (error) {
+            console.warn('[EFS] Failed to load dismissed migration runs.', error);
         }
     };
 
@@ -283,10 +310,16 @@ export const initReceivingStatus = () => {
             dismissedKeys.add(dismissKey);
             writeDismissedKeys(dismissedKeys);
         }
+        pollingActive = false;
+        if (currentModel.migrationId) {
+            post(ACTION_DISMISS_MIGRATION_RUN, { migration_id: currentModel.migrationId }).catch(() => {});
+        }
         setRootStateClasses(root, 'idle');
         render(currentModel);
     });
 
     render(currentModel);
-    runPoll();
+    loadDismissedRuns().finally(() => {
+        runPoll();
+    });
 };

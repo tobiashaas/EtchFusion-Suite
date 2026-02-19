@@ -240,9 +240,10 @@ class EFS_API_Client {
 	 * @param \WP_Post     $post             Source post.
 	 * @param string|null  $etch_content    Gutenberg/Etch content.
 	 * @param string|null  $target_post_type Optional. Target post type (from wizard mapping). If not set, source post_type is used.
+	 * @param array<string, array<string, mixed>> $loop_presets Optional. Referenced Etch loop presets.
 	 * @return array|\WP_Error
 	 */
-	public function send_post( $url, $jwt_token, $post, $etch_content = null, $target_post_type = null ) {
+	public function send_post( $url, $jwt_token, $post, $etch_content = null, $target_post_type = null, $loop_presets = array() ) {
 		$post_type = ( null !== $target_post_type && '' !== $target_post_type )
 			? $target_post_type
 			: $post->post_type;
@@ -258,6 +259,9 @@ class EFS_API_Client {
 			),
 			'etch_content' => $etch_content,
 		);
+		if ( is_array( $loop_presets ) && ! empty( $loop_presets ) ) {
+			$post_data['etch_loops'] = $loop_presets;
+		}
 
 		return $this->send_request( $url, $jwt_token, '/import/post', 'POST', $post_data );
 	}

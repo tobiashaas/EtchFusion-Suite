@@ -59,12 +59,6 @@
 
 ### 🎯 High Priority
 
-- [ ] **Framer Integration Enhancement**
-  - Implement template extraction queue system
-  - Add progress tracking for large template sets
-  - Create Framer-specific validation rules
-  - Add template preview functionality
-
 - [ ] **Migration Performance Optimization**
   - Implement batch processing for large datasets
   - Add database transaction optimization
@@ -180,7 +174,6 @@
 
 ### 📅 Short Term (Next 2-4 weeks)
 
-- Complete Framer integration queue system
 - Add comprehensive error handling
 - Implement performance optimizations
 - Create initial test suite

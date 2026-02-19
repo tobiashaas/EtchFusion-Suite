@@ -107,7 +107,7 @@
 	border-radius: var(--efs-radius);
 	color: var(--efs-neutral-ultra-light);
 	font-size: 13px;
-	font-family: 'Courier New', Consolas, monospace;
+	font-family: 'Space Grotesk', sans-serif;
 	white-space: pre-wrap;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
@@ -216,6 +216,13 @@
 	border-radius: var(--efs-radius);
 	border: var(--efs-border-light);
 	background: var(--efs-base);
+}
+
+/* Migration key block and Revoke button: force hidden when no key (overrides WP admin .button) */
+[data-efs-generated-url-wrapper][hidden],
+.efs-revoke-key-btn[hidden],
+[data-efs-revoke-migration-url][hidden] {
+	display: none !important;
 }
 
 .efs-etch-receiving-banner[hidden] {

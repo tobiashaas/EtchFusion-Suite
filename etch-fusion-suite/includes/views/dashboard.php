@@ -30,6 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php if ( $is_etch_site ) : ?>
 				<?php require __DIR__ . '/etch-setup.php'; ?>
 			<?php endif; ?>
+
+			<?php require __DIR__ . '/logs.php'; ?>
 		</div>
 	<?php endif; ?>
 </div>

@@ -238,8 +238,8 @@
 
 ### 🛠 Technical Changes
 
-- Exposed `EFS_Framer_To_Etch_Converter::get_element_children()` and `build_block_metadata()` for reuse by the template generator, resolving fatal errors during template extraction.
-- Reordered sanitiser pipeline so semantic conversions occur before wrapper removal and section tagging, ensuring Framer headings receive the correct `<h1>`/`<h2>` semantics.
+- Exposed template converter helpers for reuse by the template generator, resolving fatal errors during template extraction.
+- Reordered sanitiser pipeline so semantic conversions occur before wrapper removal and section tagging, ensuring headings receive the correct `<h1>`/`<h2>` semantics.
 - Hardened CSP configuration to use directive maps with filter hooks for script/style/connect sources and extended CORS manager with configurable methods, headers, and max-age handling.
 - Audit logger now sanitizes context, masks sensitive keys, and enforces a filterable retention cap while preserving structured metadata for success/failure events.
 
@@ -271,7 +271,7 @@
 
 ### 🐛 Bug Fixes
 
-- Prevented `EFS_Framer_HTML_Sanitizer::convert_text_components()` from exiting early when encountering non-div nodes, ensuring all text components receive semantic tags.
+- Prevented template HTML sanitizer from exiting early when encountering non-div nodes, ensuring all text components receive semantic tags.
 - Updated `EFS_Input_Validator::validate_array()` to compare sanitized keys against sanitized allow-lists, keeping validation strict without rejecting normalized inputs.
 
 ### 📚 Documentation
@@ -446,11 +446,11 @@
 - Remaining: Migrator classes, Converter classes, JS/CSS assets, Tests, Workflows
 - Migration script needed for existing installations to rename options
 
-## [0.10.2] - 2025-10-25 (14:55) - Framer Extractor Test Coverage
+## [0.10.2] - 2025-10-25 (14:55) - Template Extractor Test Coverage
 
 ### 🧪 Testing
 
-- Added Framer extractor fixtures and PHPUnit suites covering sanitizer semantics, template analyzer heuristics, and full pipeline validation (`tests/fixtures/framer-sample.html`, `tests/unit/*`, `tests/integration/FramerExtractionIntegrationTest.php`).
+- Added template extractor fixtures and PHPUnit suites covering sanitizer semantics, template analyzer heuristics, and full pipeline validation.
 - Updated `TemplateExtractorServiceTest` to assert payload structure and validation results using the DI container.
 
 ### 📚 Documentation
@@ -461,8 +461,8 @@
 
 ### ✨ New Features
 
-- Added REST API endpoints under `/b2e/v1/template/*` for extracting, listing, previewing, importing, and deleting Etch templates generated from Framer sources, complete with rate limiting, CORS enforcement, and input validation.
-- Embedded the Template Extractor interface directly into the Etch dashboard with saved-template context, providing a single entry point for Framer imports.
+- Added REST API endpoints under `/b2e/v1/template/*` for extracting, listing, previewing, importing, and deleting Etch templates, complete with rate limiting, CORS enforcement, and input validation.
+- Embedded the Template Extractor interface directly into the Etch dashboard with saved-template context.
 
 ### 🧪 Testing
 
@@ -470,16 +470,15 @@
 
 ### 📚 Documentation
 
-- Authored `docs/FRAMER-EXTRACTION.md` with architecture, pipeline steps, REST usage, troubleshooting, and testing guidance.
-- Updated `README.md` and `DOCUMENTATION.md` to reference the new extractor documentation and summarize REST/AJAX capabilities.
+- Updated `README.md` and `DOCUMENTATION.md` to reference extractor documentation and summarize REST/AJAX capabilities.
 
-## [0.10.0] - 2025-10-25 (11:05) - Framer Template Extraction
+## [0.10.0] - 2025-10-25 (11:05) - Template Extraction
 
 ### ✨ New Features
 
-- **Framer Template Extraction Framework**: Complete pipeline for importing Framer website templates into Etch
+- **Template Extraction Framework**: Complete pipeline for importing website templates into Etch
   - HTML Parser: DOMDocument-based robust HTML parsing with error handling
-  - HTML Sanitizer: Removes Framer-specific markup, semanticizes DOM structure
+  - HTML Sanitizer: Removes source-specific markup, semanticizes DOM structure
   - Template Analyzer: Detects sections (hero, features, CTA, footer), components, layout structure
   - Etch Template Generator: Converts sanitized DOM to Etch-compatible Gutenberg blocks
   - Template Extractor Service: Orchestrates complete extraction pipeline
@@ -506,7 +505,7 @@
 ### 🏗️ Architecture
 
 - **Four Core Interfaces**: `Template_Extractor`, `HTML_Sanitizer`, `Template_Analyzer`, `Etch_Template_Generator`
-- **Two Framer Implementations**: `Framer_HTML_Sanitizer`, `Framer_Template_Analyzer`
+- **Template Implementations**: HTML sanitizer and template analyzer
 - **Service Layer Integration**: Registered in DI container with autowiring
 - **Controller Pattern**: `Template_Controller` delegates to `Template_Extractor_Service`
 - **Reusable Components**: Leverages existing `Element_Factory` and `Gutenberg_Generator` patterns
@@ -514,15 +513,11 @@
 ### 🔧 Technical Details
 
 - **HTML Parsing**: DOMDocument + DOMXPath for robust invalid HTML handling
-- **Framer-Specific Sanitization**:
-  - Removes `data-framer-*` attributes and hash classes (`framer-xxxxx`)
-  - Unwraps unnecessary single-child div wrappers
-  - Semanticizes generic divs to `<header>`, `<nav>`, `<section>`, `<footer>`
-  - Converts `data-framer-component-type` to appropriate HTML tags
+- **Source-Specific Sanitization**: Removes source-specific attributes and hash classes, unwraps unnecessary single-child div wrappers, semanticizes generic divs to `<header>`, `<nav>`, `<section>`, `<footer>`, and converts component types to appropriate HTML tags.
 - **Semantic Analysis**: Heuristic-based section detection (hero, features, CTA recognition)
 - **Etch Block Generation**: Gutenberg block HTML with `etchData` metadata structure
 - **Complexity Scoring**: 0-100 scale based on DOM depth, component count, layout complexity
-- **CSS Variable Extraction**: Captures `--framer-*` inline styles for style mapping
+- **CSS Variable Extraction**: Captures inline style variables for style mapping
 
 ## [0.9.0-beta] - 2025-10-25 (08:55) - Legacy Alias Cleanup
 

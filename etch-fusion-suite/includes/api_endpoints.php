@@ -86,9 +86,110 @@ class EFS_API_Endpoints {
 	 */
 	public static function init() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
+		add_action( 'wp_ajax_efs_dismiss_migration_run', array( __CLASS__, 'dismiss_migration_run' ) );
+		add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
+		add_action( 'wp_ajax_efs_revoke_migration_key', array( __CLASS__, 'revoke_migration_key' ) );
 
 		// Add global CORS enforcement filter
 		add_filter( 'rest_request_before_callbacks', array( __CLASS__, 'enforce_cors_globally' ), 10, 3 );
+	}
+
+	/**
+	 * Persist dismissed migration run identifiers.
+	 *
+	 * @return void
+	 */
+	public static function dismiss_migration_run() {
+		check_ajax_referer( 'efs_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'code' => 'forbidden' ), 403 );
+		}
+
+		$migration_id = '';
+		if ( isset( $_POST['migrationId'] ) ) {
+			$migration_id = sanitize_text_field( wp_unslash( $_POST['migrationId'] ) );
+		} elseif ( isset( $_POST['migration_id'] ) ) {
+			$migration_id = sanitize_text_field( wp_unslash( $_POST['migration_id'] ) );
+		}
+
+		if ( '' === $migration_id ) {
+			wp_send_json_error( array( 'code' => 'missing_migration_id' ), 400 );
+		}
+
+		$dismissed = get_option( 'efs_dismissed_migration_runs', array() );
+		if ( ! is_array( $dismissed ) ) {
+			$dismissed = array();
+		}
+
+		if ( ! in_array( $migration_id, $dismissed, true ) ) {
+			$dismissed[] = $migration_id;
+		}
+
+		update_option( 'efs_dismissed_migration_runs', $dismissed );
+		wp_send_json_success( array( 'dismissed' => $dismissed ) );
+	}
+
+	/**
+	 * Return dismissed migration run identifiers.
+	 *
+	 * @return void
+	 */
+	public static function get_dismissed_migration_runs() {
+		check_ajax_referer( 'efs_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'code' => 'forbidden' ), 403 );
+		}
+
+		$dismissed = get_option( 'efs_dismissed_migration_runs', array() );
+		if ( ! is_array( $dismissed ) ) {
+			$dismissed = array();
+		}
+
+		wp_send_json_success( array( 'dismissed' => $dismissed ) );
+	}
+
+	/**
+	 * Revoke the currently active migration key.
+	 *
+	 * @return void
+	 */
+	public static function revoke_migration_key() {
+		check_ajax_referer( 'efs_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'code' => 'forbidden' ), 403 );
+		}
+
+		/** @var EFS_Migration_Token_Manager $token_manager */
+		$token_manager = self::resolve( 'token_manager' );
+		if ( ! $token_manager ) {
+			wp_send_json_error(
+				array(
+					'code'    => 'token_manager_unavailable',
+					'message' => __( 'Token manager unavailable.', 'etch-fusion-suite' ),
+				),
+				500
+			);
+		}
+
+		$revoked = $token_manager->revoke_current_migration_key();
+		if ( ! $revoked ) {
+			wp_send_json_error(
+				array(
+					'code'    => 'revoke_failed',
+					'message' => __( 'Failed to revoke migration key.', 'etch-fusion-suite' ),
+				),
+				500
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'Migration key revoked.', 'etch-fusion-suite' ),
+			)
+		);
 	}
 
 	/**
@@ -1210,6 +1311,7 @@ class EFS_API_Endpoints {
 		// angle brackets (e.g. "<ul>", "<li>"), which breaks structure/order.
 		$is_block_content = false !== strpos( $etch_content, '<!-- wp:' );
 		$post_content     = $is_block_content ? $etch_content : wp_kses_post( $etch_content );
+		self::sync_etch_loops_from_payload( isset( $payload['etch_loops'] ) && is_array( $payload['etch_loops'] ) ? $payload['etch_loops'] : array() );
 
 		$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
 		$postarr  = array(
@@ -1249,6 +1351,42 @@ class EFS_API_Endpoints {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Merge incoming Etch loop presets into local etch_loops option.
+	 *
+	 * @param array<string, array<string, mixed>> $incoming_loops Loop presets payload.
+	 * @return void
+	 */
+	private static function sync_etch_loops_from_payload( $incoming_loops ) {
+		if ( empty( $incoming_loops ) || ! is_array( $incoming_loops ) ) {
+			return;
+		}
+
+		$current_loops = get_option( 'etch_loops', array() );
+		$current_loops = is_array( $current_loops ) ? $current_loops : array();
+
+		foreach ( $incoming_loops as $loop_id => $preset ) {
+			$id = sanitize_key( (string) $loop_id );
+			if ( '' === $id || ! is_array( $preset ) ) {
+				continue;
+			}
+
+			$config = isset( $preset['config'] ) && is_array( $preset['config'] ) ? $preset['config'] : array();
+			if ( empty( $config ) ) {
+				continue;
+			}
+
+			$current_loops[ $id ] = array(
+				'name'   => isset( $preset['name'] ) ? sanitize_text_field( (string) $preset['name'] ) : $id,
+				'key'    => isset( $preset['key'] ) ? sanitize_key( (string) $preset['key'] ) : $id,
+				'global' => isset( $preset['global'] ) ? (bool) $preset['global'] : true,
+				'config' => $config,
+			);
+		}
+
+		update_option( 'etch_loops', $current_loops );
 	}
 
 	/**

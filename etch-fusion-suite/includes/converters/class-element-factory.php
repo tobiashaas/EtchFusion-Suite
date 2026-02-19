@@ -12,6 +12,7 @@ namespace Bricks2Etch\Converters;
 
 use Bricks2Etch\Converters\Elements\EFS_Element_Container;
 use Bricks2Etch\Converters\Elements\EFS_Element_Section;
+use Bricks2Etch\Converters\Elements\EFS_Element_Condition;
 use Bricks2Etch\Converters\Elements\EFS_Element_Heading;
 use Bricks2Etch\Converters\Elements\EFS_Element_Paragraph;
 use Bricks2Etch\Converters\Elements\EFS_Element_Text;
@@ -27,6 +28,7 @@ use Bricks2Etch\Converters\Elements\EFS_Element_Html;
 use Bricks2Etch\Converters\Elements\EFS_Element_Notes;
 use Bricks2Etch\Converters\Elements\EFS_Element_Shortcode;
 use Bricks2Etch\Converters\Elements\EFS_Element_TextLink;
+use Bricks2Etch\Core\EFS_Error_Handler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -40,6 +42,7 @@ class EFS_Element_Factory {
 	private const TYPE_MAP = array(
 		'container'  => EFS_Element_Container::class,
 		'section'    => EFS_Element_Section::class,
+		'condition'  => EFS_Element_Condition::class,
 		'heading'    => EFS_Element_Heading::class,
 		'text-basic' => EFS_Element_Paragraph::class,
 		'text'       => EFS_Element_Text::class,
@@ -69,12 +72,21 @@ class EFS_Element_Factory {
 	private $converters = array();
 
 	/**
+	 * Optional error handler for converter-specific warning logging.
+	 *
+	 * @var EFS_Error_Handler|null
+	 */
+	private $error_handler;
+
+	/**
 	 * Constructor
 	 *
-	 * @param array $style_map Style map for CSS classes
+	 * @param array                  $style_map Style map for CSS classes.
+	 * @param EFS_Error_Handler|null $error_handler Optional error handler instance.
 	 */
-	public function __construct( $style_map = array() ) {
-		$this->style_map = $style_map;
+	public function __construct( $style_map = array(), ?EFS_Error_Handler $error_handler = null ) {
+		$this->style_map     = $style_map;
+		$this->error_handler = $error_handler;
 		$this->load_converters();
 	}
 
@@ -114,7 +126,11 @@ class EFS_Element_Factory {
 
 		// Create converter instance (with caching)
 		if ( ! isset( $this->converters[ $converter_class ] ) ) {
-			$this->converters[ $converter_class ] = new $converter_class( $this->style_map );
+			if ( EFS_Element_Condition::class === $converter_class ) {
+				$this->converters[ $converter_class ] = new $converter_class( $this->style_map, $this->error_handler );
+			} else {
+				$this->converters[ $converter_class ] = new $converter_class( $this->style_map );
+			}
 		}
 
 		return $this->converters[ $converter_class ];

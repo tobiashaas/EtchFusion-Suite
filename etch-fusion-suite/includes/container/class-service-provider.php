@@ -25,6 +25,13 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'migration_runs_repository',
+			function ( $c ) {
+				return new \Bricks2Etch\Repositories\EFS_Migration_Runs_Repository();
+			}
+		);
+
+		$container->singleton(
 			'token_manager',
 			function ( $c ) {
 				return new \Bricks2Etch\Core\EFS_Migration_Token_Manager( $c->get( 'migration_repository' ) );
@@ -139,7 +146,7 @@ class EFS_Service_Provider {
 		$container->singleton(
 			'element_factory',
 			function ( $c ) {
-				return new \Bricks2Etch\Converters\EFS_Element_Factory();
+				return new \Bricks2Etch\Converters\EFS_Element_Factory( array(), $c->get( 'error_handler' ) );
 			}
 		);
 
@@ -327,7 +334,8 @@ class EFS_Service_Provider {
 					$c->get( 'api_client' ),
 					$c->get( 'migrator_registry' ),
 					$c->get( 'migration_repository' ),
-					$c->get( 'token_manager' )
+					$c->get( 'token_manager' ),
+					$c->get( 'migration_runs_repository' )
 				);
 			}
 		);
@@ -448,6 +456,7 @@ class EFS_Service_Provider {
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\Handlers\EFS_Logs_Ajax_Handler(
 					$c->get( 'audit_logger' ),
+					$c->get( 'migration_runs_repository' ),
 					$c->get( 'rate_limiter' ),
 					$c->get( 'input_validator' )
 				);
@@ -516,6 +525,15 @@ class EFS_Service_Provider {
 			}
 		);
 
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$container->singleton(
+				'debug_ajax',
+				function ( $c ) {
+					return new \Bricks2Etch\Ajax\Handlers\EFS_Debug_Ajax_Handler();
+				}
+			);
+		}
+
 		$container->singleton(
 			'ajax_handler',
 			function ( $c ) {
@@ -557,6 +575,7 @@ class EFS_Service_Provider {
 		return array(
 			'settings_repository',
 			'migration_repository',
+			'migration_runs_repository',
 			'style_repository',
 			'cors_manager',
 			'rate_limiter',
@@ -606,6 +625,7 @@ class EFS_Service_Provider {
 			'template_ajax',
 			'wizard_ajax',
 			'progress_ajax',
+			'debug_ajax',
 			'ajax_handler',
 			'admin_interface',
 		);

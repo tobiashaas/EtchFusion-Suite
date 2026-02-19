@@ -34,12 +34,30 @@ class EFS_Element_Image extends EFS_Base_Element {
 		$image_data   = isset( $element['settings']['image'] ) && is_array( $element['settings']['image'] ) ? $element['settings']['image'] : array();
 		$image_id     = isset( $image_data['id'] ) ? (int) $image_data['id'] : 0;
 		$image_url    = isset( $image_data['url'] ) ? (string) $image_data['url'] : '';
+		$use_dynamic  = isset( $image_data['useDynamicData'] ) ? trim( (string) $image_data['useDynamicData'] ) : '';
 		$alt_text     = $element['settings']['alt'] ?? ( $image_data['alt'] ?? '' );
 		$caption      = $element['settings']['caption'] ?? '';
 		$figure_attrs = array();
 
 		$alt_text = is_string( $alt_text ) ? $alt_text : '';
 		$caption  = is_string( $caption ) ? $caption : '';
+
+		// When the image source is dynamic data (e.g. {featured_image}), emit an Etch
+		// dynamic-image block with a resolved data-source attribute instead of a static URL.
+		if ( '' !== $use_dynamic ) {
+			$dynamic_src = $this->resolve_dynamic_image_src( $use_dynamic );
+			if ( '' !== $dynamic_src ) {
+				$dynamic_media_id = (bool) preg_match( '/^\{(?:this|item)\.image\.id\}$/', $dynamic_src );
+				if ( '' !== $css_classes ) {
+					$figure_attrs['class'] = $css_classes;
+				}
+				$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element );
+
+				$img_block = $this->generate_dynamic_image_block( 0, $dynamic_src, $alt_text, $dynamic_media_id );
+				return $this->generate_etch_element_block( $figure_block_attrs, array( $img_block ) );
+			}
+			// Unknown dynamic source — fall through to static handling (may return '' if no URL).
+		}
 
 		if ( '' === $image_url && $image_id > 0 && function_exists( 'wp_get_attachment_url' ) ) {
 			$resolved_url = wp_get_attachment_url( $image_id );
@@ -74,6 +92,44 @@ class EFS_Element_Image extends EFS_Base_Element {
 	}
 
 	/**
+	 * Map a Bricks useDynamicData tag to an Etch dynamic-image src expression.
+	 *
+	 * Bricks stores dynamic image sources as tags like `{featured_image}` or
+	 * `{acf_image_field}`. This method translates known tags to the Etch equivalent
+	 * so that the loop context can resolve them at render time.
+	 *
+	 * @param string $bricks_dynamic_tag Raw useDynamicData value (e.g. "{featured_image}").
+	 * @return string Etch dynamic src expression, or '' if the tag is unknown.
+	 */
+	private function resolve_dynamic_image_src( $bricks_dynamic_tag ) {
+		$tag = trim( (string) $bricks_dynamic_tag );
+		// Strip surrounding braces to normalise "{featured_image}" → "featured_image".
+		$tag = trim( $tag, '{}' );
+
+		$map = array(
+			'featured_image'    => '{this.image.id}',
+			'post_thumbnail'    => '{this.image.id}',
+			'woo_product_image' => '{this.image.id}',
+		);
+
+		if ( isset( $map[ $tag ] ) ) {
+			return $map[ $tag ];
+		}
+
+		// ACF image fields: {acf_field_name} or {acf:field_name}.
+		if ( 0 === strpos( $tag, 'acf:' ) ) {
+			$field_name = substr( $tag, 4 );
+			return '{this.acf.' . $field_name . '}';
+		}
+		if ( 0 === strpos( $tag, 'acf_' ) ) {
+			$field_name = substr( $tag, 4 );
+			return '{this.acf.' . $field_name . '}';
+		}
+
+		return '';
+	}
+
+	/**
 	 * Build Etch dynamic-image block for migrated images.
 	 *
 	 * Prefers mapped target media ID (from media migration) and falls back to src/alt.
@@ -81,14 +137,18 @@ class EFS_Element_Image extends EFS_Base_Element {
 	 * @param int    $source_image_id Source attachment ID from Bricks.
 	 * @param string $image_url       Source image URL.
 	 * @param string $alt_text        Image alt text.
+	 * @param bool   $dynamic_media_id Whether image_url carries a dynamic mediaId expression.
 	 * @return string
 	 */
-	private function generate_dynamic_image_block( $source_image_id, $image_url, $alt_text ) {
+	private function generate_dynamic_image_block( $source_image_id, $image_url, $alt_text, $dynamic_media_id = false ) {
 		$attributes = array();
 
 		$mapped_media_id = $this->get_mapped_target_media_id( (int) $source_image_id );
 		if ( $mapped_media_id > 0 ) {
 			$attributes['mediaId'] = (string) $mapped_media_id;
+		} elseif ( $dynamic_media_id ) {
+			$attributes['mediaId'] = (string) $image_url;
+			$attributes['alt']     = (string) $alt_text;
 		} else {
 			$attributes['src'] = (string) $image_url;
 			$attributes['alt'] = (string) $alt_text;
@@ -126,3 +186,4 @@ class EFS_Element_Image extends EFS_Base_Element {
 		return (int) $mappings[ $source_image_id ];
 	}
 }
+

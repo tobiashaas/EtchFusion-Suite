@@ -117,7 +117,29 @@ class EFS_Element_Text extends EFS_Base_Element {
 
 		$this->flush_inline_buffer( $inline_buffer, $element, $blocks );
 
-		return implode( "\n", $blocks );
+		if ( empty( $blocks ) ) {
+			return '';
+		}
+
+		$wrapper_style_ids = $this->get_style_ids( $element );
+		$wrapper_classes   = array_filter( preg_split( '/\s+/', trim( (string) $this->get_css_classes( $wrapper_style_ids ) ) ) );
+		$wrapper_classes[] = 'smart-spacing';
+		$wrapper_classes   = array_values( array_unique( array_filter( $wrapper_classes ) ) );
+		$wrapper_attrs     = array();
+
+		if ( ! empty( $wrapper_classes ) ) {
+			$wrapper_attrs['class'] = implode( ' ', $wrapper_classes );
+		}
+
+		$wrapper = $this->build_attributes(
+			$this->get_label( $element ),
+			$wrapper_style_ids,
+			$wrapper_attrs,
+			'div',
+			$element
+		);
+
+		return $this->generate_etch_element_block( $wrapper, implode( "\n", $blocks ) );
 	}
 
 	/**
@@ -167,9 +189,8 @@ class EFS_Element_Text extends EFS_Base_Element {
 	 */
 	private function generate_block( $tag, $content, $element, $node = null ) {
 		$content = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', (string) $content );
-		$style_ids      = $this->get_style_ids( $element );
-		$style_classes  = $this->get_css_classes( $style_ids );
-		$merged_classes = $this->merge_classes( $style_classes, $node );
+		$style_ids      = array();
+		$merged_classes = $this->merge_classes( '', $node );
 		$etch_attrs     = array();
 
 		if ( '' !== $merged_classes ) {

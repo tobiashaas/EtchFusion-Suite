@@ -145,7 +145,6 @@ Create this file for local customizations (gitignored):
 - `SKIP_HEALTH_CHECK`: Skip health checks during setup
 - `SAVE_LOGS_ON_SUCCESS`: Save logs even when tests pass
 - `SAVE_LOGS_ON_FAILURE`: Save logs when tests fail (default: true)
-- `EFS_ENABLE_FRAMER`: Enable Framer template extraction features
 - `SKIP_VENDOR_CHECK`: Skip vendor/autoload.php check in scripts
 
 ---
@@ -360,8 +359,6 @@ tests/playwright/
 - `SKIP_HEALTH_CHECK`: Skip pre-test health checks
 - `SAVE_LOGS_ON_SUCCESS`: Save logs on test success
 - `SAVE_LOGS_ON_FAILURE`: Save logs on test failure
-- `EFS_ENABLE_FRAMER`: Include Framer-specific tests
-
 #### Running Tests
 
 ```bash

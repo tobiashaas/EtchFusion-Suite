@@ -108,6 +108,7 @@ const createWizard = (root) => {
 		previewWarnings: root.querySelector('[data-efs-preview-warnings]'),
 		warningList: root.querySelector('[data-efs-warning-list]'),
 		progressTakeover: root.querySelector('[data-efs-progress-takeover]'),
+		progressPanel: root.querySelector('[data-efs-progress-takeover] .efs-wizard-progress__panel'),
 		progressBanner: root.querySelector('[data-efs-progress-banner]'),
 		progressFill: root.querySelector('[data-efs-wizard-progress-fill]'),
 		progressPercent: root.querySelector('[data-efs-wizard-progress-percent]'),
@@ -214,8 +215,8 @@ const createWizard = (root) => {
 				disabled = !hasValidStep2Selection();
 				label = 'Next';
 			} else if (state.currentStep === 3) {
-				disabled = false;
-				label = 'Confirm & Start Migration';
+				disabled = runtime.migrationRunning;
+				label = runtime.migrationRunning ? 'Starting migration…' : 'Confirm & Start Migration';
 			} else {
 				disabled = true;
 				label = 'Migration Running';
@@ -224,6 +225,8 @@ const createWizard = (root) => {
 			refs.nextButton.disabled = disabled;
 			refs.nextButton.textContent = label;
 			refs.nextButton.classList.toggle('efs-wizard-next--validating', state.currentStep === 1 && runtime.validatingConnect);
+			refs.nextButton.classList.toggle('efs-wizard-next--loading', state.currentStep === 3 && runtime.migrationRunning);
+			refs.nextButton.setAttribute('aria-busy', state.currentStep === 3 && runtime.migrationRunning ? 'true' : 'false');
 		}
 	};
 
@@ -685,20 +688,40 @@ const createWizard = (root) => {
 		resetTabTitle();
 		removeProgressChip(runtime.progressChip);
 		runtime.progressChip = null;
-
-		if (type === 'success') {
-			showToast(subtitle || 'Migration complete.', 'success');
-			resetWizard();
-			return;
-		}
-		showToast(subtitle || 'Migration failed.', 'error');
+		runtime.migrationRunning = false;
+		state.progressMinimized = false;
+		root.classList.remove('is-progress-minimized');
 		if (refs.progressTakeover) {
-			refs.progressTakeover.hidden = true;
+			if (refs.progressTakeover.parentNode !== document.body) {
+				document.body.appendChild(refs.progressTakeover);
+			}
+			refs.progressTakeover.hidden = false;
+			refs.progressTakeover.classList.add('is-showing-result');
+		}
+		if (refs.progressPanel) {
+			refs.progressPanel.hidden = true;
 		}
 		if (refs.progressBanner) {
 			refs.progressBanner.hidden = true;
 		}
-		runtime.migrationRunning = false;
+		if (refs.minimizeButton) {
+			refs.minimizeButton.hidden = true;
+		}
+
+		const isSuccess = type === 'success';
+		if (refs.resultTitle) {
+			refs.resultTitle.textContent = isSuccess ? 'Migration complete' : 'Migration failed';
+		}
+		if (refs.resultSubtitle) {
+			refs.resultSubtitle.textContent = subtitle || (isSuccess ? 'Migration completed successfully.' : 'Migration failed.');
+		}
+		if (refs.result) {
+			refs.result.classList.toggle('is-success', isSuccess);
+			refs.result.classList.toggle('is-error', !isSuccess);
+			refs.result.hidden = false;
+		}
+
+		showToast(subtitle || (isSuccess ? 'Migration complete.' : 'Migration failed.'), isSuccess ? 'success' : 'error');
 	};
 
 	const hideResult = () => {
@@ -718,7 +741,15 @@ const createWizard = (root) => {
 				document.body.appendChild(refs.progressTakeover);
 			}
 			refs.progressTakeover.hidden = !runtime.migrationRunning;
+			refs.progressTakeover.classList.remove('is-showing-result');
 		}
+		if (refs.progressPanel) {
+			refs.progressPanel.hidden = false;
+		}
+		if (refs.minimizeButton) {
+			refs.minimizeButton.hidden = false;
+		}
+		hideResult();
 		if (refs.progressBanner) {
 			refs.progressBanner.hidden = true;
 		}
@@ -797,15 +828,15 @@ const createWizard = (root) => {
 				renderProgress(payload);
 
 				const status = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
+				const percentage = Number(payload?.progress?.percentage ?? 0);
 
-				if (payload?.completed || status === 'completed') {
+				if (payload?.completed || status === 'completed' || percentage >= 100) {
 					perfMetrics.endMigration();
 					const hints = perfMetrics.getBottleneckHints();
 					if (hints && hints.length > 0) {
 						console.warn('[EFS][Perf] Bottleneck hints:', hints);
 					}
 					runtime.migrationRunning = false;
-					reopenProgress();
 					showResult('success', 'Migration finished successfully.');
 					return;
 				}
@@ -820,7 +851,6 @@ const createWizard = (root) => {
 				}
 
 				const isStale = Boolean(payload?.is_stale || payload?.progress?.is_stale || status === 'stale');
-				const percentage = Number(payload?.progress?.percentage ?? 0);
 				if (isStale && percentage === 0) {
 					runtime.migrationRunning = false;
 					if (refs.retryButton) {
@@ -1073,9 +1103,35 @@ const createWizard = (root) => {
 	};
 
 	const openLogsTab = () => {
+		if (refs.progressTakeover) {
+			refs.progressTakeover.hidden = true;
+		}
+		if (refs.progressBanner) {
+			refs.progressBanner.hidden = true;
+		}
+
+		const migrationHash = state.migrationId ? `#migration-${state.migrationId}` : '#logs';
+		if (state.migrationId) {
+			window.history.replaceState(null, '', migrationHash);
+		}
+
 		const logsTab = document.querySelector('[data-efs-tab="logs"]');
-		logsTab?.click();
-		document.querySelector('#efs-tab-logs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		if (logsTab) {
+			logsTab.click();
+			document.querySelector('#efs-tab-logs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			return;
+		}
+
+		const logsPanel = document.querySelector('[data-efs-log-panel]');
+		if (logsPanel) {
+			logsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			return;
+		}
+
+		const fallbackUrl = new URL(window.location.href);
+		fallbackUrl.searchParams.set('page', 'etch-fusion-suite');
+		fallbackUrl.hash = migrationHash;
+		window.location.assign(fallbackUrl.toString());
 	};
 
 	const bindEvents = () => {
@@ -1292,8 +1348,9 @@ const createWizard = (root) => {
 		const migrationId = window.efsData?.migrationId || progress?.migrationId || inProgress?.migrationId || '';
 		const completed = Boolean(window.efsData?.completed || progress?.completed);
 		const status = String(progress?.status || progress?.current_step || '').toLowerCase();
+		const percentage = Number(progress?.percentage ?? 0);
 
-		if (!migrationId || completed || status === 'completed') {
+		if (!migrationId || completed || status === 'completed' || percentage >= 100) {
 			return false;
 		}
 
@@ -1306,8 +1363,9 @@ const createWizard = (root) => {
 				migration_id: migrationId,
 			});
 			const pollStatus = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
+			const pollPercentage = Number(payload?.progress?.percentage ?? 0);
 			const isRunning = pollStatus === 'running' || pollStatus === 'receiving';
-			if (payload?.completed || pollStatus === 'completed' || pollStatus === 'error' || !isRunning) {
+			if (payload?.completed || pollStatus === 'completed' || pollStatus === 'error' || pollPercentage >= 100 || !isRunning) {
 				return false;
 			}
 
