@@ -168,18 +168,35 @@ class EFS_Migration_Controller {
 	}
 
 	public function process_batch( array $data ) {
-		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
-		$batch        = isset( $data['batch'] ) ? $data['batch'] : array();
-		$result       = $this->manager->process_batch( $migration_id, $batch );
+		$migration_id            = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		$batch                   = isset( $data['batch'] ) ? (array) $data['batch'] : array();
+		$batch['batch_size']     = isset( $data['batch_size'] ) ? max( 1, (int) $data['batch_size'] ) : 10;
+		$result                  = $this->manager->process_batch( $migration_id, $batch );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 		return array(
-			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
-			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
-			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
-			'completed'   => ! empty( $result['completed'] ),
+			'progress'     => isset( $result['progress'] ) ? $result['progress'] : array(),
+			'steps'        => isset( $result['steps'] ) ? $result['steps'] : array(),
+			'migrationId'  => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
+			'completed'    => ! empty( $result['completed'] ),
+			'remaining'    => isset( $result['remaining'] ) ? (int) $result['remaining'] : 0,
+			'current_item' => isset( $result['current_item'] ) ? $result['current_item'] : array(),
 		);
+	}
+
+	/**
+	 * Resume a JS-driven batch loop after timeout or error.
+	 *
+	 * @param array $data Request data. Expects 'migrationId'.
+	 * @return array|\WP_Error
+	 */
+	public function resume_migration( array $data ) {
+		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		if ( empty( $migration_id ) ) {
+			return new \WP_Error( 'missing_migration_id', __( 'Migration ID is required.', 'etch-fusion-suite' ) );
+		}
+		return $this->manager->resume_migration_execution( $migration_id );
 	}
 
 	public function cancel_migration( array $data = array() ) {

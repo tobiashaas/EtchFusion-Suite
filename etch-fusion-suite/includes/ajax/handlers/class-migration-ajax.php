@@ -57,6 +57,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_run_migration_background', array( $this, 'run_migration_background' ) );
 		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
 		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
+		add_action( 'wp_ajax_efs_resume_migration', array( $this, 'resume_migration' ) );
 		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
 		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
 		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
@@ -212,7 +213,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->check_rate_limit( 'migration_batch', 30, MINUTE_IN_SECONDS ) ) {
+		if ( ! $this->check_rate_limit( 'migration_batch', 1200, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
 
@@ -231,11 +232,45 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$payload = array(
 			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
 			'batch'       => $this->get_post( 'batch', array(), 'array' ),
+			'batch_size'  => $this->get_post( 'batch_size', 10, 'int' ),
 		);
 
 		$result = $this->migration_controller->process_batch( $payload );
 
 		$this->send_controller_response( $result, 'migration_batch_failed' );
+	}
+
+	/**
+	 * Resume JS-driven batch loop after timeout or error.
+	 */
+	public function resume_migration() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'migration_resume', 30, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
+			$this->log_security_event( 'ajax_action', 'Migration resume aborted: controller unavailable.' );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$payload = array(
+			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+		);
+
+		$result = $this->migration_controller->resume_migration( $payload );
+
+		$this->send_controller_response( $result, 'migration_resume_failed' );
 	}
 
 	/**

@@ -173,4 +173,26 @@ interface Migration_Repository_Interface {
 	 * @return int Number of expired transients deleted.
 	 */
 	public function cleanup_expired_tokens(): int;
+
+	/**
+	 * Save migration checkpoint for JS-driven batch loop.
+	 *
+	 * @param array $checkpoint Checkpoint data.
+	 * @return bool True on success, false on failure.
+	 */
+	public function save_checkpoint( array $checkpoint ): bool;
+
+	/**
+	 * Get migration checkpoint.
+	 *
+	 * @return array Checkpoint data, or empty array if none exists.
+	 */
+	public function get_checkpoint(): array;
+
+	/**
+	 * Delete migration checkpoint.
+	 *
+	 * @return bool True on success, false on failure.
+	 */
+	public function delete_checkpoint(): bool;
 }

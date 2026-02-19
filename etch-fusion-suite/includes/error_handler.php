@@ -237,6 +237,21 @@ class EFS_Error_Handler {
 			'description' => 'Unsupported Bricks condition; placeholder inserted',
 			'solution'    => 'Manually recreate condition logic in Etch',
 		),
+		'W009' => array(
+			'title'       => 'Post Type Mismatch on Idempotent Upsert',
+			'description' => 'Existing post found via source-ID mapping but requested post_type does not exist on target; post_type kept unchanged to avoid duplicate',
+			'solution'    => 'Register the required post type on the target site, then re-run the migration',
+		),
+		'W010' => array(
+			'title'       => 'Post Send Failed - Will Retry',
+			'description' => 'Post conversion/send failed; will be retried',
+			'solution'    => 'Automatic retry scheduled; check logs if post ultimately fails',
+		),
+		'W011' => array(
+			'title'       => 'Post Failed After Max Retries',
+			'description' => 'Post exhausted all retry attempts and was skipped',
+			'solution'    => 'Review the post manually and re-run or migrate it individually',
+		),
 	);
 
 	/**

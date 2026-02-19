@@ -28,6 +28,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	const OPTION_CURRENT_ID       = 'efs_current_migration_id';
 	const OPTION_ACTIVE_MIGRATION = 'efs_active_migration';
 	const OPTION_RECEIVING_STATE  = 'efs_receiving_migration';
+	const OPTION_CHECKPOINT       = 'efs_migration_checkpoint';
 
 	/**
 	 * Cache expiration for stats/tokens (10 minutes).
@@ -389,6 +390,47 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 
 		$this->invalidate_cache( $cache_key );
 		return update_option( $option_key, $data );
+	}
+
+	/**
+	 * Save migration checkpoint for JS-driven batch loop.
+	 *
+	 * @param array $checkpoint Checkpoint data.
+	 * @return bool True on success, false on failure.
+	 */
+	public function save_checkpoint( array $checkpoint ): bool {
+		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+		return update_option( self::OPTION_CHECKPOINT, $checkpoint );
+	}
+
+	/**
+	 * Get migration checkpoint.
+	 *
+	 * @return array Checkpoint data, or empty array if none exists.
+	 */
+	public function get_checkpoint(): array {
+		$cache_key = 'efs_cache_migration_checkpoint';
+		$cached    = get_transient( $cache_key );
+
+		if ( false !== $cached ) {
+			return is_array( $cached ) ? $cached : array();
+		}
+
+		$checkpoint = get_option( self::OPTION_CHECKPOINT, array() );
+		$checkpoint = is_array( $checkpoint ) ? $checkpoint : array();
+		set_transient( $cache_key, $checkpoint, self::CACHE_EXPIRATION_SHORT );
+
+		return $checkpoint;
+	}
+
+	/**
+	 * Delete migration checkpoint.
+	 *
+	 * @return bool True on success, false on failure.
+	 */
+	public function delete_checkpoint(): bool {
+		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+		return delete_option( self::OPTION_CHECKPOINT );
 	}
 
 	/**

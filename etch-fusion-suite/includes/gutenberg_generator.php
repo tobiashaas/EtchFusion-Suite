@@ -355,18 +355,17 @@ class EFS_Gutenberg_Generator {
 		if ( in_array( $display, array( 'grid', 'inline-grid' ), true ) ) {
 			return $attributes;
 		}
-		$neighbor_classes = array_values(
-			array_filter(
-				$class_list,
-				static function ( $name ) {
-					$name = trim( (string) $name );
-					if ( '' === $name || 'brxe-block' === $name ) {
-						return false;
-					}
-					return true;
-				}
-			)
-		);
+		$neighbor_classes = array();
+		foreach ( $class_list as $name ) {
+			$name = trim( (string) $name );
+			if ( '' === $name || 'brxe-block' === $name ) {
+				continue;
+			}
+			if ( $this->is_modifier_like_class_name( $name ) ) {
+				continue;
+			}
+			$neighbor_classes[] = $name;
+		}
 		$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
 
 		if ( 1 === count( $neighbor_classes ) ) {
@@ -436,6 +435,21 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
+	 * Determine whether a class token is a BEM-like modifier class.
+	 *
+	 * @param string $class_name Class name token.
+	 * @return bool
+	 */
+	private function is_modifier_like_class_name( $class_name ) {
+		$class_name = trim( (string) $class_name );
+		if ( '' === $class_name ) {
+			return false;
+		}
+
+		return false !== strpos( $class_name, '--' );
+	}
+
+	/**
 	 * Resolve style ID by class selector from style map.
 	 *
 	 * @param string $class_name Class name without leading dot.
@@ -463,6 +477,24 @@ class EFS_Gutenberg_Generator {
 			$style_id = isset( $style_data['id'] ) ? trim( (string) $style_data['id'] ) : '';
 			if ( '' !== $style_id ) {
 				return $style_id;
+			}
+		}
+
+		// Fallback: direct selector lookup from Etch styles (covers legacy/incomplete style_map states).
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( is_array( $etch_styles ) ) {
+			foreach ( $etch_styles as $style_id => $style_data ) {
+				if ( ! is_array( $style_data ) ) {
+					continue;
+				}
+				$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
+				if ( $selector !== $class_name ) {
+					continue;
+				}
+				$id = trim( (string) $style_id );
+				if ( '' !== $id ) {
+					return $id;
+				}
 			}
 		}
 

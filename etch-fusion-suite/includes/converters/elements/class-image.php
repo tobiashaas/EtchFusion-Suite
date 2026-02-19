@@ -38,7 +38,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 		$alt_text     = $element['settings']['alt'] ?? ( $image_data['alt'] ?? '' );
 		$caption      = $element['settings']['caption'] ?? '';
 		$figure_attrs = array();
-		$img_style    = $this->resolve_cover_img_style( $css_classes );
+		$img_style    = $this->resolve_cover_img_style( $css_classes, $element );
 
 		$alt_text = is_string( $alt_text ) ? $alt_text : '';
 		$caption  = is_string( $caption ) ? $caption : '';
@@ -173,25 +173,76 @@ class EFS_Element_Image extends EFS_Base_Element {
 	}
 
 	/**
-	 * Resolve image inline style for cover-like figure wrappers.
+	 * Resolve image inline style for cover-like wrappers.
 	 *
-	 * @param string $css_classes Wrapper classes.
-	 * @return string
+	 * Priority order:
+	 *   1. Direct _objectFit setting on the element.
+	 *   2. _objectFit in any attached Bricks global class.
+	 *   3. Class-name heuristic (__image, bg-image tokens).
+	 *
+	 * @param string $css_classes Resolved CSS class string for the figure wrapper.
+	 * @param array  $element     Bricks element data.
+	 * @return string Inline style string for the img, or ''.
 	 */
-	private function resolve_cover_img_style( $css_classes ) {
-		$tokens = preg_split( '/\s+/', trim( (string) $css_classes ) );
-		if ( ! is_array( $tokens ) ) {
-			return '';
+	private function resolve_cover_img_style( $css_classes, $element = array() ) {
+		$cover_style = 'object-fit: cover; inline-size: 100%; block-size: 100%;';
+
+		// 1. Direct element setting.
+		$settings   = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$direct_fit = isset( $settings['_objectFit'] ) ? strtolower( trim( (string) $settings['_objectFit'] ) ) : '';
+		if ( 'cover' === $direct_fit ) {
+			return $cover_style;
 		}
 
-		foreach ( $tokens as $token ) {
-			$token = trim( (string) $token );
-			if ( '' === $token ) {
-				continue;
+		// 2. Global class settings (loaded once per request).
+		$class_ids = isset( $settings['_cssGlobalClasses'] ) && is_array( $settings['_cssGlobalClasses'] )
+			? $settings['_cssGlobalClasses']
+			: array();
+
+		if ( ! empty( $class_ids ) ) {
+			static $global_class_settings = null;
+			if ( null === $global_class_settings ) {
+				$global_class_settings = array();
+				$raw                   = get_option( 'bricks_global_classes', array() );
+				if ( is_string( $raw ) ) {
+					$decoded = json_decode( $raw, true );
+					$raw     = is_array( $decoded ) ? $decoded : array();
+				}
+				if ( is_array( $raw ) ) {
+					foreach ( $raw as $class_data ) {
+						if ( ! is_array( $class_data ) || empty( $class_data['id'] ) ) {
+							continue;
+						}
+						$id                          = trim( (string) $class_data['id'] );
+						$global_class_settings[ $id ] = isset( $class_data['settings'] ) && is_array( $class_data['settings'] )
+							? $class_data['settings']
+							: array();
+					}
+				}
 			}
 
-			if ( false !== strpos( $token, '__image' ) || false !== strpos( $token, 'bg-image' ) || 'is-bg' === $token ) {
-				return 'object-fit: cover; inline-size: 100%; block-size: 100%;';
+			foreach ( $class_ids as $class_id ) {
+				$class_id = trim( (string) $class_id );
+				if ( '' === $class_id || ! isset( $global_class_settings[ $class_id ] ) ) {
+					continue;
+				}
+				$fit = isset( $global_class_settings[ $class_id ]['_objectFit'] )
+					? strtolower( trim( (string) $global_class_settings[ $class_id ]['_objectFit'] ) )
+					: '';
+				if ( 'cover' === $fit ) {
+					return $cover_style;
+				}
+			}
+		}
+
+		// 3. Class-name heuristic for common patterns (__image, bg-image).
+		$tokens = preg_split( '/\s+/', trim( (string) $css_classes ) );
+		if ( is_array( $tokens ) ) {
+			foreach ( $tokens as $token ) {
+				$token = trim( (string) $token );
+				if ( false !== strpos( $token, '__image' ) || false !== strpos( $token, 'bg-image' ) ) {
+					return $cover_style;
+				}
 			}
 		}
 

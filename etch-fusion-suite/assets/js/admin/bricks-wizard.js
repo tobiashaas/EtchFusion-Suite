@@ -14,6 +14,10 @@ const ACTION_GET_TARGET_POST_TYPES = 'efs_get_target_post_types';
 const ACTION_START_MIGRATION = 'efs_start_migration';
 const ACTION_GET_PROGRESS = 'efs_get_migration_progress';
 const ACTION_CANCEL_MIGRATION = 'efs_cancel_migration';
+const ACTION_MIGRATE_BATCH = 'efs_migrate_batch';
+const ACTION_RESUME_MIGRATION = 'efs_resume_migration';
+
+const BATCH_SIZE = 10;
 
 const POLL_INTERVAL_MS = 3000;
 const STEP_COUNT = 4;
@@ -665,8 +669,13 @@ const createWizard = (root) => {
 		}
 
 		if (refs.progressItems) {
+			const currentItemTitle = payload?.current_item?.title || progress?.current_item_title || '';
 			if (itemsTotal > 0) {
-				refs.progressItems.textContent = `Items processed: ${itemsProcessed}/${itemsTotal}`;
+				let itemsText = `Items processed: ${itemsProcessed}/${itemsTotal}`;
+				if (currentItemTitle) {
+					itemsText += ` — ${currentItemTitle}`;
+				}
+				refs.progressItems.textContent = itemsText;
 			} else if (itemsProcessed > 0) {
 				refs.progressItems.textContent = `Items processed: ${itemsProcessed}`;
 			} else {
@@ -798,6 +807,94 @@ const createWizard = (root) => {
 		}
 	};
 
+	const runBatchLoop = async (migrationId) => {
+		runtime.batchFailCount = 0;
+
+		const processBatch = async () => {
+			try {
+				const payload = await post(ACTION_MIGRATE_BATCH, {
+					migration_id: migrationId,
+					batch_size: BATCH_SIZE,
+				});
+				runtime.batchFailCount = 0;
+
+				const progress = payload?.progress || {};
+				const itemsProcessed = Number(progress?.items_processed || 0);
+				if (runtime.lastProcessedCount !== undefined && itemsProcessed > runtime.lastProcessedCount) {
+					const batchDiff = itemsProcessed - runtime.lastProcessedCount;
+					const batchDuration = performance.now() - (runtime.lastPollTime || performance.now());
+					perfMetrics.recordBatch(batchDiff, batchDuration);
+				}
+				runtime.lastProcessedCount = itemsProcessed;
+				runtime.lastPollTime = performance.now();
+
+				renderProgress(payload);
+
+				if (payload?.completed) {
+					perfMetrics.endMigration();
+					const hints = perfMetrics.getBottleneckHints();
+					if (hints && hints.length > 0) {
+						console.warn('[EFS][Perf] Bottleneck hints:', hints);
+					}
+					runtime.migrationRunning = false;
+					showResult('success', 'Migration finished successfully.');
+					return;
+				}
+
+				// Yield to event loop then continue.
+				window.setTimeout(processBatch, 100);
+			} catch (error) {
+				runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
+				if (runtime.batchFailCount >= 3) {
+					runtime.migrationRunning = false;
+					if (refs.retryButton) {
+						refs.retryButton.hidden = false;
+					}
+					showResult('error', error?.message || 'Batch processing failed. Try resuming the migration.');
+					return;
+				}
+				window.setTimeout(processBatch, POLL_INTERVAL_MS);
+			}
+		};
+
+		await processBatch();
+	};
+
+	const resumeMigration = async (migrationId) => {
+		try {
+			const payload = await post(ACTION_RESUME_MIGRATION, {
+				migration_id: migrationId,
+			});
+
+			if (payload?.resumed) {
+				hideResult();
+				if (refs.retryButton) {
+					refs.retryButton.hidden = true;
+				}
+				runtime.migrationRunning = true;
+				runtime.batchFailCount = 0;
+				updateNavigationState();
+				renderProgress(payload);
+				await runBatchLoop(migrationId);
+			} else {
+				showResult('error', 'No checkpoint found — restart the migration from the beginning.');
+				if (refs.retryButton) {
+					refs.retryButton.hidden = false;
+				}
+			}
+		} catch (error) {
+			const isNoCheckpoint = error?.code === 'no_checkpoint'
+				|| String(error?.message || '').toLowerCase().includes('checkpoint');
+			const message = isNoCheckpoint
+				? 'No checkpoint found — you need to restart the migration.'
+				: (error?.message || 'Unable to resume migration.');
+			showResult('error', message);
+			if (refs.retryButton) {
+				refs.retryButton.hidden = false;
+			}
+		}
+	};
+
 	const startPolling = (migrationId) => {
 		if (!migrationId) {
 			return;
@@ -828,6 +925,7 @@ const createWizard = (root) => {
 				renderProgress(payload);
 
 				const status = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
+				const currentStep = String(payload?.progress?.current_step || '').toLowerCase();
 				const percentage = Number(payload?.progress?.percentage ?? 0);
 
 				if (payload?.completed || status === 'completed' || percentage >= 100) {
@@ -857,6 +955,13 @@ const createWizard = (root) => {
 						refs.retryButton.hidden = false;
 					}
 					showResult('error', 'Migration did not start (e.g. background request could not reach the server). Try again or check server configuration.');
+					return;
+				}
+
+				// Background phase complete: switch to JS-driven batch loop.
+				if (currentStep === 'posts' && status === 'running') {
+					stopPolling();
+					await runBatchLoop(migrationId);
 					return;
 				}
 
@@ -1216,7 +1321,11 @@ const createWizard = (root) => {
 		refs.retryButton?.addEventListener('click', async () => {
 			refs.retryButton.hidden = true;
 			try {
-				await startMigration();
+				if (state.migrationId) {
+					await resumeMigration(state.migrationId);
+				} else {
+					await startMigration();
+				}
 			} catch (error) {
 				const message = error?.message || 'Unable to restart migration.';
 				showResult('error', message);

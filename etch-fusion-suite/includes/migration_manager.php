@@ -149,6 +149,16 @@ class EFS_Migration_Manager {
 	}
 
 	/**
+	 * Resume JS-driven batch loop after timeout or error.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return array|\WP_Error
+	 */
+	public function resume_migration_execution( $migration_id ) {
+		return $this->migration_service->resume_migration_execution( $migration_id );
+	}
+
+	/**
 	 * Cancel migration and reset progress
 	 */
 	public function cancel_migration( $migration_id = '' ) {
