@@ -491,10 +491,11 @@ class EFS_Migration_Service {
 				)
 			);
 
+			// Set step active only; do not mark completed until batching exhausts items.
 			if ( 'media' === $phase ) {
-				$this->update_progress( 'media', 60, __( 'Migrating media…', 'etch-fusion-suite' ), 0, count( $media_ids ) );
+				$this->update_progress( 'media', 60, __( 'Migrating media…', 'etch-fusion-suite' ), 0, count( $media_ids ), false );
 			} else {
-				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, $total_count );
+				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, $total_count, false );
 			}
 
 			return array(
@@ -738,14 +739,15 @@ class EFS_Migration_Service {
 				$processed_media_count,
 				$total_media_count
 			);
-			$this->update_progress( 'media', $percentage, $message, $processed_media_count, $total_media_count );
+			$this->update_progress( 'media', $percentage, $message, $processed_media_count, $total_media_count, false );
 
 			if ( empty( $remaining_media_ids ) ) {
+				// Media phase done: mark media completed, set posts active.
 				$checkpoint['phase']           = 'posts';
 				$checkpoint['processed_count'] = 0;
 				$this->migration_repository->save_checkpoint( $checkpoint );
 				$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
-				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, count( $remaining_post_ids ) );
+				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, count( $remaining_post_ids ), false );
 				return array(
 					'completed'    => false,
 					'remaining'    => count( $remaining_post_ids ),
@@ -839,22 +841,42 @@ class EFS_Migration_Service {
 			$processed_count,
 			$total_count
 		);
-		$this->update_progress( 'posts', $percentage, $message, $processed_count, $total_count );
+		$this->update_progress( 'posts', $percentage, $message, $processed_count, $total_count, false );
 
 		if ( empty( $remaining_post_ids ) ) {
-			$failed_count       = count( $failed_post_ids_final );
-			$completion_message = $failed_count > 0
-				? sprintf(
+			$failed_media_ids_final = isset( $checkpoint['failed_media_ids_final'] ) ? (array) $checkpoint['failed_media_ids_final'] : array();
+			$failed_media_count     = count( $failed_media_ids_final );
+			$failed_count           = count( $failed_post_ids_final );
+
+			if ( $failed_media_count > 0 && $failed_count > 0 ) {
+				$completion_message = sprintf(
+					/* translators: 1: failed posts count, 2: failed media count. */
+					__( 'Migration completed. %1$d post(s) and %2$d media item(s) failed after retries.', 'etch-fusion-suite' ),
+					$failed_count,
+					$failed_media_count
+				);
+			} elseif ( $failed_count > 0 ) {
+				$completion_message = sprintf(
 					/* translators: %d: failed posts count. */
 					__( 'Migration completed. %d post(s) failed after retries.', 'etch-fusion-suite' ),
 					$failed_count
-				)
-				: __( 'Migration completed successfully!', 'etch-fusion-suite' );
+				);
+			} elseif ( $failed_media_count > 0 ) {
+				$completion_message = sprintf(
+					/* translators: %d: failed media count. */
+					__( 'Migration completed. %d media item(s) failed after retries.', 'etch-fusion-suite' ),
+					$failed_media_count
+				);
+			} else {
+				$completion_message = __( 'Migration completed successfully!', 'etch-fusion-suite' );
+			}
 
 			$posts_result = array(
-				'total'                 => $total_count,
-				'migrated'              => $processed_count,
-				'failed_post_ids_final' => $failed_post_ids_final,
+				'total'                   => $total_count,
+				'migrated'                => $processed_count,
+				'failed_post_ids_final'   => $failed_post_ids_final,
+				'failed_media_ids_final'  => $failed_media_ids_final,
+				'failed_media_count'      => $failed_media_count,
 			);
 
 			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
@@ -869,11 +891,15 @@ class EFS_Migration_Service {
 			$this->migration_repository->save_stats( $migration_stats );
 
 			return array(
-				'completed'   => true,
-				'remaining'   => 0,
-				'migrationId' => $migration_id,
-				'progress'    => $this->get_progress_data(),
-				'steps'       => $this->get_steps_state(),
+				'completed'             => true,
+				'remaining'             => 0,
+				'migrationId'           => $migration_id,
+				'progress'              => $this->get_progress_data(),
+				'steps'                 => $this->get_steps_state(),
+				'message'               => $completion_message,
+				'failed_media_count'     => $failed_media_count,
+				'failed_media_ids'      => $failed_media_ids_final,
+				'failed_post_ids_final' => $failed_post_ids_final,
 			);
 		}
 
@@ -1061,8 +1087,11 @@ class EFS_Migration_Service {
 	 * @param string $step
 	 * @param int    $percentage
 	 * @param string $message
+	 * @param int|null $items_processed
+	 * @param int|null $items_total
+	 * @param bool   $mark_step_completed Optional. If false, set step as active only (in-progress); do not mark it completed. Default true.
 	 */
-	public function update_progress( $step, $percentage, $message, $items_processed = null, $items_total = null ) {
+	public function update_progress( $step, $percentage, $message, $items_processed = null, $items_total = null, $mark_step_completed = true ) {
 		$progress                 = $this->migration_repository->get_progress();
 		$previous_percentage      = isset( $progress['percentage'] ) ? (float) $progress['percentage'] : 0.0;
 		$normalized_percentage    = max( $previous_percentage, min( 100, (float) $percentage ) );
@@ -1100,6 +1129,12 @@ class EFS_Migration_Service {
 
 		$this->migration_repository->save_progress( $progress );
 
+		// Do not mark batched steps (posts, media) as completed until truly finished (percentage >= 100 or explicit completion).
+		$step_truly_finished = $mark_step_completed;
+		if ( in_array( $step, array( 'posts', 'media' ), true ) && $normalized_percentage < 100 && 'completed' !== $step ) {
+			$step_truly_finished = false;
+		}
+
 		$steps = $this->get_steps_state();
 		if ( ! empty( $steps ) ) {
 			foreach ( $steps as $key => &$step_data ) {
@@ -1113,10 +1148,18 @@ class EFS_Migration_Service {
 						$step_data['active'] = false;
 					}
 				} elseif ( $key === $step ) {
-					$step_data['status']    = 'completed';
-					$step_data['active']    = false;
-					$step_data['completed'] = true;
+					if ( $step_truly_finished ) {
+						$step_data['status']    = 'completed';
+						$step_data['active']    = false;
+						$step_data['completed'] = true;
+					} else {
+						// In-progress: set this step active without marking completed.
+						$step_data['status']    = 'active';
+						$step_data['active']    = true;
+						$step_data['completed'] = false;
+					}
 				} elseif ( empty( $step_data['completed'] ) && ! empty( $step_data['active'] ) ) {
+					// Previous active step: mark completed when moving to next (or when current step is in-progress).
 					$step_data['status']    = 'completed';
 					$step_data['active']    = false;
 					$step_data['completed'] = true;
@@ -1128,7 +1171,7 @@ class EFS_Migration_Service {
 			}
 			unset( $step_data );
 
-			if ( 'completed' !== $step && 'error' !== $step ) {
+			if ( 'completed' !== $step && 'error' !== $step && $step_truly_finished ) {
 				$next_phase = $this->get_next_phase_key( $step, $steps );
 				if ( $next_phase && isset( $steps[ $next_phase ] ) && empty( $steps[ $next_phase ]['completed'] ) ) {
 					$steps[ $next_phase ]['status']     = 'active';
@@ -1303,7 +1346,12 @@ class EFS_Migration_Service {
 		$failed_post_ids_final = isset( $results['failed_post_ids_final'] ) && is_array( $results['failed_post_ids_final'] )
 			? array_values( $results['failed_post_ids_final'] )
 			: array();
-		$failed_posts_count    = count( $failed_post_ids_final );
+		$failed_posts_count = count( $failed_post_ids_final );
+
+		$failed_media_ids_final = isset( $results['failed_media_ids_final'] ) && is_array( $results['failed_media_ids_final'] )
+			? array_values( $results['failed_media_ids_final'] )
+			: array();
+		$failed_media_count = isset( $results['failed_media_count'] ) ? (int) $results['failed_media_count'] : count( $failed_media_ids_final );
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
@@ -1361,7 +1409,7 @@ class EFS_Migration_Service {
 			)
 			: null;
 
-		$status       = $warnings_count > 0 ? 'success_with_warnings' : 'success';
+		$status       = ( $warnings_count > 0 || $failed_media_count > 0 ) ? 'success_with_warnings' : 'success';
 		$duration_sec = ( $started_ts > 0 ) ? max( 0, time() - $started_ts ) : 0;
 
 		$record = array(
@@ -1375,6 +1423,8 @@ class EFS_Migration_Service {
 			'post_type_mappings'     => $post_type_mappings,
 			'failed_posts_count'     => $failed_posts_count,
 			'failed_post_ids'        => $failed_post_ids_final,
+			'failed_media_count'     => $failed_media_count,
+			'failed_media_ids'       => $failed_media_ids_final,
 			'warnings_count'         => $warnings_count,
 			'warnings_summary'       => $warnings_summary,
 			'errors_summary'         => $errors_summary,
