@@ -1313,8 +1313,55 @@ class EFS_API_Endpoints {
 		$post_content     = $is_block_content ? $etch_content : wp_kses_post( $etch_content );
 		self::sync_etch_loops_from_payload( isset( $payload['etch_loops'] ) && is_array( $payload['etch_loops'] ) ? $payload['etch_loops'] : array() );
 
-		$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
-		$postarr  = array(
+		$source_post_id  = isset( $post['ID'] ) ? absint( $post['ID'] ) : 0;
+		$existing        = null;
+		$resolution_path = 'new';
+
+		// Tier 1: meta lookup by _b2e_original_post_id (authoritative).
+		if ( $source_post_id > 0 ) {
+			$meta_matches = get_posts(
+				array(
+					'post_type'      => 'any',
+					'post_status'    => 'any',
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_query'     => array(
+						array(
+							'key'   => '_b2e_original_post_id',
+							'value' => $source_post_id,
+							'type'  => 'NUMERIC',
+						),
+					),
+				)
+			);
+			if ( ! empty( $meta_matches ) ) {
+				$existing        = get_post( $meta_matches[0] );
+				$resolution_path = 'meta';
+			}
+		}
+
+		// Tier 2: option mapping lookup via b2e_post_mappings.
+		if ( null === $existing && $source_post_id > 0 ) {
+			$mappings = get_option( 'b2e_post_mappings', array() );
+			$mappings = is_array( $mappings ) ? $mappings : array();
+			if ( isset( $mappings[ $source_post_id ] ) ) {
+				$mapped_post = get_post( $mappings[ $source_post_id ] );
+				if ( $mapped_post instanceof \WP_Post ) {
+					$existing        = $mapped_post;
+					$resolution_path = 'option';
+				}
+			}
+		}
+
+		// Tier 3: slug fallback (existing behaviour).
+		if ( null === $existing ) {
+			$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
+			if ( $existing instanceof \WP_Post ) {
+				$resolution_path = 'slug';
+			}
+		}
+
+		$postarr = array(
 			'post_title'   => $post_title,
 			'post_name'    => $post_slug,
 			'post_type'    => $post_type,
@@ -1322,8 +1369,27 @@ class EFS_API_Endpoints {
 			'post_date'    => $post_date,
 			'post_content' => $post_content,
 		);
+
 		if ( $existing instanceof \WP_Post ) {
 			$postarr['ID'] = $existing->ID;
+
+			// Handle post_type mismatch when resolved via meta or option mapping.
+			if ( in_array( $resolution_path, array( 'meta', 'option' ), true ) && $existing->post_type !== $post_type ) {
+				if ( post_type_exists( $post_type ) ) {
+					$postarr['post_type'] = $post_type;
+				} else {
+					unset( $postarr['post_type'] );
+					self::resolve( 'error_handler' )->log_warning(
+						'W009',
+						array(
+							'source_id'            => $source_post_id,
+							'target_id'            => $existing->ID,
+							'requested_post_type'  => $post_type,
+							'kept_post_type'       => $existing->post_type,
+						)
+					);
+				}
+			}
 		}
 
 		$post_id = wp_insert_post( $postarr, true );
@@ -1331,7 +1397,6 @@ class EFS_API_Endpoints {
 			return new \WP_Error( 'post_import_failed', $post_id->get_error_message(), array( 'status' => 500 ) );
 		}
 
-		$source_post_id = isset( $post['ID'] ) ? absint( $post['ID'] ) : 0;
 		if ( $source_post_id > 0 ) {
 			$mappings                    = get_option( 'b2e_post_mappings', array() );
 			$mappings                    = is_array( $mappings ) ? $mappings : array();
@@ -1339,6 +1404,17 @@ class EFS_API_Endpoints {
 			update_option( 'b2e_post_mappings', $mappings );
 
 			update_post_meta( $post_id, '_b2e_original_post_id', $source_post_id );
+		}
+
+		if ( in_array( $resolution_path, array( 'meta', 'option', 'slug' ), true ) ) {
+			self::resolve( 'error_handler' )->log_info(
+				'Idempotent upsert: existing post resolved',
+				array(
+					'source_id'       => $source_post_id,
+					'target_id'       => (int) $post_id,
+					'resolution_path' => $resolution_path,
+				)
+			);
 		}
 
 		update_post_meta( $post_id, '_b2e_migrated_from_bricks', 1 );

@@ -30,6 +30,7 @@ class EFS_Migration_Service {
 	 * Running progress with no updates for this period is stale.
 	 */
 	private const PROGRESS_STALE_TTL = 300;
+	private const MAX_RETRIES        = 3;
 
 	/** @var EFS_Error_Handler */
 	private $error_handler;
@@ -438,50 +439,49 @@ class EFS_Migration_Service {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
 
-			$this->update_progress( 'posts', 80, __( 'Migrating posts and content...', 'etch-fusion-suite' ) );
 			$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
 			$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-			$posts_result        = $this->content_service->migrate_posts( $target, $migration_key, $this->api_client, $post_type_mappings, $selected_post_types );
-			if ( is_wp_error( $posts_result ) ) {
-				return $posts_result;
-			}
-			$posts_total    = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
-			$posts_migrated = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
-			if ( $posts_total > 0 && $posts_migrated === 0 ) {
-				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
-				$this->write_failed_run_record( $migration_id, __( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' ) );
-				$this->store_active_migration( array() );
-				return new \WP_Error(
-					'posts_migration_failed',
-					__( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' )
+
+			// Collect post IDs for JS-driven batch loop.
+			$bricks_posts    = $this->content_parser->get_bricks_posts();
+			$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
+			$all_posts       = array_merge(
+				is_array( $bricks_posts ) ? $bricks_posts : array(),
+				is_array( $gutenberg_posts ) ? $gutenberg_posts : array()
+			);
+
+			if ( ! empty( $selected_post_types ) ) {
+				$all_posts = array_filter(
+					$all_posts,
+					function ( $post ) use ( $selected_post_types ) {
+						return in_array( $post->post_type, $selected_post_types, true );
+					}
 				);
 			}
 
-			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
-			$finalization_result = $this->finalize_migration( $posts_result );
-			if ( is_wp_error( $finalization_result ) ) {
-				return $finalization_result;
-			}
+			$post_ids    = array_values( array_map( function ( $post ) { return (int) $post->ID; }, $all_posts ) );
+			$total_count = count( $post_ids );
 
-			$this->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
-			$this->store_active_migration( array() );
+			$this->migration_repository->save_checkpoint(
+				array(
+					'migrationId'        => $migration_id,
+					'remaining_post_ids' => $post_ids,
+					'processed_count'    => 0,
+					'total_count'        => $total_count,
+					'current_item_id'    => null,
+					'current_item_title' => '',
+					'phase'              => 'posts',
+				)
+			);
 
-			$migration_stats                  = $this->migration_repository->get_stats();
-			$migration_stats['last_migration'] = current_time( 'mysql' );
-			$migration_stats['status']        = 'completed';
-			$this->migration_repository->save_stats( $migration_stats );
+			$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, $total_count );
 
 			return array(
+				'posts_ready' => true,
+				'migrationId' => $migration_id,
+				'total'       => $total_count,
 				'progress'    => $this->get_progress_data(),
 				'steps'       => $this->get_steps_state(),
-				'migrationId' => $migration_id,
-				'completed'   => true,
-				'message'     => __( 'Migration completed successfully!', 'etch-fusion-suite' ),
-				'details'     => array(
-					'media' => $media_result,
-					'css'   => $css_result,
-					'posts' => $posts_result,
-				),
 			);
 		} catch ( \Throwable $exception ) {
 			$error_message = sprintf(
@@ -625,15 +625,183 @@ class EFS_Migration_Service {
 	}
 
 	/**
-	 * Process batch placeholder for async migrations.
+	 * Process a single batch of posts for JS-driven batch loop.
 	 *
-	 * @param string $migration_id
-	 * @param array  $batch
+	 * @param string $migration_id Migration ID.
+	 * @param array  $batch        Batch options. Accepts key 'batch_size' (int).
 	 *
-	 * @return array
+	 * @return array|\WP_Error
 	 */
 	public function process_batch( $migration_id, $batch ) {
-		return $this->get_progress( $migration_id );
+		$checkpoint = $this->migration_repository->get_checkpoint();
+
+		if ( empty( $checkpoint ) || (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
+			return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration.', 'etch-fusion-suite' ) );
+		}
+
+		$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
+		$processed_count    = isset( $checkpoint['processed_count'] ) ? (int) $checkpoint['processed_count'] : 0;
+		$post_attempts      = isset( $checkpoint['post_attempts'] ) && is_array( $checkpoint['post_attempts'] ) ? $checkpoint['post_attempts'] : array();
+		$failed_post_ids_final = isset( $checkpoint['failed_post_ids_final'] ) ? (array) $checkpoint['failed_post_ids_final'] : array();
+		$total_count        = isset( $checkpoint['total_count'] ) ? (int) $checkpoint['total_count'] : ( count( $remaining_post_ids ) + $processed_count );
+		$batch_size         = isset( $batch['batch_size'] ) ? max( 1, (int) $batch['batch_size'] ) : 10;
+
+		// Load target connection info from active migration.
+		$active        = $this->migration_repository->get_active_migration();
+		$active_mid    = is_array( $active ) && isset( $active['migration_id'] ) ? (string) $active['migration_id'] : '';
+		$target_url    = is_array( $active ) && isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
+		$migration_key = is_array( $active ) && isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
+
+		// Validate that the active migration context is present and matches the expected migration ID.
+		if ( '' === $active_mid || $active_mid !== (string) $migration_id || '' === $target_url || '' === $migration_key ) {
+			return new \WP_Error( 'missing_active_migration', __( 'Active migration record is missing required fields or does not match the current migration ID.', 'etch-fusion-suite' ) );
+		}
+
+		$options            = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+
+		$current_batch      = array_splice( $remaining_post_ids, 0, $batch_size );
+
+		foreach ( $current_batch as $post_id ) {
+			$post_id = (int) $post_id;
+			$result  = $this->content_service->convert_bricks_to_gutenberg( $post_id, $this->api_client, $target_url, $migration_key, $post_type_mappings );
+
+			if ( is_wp_error( $result ) ) {
+				$post_id_key      = (string) $post_id;
+				$current_attempts = isset( $post_attempts[ $post_id_key ] ) ? (int) $post_attempts[ $post_id_key ] : 0;
+				++$current_attempts;
+				$post_attempts[ $post_id_key ] = $current_attempts;
+
+				if ( $current_attempts < self::MAX_RETRIES ) {
+					$remaining_post_ids[] = $post_id;
+					$this->error_handler->log_warning(
+						'W010',
+						array(
+							'post_id'       => $post_id,
+							'attempt'       => $current_attempts,
+							'error_message' => $result->get_error_message(),
+							'action'        => 'Batch post conversion retry scheduled',
+						)
+					);
+				} else {
+					$failed_post_ids_final[] = $post_id;
+					$this->error_handler->log_warning(
+						'W011',
+						array(
+							'post_id'       => $post_id,
+							'attempts_made' => $current_attempts,
+							'error_message' => $result->get_error_message(),
+							'action'        => 'Batch post conversion failed after max retries',
+						)
+					);
+				}
+				continue;
+			}
+
+			++$processed_count;
+			$wp_post = get_post( $post_id );
+			$checkpoint['current_item_id']    = $post_id;
+			$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+		}
+
+		$checkpoint['remaining_post_ids'] = $remaining_post_ids;
+		$checkpoint['processed_count']    = $processed_count;
+		$checkpoint['post_attempts']      = $post_attempts;
+		$checkpoint['failed_post_ids_final'] = $failed_post_ids_final;
+		$this->migration_repository->save_checkpoint( $checkpoint );
+
+		$percentage = $total_count > 0 ? (int) round( 80 + ( $processed_count / $total_count * 15 ) ) : 80;
+		$message    = sprintf(
+			/* translators: 1: processed count, 2: total count. */
+			__( 'Migrating posts... %1$d/%2$d', 'etch-fusion-suite' ),
+			$processed_count,
+			$total_count
+		);
+		$this->update_progress( 'posts', $percentage, $message, $processed_count, $total_count );
+
+		if ( empty( $remaining_post_ids ) ) {
+			$failed_count = count( $failed_post_ids_final );
+			$completion_message = $failed_count > 0
+				? sprintf(
+					/* translators: %d: failed posts count. */
+					__( 'Migration completed. %d post(s) failed after retries.', 'etch-fusion-suite' ),
+					$failed_count
+				)
+				: __( 'Migration completed successfully!', 'etch-fusion-suite' );
+
+			$posts_result = array(
+				'total'    => $total_count,
+				'migrated' => $processed_count,
+				'failed_post_ids_final' => $failed_post_ids_final,
+			);
+
+			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
+			$this->finalize_migration( $posts_result );
+			$this->update_progress( 'completed', 100, $completion_message );
+			$this->store_active_migration( array() );
+			$this->migration_repository->delete_checkpoint();
+
+			$migration_stats                   = $this->migration_repository->get_stats();
+			$migration_stats['last_migration'] = current_time( 'mysql' );
+			$migration_stats['status']         = 'completed';
+			$this->migration_repository->save_stats( $migration_stats );
+
+			return array(
+				'completed'   => true,
+				'remaining'   => 0,
+				'migrationId' => $migration_id,
+				'progress'    => $this->get_progress_data(),
+				'steps'       => $this->get_steps_state(),
+			);
+		}
+
+		return array(
+			'completed'    => false,
+			'remaining'    => count( $remaining_post_ids ),
+			'migrationId'  => $migration_id,
+			'progress'     => $this->get_progress_data(),
+			'steps'        => $this->get_steps_state(),
+			'current_item' => array(
+				'id'    => $checkpoint['current_item_id'] ?? null,
+				'title' => $checkpoint['current_item_title'] ?? '',
+			),
+		);
+	}
+
+	/**
+	 * Resume a JS-driven batch loop after a timeout or error.
+	 *
+	 * Validates that a valid checkpoint exists for the given migration ID and resets the
+	 * stale flag so the batch loop can restart from where it left off.
+	 *
+	 * @param string $migration_id Migration ID to resume.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public function resume_migration_execution( $migration_id ) {
+		$checkpoint = $this->migration_repository->get_checkpoint();
+
+		if ( empty( $checkpoint ) || (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
+			return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration ID.', 'etch-fusion-suite' ) );
+		}
+
+		$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
+
+		// Reset stale flag so the batch loop can restart.
+		$progress = $this->migration_repository->get_progress();
+		if ( is_array( $progress ) && isset( $progress['is_stale'] ) ) {
+			$progress['is_stale']     = false;
+			$progress['status']       = 'running';
+			$progress['last_updated'] = current_time( 'mysql' );
+			$this->migration_repository->save_progress( $progress );
+		}
+
+		return array(
+			'resumed'     => true,
+			'remaining'   => count( $remaining_post_ids ),
+			'migrationId' => $migration_id,
+			'progress'    => $this->get_progress_data(),
+		);
 	}
 
 	/**
@@ -1007,6 +1175,10 @@ class EFS_Migration_Service {
 		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
 			? $options['post_type_mappings']
 			: array();
+		$failed_post_ids_final = isset( $results['failed_post_ids_final'] ) && is_array( $results['failed_post_ids_final'] )
+			? array_values( $results['failed_post_ids_final'] )
+			: array();
+		$failed_posts_count = count( $failed_post_ids_final );
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
@@ -1062,6 +1234,8 @@ class EFS_Migration_Service {
 			'status'                 => $status,
 			'counts_by_post_type'    => $counts_by_post_type,
 			'post_type_mappings'     => $post_type_mappings,
+			'failed_posts_count'     => $failed_posts_count,
+			'failed_post_ids'        => $failed_post_ids_final,
 			'warnings_count'         => $warnings_count,
 			'warnings_summary'       => $warnings_summary,
 			'errors_summary'         => $errors_summary,
