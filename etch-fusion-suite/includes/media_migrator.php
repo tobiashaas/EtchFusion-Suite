@@ -121,6 +121,131 @@ class EFS_Media_Migrator {
 	}
 
 	/**
+	 * Get attachment IDs only (lightweight, no full post data).
+	 *
+	 * @param array $selected_post_types Optional. Selected post types; empty = all attachments.
+	 * @return array<int> Attachment IDs.
+	 */
+	public function get_media_ids( array $selected_post_types = array() ) {
+		$selected_post_types = is_array( $selected_post_types ) ? array_values( array_filter( array_map( 'sanitize_key', $selected_post_types ) ) ) : array();
+		if ( ! empty( $selected_post_types ) ) {
+			return $this->get_media_ids_for_selected_post_types( $selected_post_types );
+		}
+
+		$query_args = array(
+			'post_type'      => 'attachment',
+			'post_status'    => 'inherit',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_query'     => array(
+				array(
+					'key'     => '_wp_attached_file',
+					'compare' => 'EXISTS',
+				),
+			),
+		);
+
+		$media_query = new \WP_Query( $query_args );
+		$ids         = is_array( $media_query->posts ) ? array_map( 'intval', $media_query->posts ) : array();
+		wp_reset_postdata();
+
+		return array_values(
+			array_filter(
+				$ids,
+				static function ( $id ) {
+					return $id > 0 && 'attachment' === get_post_type( $id );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Migrate a single media item by ID. Skips if already mapped.
+	 *
+	 * @param int    $media_id    Attachment ID.
+	 * @param string $target_url  Target site URL.
+	 * @param string $jwt_token   Migration JWT.
+	 * @return array|\WP_Error Result with keys migrated, skipped, failed, title; or WP_Error.
+	 */
+	public function migrate_media_by_id( $media_id, $target_url, $jwt_token ) {
+		$media_id = (int) $media_id;
+		if ( $media_id <= 0 ) {
+			return array(
+				'migrated' => 0,
+				'skipped'  => 0,
+				'failed'   => 1,
+				'title'    => '',
+			);
+		}
+
+		$existing_mapping = $this->get_media_mapping( $media_id );
+		if ( null !== $existing_mapping ) {
+			$this->error_handler->log_info( 'Media Migration: Skipped media ID ' . $media_id . ' (already migrated as ID: ' . $existing_mapping . ')' );
+			$title = get_the_title( $media_id );
+			return array(
+				'migrated' => 0,
+				'skipped'  => 1,
+				'failed'   => 0,
+				'title'    => is_string( $title ) ? $title : '',
+			);
+		}
+
+		$post = get_post( $media_id );
+		if ( ! $post || 'attachment' !== $post->post_type ) {
+			return array(
+				'migrated' => 0,
+				'skipped'  => 0,
+				'failed'   => 1,
+				'title'    => '',
+			);
+		}
+
+		$file_path  = get_attached_file( $media_id );
+		$media_data = array(
+			'id'          => $media_id,
+			'title'       => get_the_title( $media_id ),
+			'alt_text'    => get_post_meta( $media_id, '_wp_attachment_image_alt', true ),
+			'caption'     => $post->post_excerpt,
+			'description' => $post->post_content,
+			'file_path'   => get_post_meta( $media_id, '_wp_attached_file', true ),
+			'file_url'    => wp_get_attachment_url( $media_id ),
+			'mime_type'   => get_post_mime_type( $media_id ),
+			'file_size'   => is_string( $file_path ) && file_exists( $file_path ) ? filesize( $file_path ) : 0,
+			'upload_date' => get_the_date( 'Y-m-d H:i:s', $media_id ),
+			'post_parent' => wp_get_post_parent_id( $media_id ),
+			'metadata'    => wp_get_attachment_metadata( $media_id ),
+		);
+
+		$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $jwt_token );
+
+		if ( is_wp_error( $result ) ) {
+			$this->error_handler->log_error(
+				'E401',
+				array(
+					'media_id'    => $media_id,
+					'media_title' => $media_data['title'],
+					'error'       => $result->get_error_message(),
+					'action'      => 'Failed to migrate media file',
+				)
+			);
+			return array(
+				'migrated' => 0,
+				'skipped'  => 0,
+				'failed'   => 1,
+				'title'    => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
+			);
+		}
+
+		$this->error_handler->log_info( 'Media Migration: Success for media ID ' . $media_id );
+		return array(
+			'migrated' => 1,
+			'skipped'  => 0,
+			'failed'   => 0,
+			'title'    => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
+		);
+	}
+
+	/**
 	 * Get all media files from the source site
 	 */
 	private function get_media_files( $selected_post_types = array() ) {

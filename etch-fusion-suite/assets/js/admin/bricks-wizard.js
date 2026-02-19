@@ -678,6 +678,8 @@ const createWizard = (root) => {
 				refs.progressItems.textContent = itemsText;
 			} else if (itemsProcessed > 0) {
 				refs.progressItems.textContent = `Items processed: ${itemsProcessed}`;
+			} else if (currentItemTitle) {
+				refs.progressItems.textContent = currentItemTitle;
 			} else {
 				refs.progressItems.textContent = '';
 			}
@@ -958,8 +960,8 @@ const createWizard = (root) => {
 					return;
 				}
 
-				// Background phase complete: switch to JS-driven batch loop.
-				if (currentStep === 'posts' && status === 'running') {
+				// Background phase complete: switch to JS-driven batch loop (media or posts).
+				if ((currentStep === 'media' || currentStep === 'posts') && status === 'running') {
 					stopPolling();
 					await runBatchLoop(migrationId);
 					return;

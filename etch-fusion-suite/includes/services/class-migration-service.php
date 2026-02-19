@@ -236,7 +236,7 @@ class EFS_Migration_Service {
 			}
 			$posts_total_sync    = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
 			$posts_migrated_sync = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
-			if ( $posts_total_sync > 0 && $posts_migrated_sync === 0 ) {
+			if ( $posts_total_sync > 0 && 0 === $posts_migrated_sync ) {
 				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
 				$this->write_failed_run_record( $migration_id, __( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' ) );
 				$this->store_active_migration( array() );
@@ -367,7 +367,13 @@ class EFS_Migration_Service {
 				basename( $exception->getFile() ),
 				$exception->getLine()
 			);
-			$this->error_handler->log_error( 'E201', array( 'message' => $exception->getMessage(), 'action' => 'start_migration_async' ) );
+			$this->error_handler->log_error(
+				'E201',
+				array(
+					'message' => $exception->getMessage(),
+					'action'  => 'start_migration_async',
+				)
+			);
 			return new \WP_Error( 'migration_start_failed', $error_message );
 		}
 	}
@@ -394,7 +400,13 @@ class EFS_Migration_Service {
 			$validation_result = $this->validate_target_site_requirements();
 			if ( ! $validation_result['valid'] ) {
 				$error_message = 'Migration validation failed: ' . implode( ', ', $validation_result['errors'] );
-				$this->error_handler->log_error( 'E103', array( 'validation_errors' => $validation_result['errors'], 'action' => 'Target site validation failed' ) );
+				$this->error_handler->log_error(
+					'E103',
+					array(
+						'validation_errors' => $validation_result['errors'],
+						'action'            => 'Target site validation failed',
+					)
+				);
 				$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 				$this->update_progress( 'error', $current_percentage, $error_message );
 				$this->write_failed_run_record( $migration_id, $error_message );
@@ -422,25 +434,16 @@ class EFS_Migration_Service {
 				return $migrator_result;
 			}
 
-			$steps        = $this->get_steps_state();
-			$media_result = array( 'skipped' => true );
-			if ( isset( $steps['media'] ) ) {
-				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-				$this->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
-				$media_result = $this->media_service->migrate_media( $target, $migration_key, $selected_post_types );
-				if ( is_wp_error( $media_result ) ) {
-					return $media_result;
-				}
-			}
-
 			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
 			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
 
-			$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+			$steps               = $this->get_steps_state();
 			$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+			$include_media       = ! empty( $options['include_media'] ) && isset( $steps['media'] );
+			$media_ids           = $include_media ? $this->media_service->get_media_ids( $selected_post_types ) : array();
 
 			// Collect post IDs for JS-driven batch loop.
 			$bricks_posts    = $this->content_parser->get_bricks_posts();
@@ -459,27 +462,45 @@ class EFS_Migration_Service {
 				);
 			}
 
-			$post_ids    = array_values( array_map( function ( $post ) { return (int) $post->ID; }, $all_posts ) );
+			$post_ids    = array_values(
+				array_map(
+					function ( $post ) {
+						return (int) $post->ID;
+					},
+					$all_posts
+				)
+			);
 			$total_count = count( $post_ids );
+
+			$phase = ( $include_media && ! empty( $media_ids ) ) ? 'media' : 'posts';
 
 			$this->migration_repository->save_checkpoint(
 				array(
-					'migrationId'        => $migration_id,
-					'remaining_post_ids' => $post_ids,
-					'processed_count'    => 0,
-					'total_count'        => $total_count,
-					'current_item_id'    => null,
-					'current_item_title' => '',
-					'phase'              => 'posts',
+					'phase'                  => $phase,
+					'migrationId'            => $migration_id,
+					'remaining_media_ids'    => $media_ids,
+					'processed_media_count'  => 0,
+					'total_media_count'      => count( $media_ids ),
+					'media_attempts'         => array(),
+					'failed_media_ids_final' => array(),
+					'remaining_post_ids'     => $post_ids,
+					'processed_count'        => 0,
+					'total_count'            => $total_count,
+					'current_item_id'        => null,
+					'current_item_title'     => '',
 				)
 			);
 
-			$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, $total_count );
+			if ( 'media' === $phase ) {
+				$this->update_progress( 'media', 60, __( 'Migrating media…', 'etch-fusion-suite' ), 0, count( $media_ids ) );
+			} else {
+				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, $total_count );
+			}
 
 			return array(
 				'posts_ready' => true,
 				'migrationId' => $migration_id,
-				'total'       => $total_count,
+				'total'       => 'media' === $phase ? count( $media_ids ) : $total_count,
 				'progress'    => $this->get_progress_data(),
 				'steps'       => $this->get_steps_state(),
 			);
@@ -490,7 +511,13 @@ class EFS_Migration_Service {
 				basename( $exception->getFile() ),
 				$exception->getLine()
 			);
-			$this->error_handler->log_error( 'E201', array( 'message' => $exception->getMessage(), 'action' => 'run_migration_execution' ) );
+			$this->error_handler->log_error(
+				'E201',
+				array(
+					'message' => $exception->getMessage(),
+					'action'  => 'run_migration_execution',
+				)
+			);
 			$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 			$this->update_progress( 'error', $current_percentage, $error_message );
 			$this->write_failed_run_record( $migration_id, $error_message );
@@ -551,20 +578,20 @@ class EFS_Migration_Service {
 	 * @return array
 	 */
 	public function get_progress( $migration_id = '' ) {
-		$progress_data = $this->get_progress_data();
-		$steps         = $this->get_steps_state();
-		$migration_id  = isset( $progress_data['migrationId'] ) ? $progress_data['migrationId'] : '';
-		$progress_data['steps'] = $steps;
+		$progress_data             = $this->get_progress_data();
+		$steps                     = $this->get_steps_state();
+		$migration_id              = isset( $progress_data['migrationId'] ) ? $progress_data['migrationId'] : '';
+		$progress_data['steps']    = $steps;
 		$progress_data['is_stale'] = ! empty( $progress_data['is_stale'] );
 
 		return array(
-			'progress'    => $progress_data,
-			'steps'       => $steps,
-			'migrationId' => $migration_id,
-			'last_updated' => isset( $progress_data['last_updated'] ) ? $progress_data['last_updated'] : '',
-			'is_stale'    => ! empty( $progress_data['is_stale'] ),
+			'progress'                 => $progress_data,
+			'steps'                    => $steps,
+			'migrationId'              => $migration_id,
+			'last_updated'             => isset( $progress_data['last_updated'] ) ? $progress_data['last_updated'] : '',
+			'is_stale'                 => ! empty( $progress_data['is_stale'] ),
 			'estimated_time_remaining' => isset( $progress_data['estimated_time_remaining'] ) ? $progress_data['estimated_time_remaining'] : null,
-			'completed'   => $this->is_migration_complete(),
+			'completed'                => $this->is_migration_complete(),
 		);
 	}
 
@@ -574,12 +601,12 @@ class EFS_Migration_Service {
 	 * @return array
 	 */
 	public function detect_in_progress_migration() {
-		$state       = $this->get_progress();
-		$progress    = isset( $state['progress'] ) && is_array( $state['progress'] ) ? $state['progress'] : array();
+		$state        = $this->get_progress();
+		$progress     = isset( $state['progress'] ) && is_array( $state['progress'] ) ? $state['progress'] : array();
 		$migration_id = isset( $state['migrationId'] ) ? (string) $state['migrationId'] : '';
-		$status      = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
-		$is_stale    = ! empty( $progress['is_stale'] ) || 'stale' === $status;
-		$is_running  = in_array( $status, array( 'running', 'receiving' ), true );
+		$status       = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
+		$is_stale     = ! empty( $progress['is_stale'] ) || 'stale' === $status;
+		$is_running   = in_array( $status, array( 'running', 'receiving' ), true );
 
 		if ( '' !== $migration_id && $is_running ) {
 			return array(
@@ -603,8 +630,8 @@ class EFS_Migration_Service {
 
 		$active = $this->migration_repository->get_active_migration();
 		if ( is_array( $active ) && ! empty( $active['migration_id'] ) ) {
-			$expires_at      = isset( $active['expires_at'] ) ? (int) $active['expires_at'] : 0;
-			$active_is_stale = $is_stale || ( $expires_at > 0 && time() > $expires_at );
+			$expires_at              = isset( $active['expires_at'] ) ? (int) $active['expires_at'] : 0;
+			$active_is_stale         = $is_stale || ( $expires_at > 0 && time() > $expires_at );
 			$progress['migrationId'] = (string) $active['migration_id'];
 			return array(
 				'migrationId' => (string) $active['migration_id'],
@@ -639,28 +666,123 @@ class EFS_Migration_Service {
 			return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration.', 'etch-fusion-suite' ) );
 		}
 
-		$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
-		$processed_count    = isset( $checkpoint['processed_count'] ) ? (int) $checkpoint['processed_count'] : 0;
-		$post_attempts      = isset( $checkpoint['post_attempts'] ) && is_array( $checkpoint['post_attempts'] ) ? $checkpoint['post_attempts'] : array();
-		$failed_post_ids_final = isset( $checkpoint['failed_post_ids_final'] ) ? (array) $checkpoint['failed_post_ids_final'] : array();
-		$total_count        = isset( $checkpoint['total_count'] ) ? (int) $checkpoint['total_count'] : ( count( $remaining_post_ids ) + $processed_count );
-		$batch_size         = isset( $batch['batch_size'] ) ? max( 1, (int) $batch['batch_size'] ) : 10;
-
 		// Load target connection info from active migration.
 		$active        = $this->migration_repository->get_active_migration();
 		$active_mid    = is_array( $active ) && isset( $active['migration_id'] ) ? (string) $active['migration_id'] : '';
 		$target_url    = is_array( $active ) && isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
 		$migration_key = is_array( $active ) && isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
 
-		// Validate that the active migration context is present and matches the expected migration ID.
 		if ( '' === $active_mid || $active_mid !== (string) $migration_id || '' === $target_url || '' === $migration_key ) {
 			return new \WP_Error( 'missing_active_migration', __( 'Active migration record is missing required fields or does not match the current migration ID.', 'etch-fusion-suite' ) );
 		}
 
-		$options            = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
-		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+		$phase = isset( $checkpoint['phase'] ) ? (string) $checkpoint['phase'] : 'posts';
 
-		$current_batch      = array_splice( $remaining_post_ids, 0, $batch_size );
+		// Media phase: process a small batch of media items (3 per request to limit base64 memory).
+		if ( 'media' === $phase ) {
+			$remaining_media_ids    = isset( $checkpoint['remaining_media_ids'] ) ? (array) $checkpoint['remaining_media_ids'] : array();
+			$processed_media_count  = isset( $checkpoint['processed_media_count'] ) ? (int) $checkpoint['processed_media_count'] : 0;
+			$total_media_count      = isset( $checkpoint['total_media_count'] ) ? (int) $checkpoint['total_media_count'] : ( count( $remaining_media_ids ) + $processed_media_count );
+			$media_attempts         = isset( $checkpoint['media_attempts'] ) && is_array( $checkpoint['media_attempts'] ) ? $checkpoint['media_attempts'] : array();
+			$failed_media_ids_final = isset( $checkpoint['failed_media_ids_final'] ) ? (array) $checkpoint['failed_media_ids_final'] : array();
+			$media_batch_size       = 3;
+
+			$current_media_batch = array_splice( $remaining_media_ids, 0, $media_batch_size );
+			$current_item_id     = null;
+			$current_item_title  = '';
+
+			foreach ( $current_media_batch as $media_id ) {
+				$media_id         = (int) $media_id;
+				$media_id_key     = (string) $media_id;
+				$current_attempts = isset( $media_attempts[ $media_id_key ] ) ? (int) $media_attempts[ $media_id_key ] : 0;
+				++$current_attempts;
+				$media_attempts[ $media_id_key ] = $current_attempts;
+
+				$result = $this->media_service->migrate_media_by_id( $media_id, $target_url, $migration_key );
+
+				if ( is_wp_error( $result ) ) {
+					if ( $current_attempts < 2 ) {
+						$remaining_media_ids[] = $media_id;
+					} else {
+						$failed_media_ids_final[] = $media_id;
+						$this->error_handler->log_warning(
+							'W012',
+							array(
+								'media_id'      => $media_id,
+								'attempts_made' => $current_attempts,
+								'error_message' => $result->get_error_message(),
+								'action'        => 'Media migration failed after retries',
+							)
+						);
+					}
+					continue;
+				}
+
+				++$processed_media_count;
+				$current_item_id    = $media_id;
+				$current_item_title = isset( $result['title'] ) ? (string) $result['title'] : '';
+			}
+
+			$checkpoint['remaining_media_ids']    = $remaining_media_ids;
+			$checkpoint['processed_media_count']  = $processed_media_count;
+			$checkpoint['media_attempts']         = $media_attempts;
+			$checkpoint['failed_media_ids_final'] = $failed_media_ids_final;
+			$checkpoint['current_item_id']        = $current_item_id;
+			$checkpoint['current_item_title']     = $current_item_title;
+			$this->migration_repository->save_checkpoint( $checkpoint );
+
+			$percentage = $total_media_count > 0 ? (int) round( 60 + ( $processed_media_count / $total_media_count * 19 ) ) : 60;
+			$message    = sprintf(
+				/* translators: 1: processed media count, 2: total media count. */
+				__( 'Migrating media… %1$d/%2$d', 'etch-fusion-suite' ),
+				$processed_media_count,
+				$total_media_count
+			);
+			$this->update_progress( 'media', $percentage, $message, $processed_media_count, $total_media_count );
+
+			if ( empty( $remaining_media_ids ) ) {
+				$checkpoint['phase']           = 'posts';
+				$checkpoint['processed_count'] = 0;
+				$this->migration_repository->save_checkpoint( $checkpoint );
+				$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
+				$this->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, count( $remaining_post_ids ) );
+				return array(
+					'completed'    => false,
+					'remaining'    => count( $remaining_post_ids ),
+					'migrationId'  => $migration_id,
+					'progress'     => $this->get_progress_data(),
+					'steps'        => $this->get_steps_state(),
+					'current_item' => array(
+						'id'    => null,
+						'title' => '',
+					),
+				);
+			}
+
+			return array(
+				'completed'    => false,
+				'remaining'    => count( $remaining_media_ids ),
+				'migrationId'  => $migration_id,
+				'progress'     => $this->get_progress_data(),
+				'steps'        => $this->get_steps_state(),
+				'current_item' => array(
+					'id'    => $current_item_id,
+					'title' => $current_item_title,
+				),
+			);
+		}
+
+		// Posts phase (existing logic).
+		$remaining_post_ids    = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
+		$processed_count       = isset( $checkpoint['processed_count'] ) ? (int) $checkpoint['processed_count'] : 0;
+		$post_attempts         = isset( $checkpoint['post_attempts'] ) && is_array( $checkpoint['post_attempts'] ) ? $checkpoint['post_attempts'] : array();
+		$failed_post_ids_final = isset( $checkpoint['failed_post_ids_final'] ) ? (array) $checkpoint['failed_post_ids_final'] : array();
+		$total_count           = isset( $checkpoint['total_count'] ) ? (int) $checkpoint['total_count'] : ( count( $remaining_post_ids ) + $processed_count );
+		$batch_size            = isset( $batch['batch_size'] ) ? max( 1, (int) $batch['batch_size'] ) : 10;
+		$options               = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$post_type_mappings    = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
+
+		$current_batch = array_splice( $remaining_post_ids, 0, $batch_size );
 
 		foreach ( $current_batch as $post_id ) {
 			$post_id = (int) $post_id;
@@ -699,14 +821,14 @@ class EFS_Migration_Service {
 			}
 
 			++$processed_count;
-			$wp_post = get_post( $post_id );
+			$wp_post                          = get_post( $post_id );
 			$checkpoint['current_item_id']    = $post_id;
 			$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
 		}
 
-		$checkpoint['remaining_post_ids'] = $remaining_post_ids;
-		$checkpoint['processed_count']    = $processed_count;
-		$checkpoint['post_attempts']      = $post_attempts;
+		$checkpoint['remaining_post_ids']    = $remaining_post_ids;
+		$checkpoint['processed_count']       = $processed_count;
+		$checkpoint['post_attempts']         = $post_attempts;
 		$checkpoint['failed_post_ids_final'] = $failed_post_ids_final;
 		$this->migration_repository->save_checkpoint( $checkpoint );
 
@@ -720,7 +842,7 @@ class EFS_Migration_Service {
 		$this->update_progress( 'posts', $percentage, $message, $processed_count, $total_count );
 
 		if ( empty( $remaining_post_ids ) ) {
-			$failed_count = count( $failed_post_ids_final );
+			$failed_count       = count( $failed_post_ids_final );
 			$completion_message = $failed_count > 0
 				? sprintf(
 					/* translators: %d: failed posts count. */
@@ -730,8 +852,8 @@ class EFS_Migration_Service {
 				: __( 'Migration completed successfully!', 'etch-fusion-suite' );
 
 			$posts_result = array(
-				'total'    => $total_count,
-				'migrated' => $processed_count,
+				'total'                 => $total_count,
+				'migrated'              => $processed_count,
 				'failed_post_ids_final' => $failed_post_ids_final,
 			);
 
@@ -785,7 +907,10 @@ class EFS_Migration_Service {
 			return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration ID.', 'etch-fusion-suite' ) );
 		}
 
-		$remaining_post_ids = isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array();
+		$phase     = isset( $checkpoint['phase'] ) ? (string) $checkpoint['phase'] : 'posts';
+		$remaining = 'media' === $phase
+			? count( isset( $checkpoint['remaining_media_ids'] ) ? (array) $checkpoint['remaining_media_ids'] : array() )
+			: count( isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array() );
 
 		// Reset stale flag so the batch loop can restart.
 		$progress = $this->migration_repository->get_progress();
@@ -798,7 +923,7 @@ class EFS_Migration_Service {
 
 		return array(
 			'resumed'     => true,
-			'remaining'   => count( $remaining_post_ids ),
+			'remaining'   => $remaining,
 			'migrationId' => $migration_id,
 			'progress'    => $this->get_progress_data(),
 		);
@@ -899,18 +1024,18 @@ class EFS_Migration_Service {
 	 */
 	public function init_progress( $migration_id, array $options = array() ) {
 		$progress = array(
-			'migrationId'               => sanitize_text_field( $migration_id ),
-			'status'                    => 'running',
-			'current_step'              => 'validation',
-			'current_phase_name'        => self::PHASES['validation'],
-			'current_phase_status'      => 'active',
-			'percentage'                => 0,
-			'started_at'                => current_time( 'mysql' ),
-			'last_updated'              => current_time( 'mysql' ),
-			'completed_at'              => null,
-			'items_processed'           => 0,
-			'items_total'               => 0,
-			'estimated_time_remaining'  => null,
+			'migrationId'              => sanitize_text_field( $migration_id ),
+			'status'                   => 'running',
+			'current_step'             => 'validation',
+			'current_phase_name'       => self::PHASES['validation'],
+			'current_phase_status'     => 'active',
+			'percentage'               => 0,
+			'started_at'               => current_time( 'mysql' ),
+			'last_updated'             => current_time( 'mysql' ),
+			'completed_at'             => null,
+			'items_processed'          => 0,
+			'items_total'              => 0,
+			'estimated_time_remaining' => null,
 		);
 
 		$this->migration_repository->save_progress( $progress );
@@ -961,15 +1086,15 @@ class EFS_Migration_Service {
 		$progress['estimated_time_remaining'] = $this->estimate_time_remaining( $progress );
 
 		if ( 'completed' === $step ) {
-			$progress['status']       = 'completed';
+			$progress['status']               = 'completed';
 			$progress['current_phase_status'] = 'completed';
-			$progress['completed_at'] = current_time( 'mysql' );
+			$progress['completed_at']         = current_time( 'mysql' );
 		} elseif ( 'error' === $step ) {
-			$progress['status']       = 'error';
+			$progress['status']               = 'error';
 			$progress['current_phase_status'] = 'failed';
-			$progress['completed_at'] = current_time( 'mysql' );
+			$progress['completed_at']         = current_time( 'mysql' );
 		} else {
-			$progress['status'] = 'running';
+			$progress['status']               = 'running';
 			$progress['current_phase_status'] = 'active';
 		}
 
@@ -988,12 +1113,12 @@ class EFS_Migration_Service {
 						$step_data['active'] = false;
 					}
 				} elseif ( $key === $step ) {
-					$step_data['status'] = 'completed';
-					$step_data['active'] = false;
+					$step_data['status']    = 'completed';
+					$step_data['active']    = false;
 					$step_data['completed'] = true;
 				} elseif ( empty( $step_data['completed'] ) && ! empty( $step_data['active'] ) ) {
-					$step_data['status'] = 'completed';
-					$step_data['active'] = false;
+					$step_data['status']    = 'completed';
+					$step_data['active']    = false;
 					$step_data['completed'] = true;
 				} elseif ( empty( $step_data['completed'] ) && 'pending' === ( $step_data['status'] ?? 'pending' ) ) {
 					$step_data['status'] = 'pending';
@@ -1006,8 +1131,8 @@ class EFS_Migration_Service {
 			if ( 'completed' !== $step && 'error' !== $step ) {
 				$next_phase = $this->get_next_phase_key( $step, $steps );
 				if ( $next_phase && isset( $steps[ $next_phase ] ) && empty( $steps[ $next_phase ]['completed'] ) ) {
-					$steps[ $next_phase ]['status']  = 'active';
-					$steps[ $next_phase ]['active']  = true;
+					$steps[ $next_phase ]['status']     = 'active';
+					$steps[ $next_phase ]['active']     = true;
 					$steps[ $next_phase ]['updated_at'] = current_time( 'mysql' );
 				}
 			}
@@ -1040,9 +1165,9 @@ class EFS_Migration_Service {
 
 		$status = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
 		if ( in_array( $status, array( 'running', 'receiving' ), true ) ) {
-			$last_updated_ts       = strtotime( (string) $progress['last_updated'] );
-			$is_stale              = false !== $last_updated_ts && ( time() - $last_updated_ts ) >= self::PROGRESS_STALE_TTL;
-			$progress['is_stale']  = $is_stale;
+			$last_updated_ts      = strtotime( (string) $progress['last_updated'] );
+			$is_stale             = false !== $last_updated_ts && ( time() - $last_updated_ts ) >= self::PROGRESS_STALE_TTL;
+			$progress['is_stale'] = $is_stale;
 			if ( $is_stale ) {
 				$progress['status'] = 'stale';
 			}
@@ -1103,9 +1228,9 @@ class EFS_Migration_Service {
 	 * @return array
 	 */
 	private function initialize_steps( array $options = array() ) {
-		$include_media = ! isset( $options['include_media'] ) || ! empty( $options['include_media'] );
-		$has_acf       = $this->plugin_detector->is_acf_active();
-		$has_metabox   = $this->plugin_detector->is_metabox_active();
+		$include_media     = ! isset( $options['include_media'] ) || ! empty( $options['include_media'] );
+		$has_acf           = $this->plugin_detector->is_acf_active();
+		$has_metabox       = $this->plugin_detector->is_metabox_active();
 		$has_custom_fields = $has_acf || $has_metabox;
 
 		$phases_to_include = array(
@@ -1172,13 +1297,13 @@ class EFS_Migration_Service {
 		$target_url    = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
 		$options       = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
 
-		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
+		$post_type_mappings    = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
 			? $options['post_type_mappings']
 			: array();
 		$failed_post_ids_final = isset( $results['failed_post_ids_final'] ) && is_array( $results['failed_post_ids_final'] )
 			? array_values( $results['failed_post_ids_final'] )
 			: array();
-		$failed_posts_count = count( $failed_post_ids_final );
+		$failed_posts_count    = count( $failed_post_ids_final );
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
@@ -1216,10 +1341,24 @@ class EFS_Migration_Service {
 
 		$warnings_count   = count( $warnings );
 		$warnings_summary = $warnings_count > 0
-			? implode( '; ', array_map( function ( $w ) { return isset( $w['title'] ) ? (string) $w['title'] : (string) ( $w['code'] ?? '' ); }, $warnings ) )
+			? implode(
+				'; ',
+				array_map(
+					function ( $w ) {
+						return isset( $w['title'] ) ? (string) $w['title'] : (string) ( $w['code'] ?? '' ); },
+					$warnings
+				)
+			)
 			: null;
 		$errors_summary   = count( $errors ) > 0
-			? implode( '; ', array_map( function ( $e ) { return isset( $e['title'] ) ? (string) $e['title'] : (string) ( $e['code'] ?? '' ); }, $errors ) )
+			? implode(
+				'; ',
+				array_map(
+					function ( $e ) {
+						return isset( $e['title'] ) ? (string) $e['title'] : (string) ( $e['code'] ?? '' ); },
+					$errors
+				)
+			)
 			: null;
 
 		$status       = $warnings_count > 0 ? 'success_with_warnings' : 'success';
@@ -1337,7 +1476,7 @@ class EFS_Migration_Service {
 		$counts         = array();
 
 		foreach ( $totals_by_type as $post_type => $total ) {
-			$migrated = min( (int) $total, (int) $remaining );
+			$migrated   = min( (int) $total, (int) $remaining );
 			$remaining -= $migrated;
 
 			$counts[ $post_type ] = array(

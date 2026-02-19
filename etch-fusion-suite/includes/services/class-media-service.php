@@ -71,6 +71,39 @@ class EFS_Media_Service {
 	}
 
 	/**
+	 * Get attachment IDs only (lightweight). Delegates to media migrator.
+	 *
+	 * @param array $selected_post_types Optional. Selected post types; empty = all attachments.
+	 * @return array<int>
+	 */
+	public function get_media_ids( array $selected_post_types = array() ) {
+		return $this->media_migrator->get_media_ids( $selected_post_types );
+	}
+
+	/**
+	 * Migrate a single media item by ID. Skips if already mapped.
+	 *
+	 * @param int    $media_id   Attachment ID.
+	 * @param string $target_url Target site URL.
+	 * @param string $jwt_token  Migration JWT.
+	 * @return array|\WP_Error Result with keys migrated, skipped, failed, title; or WP_Error.
+	 */
+	public function migrate_media_by_id( $media_id, $target_url, $jwt_token ) {
+		try {
+			return $this->media_migrator->migrate_media_by_id( $media_id, $target_url, $jwt_token );
+		} catch ( \Throwable $exception ) {
+			$this->error_handler->log_error(
+				'E905',
+				array(
+					'message' => $exception->getMessage(),
+					'action'  => 'Media migration by ID failure',
+				)
+			);
+			return new \WP_Error( 'media_migration_by_id_failed', $exception->getMessage() );
+		}
+	}
+
+	/**
 	 * @return array
 	 */
 	public function get_media_stats() {
