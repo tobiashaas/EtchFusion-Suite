@@ -169,7 +169,20 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			wp_die( '0', 400 );
 		}
 
-		wp_send_json_success( array( 'completed' => true ) );
+		// Use result from run_migration_execution: when batching is pending, return completed false and progress/posts_ready.
+		$completed = isset( $result['completed'] ) && $result['completed'];
+		$payload   = array(
+			'completed'   => $completed,
+			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
+			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
+			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : $migration_id,
+		);
+		if ( isset( $result['posts_ready'] ) ) {
+			$payload['posts_ready'] = (bool) $result['posts_ready'];
+			$payload['total']       = isset( $result['total'] ) ? $result['total'] : 0;
+		}
+
+		wp_send_json_success( $payload );
 	}
 
 	/**
