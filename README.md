@@ -4,7 +4,7 @@
 ![CodeQL](https://github.com/tobiashaas/EtchFusion-Suite/workflows/CodeQL/badge.svg)
 ![PHP Version](https://img.shields.io/badge/PHP-7.4%20%7C%208.1%20%7C%208.2%20%7C%208.3%20%7C%208.4-blue)
 
-**Version:** 0.10.2  
+**Version:** 0.12.1  
 **Status:** ✅ Production Ready
 **Release Automation:** ✅ GitHub Actions & build script
 
@@ -158,13 +158,12 @@ For comprehensive documentation of all available commands, see **[etch-fusion-su
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
 - **[DOCUMENTATION.md](DOCUMENTATION.md)** - Technical documentation
 - **[docs/MIGRATOR-API.md](etch-fusion-suite/docs/MIGRATOR-API.md)** - Developer guide for the migrator system
-- **[docs/FRAMER-EXTRACTION.md](etch-fusion-suite/docs/FRAMER-EXTRACTION.md)** - Framer template extraction pipeline
 
 ---
 
 ## Release Process
 
-**Updated:** 2025-10-30 08:37
+**Updated:** February 2026
 
 1. **Update Version** – Edit `etch-fusion-suite/etch-fusion-suite.php` and synchronise the plugin header `Version:` line with the `ETCH_FUSION_SUITE_VERSION` constant.
 2. **Document Changes** – Update `CHANGELOG.md` with release notes and ensure `DOCUMENTATION.md` / `TODOS.md` entries include timestamps.
@@ -207,9 +206,9 @@ etch-fusion-suite/
 │   ├── api_client.php            # Etch API client
 │   └── ...
 ├── assets/
-│   ├── css/                      # Admin styles
-│   └── fonts/                    # Custom fonts
-└── etch-fusion-suite.php     # Main plugin file
+│   ├── css/                      # Admin styles (Space Grotesk via Google Fonts)
+│   └── js/                       # Admin scripts
+└── etch-fusion-suite.php         # Main plugin file
 ```
 
 ### Key Features
@@ -619,5 +618,5 @@ GPL v2 or later
 
 ---
 
-**Last Updated:** November 4, 2025  
-**Version:** 0.10.2
+**Last Updated:** February 2026  
+**Version:** 0.12.1

@@ -49,6 +49,7 @@
     "create-test-content": "node scripts/create-test-content.js",
     "export:etch": "node scripts/export-etch-posts.js",
     "validate:etchdata": "node scripts/validate-etchdata.js",
+    "reset:etch:migration": "node scripts/reset-etch-migration-state.js",
     "validate:full-workflow": "npm run create-test-content && npm run test:migration && npm run export:etch && npm run validate:etchdata -- validation-results",
     "reset": "wp-env clean all && npm run dev",
     "reset:soft": "wp-env clean all",

@@ -97,7 +97,7 @@ class EFS_Dynamic_Data_Converter {
 	/**
 	 * Convert dynamic data tags in content
 	 */
-	public function convert_content( $content ) {
+	public function convert_content( $content, $context = array() ) {
 		if ( empty( $content ) ) {
 			return $content;
 		}
@@ -107,6 +107,9 @@ class EFS_Dynamic_Data_Converter {
 
 		// Convert tags with modifiers
 		$converted = $this->convert_tags_with_modifiers( $converted );
+
+		// Convert legacy Bricks colon-length tags (e.g. {post_content:10}).
+		$converted = $this->convert_colon_length_tags( $converted );
 
 		// Convert ACF fields
 		$converted = $this->convert_acf_fields( $converted );
@@ -126,10 +129,80 @@ class EFS_Dynamic_Data_Converter {
 		// Convert URL parameters
 		$converted = $this->convert_url_parameters( $converted );
 
+		// Loop context: convert this.* references to the configured loop alias (default: item.*).
+		if ( is_array( $context ) && isset( $context['scope'] ) && 'loop' === $context['scope'] ) {
+			$loop_alias = isset( $context['loop_alias'] ) && is_string( $context['loop_alias'] ) && '' !== trim( $context['loop_alias'] )
+				? trim( $context['loop_alias'] )
+				: 'item';
+			$converted  = $this->replace_dynamic_root_in_expressions( $converted, 'this', $loop_alias );
+		}
+
 		// Log unconverted tags
 		$this->log_unconverted_tags( $converted );
 
 		return $converted;
+	}
+
+	/**
+	 * Convert Bricks colon-based length tags to Etch function chains.
+	 *
+	 * Examples:
+	 * - {post_content:10} => {this.content.stripTags().truncateWords(10)}
+	 * - {post_title:10}   => {this.title.stripTags().truncateWords(10)}
+	 *
+	 * @param string $content Raw content.
+	 * @return string
+	 */
+	private function convert_colon_length_tags( $content ) {
+		$pattern = '/\{(post_content|post_title|post_excerpt):(\d+)\}/';
+
+		return (string) preg_replace_callback(
+			$pattern,
+			function ( $matches ) {
+				$tag   = strtolower( (string) $matches[1] );
+				$limit = (int) $matches[2];
+				$limit = max( 1, $limit );
+
+				$base_map = array(
+					'post_content' => 'this.content',
+					'post_title'   => 'this.title',
+					'post_excerpt' => 'this.excerpt',
+				);
+
+				if ( empty( $base_map[ $tag ] ) ) {
+					return (string) $matches[0];
+				}
+
+				return '{' . $base_map[ $tag ] . '.stripTags().truncateWords(' . $limit . ')}';
+			},
+			(string) $content
+		);
+	}
+
+	/**
+	 * Replace a dynamic-data root key only inside dynamic expressions.
+	 *
+	 * Example: {this.title} => {item.title}
+	 *
+	 * @param string $content Full content.
+	 * @param string $from_root Root to replace.
+	 * @param string $to_root Replacement root.
+	 * @return string
+	 */
+	private function replace_dynamic_root_in_expressions( $content, $from_root, $to_root ) {
+		$from_root = trim( (string) $from_root );
+		$to_root   = trim( (string) $to_root );
+		if ( '' === $from_root || '' === $to_root || $from_root === $to_root ) {
+			return $content;
+		}
+
+		return (string) preg_replace_callback(
+			'/\{[^{}]+\}/',
+			static function ( $matches ) use ( $from_root, $to_root ) {
+				return str_replace( $from_root . '.', $to_root . '.', (string) $matches[0] );
+			},
+			(string) $content
+		);
 	}
 
 	/**
@@ -408,6 +481,7 @@ class EFS_Dynamic_Data_Converter {
 			foreach ( $matches[1] as $tag ) {
 				// Skip already converted tags
 				if ( strpos( $tag, 'this.' ) === 0 ||
+					strpos( $tag, 'item.' ) === 0 ||
 					strpos( $tag, 'site.' ) === 0 ||
 					strpos( $tag, 'user.' ) === 0 ||
 					strpos( $tag, 'query.' ) === 0 ||
@@ -415,8 +489,8 @@ class EFS_Dynamic_Data_Converter {
 					continue;
 				}
 
-				$this->error_handler->log_error(
-					'E004',
+				$this->error_handler->log_warning(
+					'W005',
 					array(
 						'tag'     => $tag,
 						'message' => 'Dynamic data tag not mappable to Etch format',

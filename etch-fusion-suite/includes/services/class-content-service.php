@@ -235,7 +235,8 @@ class EFS_Content_Service {
 
 		$target_post_type = $post_type_mappings[ $post->post_type ];
 
-		$response = $api_client->send_post( $target_url, $jwt_token, $post, $content, $target_post_type );
+		$loop_presets = $this->extract_loop_presets_from_content( (string) $content );
+		$response     = $api_client->send_post( $target_url, $jwt_token, $post, $content, $target_post_type, $loop_presets );
 
 		if ( is_wp_error( $response ) ) {
 			$this->error_handler->log_error(
@@ -255,5 +256,45 @@ class EFS_Content_Service {
 			'target_id' => $response['post_id'] ?? null,
 			'status'    => 'migrated',
 		);
+	}
+
+	/**
+	 * Extract loop presets referenced by etch/loop blocks in content.
+	 *
+	 * @param string $content Block content.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function extract_loop_presets_from_content( $content ) {
+		$presets = array();
+		if ( '' === trim( $content ) ) {
+			return $presets;
+		}
+
+		$loops = get_option( 'etch_loops', array() );
+		$loops = is_array( $loops ) ? $loops : array();
+		if ( empty( $loops ) ) {
+			return $presets;
+		}
+
+		if ( ! preg_match_all( '/<!--\s+wp:etch\/loop\s+(\{.*?\})\s+-->/s', $content, $matches ) ) {
+			return $presets;
+		}
+
+		$json_chunks = isset( $matches[1] ) && is_array( $matches[1] ) ? $matches[1] : array();
+		foreach ( $json_chunks as $json_chunk ) {
+			$attrs = json_decode( (string) $json_chunk, true );
+			if ( ! is_array( $attrs ) || empty( $attrs['loopId'] ) ) {
+				continue;
+			}
+
+			$loop_id = sanitize_key( (string) $attrs['loopId'] );
+			if ( '' === $loop_id || ! isset( $loops[ $loop_id ] ) || ! is_array( $loops[ $loop_id ] ) ) {
+				continue;
+			}
+
+			$presets[ $loop_id ] = $loops[ $loop_id ];
+		}
+
+		return $presets;
 	}
 }

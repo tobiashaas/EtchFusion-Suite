@@ -114,6 +114,55 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			wp_die( '0', 503 );
 		}
 
+		$migration_repository = null;
+		$error_handler        = null;
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			$container = etch_fusion_suite_container();
+			if ( $container->has( 'migration_repository' ) ) {
+				$migration_repository = $container->get( 'migration_repository' );
+			}
+			if ( $container->has( 'error_handler' ) ) {
+				$error_handler = $container->get( 'error_handler' );
+			}
+		}
+
+		register_shutdown_function(
+			function () use ( $migration_id, $migration_repository, $error_handler ) {
+				$error = error_get_last();
+				if ( ! is_array( $error ) || ! in_array( $error['type'] ?? null, array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
+					return;
+				}
+
+				if ( $migration_repository ) {
+					$progress                   = $migration_repository->get_progress();
+					$current_percentage         = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
+					$progress['migrationId']    = $migration_id;
+					$progress['status']         = 'error';
+					$progress['percentage']     = $current_percentage;
+					$progress['message']        = sprintf( 'Fatal error during migration: %s', $error['message'] ?? '' );
+					$progress['last_updated']   = current_time( 'mysql' );
+					$progress['current_step']   = 'error';
+					$progress['completed_at']   = current_time( 'mysql' );
+					$progress['is_stale']       = false;
+					$progress['current_phase_status'] = 'failed';
+					$migration_repository->save_progress( $progress );
+					$migration_repository->save_active_migration( array() );
+				}
+
+				if ( $error_handler ) {
+					$error_handler->log_error(
+						'E500',
+						array(
+							'message' => $error['message'] ?? '',
+							'file'    => $error['file'] ?? '',
+							'line'    => $error['line'] ?? 0,
+							'action'  => 'Fatal error during background migration',
+						)
+					);
+				}
+			}
+		);
+
 		$result = $this->migration_controller->run_migration_execution( $migration_id, $bg_token );
 		if ( is_wp_error( $result ) ) {
 			wp_die( '0', 400 );

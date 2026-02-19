@@ -1449,9 +1449,6 @@ composer test:coverage
 
 - Unit tests:
   - `tests/unit/TemplateExtractorServiceTest.php` validates payload shape and template validation edge cases via the service container.
-  - `tests/unit/FramerHtmlSanitizerTest.php` ensures Framer scripts are removed and semantic conversions (sections, headings) apply as expected.
-  - `tests/unit/FramerTemplateAnalyzerTest.php` checks section detection heuristics (`hero`, `features`, `footer`) and media source annotations for Framer CDN assets.
-- Integration test: `tests/integration/FramerExtractionIntegrationTest.php` exercises the full DI-driven pipeline and asserts that Etch blocks, metadata, and CSS variable styles are generated end-to-end.
 - UI tests: PHP-powered admin assertions moved to `tests/ui/AdminUITest.php` and execute under the `ui` PHPUnit suite to avoid confusion with browser automation.
 - **Current workflow:** run unit tests inside the WordPress container
 

@@ -4,7 +4,7 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 const CWD = path.resolve(__dirname, '..');
-const WP_ENV_ARGS = ['run', 'cli', 'wp'];
+const WP_ENV_ARGS = ['run', 'cli', 'wp', '--skip-themes'];
 
 function runWpCli(args) {
   const run = process.platform === 'win32'
@@ -23,175 +23,42 @@ function runWpCli(args) {
   return result.stdout.trim();
 }
 
-function generateBricksContent(index) {
-  const headingId = `heading-${index}`;
-  const textId = `text-${index}`;
-
-  return [
-    {
-      id: `container-${index}`,
-      name: 'container',
-      label: `Test Container ${index}`,
-      children: [headingId, textId],
-      settings: {
-        margin: { top: '40px', bottom: '40px' }
-      }
-    },
-    {
-      id: headingId,
-      name: 'heading',
-      label: `Heading ${index}`,
-      settings: {
-        text: `Test Heading ${index}`,
-        tag: 'h2'
-      }
-    },
-    {
-      id: textId,
-      name: 'text-basic',
-      label: `Body Copy ${index}`,
-      settings: {
-        text: `Lorem ipsum dolor sit amet ${index}.`
-      }
-    }
-  ];
-}
-
-function createPosts() {
-  for (let i = 1; i <= 10; i += 1) {
-    const bricksContent = JSON.stringify(generateBricksContent(i));
-    const meta = JSON.stringify({
-      _bricks_page_content_2: bricksContent,
-      _bricks_editor_mode: 'bricks'
-    });
-
-    runWpCli([
-      'post',
-      'create',
-      '--post_type=post',
-      `--post_title=Test Post ${i}`,
-      '--post_status=publish',
-      `--meta_input=${meta}`
-    ]);
-  }
-}
-
-function createPages() {
-  const templates = [
-    { title: 'Landing Page', heading: 'Build Faster', text: 'Reusable sections for marketing teams.' },
-    { title: 'Features', heading: 'Migration Highlights', text: 'We migrate content, styles and global classes.' },
-    { title: 'Pricing', heading: 'Simple Pricing', text: 'One migration, unlimited results.' },
-    { title: 'About', heading: 'About the Team', text: 'Crafted by Bricks and Etch specialists.' },
-    { title: 'Contact', heading: 'Let’s Talk Migration', text: 'Schedule a demo today.' }
-  ];
-
-  templates.forEach((template, index) => {
-    const bricksContent = JSON.stringify([
-      {
-        id: `hero-${index}`,
-        name: 'container',
-        label: `${template.title} Hero`,
-        children: [`hero-heading-${index}`, `hero-text-${index}`],
-        settings: {
-          background: { type: 'color', color: '#0f172a' },
-          padding: { top: '120px', bottom: '120px' }
-        }
-      },
-      {
-        id: `hero-heading-${index}`,
-        name: 'heading',
-        label: `${template.title} Heading`,
-        settings: {
-          text: template.heading,
-          tag: 'h1',
-          typography: { color: '#f8fafc', font_size: '48px' }
-        }
-      },
-      {
-        id: `hero-text-${index}`,
-        name: 'text-basic',
-        label: `${template.title} Copy`,
-        settings: {
-          text: template.text,
-          typography: { color: '#e2e8f0', font_size: '18px' }
-        }
-      }
-    ]);
-
-    const meta = JSON.stringify({
-      _bricks_page_content_2: bricksContent,
-      _bricks_builder_data: bricksContent,
-      _bricks_template_type: 'page'
-    });
-
-    runWpCli([
-      'post',
-      'create',
-      '--post_type=page',
-      `--post_title=${template.title}`,
-      '--post_status=publish',
-      `--meta_input=${meta}`
-    ]);
-  });
-}
-
-function createGlobalClasses() {
-  const classes = [
-    {
-      id: 'btn-primary',
-      name: 'Primary Button',
-      settings: {
-        color: '#ffffff',
-        background: '#2563eb',
-        padding: { top: '12px', right: '24px', bottom: '12px', left: '24px' },
-        border_radius: '8px'
-      }
-    },
-    {
-      id: 'section-spacing',
-      name: 'Section Spacing',
-      settings: {
-        margin: { top: '80px', bottom: '80px' }
-      }
-    }
-  ];
-
-  const optionValue = JSON.stringify(classes);
-  runWpCli(['option', 'update', 'bricks_global_classes', optionValue]);
-}
-
-function importMedia() {
-  try {
-    runWpCli([
-      'media',
-      'import',
-      '/var/www/html/wp-content/plugins/etch-fusion-suite/test-images/*',
-      '--skip-copy'
-    ]);
-  } catch (error) {
-    console.warn('⚠ Media import skipped:', error.message);
-  }
+function getBricksBaseSummary() {
+  return runWpCli([
+    'eval',
+    [
+      '$classes = get_option("bricks_global_classes", array());',
+      '$media = wp_count_attachments();',
+      '$images = 0;',
+      'foreach ((array) $media as $mime => $count) {',
+      '  if (0 === strpos((string) $mime, "image/")) { $images += (int) $count; }',
+      '}',
+      '$templates = wp_count_posts("bricks_template")->publish ?? 0;',
+      '$pages = wp_count_posts("page")->publish ?? 0;',
+      '$posts = wp_count_posts("post")->publish ?? 0;',
+      'echo "classes=" . (is_array($classes) ? count($classes) : 0) . PHP_EOL;',
+      'echo "images=" . (int) $images . PHP_EOL;',
+      'echo "templates=" . (int) $templates . PHP_EOL;',
+      'echo "pages=" . (int) $pages . PHP_EOL;',
+      'echo "posts=" . (int) $posts . PHP_EOL;'
+    ].join(' ')
+  ]);
 }
 
 async function createTestContent() {
-  console.log('▶ Creating test posts...');
-  createPosts();
+  console.log('Using existing Bricks base content.');
+  console.log('No test text content will be created.');
+  console.log('No test media will be imported.');
 
-  console.log('▶ Creating test pages...');
-  createPages();
+  const summary = getBricksBaseSummary();
+  console.log(summary);
 
-  console.log('▶ Creating global classes...');
-  createGlobalClasses();
-
-  console.log('▶ Importing media (if available)...');
-  importMedia();
-
-  console.log('✓ Test content ready on Bricks instance');
+  console.log('Bricks base check complete.');
 }
 
 if (require.main === module) {
   createTestContent().catch((error) => {
-    console.error('✗ Failed to create test content:', error.message);
+    console.error('Failed to check Bricks base:', error.message);
     process.exit(1);
   });
 }

@@ -3,7 +3,7 @@
  * Plugin Name: Etch Fusion Suite
  * Plugin URI: https://github.com/tobiashaas/EtchFusion-Suite
  * Description: End-to-end migration and orchestration toolkit for transforming Bricks Builder sites into native Etch experiences.
- * Version: 0.12.0
+ * Version: 0.12.1
  * Author: Tobias Haas
  * License: GPL v2 or later
  * Text Domain: etch-fusion-suite
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants (needed for load path).
-define( 'ETCH_FUSION_SUITE_VERSION', '0.12.0' );
+define( 'ETCH_FUSION_SUITE_VERSION', '0.12.1' );
 define( 'ETCH_FUSION_SUITE_FILE', __FILE__ );
 define( 'ETCH_FUSION_SUITE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETCH_FUSION_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -212,6 +212,10 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Initialize AJAX handlers (NEW - v0.5.1)
 		$this->ajax_handler = $container->get( 'ajax_handler' );
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $container->has( 'debug_ajax' ) ) {
+			$container->get( 'debug_ajax' );
+		}
 	}
 
 	/**

@@ -93,39 +93,24 @@ class EFS_CSS_Converter {
 
 	/**
 	 * Convert Bricks breakpoint name to Etch media query
-	 * Uses modern range syntax and to-rem() function
-	 * Desktop-first approach: styles cascade down unless overridden
+	 * Uses modern range syntax and to-rem() function.
+	 * Bricks responsive breakpoints are desktop-first max-width breakpoints.
 	 *
 	 * @param string $breakpoint Bricks breakpoint name
 	 * @return string|false Media query or false if unknown
 	 */
 	private function get_media_query_for_breakpoint( $breakpoint ) {
-		// Bricks uses desktop-first (max-width), but we convert to min-width
-		// for better cascading behavior in Etch
-		//
-		// Desktop-first with cascading:
-		// - Desktop styles apply to all screens
-		// - Tablet styles override desktop for smaller screens
-		// - Mobile styles override tablet for even smaller screens
+		// Keep Bricks desktop-first cascade semantics:
+		// - tablet_landscape applies up to 1199px
+		// - tablet_portrait applies up to 991px
+		// - mobile_landscape applies up to 767px
+		// - mobile_portrait applies up to 478px
+		// Desktop remains explicit for 1200px+ overrides when present.
 		$breakpoints = array(
-			// Desktop: 1200px and up
-			// Applies to all screens 1200px+
 			'desktop'          => '@media (width >= to-rem(1200px))',
-
-			// Tablet Landscape: 992px and up
-			// Overrides desktop for screens 992px-1199px
-			'tablet_landscape' => '@media (width >= to-rem(992px))',
-
-			// Tablet Portrait: 768px and up
-			// Overrides tablet landscape for screens 768px-991px
-			'tablet_portrait'  => '@media (width >= to-rem(768px))',
-
-			// Mobile Landscape: 479px and up
-			// Overrides tablet for screens 479px-767px
-			'mobile_landscape' => '@media (width >= to-rem(479px))',
-
-			// Mobile Portrait: 0-478px only
-			// Overrides everything for smallest screens
+			'tablet_landscape' => '@media (width <= to-rem(1199px))',
+			'tablet_portrait'  => '@media (width <= to-rem(991px))',
+			'mobile_landscape' => '@media (width <= to-rem(767px))',
 			'mobile_portrait'  => '@media (width <= to-rem(478px))',
 		);
 
@@ -973,12 +958,12 @@ class EFS_CSS_Converter {
 	private function convert_responsive_variants( $settings ) {
 		$responsive_css = '';
 
-		// Bricks breakpoints
+		// Bricks desktop-first breakpoint semantics.
 		$breakpoints = array(
 			'mobile_portrait'  => '(max-width: 478px)',
-			'mobile_landscape' => '(min-width: 479px) and (max-width: 767px)',
-			'tablet_portrait'  => '(min-width: 768px) and (max-width: 991px)',
-			'tablet_landscape' => '(min-width: 992px) and (max-width: 1199px)',
+			'mobile_landscape' => '(max-width: 767px)',
+			'tablet_portrait'  => '(max-width: 991px)',
+			'tablet_landscape' => '(max-width: 1199px)',
 			'desktop'          => '(min-width: 1200px)',
 		);
 
@@ -1383,6 +1368,7 @@ class EFS_CSS_Converter {
 		$css = array();
 		$has_flex_container_property = false;
 		$has_display_defined         = ! empty( $settings['_display'] );
+		$has_flex_direction_defined  = false;
 
 		// Flex container properties
 		// _direction is an alias for _flexDirection in Bricks
@@ -1390,6 +1376,7 @@ class EFS_CSS_Converter {
 		if ( ! empty( $flex_direction ) ) {
 			$css[] = 'flex-direction: ' . $flex_direction . ';';
 			$has_flex_container_property = true;
+			$has_flex_direction_defined  = true;
 		}
 
 		if ( ! empty( $settings['_flexWrap'] ) ) {
@@ -1430,7 +1417,14 @@ class EFS_CSS_Converter {
 		// Bricks "block" wrappers often carry flex-* props without an explicit display value.
 		// Preserve expected behavior unless layout display is explicitly set elsewhere.
 		if ( $has_flex_container_property && ! $has_display_defined ) {
-			$css = array_merge( array( 'display: flex;' ), $css );
+			$injected = array( 'display: flex;' );
+
+			// Bricks block defaults are column-oriented; preserve that when no explicit direction exists.
+			if ( ! $has_flex_direction_defined ) {
+				$injected[] = 'flex-direction: column;';
+			}
+
+			$css = array_merge( $injected, $css );
 		}
 
 		// Flex item properties
@@ -2013,6 +2007,31 @@ class EFS_CSS_Converter {
 			return $css;
 		}
 
+		$css = preg_replace_callback(
+			'/\b(row-gap|column-gap|gap)\s*:\s*([a-z][a-z0-9_-]*)\s*;/i',
+			static function ( $matches ) {
+				$property = strtolower( (string) $matches[1] );
+				$value    = strtolower( (string) $matches[2] );
+				$keywords = array(
+					'normal',
+					'inherit',
+					'initial',
+					'unset',
+					'revert',
+					'revert-layer',
+				);
+
+				if ( in_array( $value, $keywords, true ) ) {
+					return $property . ': ' . $value . ';';
+				}
+
+				// Bare identifiers are invalid for gap properties unless they are CSS-wide keywords.
+				// Drop invalid declarations instead of guessing a CSS variable.
+				return '';
+			},
+			$css
+		);
+
 		$css = preg_replace( '/row-gap:\s*([^;{}]+);\s*column-gap:\s*\1\s*;/i', 'gap: $1;', $css );
 		$css = preg_replace( '/column-gap:\s*([^;{}]+);\s*row-gap:\s*\1\s*;/i', 'gap: $1;', $css );
 		$css = $this->normalize_identical_shorthands( $css );
@@ -2047,69 +2066,83 @@ class EFS_CSS_Converter {
 		$css = preg_replace_callback(
 			'/\{([^{}]*)\}/s',
 			function ( $matches ) {
-				$decls = $matches[1];
-
-				$decls = $this->collapse_quad_shorthand(
-					$decls,
-					array(
-						'inset-block-start',
-						'inset-inline-end',
-						'inset-block-end',
-						'inset-inline-start',
-					),
-					'inset'
-				);
-
-				$decls = $this->collapse_quad_shorthand(
-					$decls,
-					array(
-						'padding-block-start',
-						'padding-inline-end',
-						'padding-block-end',
-						'padding-inline-start',
-					),
-					'padding'
-				);
-
-				$decls = $this->collapse_quad_shorthand(
-					$decls,
-					array(
-						'margin-block-start',
-						'margin-inline-end',
-						'margin-block-end',
-						'margin-inline-start',
-					),
-					'margin'
-				);
-
-				$decls = $this->collapse_quad_shorthand(
-					$decls,
-					array(
-						'border-start-start-radius',
-						'border-start-end-radius',
-						'border-end-end-radius',
-						'border-end-start-radius',
-					),
-					'border-radius'
-				);
-
-				$decls = $this->collapse_quad_shorthand(
-					$decls,
-					array(
-						'border-top-left-radius',
-						'border-top-right-radius',
-						'border-bottom-right-radius',
-						'border-bottom-left-radius',
-					),
-					'border-radius'
-				);
-
-				return '{' . $decls . '}';
+				return '{' . $this->collapse_known_quad_shorthands( $matches[1] ) . '}';
 			},
 			$css
 		);
 
+		// Also normalize declaration-only strings (no selector braces),
+		// which are common in generated Etch style payloads.
+		if ( false === strpos( $css, '{' ) && false === strpos( $css, '}' ) ) {
+			$css = $this->collapse_known_quad_shorthands( $css );
+		}
+
 		return $css;
+	}
+
+	/**
+	 * Apply known quad-shorthand collapses to a declaration list.
+	 *
+	 * @param string $decls Declaration block without braces.
+	 * @return string
+	 */
+	private function collapse_known_quad_shorthands( $decls ) {
+		$decls = $this->collapse_quad_shorthand(
+			$decls,
+			array(
+				'inset-block-start',
+				'inset-inline-end',
+				'inset-block-end',
+				'inset-inline-start',
+			),
+			'inset'
+		);
+
+		$decls = $this->collapse_quad_shorthand(
+			$decls,
+			array(
+				'padding-block-start',
+				'padding-inline-end',
+				'padding-block-end',
+				'padding-inline-start',
+			),
+			'padding'
+		);
+
+		$decls = $this->collapse_quad_shorthand(
+			$decls,
+			array(
+				'margin-block-start',
+				'margin-inline-end',
+				'margin-block-end',
+				'margin-inline-start',
+			),
+			'margin'
+		);
+
+		$decls = $this->collapse_quad_shorthand(
+			$decls,
+			array(
+				'border-start-start-radius',
+				'border-start-end-radius',
+				'border-end-end-radius',
+				'border-end-start-radius',
+			),
+			'border-radius'
+		);
+
+		$decls = $this->collapse_quad_shorthand(
+			$decls,
+			array(
+				'border-top-left-radius',
+				'border-top-right-radius',
+				'border-bottom-right-radius',
+				'border-bottom-left-radius',
+			),
+			'border-radius'
+		);
+
+		return $decls;
 	}
 
 	/**

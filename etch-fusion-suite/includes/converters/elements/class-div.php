@@ -47,6 +47,12 @@ class EFS_Element_Div extends EFS_Base_Element {
 			$etch_attributes['class'] = $css_classes;
 		}
 
+		// Bricks block-type elements have implicit `display: flex; flex-direction: column;`
+		// via the built-in brxe-block class. Ensure equivalent display is present in Etch.
+		if ( 'block' === ( $element['name'] ?? '' ) ) {
+			$etch_attributes = $this->apply_brxe_block_display( $style_ids, $etch_attributes, $element );
+		}
+
 		// Build block attributes
 		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
 

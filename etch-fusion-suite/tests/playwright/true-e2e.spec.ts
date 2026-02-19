@@ -5,6 +5,9 @@ import {
   verifyPostTypesOnEtch,
 } from './migration-test-utils';
 import {
+  cleanupTestContent,
+  createTestContentOnBricks,
+  queryEtchDatabase,
   generateRealMigrationUrl,
   waitForRealMigrationComplete,
 } from './true-e2e-helpers';
@@ -168,6 +171,11 @@ const connectWizardWithFreshMigrationUrl = async (
   throw new Error(`Unable to complete connection step. ${lastError || 'No connect error message was rendered.'}`);
 };
 
+const buildUniquePrefix = (label: string): string => {
+  const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `E2E ${label} ${token}`;
+};
+
 const startRealMigrationFromPreview = async (
   page: import('@playwright/test').Page,
 ): Promise<void> => {
@@ -277,8 +285,24 @@ test.describe('Post Type Mapping Validation @slow @e2e', () => {
   test('verifies bricks_template maps to etch_template in database, not page @slow @e2e', async ({ browser }) => {
     test.setTimeout(360_000);
     const env = await createCrossSiteContexts(browser);
+    const sourceCreatedIds: number[] = [];
+    let seededTitle = '';
+    const seedPrefix = buildUniquePrefix('BricksTemplate');
 
     try {
+      const seeded = await createTestContentOnBricks(env.bricksPage, [
+        {
+          title: `${seedPrefix} Source`,
+          content: '<div data-e2e="bricks-template">template payload</div>',
+          post_type: 'bricks_template',
+          meta: {
+            _e2e_seed: seedPrefix,
+          },
+        },
+      ]);
+      sourceCreatedIds.push(...seeded);
+      seededTitle = `${seedPrefix} Source`;
+
       await forceResetWizardState(env.bricksPage);
       await connectWizardWithFreshMigrationUrl(env.bricksPage, env.etchPage);
       await waitForRealDiscoveryComplete(env.bricksPage, 45_000);
@@ -288,11 +312,6 @@ test.describe('Post Type Mapping Validation @slow @e2e', () => {
       const sourceTemplateCount = await getSourcePostTypeCount(env.bricksPage, 'bricks_template');
       test.skip(sourceTemplateCount <= 0, 'No bricks_template entries available on source for mapping validation');
 
-      const before = await verifyPostTypesOnEtch(env.etchPage, [
-        { slug: 'page' },
-        { slug: 'etch_template' },
-      ]);
-
       await setOnlySelectedPostTypes(env.bricksPage, ['bricks_template']);
       await selectPostTypeMappings(env.bricksPage, { bricks_template: 'etch_template' });
       await env.bricksPage.locator('[data-efs-wizard-next]').click({ force: true });
@@ -301,11 +320,47 @@ test.describe('Post Type Mapping Validation @slow @e2e', () => {
       const finalProcessed = Number((finalProgress.progress as { items_processed?: number } | undefined)?.items_processed ?? 0);
       expect(finalProcessed).toBeGreaterThanOrEqual(0);
 
-      const after = await waitForEtchCountIncrease(env.etchPage, before, ['etch_template'], 180_000);
+      await expect
+        .poll(async () => {
+          const rows = await queryEtchDatabase(
+            env.etchPage,
+            `
+              SELECT ID, post_type, post_title
+              FROM wp_posts
+              WHERE post_title LIKE '%${seedPrefix.replace(/'/g, "''")}%'
+              ORDER BY ID DESC
+              LIMIT 20
+            `,
+          );
+          return rows.length;
+        }, { timeout: 180_000 })
+        .toBeGreaterThan(0);
 
-      expect(after.etch_template ?? 0).toBeGreaterThan(before.etch_template ?? 0);
-      expect(after.page ?? 0).toBe(before.page ?? 0);
+      const mappedRows = await queryEtchDatabase(
+        env.etchPage,
+        `
+          SELECT ID, post_type, post_title
+          FROM wp_posts
+          WHERE post_title = '${seededTitle.replace(/'/g, "''")}'
+          ORDER BY ID DESC
+          LIMIT 20
+        `,
+      );
+
+      expect(mappedRows.length).toBeGreaterThan(0);
+      expect(mappedRows.some((row) => String(row.post_type) === 'etch_template')).toBeTruthy();
+      expect(mappedRows.every((row) => String(row.post_type) !== 'page')).toBeTruthy();
+
+      const etchIds = mappedRows
+        .map((row) => Number(row.ID))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      if (etchIds.length > 0) {
+        await cleanupTestContent(env.etchPage, etchIds);
+      }
     } finally {
+      if (sourceCreatedIds.length > 0) {
+        await cleanupTestContent(env.bricksPage, sourceCreatedIds);
+      }
       await env.cleanup();
     }
   });

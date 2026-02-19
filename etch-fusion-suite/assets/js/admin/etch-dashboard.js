@@ -2,6 +2,7 @@ import { post } from './api.js';
 import { setLoading, showToast } from './ui.js';
 
 const ACTION_GENERATE_KEY = 'efs_generate_migration_key';
+const ACTION_REVOKE_KEY = 'efs_revoke_migration_key';
 const DEFAULT_EXPIRY_SECONDS = 8 * 60 * 60;
 
 const formatExpiryLabel = (expiresAt, expirationSeconds) => {
@@ -38,6 +39,15 @@ const fallbackCopy = (value) => {
     return copied;
 };
 
+const fallbackPromptCopy = (value) => {
+    try {
+        window.prompt('Copy migration key:', value);
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
+
 export const copyToClipboard = async (value) => {
     if (!value) {
         return false;
@@ -49,10 +59,32 @@ export const copyToClipboard = async (value) => {
             return true;
         }
     } catch (error) {
-        return fallbackCopy(value);
+        const copiedWithExecCommand = fallbackCopy(value);
+        if (copiedWithExecCommand) {
+            return true;
+        }
+        return fallbackPromptCopy(value);
     }
 
-    return fallbackCopy(value);
+    const copiedWithExecCommand = fallbackCopy(value);
+    if (copiedWithExecCommand) {
+        return true;
+    }
+    return fallbackPromptCopy(value);
+};
+
+const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const withHighlightedKeywords = (value) => {
+    const escaped = escapeHtml(value);
+    return escaped
+        .replace(/\b(password)\b/gi, '<span class="efs-security-highlight">$1</span>')
+        .replace(/\b(passwort)\b/gi, '<span class="efs-security-highlight">$1</span>');
 };
 
 export const showSecurityGuidance = (elements, response = {}) => {
@@ -61,7 +93,12 @@ export const showSecurityGuidance = (elements, response = {}) => {
 
     if (securityNote) {
         const serverNote = response?.treat_as_password_note || 'Treat this key like a password.';
-        securityNote.textContent = serverNote;
+        let html = withHighlightedKeywords(serverNote.trim());
+        if (!/[.!?]$/.test(String(serverNote).trim())) {
+            html += '.';
+        }
+        html += ' Anyone with this key can start migration into this site <span class="efs-security-highlight">until it expires</span>.';
+        securityNote.innerHTML = html;
     }
 
     if (httpsWarning) {
@@ -82,6 +119,9 @@ const revealGeneratedUrl = (elements, expiration = {}) => {
 
     if (elements?.copyActions) {
         elements.copyActions.hidden = false;
+    }
+    if (elements?.revokeButton) {
+        elements.revokeButton.hidden = false;
     }
 
     if (elements?.expiryDisplay) {
@@ -147,7 +187,13 @@ const bindCopyButton = (elements) => {
     }
 
     copyButton.addEventListener('click', async () => {
-        const copied = await copyToClipboard(output.value);
+        const value = output.value || '';
+        if (!value.trim()) {
+            showToast('No migration key available to copy.', 'error');
+            return;
+        }
+
+        const copied = await copyToClipboard(value);
         if (!copied) {
             showToast('Unable to copy key. Copy it manually.', 'error');
             return;
@@ -159,6 +205,60 @@ const bindCopyButton = (elements) => {
         window.setTimeout(() => {
             copyButton.textContent = originalLabel;
         }, 1200);
+    });
+};
+
+const bindRevokeButton = (elements) => {
+    const revokeButton = elements?.revokeButton;
+    const output = elements?.urlOutput;
+    if (!revokeButton || !output) {
+        return;
+    }
+
+    revokeButton.addEventListener('click', async () => {
+        const hasKey = Boolean(output.value?.trim());
+        if (!hasKey) {
+            showToast('No active migration key to revoke.', 'info');
+            return;
+        }
+
+        const confirmed = window.confirm('Revoke the current migration key now?');
+        if (!confirmed) {
+            return;
+        }
+
+        setLoading(revokeButton, true);
+        revokeButton.classList.add('is-loading');
+
+        try {
+            await post(ACTION_REVOKE_KEY);
+            output.value = '';
+
+            if (elements.generatedUrlWrapper) {
+                elements.generatedUrlWrapper.hidden = true;
+            }
+            if (elements.copyActions) {
+                elements.copyActions.hidden = true;
+            }
+            if (elements.revokeButton) {
+                elements.revokeButton.hidden = true;
+            }
+            if (elements.expiryDisplay) {
+                elements.expiryDisplay.hidden = true;
+                elements.expiryDisplay.textContent = '';
+            }
+            if (elements.generateButton) {
+                const generateLabel = elements.generateButton.getAttribute('data-efs-generate-label') || 'Generate';
+                elements.generateButton.textContent = generateLabel;
+            }
+
+            showToast('Migration key revoked.', 'success');
+        } catch (error) {
+            showToast(error?.message || 'Unable to revoke migration key.', 'error');
+        } finally {
+            setLoading(revokeButton, false);
+            revokeButton.classList.remove('is-loading');
+        }
     });
 };
 
@@ -178,6 +278,7 @@ export const initEtchDashboard = () => {
         generatedUrlWrapper: root.querySelector('[data-efs-generated-url-wrapper]'),
         copyActions: root.querySelector('[data-efs-copy-url-actions]'),
         copyButton: root.querySelector('[data-efs-copy-migration-url]'),
+        revokeButton: root.querySelector('[data-efs-revoke-migration-url]'),
         urlOutput: root.querySelector('[data-efs-generated-migration-url]'),
         securityNote: root.querySelector('[data-efs-security-note]'),
         httpsWarning: root.querySelector('[data-efs-https-warning]'),
@@ -185,9 +286,24 @@ export const initEtchDashboard = () => {
     };
 
     bindCopyButton(elements);
+    bindRevokeButton(elements);
 
-    if (elements.urlOutput?.value?.trim()) {
+    const hasKey = Boolean(elements.urlOutput?.value?.trim());
+    if (hasKey) {
         revealGeneratedUrl(elements);
+    } else {
+        if (elements.generatedUrlWrapper) {
+            elements.generatedUrlWrapper.hidden = true;
+        }
+        if (elements.copyActions) {
+            elements.copyActions.hidden = true;
+        }
+        if (elements.revokeButton) {
+            elements.revokeButton.hidden = true;
+        }
+        if (elements.expiryDisplay) {
+            elements.expiryDisplay.hidden = true;
+        }
     }
 
     form.addEventListener('submit', async (event) => {

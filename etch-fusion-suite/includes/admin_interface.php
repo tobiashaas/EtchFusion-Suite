@@ -60,6 +60,15 @@ class EFS_Admin_Interface {
 			return;
 		}
 
+		// Google Font: Space Grotesk (used by admin UI)
+		$font_url = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap';
+		wp_enqueue_style(
+			'efs-google-font-space-grotesk',
+			$font_url,
+			array(),
+			null
+		);
+
 		// Enqueue admin CSS
 		$css_path = ETCH_FUSION_SUITE_DIR . 'assets/css/admin.css';
 		if ( file_exists( $css_path ) ) {
@@ -71,7 +80,7 @@ class EFS_Admin_Interface {
 			wp_enqueue_style(
 				'efs-admin-css',
 				ETCH_FUSION_SUITE_URL . 'assets/css/admin.css',
-				array(),
+				array( 'efs-google-font-space-grotesk' ),
 				$css_version
 			);
 		}

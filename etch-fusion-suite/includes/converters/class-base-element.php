@@ -34,6 +34,13 @@ abstract class EFS_Base_Element {
 	protected $pending_acss_inline_css = '';
 
 	/**
+	 * Current Bricks element being converted (used for class-preservation helpers).
+	 *
+	 * @var array
+	 */
+	protected $current_element = array();
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( $style_map = array() ) {
@@ -57,7 +64,8 @@ abstract class EFS_Base_Element {
 	 * @return array Style IDs
 	 */
 	protected function get_style_ids( $element ) {
-		$style_ids = array();
+		$style_ids                     = array();
+		$this->current_element         = is_array( $element ) ? $element : array();
 		$this->pending_acss_inline_css = $this->build_acss_inline_css( $element );
 
 		// Get Global Classes from settings
@@ -101,7 +109,66 @@ abstract class EFS_Base_Element {
 			}
 		}
 
+		// Preserve ACSS background utility classes on elements (e.g. bg--ultra-light).
+		$classes = array_merge( $classes, $this->get_preserved_acss_background_classes() );
+
+		$classes = array_values( array_unique( array_filter( $classes ) ) );
+
 		return implode( ' ', $classes );
+	}
+
+	/**
+	 * Collect ACSS background utility class names attached to the current element.
+	 *
+	 * @return array<int,string>
+	 */
+	protected function get_preserved_acss_background_classes() {
+		$classes = array();
+
+		$element = is_array( $this->current_element ) ? $this->current_element : array();
+		if ( empty( $element['settings']['_cssGlobalClasses'] ) || ! is_array( $element['settings']['_cssGlobalClasses'] ) ) {
+			return $classes;
+		}
+
+		static $class_name_by_id = null;
+		if ( null === $class_name_by_id ) {
+			$class_name_by_id = array();
+			$global_classes   = get_option( 'bricks_global_classes', array() );
+			if ( is_string( $global_classes ) ) {
+				$decoded = json_decode( $global_classes, true );
+				if ( is_array( $decoded ) ) {
+					$global_classes = $decoded;
+				}
+			}
+
+			if ( is_array( $global_classes ) ) {
+				foreach ( $global_classes as $class_data ) {
+					if ( ! is_array( $class_data ) || empty( $class_data['id'] ) ) {
+						continue;
+					}
+					$id   = trim( (string) $class_data['id'] );
+					$name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+					if ( '' === $id || '' === $name ) {
+						continue;
+					}
+					$class_name_by_id[ $id ] = ltrim( preg_replace( '/^acss_import_/', '', $name ), '.' );
+				}
+			}
+		}
+
+		foreach ( $element['settings']['_cssGlobalClasses'] as $class_id ) {
+			$id = is_scalar( $class_id ) ? trim( (string) $class_id ) : '';
+			if ( '' === $id || empty( $class_name_by_id[ $id ] ) ) {
+				continue;
+			}
+
+			$name = (string) $class_name_by_id[ $id ];
+			if ( 0 === strpos( $name, 'bg--' ) ) {
+				$classes[] = $name;
+			}
+		}
+
+		return $classes;
 	}
 
 	/**
@@ -125,14 +192,15 @@ abstract class EFS_Base_Element {
 	protected function get_tag( $element, $fallback_tag = 'div' ) {
 		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
 		$tag      = $settings['tag'] ?? $fallback_tag;
+		$custom_tag = isset( $settings['customTag'] ) && is_string( $settings['customTag'] ) ? trim( $settings['customTag'] ) : '';
 
 		if ( ! is_string( $tag ) || '' === trim( $tag ) ) {
 			return (string) $fallback_tag;
 		}
 
 		$tag = strtolower( trim( $tag ) );
-		if ( 'custom' === $tag && ! empty( $settings['customTag'] ) && is_string( $settings['customTag'] ) ) {
-			$tag = strtolower( trim( $settings['customTag'] ) );
+		if ( 'custom' === $tag && '' !== $custom_tag ) {
+			$tag = strtolower( $custom_tag );
 		}
 
 		if ( '' === $tag || ! preg_match( '/^[a-z][a-z0-9-]*$/', $tag ) ) {
@@ -152,8 +220,8 @@ abstract class EFS_Base_Element {
 	 * @return array Block attributes
 	 */
 	protected function build_attributes( $label, $style_ids, $etch_attributes, $tag = 'div', $element = array() ) {
-		$etch_attributes = $this->merge_pending_acss_inline_style( $etch_attributes, $element );
-		$label           = $this->sanitize_label( $label, ucfirst( $this->element_type ) );
+		$etch_attributes   = $this->merge_pending_acss_inline_style( $etch_attributes, $element );
+		$label             = $this->sanitize_label( $label, ucfirst( $this->element_type ) );
 		$custom_attributes = $this->extract_custom_attributes( $element );
 		if ( ! empty( $custom_attributes ) ) {
 			$etch_attributes = array_merge( $custom_attributes, (array) $etch_attributes );
@@ -229,7 +297,7 @@ abstract class EFS_Base_Element {
 		$existing = isset( $etch_attributes['style'] ) && is_scalar( $etch_attributes['style'] )
 			? trim( (string) $etch_attributes['style'] )
 			: '';
-		$pending = trim( (string) $this->pending_acss_inline_css );
+		$pending  = trim( (string) $this->pending_acss_inline_css );
 
 		if ( '' !== $existing && ';' !== substr( $existing, -1 ) ) {
 			$existing .= ';';
@@ -244,7 +312,7 @@ abstract class EFS_Base_Element {
 			return $etch_attributes;
 		}
 
-		$etch_attributes['style'] = trim( $existing . ' ' . $pending );
+		$etch_attributes['style']      = trim( $existing . ' ' . $pending );
 		$this->pending_acss_inline_css = '';
 
 		return $etch_attributes;
@@ -322,6 +390,68 @@ abstract class EFS_Base_Element {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Ensure Bricks block elements preserve their flex-column display.
+	 *
+	 * Bricks automatically adds `display: flex; flex-direction: column;` to every
+	 * `block`-type element via the built-in `brxe-block` class. Since that class is
+	 * not a user-defined global class it is not migrated to Etch. This method detects
+	 * when no display property is already defined for the element's associated styles
+	 * and appends the equivalent declarations.
+	 *
+	 * @param array $style_ids       Etch style IDs resolved for the element.
+	 * @param array $etch_attributes Current attribute array being built.
+	 * @param array $element         Source Bricks element data.
+	 * @return array Updated attributes.
+	 */
+	protected function apply_brxe_block_display( array $style_ids, array $etch_attributes, array $element ) {
+		// Check if any resolved Etch style already defines a display property.
+		$etch_styles = get_option( 'etch_styles', array() );
+		$etch_styles = is_array( $etch_styles ) ? $etch_styles : array();
+
+		foreach ( $style_ids as $style_id ) {
+			if ( ! is_scalar( $style_id ) || '' === $style_id ) {
+				continue;
+			}
+			$css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
+				? (string) $etch_styles[ $style_id ]['css'] : '';
+			if ( preg_match( '/\bdisplay\s*:/i', $css ) ) {
+				return $etch_attributes;
+			}
+		}
+
+		// Check existing inline style.
+		$current_style = isset( $etch_attributes['style'] ) && is_scalar( $etch_attributes['style'] )
+			? trim( (string) $etch_attributes['style'] ) : '';
+		if ( preg_match( '/\bdisplay\s*:/i', $current_style ) ) {
+			return $etch_attributes;
+		}
+
+		// Respect explicit display set in Bricks element settings.
+		$settings       = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$bricks_display = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
+		if ( in_array( $bricks_display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true ) ) {
+			return $etch_attributes;
+		}
+
+		$declarations = 'display: flex; flex-direction: column;';
+
+		// Prefer patching the primary neighbor style over using an inline declaration.
+		$target_style_id = $this->resolve_single_neighbor_style_id( $element );
+		if ( '' !== $target_style_id ) {
+			$this->append_declarations_to_style_id( $target_style_id, $declarations );
+			return $etch_attributes;
+		}
+
+		// Fall back to an inline style attribute.
+		if ( '' !== $current_style && ';' !== substr( rtrim( $current_style ), -1 ) ) {
+			$current_style .= ';';
+		}
+		$etch_attributes['style'] = trim( $current_style . ' ' . $declarations );
+
+		return $etch_attributes;
 	}
 
 	/**
@@ -424,7 +554,7 @@ abstract class EFS_Base_Element {
 
 		static $acss_names = null;
 		if ( null === $acss_names ) {
-			$acss_names      = array();
+			$acss_names     = array();
 			$global_classes = get_option( 'bricks_global_classes', array() );
 			if ( is_string( $global_classes ) ) {
 				$decoded = json_decode( $global_classes, true );

@@ -217,6 +217,26 @@ class EFS_Error_Handler {
 			'description' => 'Media files migration process completed',
 			'solution'    => 'Review migration results for any failed files',
 		),
+		'W005' => array(
+			'title'       => 'Dynamic Data Tag Not Mappable',
+			'description' => 'Bricks dynamic data tag has no Etch equivalent; raw syntax preserved',
+			'solution'    => 'Manually update the dynamic data reference in Etch',
+		),
+		'W006' => array(
+			'title'       => '.brxe-block Display Fallback Applied',
+			'description' => 'Layout fallback fired for .brxe-block; check migrated layout',
+			'solution'    => 'Review the migrated element display and flex-direction settings',
+		),
+		'W007' => array(
+			'title'       => 'Loop Not Converted',
+			'description' => 'Unsupported Bricks loop query shape; placeholder inserted',
+			'solution'    => 'Manually recreate loop query in Etch',
+		),
+		'W008' => array(
+			'title'       => 'Condition Not Converted',
+			'description' => 'Unsupported Bricks condition; placeholder inserted',
+			'solution'    => 'Manually recreate condition logic in Etch',
+		),
 	);
 
 	/**
@@ -338,6 +358,21 @@ class EFS_Error_Handler {
 		if ( count( $log ) > 1000 ) {
 			$log = array_slice( $log, -1000 );
 		}
+
+		// Apply 10-day retention: remove entries older than 10 days.
+		$cutoff = time() - ( 10 * DAY_IN_SECONDS );
+		$log    = array_values(
+			array_filter(
+				$log,
+				function ( $entry ) use ( $cutoff ) {
+					if ( ! isset( $entry['timestamp'] ) ) {
+						return true; // Keep entries without timestamps to avoid data loss.
+					}
+					$ts = strtotime( (string) $entry['timestamp'] );
+					return false === $ts || $ts >= $cutoff;
+				}
+			)
+		);
 
 		update_option( 'efs_migration_log', $log );
 	}

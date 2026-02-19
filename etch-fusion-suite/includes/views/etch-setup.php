@@ -72,32 +72,33 @@ if (
 		}
 	}
 
-	// When no key was just generated (e.g. on page load/refresh), show the current stored key if still valid.
-	if ( '' === $etch_fusion_suite_generated_url
-		&& function_exists( 'etch_fusion_suite_container' )
-		&& etch_fusion_suite_container()->has( 'token_manager' )
-	) {
-		$etch_fusion_suite_token_manager = etch_fusion_suite_container()->get( 'token_manager' );
-		$etch_fusion_suite_current       = $etch_fusion_suite_token_manager->get_current_migration_display_data();
-		if ( ! empty( $etch_fusion_suite_current['migration_url'] ) ) {
-			$etch_fusion_suite_generated_url = (string) $etch_fusion_suite_current['migration_url'];
-			$etch_fusion_suite_expires_at    = isset( $etch_fusion_suite_current['expires_at'] ) ? (string) $etch_fusion_suite_current['expires_at'] : '';
-			$etch_fusion_suite_secs          = isset( $etch_fusion_suite_current['expiration_seconds'] ) ? (int) $etch_fusion_suite_current['expiration_seconds'] : 0;
-			$etch_fusion_suite_hours         = max( 1, (int) round( $etch_fusion_suite_secs / 3600 ) );
-			$etch_fusion_suite_relative_expiry = sprintf(
-				/* translators: %d: hour count */
-				_n( 'Expires in %d hour.', 'Expires in %d hours.', $etch_fusion_suite_hours, 'etch-fusion-suite' ),
-				$etch_fusion_suite_hours
-			);
-			$etch_fusion_suite_expires_label = '' !== $etch_fusion_suite_expires_at
-				? sprintf(
-					/* translators: 1: relative expiry label, 2: expiration date/time text from server */
-					__( '%1$s (at %2$s).', 'etch-fusion-suite' ),
-					$etch_fusion_suite_relative_expiry,
-					$etch_fusion_suite_expires_at
-				)
-				: $etch_fusion_suite_relative_expiry;
-		}
+}
+
+// Show currently active key (if still valid), including after regular page reload.
+if ( '' === $etch_fusion_suite_generated_url
+	&& function_exists( 'etch_fusion_suite_container' )
+	&& etch_fusion_suite_container()->has( 'token_manager' )
+) {
+	$etch_fusion_suite_token_manager = etch_fusion_suite_container()->get( 'token_manager' );
+	$etch_fusion_suite_current       = $etch_fusion_suite_token_manager->get_current_migration_display_data();
+	if ( ! empty( $etch_fusion_suite_current['migration_url'] ) ) {
+		$etch_fusion_suite_generated_url = (string) $etch_fusion_suite_current['migration_url'];
+		$etch_fusion_suite_expires_at    = isset( $etch_fusion_suite_current['expires_at'] ) ? (string) $etch_fusion_suite_current['expires_at'] : '';
+		$etch_fusion_suite_secs          = isset( $etch_fusion_suite_current['expiration_seconds'] ) ? (int) $etch_fusion_suite_current['expiration_seconds'] : 0;
+		$etch_fusion_suite_hours         = max( 1, (int) round( $etch_fusion_suite_secs / 3600 ) );
+		$etch_fusion_suite_relative_expiry = sprintf(
+			/* translators: %d: hour count */
+			_n( 'Expires in %d hour.', 'Expires in %d hours.', $etch_fusion_suite_hours, 'etch-fusion-suite' ),
+			$etch_fusion_suite_hours
+		);
+		$etch_fusion_suite_expires_label = '' !== $etch_fusion_suite_expires_at
+			? sprintf(
+				/* translators: 1: relative expiry label, 2: expiration date/time text from server */
+				__( '%1$s (at %2$s).', 'etch-fusion-suite' ),
+				$etch_fusion_suite_relative_expiry,
+				$etch_fusion_suite_expires_at
+			)
+			: $etch_fusion_suite_relative_expiry;
 	}
 }
 ?>
@@ -128,6 +129,7 @@ if (
 					type="submit"
 					class="button button-primary"
 					data-efs-generate-migration-url
+					data-efs-generate-label="<?php esc_attr_e( 'Generate', 'etch-fusion-suite' ); ?>"
 					data-efs-regenerate-label="<?php esc_attr_e( 'Regenerate', 'etch-fusion-suite' ); ?>"
 					aria-label="<?php esc_attr_e( 'Generate migration key', 'etch-fusion-suite' ); ?>"
 				>
@@ -145,7 +147,8 @@ if (
 			<?php endif; ?>
 		</div>
 
-		<div class="efs-etch-dashboard__block efs-field efs-etch-dashboard__generated-url" data-efs-generated-url-wrapper<?php echo '' === $etch_fusion_suite_generated_url ? ' hidden' : ''; ?>>
+		<?php $etch_fusion_suite_has_key = '' !== trim( (string) $etch_fusion_suite_generated_url ); ?>
+		<div class="efs-etch-dashboard__block efs-field efs-etch-dashboard__generated-url" data-efs-generated-url-wrapper<?php echo $etch_fusion_suite_has_key ? '' : ' hidden'; ?>>
 			<h3 class="efs-etch-dashboard__block-title"><?php esc_html_e( 'Migration Key', 'etch-fusion-suite' ); ?></h3>
 			<label for="efs-generated-migration-url" class="efs-etch-dashboard__block-desc"><?php esc_html_e( 'Share this key with the Bricks site', 'etch-fusion-suite' ); ?></label>
 			<textarea
@@ -164,6 +167,15 @@ if (
 					aria-label="<?php esc_attr_e( 'Copy migration key', 'etch-fusion-suite' ); ?>"
 				>
 					<?php esc_html_e( 'Copy Key', 'etch-fusion-suite' ); ?>
+				</button>
+				<button
+					type="button"
+					class="button efs-revoke-key-btn"
+					data-efs-revoke-migration-url
+					<?php echo $etch_fusion_suite_has_key ? '' : ' hidden'; ?>
+					aria-label="<?php esc_attr_e( 'Revoke migration key', 'etch-fusion-suite' ); ?>"
+				>
+					<?php esc_html_e( 'Revoke Key', 'etch-fusion-suite' ); ?>
 				</button>
 			</div>
 			<p class="efs-etch-dashboard__url-note" data-efs-security-note>

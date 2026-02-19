@@ -30,7 +30,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 	public function convert( $element, $children = array(), $context = array() ) {
 		$style_ids   = $this->get_style_ids( $element );
 		$css_classes = $this->get_css_classes( $style_ids );
-		$tag         = strtolower( $this->get_tag( $element, 'h2' ) );
+		$tag         = strtolower( $this->get_tag( $element, 'h3' ) );
 		$label       = $this->get_label( $element );
 		$text        = $element['settings']['text'] ?? 'Heading';
 		$text        = is_string( $text ) ? $text : 'Heading';
@@ -40,7 +40,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		$inner_block = '';
 
 		if ( ! in_array( $tag, $valid_tags, true ) ) {
-			$tag = 'h2';
+			$tag = 'h3';
 		}
 
 		$etch_attributes = array();

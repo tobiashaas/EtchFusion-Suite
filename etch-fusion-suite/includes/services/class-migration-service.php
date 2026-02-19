@@ -61,6 +61,9 @@ class EFS_Migration_Service {
 	/** @var Migration_Repository_Interface */
 	private $migration_repository;
 
+	/** @var \Bricks2Etch\Repositories\EFS_Migration_Runs_Repository|null */
+	private $migration_runs_repository;
+
 	/**
 	 * @param EFS_Error_Handler                $error_handler
 	 * @param EFS_Plugin_Detector              $plugin_detector
@@ -72,6 +75,7 @@ class EFS_Migration_Service {
 	 * @param EFS_Migrator_Registry            $migrator_registry
 	 * @param Migration_Repository_Interface   $migration_repository
 	 * @param \Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager
+	 * @param \Bricks2Etch\Repositories\EFS_Migration_Runs_Repository|null $migration_runs_repository
 	 */
 	public function __construct(
 		EFS_Error_Handler $error_handler,
@@ -83,18 +87,31 @@ class EFS_Migration_Service {
 		EFS_API_Client $api_client,
 		EFS_Migrator_Registry $migrator_registry,
 		Migration_Repository_Interface $migration_repository,
-		?\Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager = null
+		?\Bricks2Etch\Core\EFS_Migration_Token_Manager $token_manager = null,
+		?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null
 	) {
-		$this->error_handler        = $error_handler;
-		$this->plugin_detector      = $plugin_detector;
-		$this->content_parser       = $content_parser;
-		$this->css_service          = $css_service;
-		$this->media_service        = $media_service;
-		$this->content_service      = $content_service;
-		$this->api_client           = $api_client;
-		$this->migrator_registry    = $migrator_registry;
-		$this->migration_repository = $migration_repository;
-		$this->token_manager        = $token_manager;
+		$this->error_handler             = $error_handler;
+		$this->plugin_detector           = $plugin_detector;
+		$this->content_parser            = $content_parser;
+		$this->css_service               = $css_service;
+		$this->media_service             = $media_service;
+		$this->content_service           = $content_service;
+		$this->api_client                = $api_client;
+		$this->migrator_registry         = $migrator_registry;
+		$this->migration_repository      = $migration_repository;
+		$this->token_manager             = $token_manager;
+		$this->migration_runs_repository = $migration_runs_repository;
+
+		if ( null === $this->migration_runs_repository && function_exists( 'etch_fusion_suite_container' ) ) {
+			try {
+				$container = etch_fusion_suite_container();
+				if ( $container->has( 'migration_runs_repository' ) ) {
+					$this->migration_runs_repository = $container->get( 'migration_runs_repository' );
+				}
+			} catch ( \Exception $e ) {
+				// Silently fail if container not available.
+			}
+		}
 	}
 
 	/**
@@ -166,6 +183,7 @@ class EFS_Migration_Service {
 				);
 				$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 				$this->update_progress( 'error', $current_percentage, $error_message );
+				$this->write_failed_run_record( $migration_id, $error_message );
 				$this->store_active_migration( array() );
 
 				return new \WP_Error( 'validation_failed', $error_message );
@@ -215,10 +233,11 @@ class EFS_Migration_Service {
 			if ( is_wp_error( $posts_result ) ) {
 				return $posts_result;
 			}
-			$posts_total_sync   = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
+			$posts_total_sync    = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
 			$posts_migrated_sync = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
 			if ( $posts_total_sync > 0 && $posts_migrated_sync === 0 ) {
 				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
+				$this->write_failed_run_record( $migration_id, __( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' ) );
 				$this->store_active_migration( array() );
 				return new \WP_Error(
 					'posts_migration_failed',
@@ -252,7 +271,7 @@ class EFS_Migration_Service {
 					'posts' => $posts_result,
 				),
 			);
-		} catch ( \Exception $exception ) {
+		} catch ( \Throwable $exception ) {
 			$error_message = sprintf(
 				'Migration process failed: %s (File: %s, Line: %d)',
 				$exception->getMessage(),
@@ -273,6 +292,7 @@ class EFS_Migration_Service {
 
 			$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 			$this->update_progress( 'error', $current_percentage, $error_message );
+			$this->write_failed_run_record( isset( $migration_id ) ? $migration_id : '', $error_message );
 			$this->store_active_migration( array() );
 
 			return new \WP_Error( 'migration_failed', $error_message );
@@ -339,7 +359,7 @@ class EFS_Migration_Service {
 				'completed'   => false,
 				'message'     => __( 'Migration started.', 'etch-fusion-suite' ),
 			);
-		} catch ( \Exception $exception ) {
+		} catch ( \Throwable $exception ) {
 			$error_message = sprintf(
 				'Migration start failed: %s (File: %s, Line: %d)',
 				$exception->getMessage(),
@@ -376,6 +396,7 @@ class EFS_Migration_Service {
 				$this->error_handler->log_error( 'E103', array( 'validation_errors' => $validation_result['errors'], 'action' => 'Target site validation failed' ) );
 				$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 				$this->update_progress( 'error', $current_percentage, $error_message );
+				$this->write_failed_run_record( $migration_id, $error_message );
 				$this->store_active_migration( array() );
 				return new \WP_Error( 'validation_failed', $error_message );
 			}
@@ -425,9 +446,10 @@ class EFS_Migration_Service {
 				return $posts_result;
 			}
 			$posts_total    = isset( $posts_result['total'] ) ? (int) $posts_result['total'] : 0;
-			$posts_migrated  = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
+			$posts_migrated = isset( $posts_result['migrated'] ) ? (int) $posts_result['migrated'] : 0;
 			if ( $posts_total > 0 && $posts_migrated === 0 ) {
 				$this->update_progress( 'error', 80, __( 'No posts could be transferred to the target site.', 'etch-fusion-suite' ) );
+				$this->write_failed_run_record( $migration_id, __( 'No posts could be transferred. Check the connection to the target site, the migration key, and that Page/Post types are mapped correctly.', 'etch-fusion-suite' ) );
 				$this->store_active_migration( array() );
 				return new \WP_Error(
 					'posts_migration_failed',
@@ -444,9 +466,9 @@ class EFS_Migration_Service {
 			$this->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
 			$this->store_active_migration( array() );
 
-			$migration_stats                   = $this->migration_repository->get_stats();
-			$migration_stats['last_migration']  = current_time( 'mysql' );
-			$migration_stats['status']         = 'completed';
+			$migration_stats                  = $this->migration_repository->get_stats();
+			$migration_stats['last_migration'] = current_time( 'mysql' );
+			$migration_stats['status']        = 'completed';
 			$this->migration_repository->save_stats( $migration_stats );
 
 			return array(
@@ -461,7 +483,7 @@ class EFS_Migration_Service {
 					'posts' => $posts_result,
 				),
 			);
-		} catch ( \Exception $exception ) {
+		} catch ( \Throwable $exception ) {
 			$error_message = sprintf(
 				'Migration process failed: %s (File: %s, Line: %d)',
 				$exception->getMessage(),
@@ -471,6 +493,7 @@ class EFS_Migration_Service {
 			$this->error_handler->log_error( 'E201', array( 'message' => $exception->getMessage(), 'action' => 'run_migration_execution' ) );
 			$current_percentage = isset( $this->get_progress_data()['percentage'] ) ? (int) $this->get_progress_data()['percentage'] : 0;
 			$this->update_progress( 'error', $current_percentage, $error_message );
+			$this->write_failed_run_record( $migration_id, $error_message );
 			$this->store_active_migration( array() );
 			return new \WP_Error( 'migration_failed', $error_message );
 		}
@@ -954,9 +977,9 @@ class EFS_Migration_Service {
 	}
 
 	/**
-	 * Finalize migration.
+	 * Finalize migration and persist a run record.
 	 *
-	 * @param array $results
+	 * @param array $results Posts migration results (total, migrated).
 	 *
 	 * @return true|\WP_Error
 	 */
@@ -969,7 +992,231 @@ class EFS_Migration_Service {
 			)
 		);
 
+		if ( ! $this->migration_runs_repository ) {
+			return true;
+		}
+
+		$progress_data = $this->get_progress_data();
+		$active        = $this->migration_repository->get_active_migration();
+		$migration_id  = isset( $progress_data['migrationId'] ) ? (string) $progress_data['migrationId'] : '';
+		$started_at    = isset( $progress_data['started_at'] ) ? (string) $progress_data['started_at'] : '';
+		$completed_at  = current_time( 'mysql' );
+		$target_url    = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
+		$options       = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+
+		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
+			? $options['post_type_mappings']
+			: array();
+
+		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
+
+		$started_ts = $started_at ? strtotime( $started_at ) : 0;
+		$all_log    = get_option( 'efs_migration_log', array() );
+		$all_log    = is_array( $all_log ) ? $all_log : array();
+
+		$warnings = array_filter(
+			$all_log,
+			function ( $entry ) use ( $started_ts ) {
+				if ( ! is_array( $entry ) || 'warning' !== ( $entry['type'] ?? '' ) ) {
+					return false;
+				}
+				if ( $started_ts <= 0 ) {
+					return true;
+				}
+				$ts = isset( $entry['timestamp'] ) ? strtotime( $entry['timestamp'] ) : false;
+				return false !== $ts && $ts >= $started_ts;
+			}
+		);
+
+		$errors = array_filter(
+			$all_log,
+			function ( $entry ) use ( $started_ts ) {
+				if ( ! is_array( $entry ) || 'error' !== ( $entry['type'] ?? '' ) ) {
+					return false;
+				}
+				if ( $started_ts <= 0 ) {
+					return true;
+				}
+				$ts = isset( $entry['timestamp'] ) ? strtotime( $entry['timestamp'] ) : false;
+				return false !== $ts && $ts >= $started_ts;
+			}
+		);
+
+		$warnings_count   = count( $warnings );
+		$warnings_summary = $warnings_count > 0
+			? implode( '; ', array_map( function ( $w ) { return isset( $w['title'] ) ? (string) $w['title'] : (string) ( $w['code'] ?? '' ); }, $warnings ) )
+			: null;
+		$errors_summary   = count( $errors ) > 0
+			? implode( '; ', array_map( function ( $e ) { return isset( $e['title'] ) ? (string) $e['title'] : (string) ( $e['code'] ?? '' ); }, $errors ) )
+			: null;
+
+		$status       = $warnings_count > 0 ? 'success_with_warnings' : 'success';
+		$duration_sec = ( $started_ts > 0 ) ? max( 0, time() - $started_ts ) : 0;
+
+		$record = array(
+			'migrationId'            => $migration_id,
+			'timestamp_started_at'   => $started_at,
+			'timestamp_completed_at' => $completed_at,
+			'source_site'            => $target_url,
+			'target_url'             => $target_url,
+			'status'                 => $status,
+			'counts_by_post_type'    => $counts_by_post_type,
+			'post_type_mappings'     => $post_type_mappings,
+			'warnings_count'         => $warnings_count,
+			'warnings_summary'       => $warnings_summary,
+			'errors_summary'         => $errors_summary,
+			'duration_sec'           => $duration_sec,
+		);
+
+		$this->migration_runs_repository->save_run( $record );
+
 		return true;
+	}
+
+	/**
+	 * Build per-post-type migration counts for run records.
+	 *
+	 * @param array $results Posts migration result payload.
+	 * @param array $options Active migration options payload.
+	 * @return array
+	 */
+	private function build_counts_by_post_type( array $results, array $options ): array {
+		$raw_counts = array();
+		if ( isset( $results['counts_by_post_type'] ) && is_array( $results['counts_by_post_type'] ) ) {
+			$raw_counts = $results['counts_by_post_type'];
+		} elseif ( isset( $results['by_post_type'] ) && is_array( $results['by_post_type'] ) ) {
+			$raw_counts = $results['by_post_type'];
+		}
+
+		if ( ! empty( $raw_counts ) ) {
+			$normalized = array();
+			foreach ( $raw_counts as $post_type => $value ) {
+				$key = sanitize_key( (string) $post_type );
+				if ( '' === $key ) {
+					continue;
+				}
+
+				if ( is_array( $value ) ) {
+					$total    = isset( $value['total'] ) ? (int) $value['total'] : ( isset( $value['items_total'] ) ? (int) $value['items_total'] : 0 );
+					$migrated = isset( $value['migrated'] ) ? (int) $value['migrated'] : ( isset( $value['items_processed'] ) ? (int) $value['items_processed'] : $total );
+				} else {
+					$total    = (int) $value;
+					$migrated = (int) $value;
+				}
+
+				$normalized[ $key ] = array(
+					'total'    => max( 0, $total ),
+					'migrated' => max( 0, $migrated ),
+				);
+			}
+
+			if ( ! empty( $normalized ) ) {
+				return $normalized;
+			}
+		}
+
+		$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] )
+			? $options['selected_post_types']
+			: array();
+		$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
+			? $options['post_type_mappings']
+			: array();
+
+		if ( empty( $selected_post_types ) && ! empty( $post_type_mappings ) ) {
+			$selected_post_types = array_keys( $post_type_mappings );
+		}
+
+		$selected_post_types = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'sanitize_key', $selected_post_types ),
+					function ( $slug ) {
+						return '' !== $slug;
+					}
+				)
+			)
+		);
+
+		if ( empty( $selected_post_types ) ) {
+			return array();
+		}
+
+		$all_posts = array_merge(
+			is_array( $this->content_service->get_bricks_posts() ) ? $this->content_service->get_bricks_posts() : array(),
+			is_array( $this->content_service->get_gutenberg_posts() ) ? $this->content_service->get_gutenberg_posts() : array()
+		);
+
+		$totals_by_type = array_fill_keys( $selected_post_types, 0 );
+		foreach ( $all_posts as $post ) {
+			if ( ! is_object( $post ) || ! isset( $post->post_type ) ) {
+				continue;
+			}
+			$post_type = sanitize_key( (string) $post->post_type );
+			if ( isset( $totals_by_type[ $post_type ] ) ) {
+				++$totals_by_type[ $post_type ];
+			}
+		}
+
+		$total_migrated = isset( $results['migrated'] ) ? max( 0, (int) $results['migrated'] ) : 0;
+		$total_selected = array_sum( $totals_by_type );
+		$remaining      = min( $total_migrated, $total_selected );
+		$counts         = array();
+
+		foreach ( $totals_by_type as $post_type => $total ) {
+			$migrated = min( (int) $total, (int) $remaining );
+			$remaining -= $migrated;
+
+			$counts[ $post_type ] = array(
+				'total'    => max( 0, (int) $total ),
+				'migrated' => max( 0, (int) $migrated ),
+			);
+		}
+
+		return $counts;
+	}
+
+	/**
+	 * Write a minimal "failed" run record for error paths before active migration is cleared.
+	 *
+	 * @param string $migration_id   Migration ID (may be empty if error occurred before ID was generated).
+	 * @param string $error_message  Human-readable error message.
+	 * @return void
+	 */
+	private function write_failed_run_record( string $migration_id, string $error_message ): void {
+		if ( ! $this->migration_runs_repository || '' === $migration_id ) {
+			return;
+		}
+
+		$progress_data = $this->get_progress_data();
+		$started_at    = isset( $progress_data['started_at'] ) ? (string) $progress_data['started_at'] : '';
+		$completed_at  = current_time( 'mysql' );
+		$active        = $this->migration_repository->get_active_migration();
+		$target_url    = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
+		$options       = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+
+		$post_type_mappings = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] )
+			? $options['post_type_mappings']
+			: array();
+
+		$started_ts   = $started_at ? strtotime( $started_at ) : 0;
+		$duration_sec = $started_ts > 0 ? max( 0, time() - $started_ts ) : 0;
+
+		$record = array(
+			'migrationId'            => $migration_id,
+			'timestamp_started_at'   => $started_at,
+			'timestamp_completed_at' => $completed_at,
+			'source_site'            => get_site_url(),
+			'target_url'             => $target_url,
+			'status'                 => 'failed',
+			'counts_by_post_type'    => array(),
+			'post_type_mappings'     => $post_type_mappings,
+			'warnings_count'         => 0,
+			'warnings_summary'       => null,
+			'errors_summary'         => $error_message,
+			'duration_sec'           => $duration_sec,
+		);
+
+		$this->migration_runs_repository->save_run( $record );
 	}
 
 	/**

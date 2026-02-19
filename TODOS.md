@@ -2,9 +2,6 @@
 
 ## Completed ✅
 
-- [ ] Nov 04 verification – Framer feature flag alignment
-  - **Added:** 2025-11-04 19:45
-  - **Scope:** JS localization, PHP feature flags, REST gating, admin view guard, test updates
 - [✅] Nov 03 verification – Dashboard test & migration token alignment
   - **Added:** 2025-11-03 19:56
   - **Completed:** 2025-11-03 21:32

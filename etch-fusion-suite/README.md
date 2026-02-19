@@ -766,51 +766,6 @@ Use `docs/admin-dashboard-deployment-checklist.md` for rollout and rollback veri
 3. Upload and activate on both WordPress sites
 4. Configure migration using the JWT-based authentication system
 
-## Framer Template Extraction
-
-The plugin includes experimental support for extracting templates from Framer websites and converting them to Etch-compatible formats.
-
-### PHP-Level Feature Flag
-
-Framer template extraction is disabled by default and must be enabled at the PHP level:
-
-**Enable via wp-config.php**:
-```php
-define( 'EFS_ENABLE_FRAMER', true );
-```
-
-**Enable via Filter**:
-```php
-add_filter( 'efs_enable_framer', '__return_true' );
-```
-
-### Feature Behavior
-
-- **Deployment-Level Decision**: This is a deployment-level configuration, not a user-facing toggle
-- **Templates Tab**: When enabled, a "Templates" tab appears in the Etch admin dashboard
-- **Security**: All endpoints are protected by authentication and CORS validation
-- **Experimental**: This feature is experimental and may change in future releases
-
-### Testing Locally
-
-To test Framer integration locally, add to your `.wp-env.override.json`:
-```json
-{
-  "extra": {
-    "notes": "Set EFS_ENABLE_FRAMER=true to test Framer integration locally"
-  }
-}
-```
-
-Then add to your wp-config.php or use the filter approach above.
-
-### Usage
-
-1. Enable the feature using one of the methods above
-2. Navigate to **Etch Dashboard** → **Etch Fusion Suite** → **Templates** tab
-3. Use the template extraction interface to import Framer designs
-4. Extracted templates will be converted to Etch-compatible formats
-
 ## Code Quality
 
 ### WordPress Coding Standards

@@ -398,74 +398,6 @@ Das Plugin wurde erfolgreich von einer monolithischen 2584-Zeilen-Datei zu einer
 
 ---
 
-## ✅ Phase 8: Framer Template Extraction
-
-### Status: **VOLLSTÄNDIG IMPLEMENTIERT** ✓
-
-#### Achievements:
-
-**Template-Extraction-Pipeline:**
-- ✅ 4-Komponenten-Architektur:
-  1. `EFS_HTML_Parser` - DOMDocument-basiertes HTML-Parsing
-  2. `EFS_Framer_HTML_Sanitizer` - Framer-spezifische DOM-Bereinigung
-  3. `EFS_Framer_Template_Analyzer` - Struktur-Analyse und Komponenten-Erkennung
-  4. `EFS_Etch_Template_Generator` - Etch-Block-Generierung
-
-**HTML-Sanitization:**
-- ✅ Entfernt Framer-Scripts (`framer.com`, `framerusercontent.com`)
-- ✅ Entfernt Hash-Klassen (`framer-xxxxx`)
-- ✅ Entfernt data-framer-* Attribute (außer für Analyse)
-- ✅ Unwrapping von Single-Child-Containern
-- ✅ Semantisierung: div → header, nav, section, footer, p, h1-h6, button
-- ✅ Extrahiert CSS-Variablen (`--framer-*`)
-
-**Template-Analyse:**
-- ✅ Section-Identifikation (Hero, Features, CTA, Footer)
-- ✅ Komponenten-Erkennung (Text, Image, Button, SVG)
-- ✅ Layout-Struktur-Extraktion (Verschachtelungstiefe, Grid/Flex)
-- ✅ Typography-Analyse (Heading-Hierarchie, Font-Families)
-- ✅ Media-Element-Detection
-- ✅ Complexity-Scoring (0-100)
-
-**Etch-Template-Generierung:**
-- ✅ Konvertiert zu Gutenberg-Blöcken mit etchData
-- ✅ Mappt Framer-Komponenten zu Etch-Elementen
-- ✅ Generiert Style-Definitionen aus CSS-Variablen
-- ✅ Erstellt Template-Metadaten (Name, Description, Complexity)
-
-**UI-Integration:**
-- ✅ Neuer "Template Extractor" Tab im Admin Dashboard
-- ✅ Zwei Input-Modi: URL + HTML-String
-- ✅ Live-Progress-Updates während Extraktion
-- ✅ Template-Preview mit Metadata
-- ✅ Saved-Templates-Management (Save, Delete, Import)
-
-**API-Integration:**
-- ✅ 5 REST-Endpoints: `/template/extract`, `/templates`, `/template/{id}`, `/template/{id}/delete`, `/template/{id}/import`
-- ✅ 5 AJAX-Actions: `efs_extract_template`, `efs_get_extraction_progress`, `efs_save_template`, `efs_get_saved_templates`, `efs_delete_template`
-- ✅ Rate-Limiting (10-30 req/min)
-- ✅ Security-Validation + Audit-Logging
-
-**Testing:**
-- ✅ Fixture: `framer-sample.html` (repräsentatives Framer-Template)
-- ✅ 3 Unit-Tests (Service, Sanitizer, Analyzer)
-- ✅ 1 Integration-Test (End-to-End-Pipeline)
-
-### Metriken:
-
-| Metrik | Wert |
-|--------|------|
-| Template-Komponenten | 7 |
-| Interfaces | 3 |
-| Sanitization-Schritte | 6 |
-| Analyse-Dimensionen | 6 |
-| REST-Endpoints | 5 |
-| AJAX-Actions | 5 |
-| Test-Coverage | 4 Tests |
-| Documentation | FRAMER-EXTRACTION.md (umfassend) |
-
----
-
 ## ✅ Bonus: CI/CD Pipeline
 
 ### Status: **VOLLSTÄNDIG IMPLEMENTIERT** ✓
@@ -506,8 +438,8 @@ Das Plugin wurde erfolgreich von einer monolithischen 2584-Zeilen-Datei zu einer
 - ✅ Security-Updates mit höherer Priorität
 
 **Test-Suites:**
-- ✅ Unit-Tests: 7 Test-Klassen (ServiceContainer, Security, Repository, Migrator, FramerHtmlSanitizer, FramerTemplateAnalyzer, TemplateExtractorService)
-- ✅ Integration-Tests: 2 Test-Klassen (Migration, FramerExtraction)
+- ✅ Unit-Tests: 7 Test-Klassen (ServiceContainer, Security, Repository, Migrator, TemplateExtractorService, u. a.)
+- ✅ Integration-Tests: 2 Test-Klassen (Migration, Template Extraction)
 - ✅ E2E-Tests: 1 Test-Klasse (AdminUI)
 - ✅ Performance-Tests: 1 Test-Klasse (MigrationPerformance)
 
@@ -604,14 +536,11 @@ Bricks2Etch\
 │   ├── EFS_Migrator_Registry
 │   ├── EFS_Migrator_Discovery
 │   └── 4 konkrete Migratoren
-├── Templates (10 Klassen)
+├── Templates (7+ Klassen)
 │   ├── Interfaces\ (3 Interfaces)
 │   ├── EFS_HTML_Parser
 │   ├── EFS_HTML_Sanitizer (Base)
-│   ├── EFS_Framer_HTML_Sanitizer
 │   ├── EFS_Template_Analyzer (Base)
-│   ├── EFS_Framer_Template_Analyzer
-│   ├── EFS_Framer_To_Etch_Converter
 │   └── EFS_Etch_Template_Generator
 ├── Parsers (4 Klassen)
 │   ├── EFS_CSS_Converter
@@ -871,15 +800,7 @@ Bricks2Etch\
 **Pipeline-Architektur:**
 - ✓ 4 Komponenten (Parser, Sanitizer, Analyzer, Generator)
 - ✓ 3 Interfaces für Erweiterbarkeit
-- ✓ Framer-spezifische Implementierungen
 - ✓ Orchestriert durch Template Extractor Service
-
-**Framer-Handling:**
-- ✓ Entfernt Framer-Scripts
-- ✓ Entfernt Hash-Klassen
-- ✓ Semantisiert DOM (div → header, nav, section, etc.)
-- ✓ Extrahiert CSS-Variablen
-- ✓ Unwrapping von Single-Child-Containern
 
 **Template-Analyse:**
 - ✓ Section-Identifikation (Hero, Features, CTA, Footer)
@@ -890,7 +811,7 @@ Bricks2Etch\
 
 **Etch-Integration:**
 - ✓ Generiert Gutenberg-Blöcke mit etchData
-- ✓ Mappt Framer-Komponenten zu Etch-Elementen
+- ✓ Mappt Template-Komponenten zu Etch-Elementen
 - ✓ Generiert Style-Definitionen
 - ✓ Speichert Templates als Draft-Posts
 
@@ -1030,12 +951,6 @@ Bricks2Etch\
 - Moderne CSS-Features (color-mix, oklch)
 - Keine inline Styles
 
-### 7. **Framer-Template-Extraktion**
-- Innovatives Feature (nicht in anderen Plugins)
-- 4-Komponenten-Pipeline
-- Intelligente Semantisierung
-- Etch-kompatible Output
-
 ---
 
 ## 📋 Empfehlungen für V1.0.0 Release
@@ -1051,7 +966,7 @@ Bricks2Etch\
 3. **CHANGELOG.md** V1.0.0 Entry hinzufügen
 4. **Manuelle Tests** durchführen:
    - Migration-Workflow (Bricks → Etch)
-   - Template-Extraktion (Framer → Etch)
+   - Template-Extraktion
    - CORS-Validation
    - Rate-Limiting
    - Alle AJAX-Actions
@@ -1086,7 +1001,7 @@ Das Etch Fusion Suite Plugin ist **produktionsreif für V1.0.0 Release**. Die Re
 ✅ **Code-Qualität:** Sauber, konsistent, gut dokumentiert  
 ✅ **Security:** Production-ready mit umfassenden Maßnahmen  
 ✅ **Extensibility:** Plugin-System für Third-Party-Integration  
-✅ **Innovation:** Framer-Template-Extraktion (Unique-Feature)  
+✅ **Innovation:** Template-Extraktion und Etch-Integration  
 ✅ **Developer-Experience:** Exzellent (wp-env, CI/CD, Docs)  
 ✅ **Testing:** Gut strukturiert (4 Suites, 11 Klassen)  
 ✅ **CI/CD:** Vollständig automatisiert  
