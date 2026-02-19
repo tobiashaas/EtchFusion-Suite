@@ -1509,9 +1509,9 @@ class EFS_Gutenberg_Generator {
 			'post_status'    => 'publish',
 		);
 
-		// Attachment loops in Etch expect `published` status.
+		// Attachments use regular WP post status here.
 		if ( 'attachment' === $post_type ) {
-			$args['post_status'] = 'published';
+			$args['post_status'] = 'publish';
 		}
 
 		if ( isset( $query['posts_per_page'] ) && is_scalar( $query['posts_per_page'] ) && '' !== trim( (string) $query['posts_per_page'] ) ) {
