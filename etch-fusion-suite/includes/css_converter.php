@@ -100,21 +100,172 @@ class EFS_CSS_Converter {
 	 * @return string|false Media query or false if unknown
 	 */
 	private function get_media_query_for_breakpoint( $breakpoint ) {
-		// Keep Bricks desktop-first cascade semantics:
-		// - tablet_landscape applies up to 1199px
-		// - tablet_portrait applies up to 991px
-		// - mobile_landscape applies up to 767px
-		// - mobile_portrait applies up to 478px
-		// Desktop remains explicit for 1200px+ overrides when present.
-		$breakpoints = array(
-			'desktop'          => '@media (width >= to-rem(1200px))',
-			'tablet_landscape' => '@media (width <= to-rem(1199px))',
-			'tablet_portrait'  => '@media (width <= to-rem(991px))',
-			'mobile_landscape' => '@media (width <= to-rem(767px))',
-			'mobile_portrait'  => '@media (width <= to-rem(478px))',
+		$queries = $this->get_breakpoint_media_query_map( true );
+		if ( ! isset( $queries[ $breakpoint ] ) ) {
+			return false;
+		}
+
+		return '@media ' . $queries[ $breakpoint ];
+	}
+
+	/**
+	 * Resolve Bricks breakpoint width map (including custom breakpoints).
+	 *
+	 * @return array<string,array<string,int|string>>
+	 */
+	private function get_breakpoint_width_map() {
+		$definitions = array(
+			'tablet_landscape' => array(
+				'type'  => 'max',
+				'width' => 1199,
+			),
+			'tablet_portrait'  => array(
+				'type'  => 'max',
+				'width' => 991,
+			),
+			'mobile_landscape' => array(
+				'type'  => 'max',
+				'width' => 767,
+			),
+			'mobile_portrait'  => array(
+				'type'  => 'max',
+				'width' => 478,
+			),
+			'desktop'          => array(
+				'type'  => 'min',
+				'width' => 1200,
+			),
 		);
 
-		return isset( $breakpoints[ $breakpoint ] ) ? $breakpoints[ $breakpoint ] : false;
+		$raw_breakpoints = function_exists( 'get_option' ) ? get_option( 'bricks_breakpoints', array() ) : array();
+		if ( is_string( $raw_breakpoints ) ) {
+			$decoded = json_decode( $raw_breakpoints, true );
+			if ( is_array( $decoded ) ) {
+				$raw_breakpoints = $decoded;
+			}
+		}
+
+		if ( is_array( $raw_breakpoints ) ) {
+			foreach ( $raw_breakpoints as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+
+				$key = isset( $item['key'] ) ? $this->sanitize_breakpoint_key( (string) $item['key'] ) : '';
+				if ( '' === $key ) {
+					continue;
+				}
+
+				$width = isset( $item['width'] ) ? (int) $item['width'] : 0;
+				if ( $width <= 0 ) {
+					continue;
+				}
+
+				if ( 'desktop' === $key || ! empty( $item['base'] ) ) {
+					$definitions['desktop'] = array(
+						'type'  => 'min',
+						'width' => $width + 1,
+					);
+					continue;
+				}
+
+				$definitions[ $key ] = array(
+					'type'  => 'max',
+					'width' => $width,
+				);
+			}
+		}
+
+		$desktop_definition = isset( $definitions['desktop'] ) ? $definitions['desktop'] : null;
+		unset( $definitions['desktop'] );
+
+		uasort(
+			$definitions,
+			static function ( $a, $b ) {
+				$a_width = isset( $a['width'] ) ? (int) $a['width'] : 0;
+				$b_width = isset( $b['width'] ) ? (int) $b['width'] : 0;
+				return $b_width <=> $a_width;
+			}
+		);
+
+		if ( is_array( $desktop_definition ) ) {
+			$definitions = array_merge( array( 'desktop' => $desktop_definition ), $definitions );
+		}
+
+		return $definitions;
+	}
+
+	/**
+	 * Build media query strings for all registered breakpoints.
+	 *
+	 * @param bool $etch_syntax When true, use Etch range syntax with to-rem().
+	 * @return array<string,string>
+	 */
+	private function get_breakpoint_media_query_map( $etch_syntax = false ) {
+		$definitions = $this->get_breakpoint_width_map();
+		$queries     = array();
+
+		foreach ( $definitions as $key => $definition ) {
+			$width = isset( $definition['width'] ) ? (int) $definition['width'] : 0;
+			$type  = isset( $definition['type'] ) ? (string) $definition['type'] : 'max';
+			if ( $width <= 0 ) {
+				continue;
+			}
+
+			if ( $etch_syntax ) {
+				$queries[ $key ] = 'min' === $type
+					? '(width >= to-rem(' . $width . 'px))'
+					: '(width <= to-rem(' . $width . 'px))';
+				continue;
+			}
+
+			$queries[ $key ] = 'min' === $type
+				? '(min-width: ' . $width . 'px)'
+				: '(max-width: ' . $width . 'px)';
+		}
+
+		return $queries;
+	}
+
+	/**
+	 * Detect breakpoint keys in settings (registered + custom CSS breakpoint suffixes).
+	 *
+	 * @param array<string,mixed> $settings Bricks settings.
+	 * @return array<int,string>
+	 */
+	private function detect_breakpoint_keys( array $settings ) {
+		$keys = array_keys( $this->get_breakpoint_media_query_map() );
+
+		foreach ( $settings as $setting_key => $value ) {
+			$setting_key = (string) $setting_key;
+			if ( 0 !== strpos( $setting_key, '_cssCustom:' ) ) {
+				continue;
+			}
+
+			$breakpoint = $this->sanitize_breakpoint_key( substr( $setting_key, strlen( '_cssCustom:' ) ) );
+			if ( '' !== $breakpoint ) {
+				$keys[] = $breakpoint;
+			}
+		}
+
+		return array_values( array_unique( array_filter( $keys ) ) );
+	}
+
+	/**
+	 * Sanitize breakpoint keys with or without WordPress loaded.
+	 *
+	 * @param string $key Candidate key.
+	 * @return string
+	 */
+	private function sanitize_breakpoint_key( $key ) {
+		if ( function_exists( 'sanitize_key' ) ) {
+			return (string) sanitize_key( (string) $key );
+		}
+
+		$normalized = strtolower( (string) $key );
+		$normalized = preg_replace( '/[^a-z0-9_-]/', '', $normalized );
+
+		return is_string( $normalized ) ? $normalized : '';
 	}
 
 	/**
@@ -380,6 +531,28 @@ class EFS_CSS_Converter {
 			)
 		);
 
+		// Step 2b: Convert element-local Bricks settings to ID-scoped Etch styles.
+		$element_style_data = $this->collect_element_id_styles_from_posts( $selected_post_types );
+		if ( ! empty( $element_style_data['styles'] ) && is_array( $element_style_data['styles'] ) ) {
+			foreach ( $element_style_data['styles'] as $style_id => $style_definition ) {
+				if ( isset( $etch_styles[ $style_id ] ) ) {
+					$existing_css = trim( (string) ( $etch_styles[ $style_id ]['css'] ?? '' ) );
+					$new_css      = trim( (string) ( $style_definition['css'] ?? '' ) );
+					if ( '' !== $existing_css && '' !== $new_css ) {
+						$etch_styles[ $style_id ]['css'] = $existing_css . "\n  " . $new_css;
+					} elseif ( '' !== $new_css ) {
+						$etch_styles[ $style_id ]['css'] = $new_css;
+					}
+					continue;
+				}
+
+				$etch_styles[ $style_id ] = $style_definition;
+			}
+		}
+		if ( ! empty( $element_style_data['custom_css'] ) && is_string( $element_style_data['custom_css'] ) ) {
+			$custom_css_stylesheet .= "\n" . $element_style_data['custom_css'] . "\n";
+		}
+
 		// Step 3: Parse custom CSS stylesheet and merge with existing styles
 		$this->log_debug_info(
 			'CSS Converter: Custom CSS stylesheet length',
@@ -389,7 +562,11 @@ class EFS_CSS_Converter {
 		);
 		if ( ! empty( $custom_css_stylesheet ) ) {
 			$this->log_debug_info( 'CSS Converter: Parsing custom CSS stylesheet' );
-			$custom_styles = $this->parse_custom_css_stylesheet( $custom_css_stylesheet, $style_map );
+			$custom_styles    = $this->parse_custom_css_stylesheet( $custom_css_stylesheet, $style_map );
+			$id_custom_styles = $this->parse_custom_id_css_stylesheet( $custom_css_stylesheet );
+			if ( ! empty( $id_custom_styles ) ) {
+				$custom_styles = array_merge( $custom_styles, $id_custom_styles );
+			}
 			$this->log_debug_info(
 				'CSS Converter: Parsed custom styles',
 				array(
@@ -849,6 +1026,186 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Collect element-local settings as ID-scoped styles and custom CSS.
+	 *
+	 * @param array<int,string> $selected_post_types Post types selected for migration.
+	 * @return array{styles: array<string,array<string,mixed>>, custom_css: string}
+	 */
+	private function collect_element_id_styles_from_posts( array $selected_post_types = array() ) {
+		$result = array(
+			'styles'     => array(),
+			'custom_css' => '',
+		);
+
+		$post_types = ! empty( $selected_post_types ) ? $selected_post_types : array( 'post', 'page', 'bricks_template' );
+		$post_types = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $post_types ),
+				static function ( $value ) {
+					return '' !== $value;
+				}
+			)
+		);
+		if ( empty( $post_types ) || ! function_exists( 'get_posts' ) || ! function_exists( 'get_post_meta' ) ) {
+			return $result;
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'   => $post_types,
+				'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
+				'numberposts' => -1,
+				'meta_query'  => array(
+					'relation' => 'OR',
+					array(
+						'key'     => '_bricks_page_content_2',
+						'compare' => 'EXISTS',
+					),
+					array(
+						'key'     => '_bricks_page_content',
+						'compare' => 'EXISTS',
+					),
+				),
+			)
+		);
+
+		foreach ( $posts as $post ) {
+			$elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
+			if ( empty( $elements ) ) {
+				$elements = get_post_meta( $post->ID, '_bricks_page_content', true );
+			}
+			if ( is_string( $elements ) ) {
+				$elements = maybe_unserialize( $elements );
+			}
+			if ( ! is_array( $elements ) ) {
+				continue;
+			}
+
+			foreach ( $elements as $element ) {
+				if ( ! is_array( $element ) ) {
+					continue;
+				}
+
+				$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+				if ( empty( $settings ) ) {
+					continue;
+				}
+
+				$selector_id = $this->map_bricks_element_id_to_etch_selector_id( $element );
+				if ( '' !== $selector_id ) {
+					$base_css       = trim( $this->convert_bricks_settings_to_css( $settings ) );
+					$responsive_css = trim( $this->convert_responsive_variants( $settings ) );
+					$combined_css   = trim( $base_css . ( '' !== $responsive_css ? ' ' . $responsive_css : '' ) );
+
+					if ( '' !== $combined_css ) {
+						$combined_css = $this->convert_to_logical_properties( $combined_css );
+						$style_id     = 'id_' . substr( md5( '#' . $selector_id ), 0, 8 );
+
+						if ( isset( $result['styles'][ $style_id ] ) ) {
+							$existing_css = trim( (string) $result['styles'][ $style_id ]['css'] );
+							$result['styles'][ $style_id ]['css'] = trim( $existing_css . "\n  " . $combined_css );
+						} else {
+							$result['styles'][ $style_id ] = array(
+								'type'       => 'class',
+								'selector'   => '#' . $selector_id,
+								'collection' => 'default',
+								'css'        => $combined_css,
+								'readonly'   => false,
+							);
+						}
+					}
+				}
+
+				$bricks_root_selector = $this->get_bricks_element_root_selector( $element );
+
+				if ( ! empty( $settings['_cssCustom'] ) && is_string( $settings['_cssCustom'] ) ) {
+					$custom_css = str_replace( '%root%', $bricks_root_selector, $settings['_cssCustom'] );
+					$custom_css = $this->normalize_deprecated_hsl_references( $custom_css );
+					$result['custom_css'] .= "\n" . $custom_css . "\n";
+				}
+
+				foreach ( $settings as $key => $value ) {
+					if ( ! is_string( $key ) || 0 !== strpos( $key, '_cssCustom:' ) || ! is_string( $value ) || '' === trim( $value ) ) {
+						continue;
+					}
+
+					$breakpoint = str_replace( '_cssCustom:', '', $key );
+					$custom_css = str_replace( '%root%', $bricks_root_selector, $value );
+					$custom_css = $this->normalize_deprecated_hsl_references( $custom_css );
+					$media      = $this->get_media_query_for_breakpoint( $breakpoint );
+
+					if ( false === $media ) {
+						$result['custom_css'] .= "\n" . $custom_css . "\n";
+						continue;
+					}
+
+					$result['custom_css'] .= "\n" . $media . " {\n" . $custom_css . "\n}\n";
+				}
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Map Bricks element IDs to migrated Etch IDs for selector use.
+	 *
+	 * @param array<string,mixed> $element Bricks element.
+	 * @return string
+	 */
+	private function map_bricks_element_id_to_etch_selector_id( array $element ) {
+		$raw_id = isset( $element['id'] ) ? trim( (string) $element['id'] ) : '';
+		if ( '' === $raw_id ) {
+			return '';
+		}
+
+		$raw_id = ltrim( $raw_id, '#' );
+		if ( '' === $raw_id ) {
+			return '';
+		}
+
+		if ( 0 === strpos( $raw_id, 'etch-' ) ) {
+			return $raw_id;
+		}
+
+		if ( 0 === strpos( $raw_id, 'brxe-' ) ) {
+			return 'etch-' . substr( $raw_id, 5 );
+		}
+
+		$normalized = preg_replace( '/[^a-zA-Z0-9_-]/', '', $raw_id );
+		$normalized = is_string( $normalized ) ? trim( $normalized ) : '';
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		return 'etch-' . $normalized;
+	}
+
+	/**
+	 * Resolve the Bricks root selector token for `%root%` substitution.
+	 *
+	 * @param array<string,mixed> $element Bricks element.
+	 * @return string
+	 */
+	private function get_bricks_element_root_selector( array $element ) {
+		$raw_id = isset( $element['id'] ) ? trim( (string) $element['id'] ) : '';
+		$raw_id = ltrim( $raw_id, '#' );
+		if ( '' === $raw_id ) {
+			return '';
+		}
+
+		if ( 0 === strpos( $raw_id, 'brxe-' ) ) {
+			return '#' . $raw_id;
+		}
+
+		if ( 0 === strpos( $raw_id, 'etch-' ) ) {
+			return '#brxe-' . substr( $raw_id, 5 );
+		}
+
+		return '#brxe-' . $raw_id;
+	}
+
+	/**
 	 * Convert single Bricks class to Etch format
 	 */
 	public function convert_bricks_class_to_etch( $bricks_class ) {
@@ -865,7 +1222,7 @@ class EFS_CSS_Converter {
 			$css = $this->convert_bricks_settings_to_css( $bricks_class['settings'], $class_name );
 
 			// Convert responsive variants
-			$responsive_css = $this->convert_responsive_variants( $bricks_class['settings'] );
+			$responsive_css = $this->convert_responsive_variants( $bricks_class['settings'], $class_name );
 			if ( ! empty( $responsive_css ) ) {
 				$css .= ' ' . $responsive_css;
 			}
@@ -955,35 +1312,59 @@ class EFS_CSS_Converter {
 	/**
 	 * Convert responsive variants to media queries
 	 */
-	private function convert_responsive_variants( $settings ) {
+	private function convert_responsive_variants( $settings, $class_name = '' ) {
 		$responsive_css = '';
 
-		// Bricks desktop-first breakpoint semantics.
-		$breakpoints = array(
-			'mobile_portrait'  => '(max-width: 478px)',
-			'mobile_landscape' => '(max-width: 767px)',
-			'tablet_portrait'  => '(max-width: 991px)',
-			'tablet_landscape' => '(max-width: 1199px)',
-			'desktop'          => '(min-width: 1200px)',
-		);
+		$breakpoints = $this->get_breakpoint_media_query_map();
+		if ( empty( $breakpoints ) ) {
+			return $responsive_css;
+		}
 
-		foreach ( $breakpoints as $breakpoint => $media_query ) {
-			$breakpoint_settings = array();
+		$normalized_map = array();
+		foreach ( $breakpoints as $breakpoint_key => $media_query ) {
+			$normalized_map[ $this->sanitize_breakpoint_key( (string) $breakpoint_key ) ] = $media_query;
+		}
 
-			// Extract all properties for this breakpoint
-			foreach ( $settings as $key => $value ) {
-				if ( preg_match( '/:' . preg_quote( $breakpoint, '/' ) . '$/', (string) $key ) ) {
-					// Remove breakpoint suffix to get base property name.
-					$base_key                         = preg_replace( '/:' . preg_quote( $breakpoint, '/' ) . '$/', '', (string) $key );
-					$breakpoint_settings[ $base_key ] = $value;
-				}
+		$bucketed_settings = array();
+		foreach ( (array) $settings as $key => $value ) {
+			$key = (string) $key;
+			if ( false === strpos( $key, ':' ) ) {
+				continue;
 			}
 
-			if ( ! empty( $breakpoint_settings ) ) {
-				$breakpoint_css = $this->convert_bricks_settings_to_css( $breakpoint_settings );
-				if ( ! empty( $breakpoint_css ) ) {
-					$responsive_css .= "\n@media " . $media_query . " {\n  " . str_replace( ';', ";\n  ", trim( $breakpoint_css ) ) . "\n}";
-				}
+			$last_colon_pos = strrpos( $key, ':' );
+			if ( false === $last_colon_pos ) {
+				continue;
+			}
+
+			$suffix         = substr( $key, $last_colon_pos + 1 );
+			$normalized_key = $this->sanitize_breakpoint_key( $suffix );
+			if ( '' === $normalized_key || ! isset( $normalized_map[ $normalized_key ] ) ) {
+				continue;
+			}
+
+			$base_key = substr( $key, 0, $last_colon_pos );
+			if ( '' === $base_key ) {
+				continue;
+			}
+
+			if ( ! isset( $bucketed_settings[ $normalized_key ] ) ) {
+				$bucketed_settings[ $normalized_key ] = array();
+			}
+			$bucketed_settings[ $normalized_key ][ $base_key ] = $value;
+		}
+
+		foreach ( $breakpoints as $breakpoint_key => $media_query ) {
+			$normalized_key      = $this->sanitize_breakpoint_key( (string) $breakpoint_key );
+			$breakpoint_settings = $bucketed_settings[ $normalized_key ] ?? array();
+
+			if ( empty( $breakpoint_settings ) ) {
+				continue;
+			}
+
+			$breakpoint_css = $this->convert_bricks_settings_to_css( $breakpoint_settings, $class_name );
+			if ( ! empty( $breakpoint_css ) ) {
+				$responsive_css .= "\n@media " . $media_query . " {\n  " . str_replace( ';', ";\n  ", trim( $breakpoint_css ) ) . "\n}";
 			}
 		}
 
@@ -993,8 +1374,16 @@ class EFS_CSS_Converter {
 	/**
 	 * Convert Bricks settings to CSS
 	 */
-	private function convert_bricks_settings_to_css( $settings, $class_name = '' ) {
+	private function convert_bricks_settings_to_css( $settings, $class_name = '', $include_selector_variants = true ) {
 		$css_properties = array();
+
+		// Generated content (used by pseudo-element UI settings like _content::before/_content::after).
+		if ( isset( $settings['_content'] ) && '' !== trim( (string) $settings['_content'] ) ) {
+			$content_value = $this->normalize_content_property_value( $settings['_content'] );
+			if ( '' !== $content_value ) {
+				$css_properties[] = 'content: ' . $content_value . ';';
+			}
+		}
 
 		// Layout & Display
 		$css_properties = array_merge( $css_properties, $this->convert_layout( $settings ) );
@@ -1025,9 +1414,9 @@ class EFS_CSS_Converter {
 
 		// Border (Bricks uses _border)
 		if ( ! empty( $settings['_border'] ) ) {
-			$css_properties = array_merge( $css_properties, $this->convert_border( $settings['_border'] ) );
+			$css_properties = array_merge( $css_properties, $this->convert_border_properties( $settings['_border'] ) );
 		} elseif ( ! empty( $settings['border'] ) ) {
-			$css_properties = array_merge( $css_properties, $this->convert_border( $settings['border'] ) );
+			$css_properties = array_merge( $css_properties, $this->convert_border_properties( $settings['border'] ) );
 		}
 
 		// Typography
@@ -1056,7 +1445,216 @@ class EFS_CSS_Converter {
 		// Filter empty values
 		$css_properties = array_filter( $css_properties );
 
+		if ( $include_selector_variants ) {
+			$selector_variants_css = $this->convert_selector_variants( $settings, $class_name );
+			if ( '' !== $selector_variants_css ) {
+				$css_properties[] = $selector_variants_css;
+			}
+		}
+
 		return implode( ' ', $css_properties );
+	}
+
+	/**
+	 * Convert Bricks selector/state variants stored as keyed suffixes (e.g. _typography:hover, _content::after).
+	 *
+	 * @param array  $settings   Bricks settings array.
+	 * @param string $class_name Optional class name (without dot) for selector normalization.
+	 * @return string
+	 */
+	private function convert_selector_variants( $settings, $class_name = '' ) {
+		$variant_settings       = array();
+		$breakpoints            = $this->detect_breakpoint_keys( is_array( $settings ) ? $settings : array() );
+		$normalized_breakpoints = array();
+		foreach ( $breakpoints as $breakpoint_key ) {
+			$normalized = $this->sanitize_breakpoint_key( (string) $breakpoint_key );
+			if ( '' !== $normalized ) {
+				$normalized_breakpoints[ $normalized ] = true;
+			}
+		}
+
+		foreach ( $settings as $key => $value ) {
+			$key = (string) $key;
+
+			if ( '' === $key || false === strpos( $key, ':' ) ) {
+				continue;
+			}
+
+			// Custom CSS is handled by dedicated stylesheet parsing.
+			if ( 0 === strpos( $key, '_cssCustom:' ) ) {
+				continue;
+			}
+
+			$separator_pos = strpos( $key, ':' );
+			if ( false === $separator_pos ) {
+				continue;
+			}
+
+			$base_key = substr( $key, 0, $separator_pos );
+			$suffix   = substr( $key, $separator_pos );
+
+			if ( '' === $base_key || '' === $suffix ) {
+				continue;
+			}
+
+			// Responsive variants are handled in convert_responsive_variants().
+			$suffix_key = $this->sanitize_breakpoint_key( ltrim( $suffix, ':' ) );
+			if ( '' !== $suffix_key && isset( $normalized_breakpoints[ $suffix_key ] ) ) {
+				continue;
+			}
+
+			if ( ! isset( $variant_settings[ $suffix ] ) ) {
+				$variant_settings[ $suffix ] = array();
+			}
+			$variant_settings[ $suffix ][ $base_key ] = $value;
+		}
+
+		if ( empty( $variant_settings ) ) {
+			return '';
+		}
+
+		$css_chunks = array();
+		foreach ( $variant_settings as $suffix => $variant_values ) {
+			$variant_css = trim( $this->convert_bricks_settings_to_css( $variant_values, $class_name, false ) );
+			if ( '' === $variant_css ) {
+				continue;
+			}
+
+			$selector = $this->normalize_variant_selector_suffix( $suffix, $class_name );
+			if ( '' === $selector ) {
+				continue;
+			}
+
+			$css_chunks[] = $selector . " {\n  " . trim( $variant_css ) . "\n}";
+		}
+
+		return implode( "\n\n", $css_chunks );
+	}
+
+	/**
+	 * Normalize a selector suffix to nested ampersand selector form.
+	 *
+	 * @param string $suffix Raw suffix (e.g. :hover, ::after, :hover .child, > .item).
+	 * @param string $class_name Optional class name without leading dot.
+	 * @return string
+	 */
+	private function normalize_variant_selector_suffix( $suffix, $class_name = '' ) {
+		$suffix = trim( (string) $suffix );
+		if ( '' === $suffix ) {
+			return '';
+		}
+
+		if ( '' !== $class_name ) {
+			return $this->normalize_selector_suffix_with_ampersand( $suffix, $class_name );
+		}
+
+		if ( 0 === strpos( $suffix, '&' ) ) {
+			return $suffix;
+		}
+
+		if ( preg_match( '/^[>+~]/', $suffix ) || preg_match( '/^[.#\[]/', $suffix ) ) {
+			return '& ' . $suffix;
+		}
+
+		return '&' . $suffix;
+	}
+
+	/**
+	 * Normalize values for the CSS `content` property.
+	 *
+	 * @param mixed $value Raw value from Bricks.
+	 * @return string
+	 */
+	private function normalize_content_property_value( $value ) {
+		$content = trim( (string) $value );
+		if ( '' === $content ) {
+			return '';
+		}
+
+		$keywords = array(
+			'normal',
+			'none',
+			'open-quote',
+			'close-quote',
+			'no-open-quote',
+			'no-close-quote',
+			'inherit',
+			'initial',
+			'unset',
+			'revert',
+			'revert-layer',
+		);
+		if ( in_array( strtolower( $content ), $keywords, true ) ) {
+			return strtolower( $content );
+		}
+
+		if ( preg_match( '/^(attr|counter|counters)\s*\(/i', $content ) ) {
+			return $content;
+		}
+
+		if ( preg_match( '/^([\'"]).*\\1$/s', $content ) ) {
+			return $content;
+		}
+
+		return '"' . addcslashes( $content, "\\\"" ) . '"';
+	}
+
+	/**
+	 * Normalize border-width value strings (supports shorthand).
+	 *
+	 * Bricks UI can store unitless numbers for border widths. CSS requires
+	 * explicit units except for zero, so numeric tokens are converted to px.
+	 *
+	 * @param string $value Raw border-width value.
+	 * @return string
+	 */
+	private function normalize_border_width_value( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) {
+			return $value;
+		}
+
+		// Safely normalize plain token shorthand like "1 1 1 1".
+		if ( preg_match( '/^[0-9\.\s]+$/', $value ) ) {
+			$parts = preg_split( '/\s+/', $value );
+			$parts = is_array( $parts ) ? $parts : array( $value );
+			$parts = array_map( array( $this, 'normalize_border_width_component' ), $parts );
+			$parts = array_values(
+				array_filter(
+					$parts,
+					static function ( $part ) {
+						return '' !== trim( (string) $part );
+					}
+				)
+			);
+
+			return implode( ' ', $parts );
+		}
+
+		return $this->normalize_border_width_component( $value );
+	}
+
+	/**
+	 * Normalize a single border-width component.
+	 *
+	 * @param string $component Raw component value.
+	 * @return string
+	 */
+	private function normalize_border_width_component( $component ) {
+		$component = trim( (string) $component );
+		if ( '' === $component ) {
+			return $component;
+		}
+
+		if ( preg_match( '/^-?(?:0|0+\.[0-9]+)$/', $component ) ) {
+			return '0';
+		}
+
+		if ( preg_match( '/^-?[0-9]+(?:\.[0-9]+)?$/', $component ) ) {
+			return $component . 'px';
+		}
+
+		return $component;
 	}
 
 	/**
@@ -1164,19 +1762,19 @@ class EFS_CSS_Converter {
 	/**
 	 * Convert border settings
 	 */
-	private function convert_border( $border ) {
+	private function convert_border_properties( $border ) {
 		$css = array();
 
 		// Border width - can be string or array
 		if ( ! empty( $border['width'] ) ) {
 			if ( is_string( $border['width'] ) ) {
-				$css[] = 'border-width: ' . $border['width'] . ';';
+				$css[] = 'border-width: ' . $this->normalize_border_width_value( $border['width'] ) . ';';
 			} elseif ( is_array( $border['width'] ) ) {
-				$top    = $border['width']['top'] ?? '0';
-				$right  = $border['width']['right'] ?? '0';
-				$bottom = $border['width']['bottom'] ?? '0';
-				$left   = $border['width']['left'] ?? '0';
-				$css[]  = 'border-width: ' . $top . ' ' . $right . ' ' . $bottom . ' ' . $left . ';';
+				$top    = $this->normalize_border_width_component( $border['width']['top'] ?? '0' );
+				$right  = $this->normalize_border_width_component( $border['width']['right'] ?? '0' );
+				$bottom = $this->normalize_border_width_component( $border['width']['bottom'] ?? '0' );
+				$left   = $this->normalize_border_width_component( $border['width']['left'] ?? '0' );
+				$css[]  = 'border-width: ' . $this->build_quad_shorthand_value( $top, $right, $bottom, $left ) . ';';
 			}
 		}
 
@@ -1200,7 +1798,7 @@ class EFS_CSS_Converter {
 				$right  = $border['radius']['right'] ?? '0';
 				$bottom = $border['radius']['bottom'] ?? '0';
 				$left   = $border['radius']['left'] ?? '0';
-				$css[]  = 'border-radius: ' . $top . ' ' . $right . ' ' . $bottom . ' ' . $left . ';';
+				$css[]  = 'border-radius: ' . $this->build_quad_shorthand_value( $top, $right, $bottom, $left ) . ';';
 			}
 		}
 
@@ -1571,163 +2169,53 @@ class EFS_CSS_Converter {
 	private function convert_margin_padding( $settings ) {
 		$css = array();
 
-		// Margin - convert to logical properties
-		$margin_top    = null;
-		$margin_right  = null;
-		$margin_bottom = null;
-		$margin_left   = null;
+		$margin_values = $this->extract_quad_values_from_settings(
+			$settings,
+			'_margin',
+			array(
+				'top'    => '_marginTop',
+				'right'  => '_marginRight',
+				'bottom' => '_marginBottom',
+				'left'   => '_marginLeft',
+			)
+		);
+		if ( null !== $margin_values['direct'] ) {
+			$css[] = 'margin: ' . $margin_values['direct'] . ';';
+		}
+		$css = array_merge(
+			$css,
+			$this->build_logical_quad_declarations(
+				'margin',
+				$margin_values['top'],
+				$margin_values['right'],
+				$margin_values['bottom'],
+				$margin_values['left']
+			)
+		);
 
-		if ( ! empty( $settings['_margin'] ) ) {
-			$margin = $settings['_margin'];
-			if ( is_array( $margin ) ) {
-				if ( array_key_exists( 'top', $margin ) ) {
-					$margin_top = $margin['top'];
-				}
-				if ( array_key_exists( 'right', $margin ) ) {
-					$margin_right = $margin['right'];
-				}
-				if ( array_key_exists( 'bottom', $margin ) ) {
-					$margin_bottom = $margin['bottom'];
-				}
-				if ( array_key_exists( 'left', $margin ) ) {
-					$margin_left = $margin['left'];
-				}
-			} else {
-				$css[] = 'margin: ' . $margin . ';';
-			}
+		$padding_values = $this->extract_quad_values_from_settings(
+			$settings,
+			'_padding',
+			array(
+				'top'    => '_paddingTop',
+				'right'  => '_paddingRight',
+				'bottom' => '_paddingBottom',
+				'left'   => '_paddingLeft',
+			)
+		);
+		if ( null !== $padding_values['direct'] ) {
+			$css[] = 'padding: ' . $padding_values['direct'] . ';';
 		}
-
-		// Individual margin properties (e.g., _marginTop, _marginBottom)
-		if ( isset( $settings['_marginTop'] ) ) {
-			$margin_top = $settings['_marginTop'];
-		}
-		if ( isset( $settings['_marginRight'] ) ) {
-			$margin_right = $settings['_marginRight'];
-		}
-		if ( isset( $settings['_marginBottom'] ) ) {
-			$margin_bottom = $settings['_marginBottom'];
-		}
-		if ( isset( $settings['_marginLeft'] ) ) {
-			$margin_left = $settings['_marginLeft'];
-		}
-
-		$margin_block_value  = null;
-		$margin_inline_value = null;
-
-		if ( null !== $margin_top && null !== $margin_bottom && (string) $margin_top === (string) $margin_bottom ) {
-			$margin_block_value = (string) $margin_top;
-		}
-
-		if ( null !== $margin_left && null !== $margin_right && (string) $margin_left === (string) $margin_right ) {
-			$margin_inline_value = (string) $margin_left;
-		}
-
-		if ( null !== $margin_block_value && null !== $margin_inline_value && $margin_block_value === $margin_inline_value ) {
-			$css[] = 'margin: ' . $margin_block_value . ';';
-		} else {
-			if ( null !== $margin_block_value ) {
-				$css[] = 'margin-block: ' . $margin_block_value . ';';
-			} else {
-				if ( null !== $margin_top ) {
-					$css[] = 'margin-block-start: ' . $margin_top . ';';
-				}
-				if ( null !== $margin_bottom ) {
-					$css[] = 'margin-block-end: ' . $margin_bottom . ';';
-				}
-			}
-
-			if ( null !== $margin_inline_value ) {
-				$css[] = 'margin-inline: ' . $margin_inline_value . ';';
-			} else {
-				if ( null !== $margin_right ) {
-					$css[] = 'margin-inline-end: ' . $margin_right . ';';
-				}
-				if ( null !== $margin_left ) {
-					$css[] = 'margin-inline-start: ' . $margin_left . ';';
-				}
-			}
-		}
-
-		// Padding - convert to logical properties
-		$padding_top    = null;
-		$padding_right  = null;
-		$padding_bottom = null;
-		$padding_left   = null;
-
-		if ( ! empty( $settings['_padding'] ) ) {
-			$padding = $settings['_padding'];
-			if ( is_array( $padding ) ) {
-				if ( array_key_exists( 'top', $padding ) ) {
-					$padding_top = $padding['top'];
-				}
-				if ( array_key_exists( 'right', $padding ) ) {
-					$padding_right = $padding['right'];
-				}
-				if ( array_key_exists( 'bottom', $padding ) ) {
-					$padding_bottom = $padding['bottom'];
-				}
-				if ( array_key_exists( 'left', $padding ) ) {
-					$padding_left = $padding['left'];
-				}
-			} else {
-				$css[] = 'padding: ' . $padding . ';';
-			}
-		}
-
-		// Individual padding properties
-		if ( isset( $settings['_paddingTop'] ) ) {
-			$padding_top = $settings['_paddingTop'];
-		}
-		if ( isset( $settings['_paddingRight'] ) ) {
-			$padding_right = $settings['_paddingRight'];
-		}
-		if ( isset( $settings['_paddingBottom'] ) ) {
-			$padding_bottom = $settings['_paddingBottom'];
-		}
-		if ( isset( $settings['_paddingLeft'] ) ) {
-			$padding_left = $settings['_paddingLeft'];
-		}
-
-		$padding_block_value  = null;
-		$padding_inline_value = null;
-
-		// Prefer shorthand when block-start and block-end are identical.
-		if ( null !== $padding_top && null !== $padding_bottom && (string) $padding_top === (string) $padding_bottom ) {
-			$padding_block_value = (string) $padding_top;
-		}
-
-		// Prefer shorthand when inline-start and inline-end are identical.
-		if ( null !== $padding_left && null !== $padding_right && (string) $padding_left === (string) $padding_right ) {
-			$padding_inline_value = (string) $padding_left;
-		}
-
-		// If all four values are equal, emit full shorthand.
-		if ( null !== $padding_block_value && null !== $padding_inline_value && $padding_block_value === $padding_inline_value ) {
-			$css[] = 'padding: ' . $padding_block_value . ';';
-			return $css;
-		}
-
-		if ( null !== $padding_block_value ) {
-			$css[] = 'padding-block: ' . $padding_block_value . ';';
-		} else {
-			if ( null !== $padding_top ) {
-				$css[] = 'padding-block-start: ' . $padding_top . ';';
-			}
-			if ( null !== $padding_bottom ) {
-				$css[] = 'padding-block-end: ' . $padding_bottom . ';';
-			}
-		}
-
-		if ( null !== $padding_inline_value ) {
-			$css[] = 'padding-inline: ' . $padding_inline_value . ';';
-		} else {
-			if ( null !== $padding_right ) {
-				$css[] = 'padding-inline-end: ' . $padding_right . ';';
-			}
-			if ( null !== $padding_left ) {
-				$css[] = 'padding-inline-start: ' . $padding_left . ';';
-			}
-		}
+		$css = array_merge(
+			$css,
+			$this->build_logical_quad_declarations(
+				'padding',
+				$padding_values['top'],
+				$padding_values['right'],
+				$padding_values['bottom'],
+				$padding_values['left']
+			)
+		);
 
 		return $css;
 	}
@@ -1742,23 +2230,26 @@ class EFS_CSS_Converter {
 			$css[] = 'position: ' . $settings['_position'] . ';';
 		}
 
-		// Convert to logical properties (inset-*)
-		// Use isset() instead of !empty() to allow "0" values
-		if ( isset( $settings['_top'] ) && '' !== $settings['_top'] ) {
-			$css[] = 'inset-block-start: ' . $settings['_top'] . ';';
-		}
-
-		if ( isset( $settings['_right'] ) && '' !== $settings['_right'] ) {
-			$css[] = 'inset-inline-end: ' . $settings['_right'] . ';';
-		}
-
-		if ( isset( $settings['_bottom'] ) && '' !== $settings['_bottom'] ) {
-			$css[] = 'inset-block-end: ' . $settings['_bottom'] . ';';
-		}
-
-		if ( isset( $settings['_left'] ) && '' !== $settings['_left'] ) {
-			$css[] = 'inset-inline-start: ' . $settings['_left'] . ';';
-		}
+		$inset_values = $this->extract_quad_values_from_settings(
+			$settings,
+			null,
+			array(
+				'top'    => '_top',
+				'right'  => '_right',
+				'bottom' => '_bottom',
+				'left'   => '_left',
+			)
+		);
+		$css = array_merge(
+			$css,
+			$this->build_logical_quad_declarations(
+				'inset',
+				$inset_values['top'],
+				$inset_values['right'],
+				$inset_values['bottom'],
+				$inset_values['left']
+			)
+		);
 
 		return $css;
 	}
@@ -2053,7 +2544,7 @@ class EFS_CSS_Converter {
 	}
 
 	/**
-	 * Collapse logical longhands to shorthand only when all four side values are identical.
+	 * Collapse logical longhands to the shortest valid shorthand (1/2/3/4 values).
 	 *
 	 * @param string $css Raw CSS.
 	 * @return string
@@ -2146,7 +2637,7 @@ class EFS_CSS_Converter {
 	}
 
 	/**
-	 * Collapse four longhand declarations into one shorthand when all values match.
+	 * Collapse four longhand declarations into one shorthand using shortest valid 1/2/3/4 syntax.
 	 *
 	 * @param string             $decls Declaration block without braces.
 	 * @param array<int,string>  $properties Ordered list of four longhand properties.
@@ -2164,20 +2655,7 @@ class EFS_CSS_Converter {
 			$values[] = trim( (string) $match[1] );
 		}
 
-		$top    = $values[0];
-		$right  = $values[1];
-		$bottom = $values[2];
-		$left   = $values[3];
-
-		if ( $top === $right && $top === $bottom && $top === $left ) {
-			$shorthand_value = $top;
-		} elseif ( $top === $bottom && $right === $left ) {
-			$shorthand_value = $top . ' ' . $right;
-		} elseif ( $right === $left ) {
-			$shorthand_value = $top . ' ' . $right . ' ' . $bottom;
-		} else {
-			return $decls;
-		}
+		$shorthand_value = $this->build_quad_shorthand_value( $values[0], $values[1], $values[2], $values[3] );
 
 		foreach ( $properties as $property ) {
 			$decls = preg_replace( '/(?:^|;)\s*' . preg_quote( $property, '/' ) . '\s*:\s*[^;{}]+\s*;/i', ';', $decls );
@@ -2192,6 +2670,123 @@ class EFS_CSS_Converter {
 		}
 
 		return trim( $decls . ' ' . $shorthand . ': ' . $shorthand_value . ';' );
+	}
+
+	/**
+	 * Build shortest valid quad shorthand value (top right bottom left).
+	 *
+	 * @param string $top Top value.
+	 * @param string $right Right value.
+	 * @param string $bottom Bottom value.
+	 * @param string $left Left value.
+	 * @return string
+	 */
+	private function build_quad_shorthand_value( $top, $right, $bottom, $left ) {
+		$top    = (string) $top;
+		$right  = (string) $right;
+		$bottom = (string) $bottom;
+		$left   = (string) $left;
+
+		if ( $top === $right && $top === $bottom && $top === $left ) {
+			return $top;
+		}
+
+		if ( $top === $bottom && $right === $left ) {
+			return $top . ' ' . $right;
+		}
+
+		if ( $right === $left ) {
+			return $top . ' ' . $right . ' ' . $bottom;
+		}
+
+		return $top . ' ' . $right . ' ' . $bottom . ' ' . $left;
+	}
+
+	/**
+	 * Extract quad values from combined and individual settings.
+	 *
+	 * @param array<string,mixed>      $settings Source settings.
+	 * @param string|null              $compound_key Key containing array|string quad value.
+	 * @param array<string,string>     $side_keys   Map: top/right/bottom/left => setting key.
+	 * @return array<string,string|null>
+	 */
+	private function extract_quad_values_from_settings( array $settings, $compound_key, array $side_keys ) {
+		$values = array(
+			'direct' => null,
+			'top'    => null,
+			'right'  => null,
+			'bottom' => null,
+			'left'   => null,
+		);
+
+		if ( null !== $compound_key && array_key_exists( $compound_key, $settings ) ) {
+			$compound_value = $settings[ $compound_key ];
+			if ( is_array( $compound_value ) ) {
+				foreach ( array( 'top', 'right', 'bottom', 'left' ) as $side ) {
+					if ( array_key_exists( $side, $compound_value ) && '' !== (string) $compound_value[ $side ] ) {
+						$values[ $side ] = (string) $compound_value[ $side ];
+					}
+				}
+			} elseif ( '' !== (string) $compound_value ) {
+				$values['direct'] = (string) $compound_value;
+			}
+		}
+
+		foreach ( array( 'top', 'right', 'bottom', 'left' ) as $side ) {
+			$key = $side_keys[ $side ] ?? null;
+			if ( null !== $key && array_key_exists( $key, $settings ) && '' !== (string) $settings[ $key ] ) {
+				$values[ $side ] = (string) $settings[ $key ];
+			}
+		}
+
+		return $values;
+	}
+
+	/**
+	 * Build logical block/inline declarations from quad values.
+	 *
+	 * @param string      $property Base property (e.g. margin, padding, inset).
+	 * @param string|null $top Top value.
+	 * @param string|null $right Right value.
+	 * @param string|null $bottom Bottom value.
+	 * @param string|null $left Left value.
+	 * @return array<int,string>
+	 */
+	private function build_logical_quad_declarations( $property, $top, $right, $bottom, $left ) {
+		$css = array();
+
+		$has_all_sides = null !== $top && null !== $right && null !== $bottom && null !== $left;
+		if ( $has_all_sides ) {
+			$css[] = $property . ': ' . $this->build_quad_shorthand_value( $top, $right, $bottom, $left ) . ';';
+			return $css;
+		}
+
+		$block_equal = null !== $top && null !== $bottom && (string) $top === (string) $bottom;
+		$inline_equal = null !== $right && null !== $left && (string) $right === (string) $left;
+
+		if ( $block_equal ) {
+			$css[] = $property . '-block: ' . $top . ';';
+		} else {
+			if ( null !== $top ) {
+				$css[] = $property . '-block-start: ' . $top . ';';
+			}
+			if ( null !== $bottom ) {
+				$css[] = $property . '-block-end: ' . $bottom . ';';
+			}
+		}
+
+		if ( $inline_equal ) {
+			$css[] = $property . '-inline: ' . $right . ';';
+		} else {
+			if ( null !== $right ) {
+				$css[] = $property . '-inline-end: ' . $right . ';';
+			}
+			if ( null !== $left ) {
+				$css[] = $property . '-inline-start: ' . $left . ';';
+			}
+		}
+
+		return $css;
 	}
 
 	/**
@@ -2271,6 +2866,7 @@ class EFS_CSS_Converter {
 	 */
 	private function parse_custom_css_stylesheet( $stylesheet, $style_map = array() ) {
 		$styles = array();
+		$stylesheet = $this->normalize_bricks_id_selectors_in_css( (string) $stylesheet );
 
 		// Find ALL unique class names in the stylesheet
 		preg_match_all( '/\.([a-zA-Z0-9_-]+)/', $stylesheet, $all_class_matches );
@@ -2326,6 +2922,43 @@ class EFS_CSS_Converter {
 			$styles[ $style_id ] = array(
 				'type'       => 'class',
 				'selector'   => '.' . $class_name,
+				'collection' => 'default',
+				'css'        => trim( $converted_css ),
+				'readonly'   => false,
+			);
+		}
+
+		return $styles;
+	}
+
+	/**
+	 * Parse ID-based custom CSS stylesheet rules (e.g. #etch-foo, #my-anchor).
+	 *
+	 * @param string $stylesheet Full custom stylesheet.
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function parse_custom_id_css_stylesheet( $stylesheet ) {
+		$styles     = array();
+		$stylesheet = $this->normalize_bricks_id_selectors_in_css( (string) $stylesheet );
+
+		preg_match_all( '/#([a-zA-Z_][a-zA-Z0-9_-]*)/', $stylesheet, $all_id_matches );
+		if ( empty( $all_id_matches[1] ) ) {
+			return $styles;
+		}
+
+		$id_names = array_unique( $all_id_matches[1] );
+
+		foreach ( $id_names as $id_name ) {
+			$id_css = $this->extract_css_for_id( $stylesheet, $id_name );
+			if ( '' === trim( $id_css ) ) {
+				continue;
+			}
+
+			$converted_css = $this->convert_nested_id_selectors_to_ampersand( $id_css, $id_name );
+			$style_id      = 'id_' . substr( md5( '#' . $id_name ), 0, 8 );
+			$styles[ $style_id ] = array(
+				'type'       => 'class',
+				'selector'   => '#' . $id_name,
 				'collection' => 'default',
 				'css'        => trim( $converted_css ),
 				'readonly'   => false,
@@ -2397,6 +3030,71 @@ class EFS_CSS_Converter {
 				$brace_count = substr_count( $line, '{' ) - substr_count( $line, '}' );
 
 				// Collect until rule ends
+				while ( $brace_count > 0 && $i < count( $lines ) - 1 ) {
+					++$i;
+					$line         = $lines[ $i ];
+					$rule        .= $line . "\n";
+					$brace_count += substr_count( $line, '{' );
+					$brace_count -= substr_count( $line, '}' );
+				}
+
+				$css_parts[] = trim( $rule );
+			}
+		}
+
+		return implode( "\n\n", $css_parts );
+	}
+
+	/**
+	 * Extract all CSS rules for a specific ID selector from stylesheet.
+	 *
+	 * @param string $stylesheet Full stylesheet.
+	 * @param string $id_name ID name without hash.
+	 * @return string
+	 */
+	private function extract_css_for_id( $stylesheet, $id_name ) {
+		$escaped_id = preg_quote( $id_name, '/' );
+		$id_token   = '/#' . $escaped_id . '(?![a-zA-Z0-9_-])/';
+		$rule_start = '/#' . $escaped_id . '(?![a-zA-Z0-9_-])([^{]*?)\{/';
+		$css_parts  = array();
+
+		$lines         = explode( "\n", $stylesheet );
+		$current_media = null;
+		$media_content = '';
+		$brace_count   = 0;
+		$in_media      = false;
+
+		for ( $i = 0; $i < count( $lines ); $i++ ) {
+			$line = $lines[ $i ];
+
+			if ( preg_match( '/@media\s+([^{]+)\{/', $line, $media_match ) ) {
+				$current_media = '@media ' . trim( $media_match[1] );
+				$media_content = '';
+				$brace_count   = 1;
+				$in_media      = true;
+				continue;
+			}
+
+			if ( $in_media ) {
+				$brace_count += substr_count( $line, '{' );
+				$brace_count -= substr_count( $line, '}' );
+				$media_content .= $line . "\n";
+
+				if ( 0 === $brace_count ) {
+					if ( preg_match( $id_token, $media_content ) ) {
+						$css_parts[] = $current_media . " {\n" . trim( $media_content ) . "\n}";
+					}
+					$in_media      = false;
+					$current_media = null;
+					$media_content = '';
+				}
+				continue;
+			}
+
+			if ( preg_match( $rule_start, $line ) ) {
+				$rule        = $line . "\n";
+				$brace_count = substr_count( $line, '{' ) - substr_count( $line, '}' );
+
 				while ( $brace_count > 0 && $i < count( $lines ) - 1 ) {
 					++$i;
 					$line         = $lines[ $i ];
@@ -2508,6 +3206,61 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Convert nested ID selectors to & syntax for CSS nesting.
+	 *
+	 * @param string $css CSS for specific ID.
+	 * @param string $id_name ID without hash.
+	 * @return string
+	 */
+	private function convert_nested_id_selectors_to_ampersand( $css, $id_name ) {
+		$escaped_id    = preg_quote( $id_name, '/' );
+		$rules         = array();
+		$main_css      = '';
+		$media_queries = $this->extract_media_queries_for_id( $css, $id_name );
+
+		foreach ( $media_queries as $mq ) {
+			$css = str_replace( $mq['original'], '', $css );
+		}
+
+		$pattern = '/#' . $escaped_id . '(?![a-zA-Z0-9_-])([^{]*?)\{([^}]*)\}/s';
+		if ( preg_match_all( $pattern, $css, $matches, PREG_SET_ORDER ) ) {
+			foreach ( $matches as $match ) {
+				$selector_suffix = $this->normalize_selector_suffix_with_ampersand( $match[1], $id_name );
+				$rule_content    = trim( $match[2] );
+				if ( '' === trim( $selector_suffix ) ) {
+					$main_css .= $rule_content . "\n";
+				} else {
+					$rules[] = array(
+						'selector' => $selector_suffix,
+						'css'      => $rule_content,
+					);
+				}
+			}
+		}
+
+		$result = trim( $main_css );
+		foreach ( $rules as $rule ) {
+			if ( '' !== $result ) {
+				$result .= "\n\n";
+			}
+			$result .= $rule['selector'] . " {\n  " . trim( $rule['css'] ) . "\n}";
+		}
+
+		foreach ( $media_queries as $media ) {
+			if ( '' !== $result ) {
+				$result .= "\n\n";
+			}
+			$result .= $media['condition'] . " {\n  " . $media['css'] . "\n}";
+		}
+
+		if ( '' === $result ) {
+			$result = preg_replace( '/#' . $escaped_id . '(\s+[>+~]|\s+[.#\[]|::|:)/', '&$1', $css );
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Extract media queries from CSS with proper brace counting
 	 *
 	 * @param string $css CSS content
@@ -2560,6 +3313,62 @@ class EFS_CSS_Converter {
 					$converted_content = $this->convert_selectors_in_media_query( $media_content, $class_name );
 
 					$media_queries[] = array(
+						'condition' => '@media ' . $media_condition,
+						'css'       => trim( $converted_content ),
+						'original'  => substr( $css, $media_pos, $i - $media_pos ),
+					);
+				}
+			}
+
+			$pos = $i;
+		}
+
+		return $media_queries;
+	}
+
+	/**
+	 * Extract media queries containing a specific ID selector.
+	 *
+	 * @param string $css CSS content.
+	 * @param string $id_name ID name without hash.
+	 * @return array<int,array<string,string>>
+	 */
+	private function extract_media_queries_for_id( $css, $id_name ) {
+		$media_queries = array();
+		$pos           = 0;
+		$length        = strlen( $css );
+		$id_token      = '/#' . preg_quote( $id_name, '/' ) . '(?![a-zA-Z0-9_-])/';
+
+		while ( $pos < $length ) {
+			$media_pos = strpos( $css, '@media', $pos );
+			if ( false === $media_pos ) {
+				break;
+			}
+
+			$open_brace = strpos( $css, '{', $media_pos );
+			if ( false === $open_brace ) {
+				break;
+			}
+
+			$media_condition = trim( substr( $css, $media_pos + 6, $open_brace - $media_pos - 6 ) );
+			$brace_count     = 1;
+			$i               = $open_brace + 1;
+			$content_start   = $i;
+
+			while ( $i < $length && $brace_count > 0 ) {
+				if ( '{' === $css[ $i ] ) {
+					++$brace_count;
+				} elseif ( '}' === $css[ $i ] ) {
+					--$brace_count;
+				}
+				++$i;
+			}
+
+			if ( 0 === $brace_count ) {
+				$media_content = substr( $css, $content_start, $i - $content_start - 1 );
+				if ( preg_match( $id_token, $media_content ) ) {
+					$converted_content = $this->convert_selectors_in_media_query_for_id( $media_content, $id_name );
+					$media_queries[]   = array(
 						'condition' => '@media ' . $media_condition,
 						'css'       => trim( $converted_content ),
 						'original'  => substr( $css, $media_pos, $i - $media_pos ),
@@ -2634,6 +3443,54 @@ class EFS_CSS_Converter {
 		);
 
 		return $result;
+	}
+
+	/**
+	 * Convert ID selectors inside media query to & syntax.
+	 *
+	 * @param string $media_content Media query content.
+	 * @param string $id_name ID selector name without hash.
+	 * @return string
+	 */
+	private function convert_selectors_in_media_query_for_id( $media_content, $id_name ) {
+		$escaped_id = preg_quote( $id_name, '/' );
+		$rules      = array();
+		$pattern    = '/#' . $escaped_id . '(?![a-zA-Z0-9_-])([^{]*?)\{([^}]*)\}/s';
+
+		if ( preg_match_all( $pattern, $media_content, $matches, PREG_SET_ORDER ) ) {
+			foreach ( $matches as $match ) {
+				$selector_suffix = trim( $match[1] );
+				$rule_content    = trim( $match[2] );
+				$nested_selector = $this->normalize_selector_suffix_with_ampersand( $selector_suffix, $id_name );
+				if ( '' === trim( $nested_selector ) ) {
+					$nested_selector = '&';
+				}
+
+				$rules[] = $nested_selector . " {\n    " . $rule_content . "\n  }";
+			}
+		}
+
+		return implode( "\n\n  ", $rules );
+	}
+
+	/**
+	 * Normalize Bricks id selectors in CSS (`#brxe-...` => `#etch-...`).
+	 *
+	 * @param string $css Raw CSS.
+	 * @return string
+	 */
+	private function normalize_bricks_id_selectors_in_css( $css ) {
+		if ( '' === (string) $css ) {
+			return $css;
+		}
+
+		return (string) preg_replace_callback(
+			'/#brxe-([a-zA-Z0-9_-]+)/i',
+			static function ( $matches ) {
+				return '#etch-' . $matches[1];
+			},
+			(string) $css
+		);
 	}
 
 	/**
