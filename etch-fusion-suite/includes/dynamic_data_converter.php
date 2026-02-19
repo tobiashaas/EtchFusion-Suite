@@ -135,6 +135,10 @@ class EFS_Dynamic_Data_Converter {
 				? trim( $context['loop_alias'] )
 				: 'item';
 			$converted  = $this->replace_dynamic_root_in_expressions( $converted, 'this', $loop_alias );
+
+			if ( isset( $context['loop_query'] ) && $this->is_attachment_loop_query( $context['loop_query'] ) ) {
+				$converted = str_replace( '{' . $loop_alias . '.image.id}', '{' . $loop_alias . '.id}', $converted );
+			}
 		}
 
 		// Log unconverted tags
@@ -203,6 +207,30 @@ class EFS_Dynamic_Data_Converter {
 			},
 			(string) $content
 		);
+	}
+
+	/**
+	 * Determine whether loop query targets attachments.
+	 *
+	 * @param mixed $loop_query Loop query payload.
+	 * @return bool
+	 */
+	private function is_attachment_loop_query( $loop_query ) {
+		if ( ! is_array( $loop_query ) ) {
+			return false;
+		}
+
+		$post_type = 'post';
+		if ( isset( $loop_query['post_type'] ) && is_array( $loop_query['post_type'] ) ) {
+			$first_type = reset( $loop_query['post_type'] );
+			if ( is_string( $first_type ) && '' !== trim( $first_type ) ) {
+				$post_type = sanitize_key( $first_type );
+			}
+		} elseif ( isset( $loop_query['post_type'] ) && is_string( $loop_query['post_type'] ) && '' !== trim( $loop_query['post_type'] ) ) {
+			$post_type = sanitize_key( (string) $loop_query['post_type'] );
+		}
+
+		return 'attachment' === $post_type;
 	}
 
 	/**

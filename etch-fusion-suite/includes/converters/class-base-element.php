@@ -109,8 +109,10 @@ abstract class EFS_Base_Element {
 			}
 		}
 
-		// Preserve ACSS background utility classes on elements (e.g. bg--ultra-light).
-		$classes = array_merge( $classes, $this->get_preserved_acss_background_classes() );
+		// Preserve resolved Bricks global class names even when no style-map entry exists.
+		$classes = array_merge( $classes, $this->get_resolved_global_class_names() );
+		// Preserve custom class tokens from Bricks `_cssClasses` as class names.
+		$classes = array_merge( $classes, $this->get_custom_css_class_tokens() );
 
 		$classes = array_values( array_unique( array_filter( $classes ) ) );
 
@@ -118,11 +120,42 @@ abstract class EFS_Base_Element {
 	}
 
 	/**
-	 * Collect ACSS background utility class names attached to the current element.
+	 * Collect plain class tokens from Bricks `_cssClasses`.
 	 *
 	 * @return array<int,string>
 	 */
-	protected function get_preserved_acss_background_classes() {
+	protected function get_custom_css_class_tokens() {
+		$classes = array();
+		$element = is_array( $this->current_element ) ? $this->current_element : array();
+		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$raw      = isset( $settings['_cssClasses'] ) && is_scalar( $settings['_cssClasses'] ) ? trim( (string) $settings['_cssClasses'] ) : '';
+
+		if ( '' === $raw ) {
+			return $classes;
+		}
+
+		$tokens = preg_split( '/\s+/', $raw );
+		if ( ! is_array( $tokens ) ) {
+			return $classes;
+		}
+
+		foreach ( $tokens as $token ) {
+			$token = trim( (string) $token );
+			if ( '' === $token ) {
+				continue;
+			}
+			$classes[] = $token;
+		}
+
+		return $classes;
+	}
+
+	/**
+	 * Collect resolved Bricks global class names attached to the current element.
+	 *
+	 * @return array<int,string>
+	 */
+	protected function get_resolved_global_class_names() {
 		$classes = array();
 
 		$element = is_array( $this->current_element ) ? $this->current_element : array();
@@ -130,40 +163,14 @@ abstract class EFS_Base_Element {
 			return $classes;
 		}
 
-		static $class_name_by_id = null;
-		if ( null === $class_name_by_id ) {
-			$class_name_by_id = array();
-			$global_classes   = get_option( 'bricks_global_classes', array() );
-			if ( is_string( $global_classes ) ) {
-				$decoded = json_decode( $global_classes, true );
-				if ( is_array( $decoded ) ) {
-					$global_classes = $decoded;
-				}
-			}
-
-			if ( is_array( $global_classes ) ) {
-				foreach ( $global_classes as $class_data ) {
-					if ( ! is_array( $class_data ) || empty( $class_data['id'] ) ) {
-						continue;
-					}
-					$id   = trim( (string) $class_data['id'] );
-					$name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
-					if ( '' === $id || '' === $name ) {
-						continue;
-					}
-					$class_name_by_id[ $id ] = ltrim( preg_replace( '/^acss_import_/', '', $name ), '.' );
-				}
-			}
-		}
-
 		foreach ( $element['settings']['_cssGlobalClasses'] as $class_id ) {
 			$id = is_scalar( $class_id ) ? trim( (string) $class_id ) : '';
-			if ( '' === $id || empty( $class_name_by_id[ $id ] ) ) {
+			if ( '' === $id ) {
 				continue;
 			}
 
-			$name = (string) $class_name_by_id[ $id ];
-			if ( 0 === strpos( $name, 'bg--' ) ) {
+			$name = $this->resolve_global_class_name_by_id( $id );
+			if ( '' !== $name ) {
 				$classes[] = $name;
 			}
 		}
@@ -530,6 +537,18 @@ abstract class EFS_Base_Element {
 			if ( '' === $key || empty( $acss_inline_map[ $key ] ) ) {
 				continue;
 			}
+			$class_name = $this->resolve_global_class_name_by_id( $key );
+			// Keep ACSS background utility classes as classes only; no inline fallback needed.
+			if (
+				'' !== $class_name
+				&& (
+					0 === strpos( $class_name, 'bg--' )
+					|| 'is-bg' === $class_name
+					|| 0 === strpos( $class_name, 'is-bg-' )
+				)
+			) {
+				continue;
+			}
 			$declarations[] = trim( (string) $acss_inline_map[ $key ] );
 		}
 
@@ -538,6 +557,47 @@ abstract class EFS_Base_Element {
 		}
 
 		return implode( ' ', array_unique( array_filter( $declarations ) ) );
+	}
+
+	/**
+	 * Resolve Bricks global class name from class ID.
+	 *
+	 * @param string $class_id Bricks global class id.
+	 * @return string
+	 */
+	protected function resolve_global_class_name_by_id( $class_id ) {
+		$class_id = trim( (string) $class_id );
+		if ( '' === $class_id ) {
+			return '';
+		}
+
+		static $class_name_by_id = null;
+		if ( null === $class_name_by_id ) {
+			$class_name_by_id = array();
+			$global_classes   = get_option( 'bricks_global_classes', array() );
+			if ( is_string( $global_classes ) ) {
+				$decoded = json_decode( $global_classes, true );
+				if ( is_array( $decoded ) ) {
+					$global_classes = $decoded;
+				}
+			}
+
+			if ( is_array( $global_classes ) ) {
+				foreach ( $global_classes as $class_data ) {
+					if ( ! is_array( $class_data ) || empty( $class_data['id'] ) ) {
+						continue;
+					}
+					$id   = trim( (string) $class_data['id'] );
+					$name = isset( $class_data['name'] ) ? trim( (string) $class_data['name'] ) : '';
+					if ( '' === $id || '' === $name ) {
+						continue;
+					}
+					$class_name_by_id[ $id ] = ltrim( preg_replace( '/^acss_import_/', '', $name ), '.' );
+				}
+			}
+		}
+
+		return isset( $class_name_by_id[ $class_id ] ) ? (string) $class_name_by_id[ $class_id ] : '';
 	}
 
 	/**

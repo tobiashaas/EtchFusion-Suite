@@ -4,7 +4,7 @@
 ![CodeQL](https://github.com/tobiashaas/EtchFusion-Suite/workflows/CodeQL/badge.svg)
 ![PHP Version](https://img.shields.io/badge/PHP-7.4%20%7C%208.1%20%7C%208.2%20%7C%208.3%20%7C%208.4-blue)
 
-**Version:** 0.12.1  
+**Version:** 0.12.2  
 **Status:** ✅ Production Ready
 **Release Automation:** ✅ GitHub Actions & build script
 
@@ -619,4 +619,4 @@ GPL v2 or later
 ---
 
 **Last Updated:** February 2026  
-**Version:** 0.12.1
+**Version:** 0.12.2

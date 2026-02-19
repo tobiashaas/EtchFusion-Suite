@@ -1271,6 +1271,7 @@ class EFS_Gutenberg_Generator {
 				$dynamic_context  = $is_loop_element ? array(
 					'scope'      => 'loop',
 					'loop_alias' => 'item',
+					'loop_query' => $element['settings']['query'],
 				) : array();
 				$result = $this->dynamic_data_converter->convert_content( $result, $dynamic_context );
 				return $this->wrap_loop_block_if_needed( $element, $result );
@@ -1507,6 +1508,11 @@ class EFS_Gutenberg_Generator {
 			'order'          => '$order ?? \'DESC\'',
 			'post_status'    => 'publish',
 		);
+
+		// Attachment loops in Etch expect `published` status.
+		if ( 'attachment' === $post_type ) {
+			$args['post_status'] = 'published';
+		}
 
 		if ( isset( $query['posts_per_page'] ) && is_scalar( $query['posts_per_page'] ) && '' !== trim( (string) $query['posts_per_page'] ) ) {
 			$args['posts_per_page'] = (string) $query['posts_per_page'];
