@@ -83,12 +83,19 @@ class EFS_Element_Heading extends EFS_Base_Element {
 			$link_attributes['rel']    = 'noopener noreferrer';
 		}
 
-		$text_html = '<a href="' . esc_url( $link_url ) . '"';
+		$link_attributes = array(
+			'href' => $link_url,
+		);
 		if ( $new_tab ) {
-			$text_html .= ' target="_blank" rel="noopener noreferrer"';
+			$link_attributes['target'] = '_blank';
+			$link_attributes['rel']    = 'noopener noreferrer';
 		}
-		$text_html .= '>' . $text . '</a>';
 
-		return $this->generate_etch_text_block( $text_html );
+		$link_attrs = $this->build_attributes( 'Heading Link', array(), $link_attributes, 'a', array() );
+
+		return $this->generate_etch_element_block(
+			$link_attrs,
+			$this->generate_etch_text_block( $text )
+		);
 	}
 }

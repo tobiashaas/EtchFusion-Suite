@@ -1511,7 +1511,7 @@ class EFS_Gutenberg_Generator {
 
 		// Attachments use regular WP post status here.
 		if ( 'attachment' === $post_type ) {
-			$args['post_status'] = 'publish';
+			$args['post_status'] = 'inherit';
 		}
 
 		if ( isset( $query['posts_per_page'] ) && is_scalar( $query['posts_per_page'] ) && '' !== trim( (string) $query['posts_per_page'] ) ) {

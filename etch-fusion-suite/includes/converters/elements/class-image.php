@@ -111,6 +111,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 			'featured_image'    => '{this.image.id}',
 			'post_thumbnail'    => '{this.image.id}',
 			'woo_product_image' => '{this.image.id}',
+			'post_id'           => '{this.id}',
 		);
 
 		if ( isset( $map[ $tag ] ) ) {

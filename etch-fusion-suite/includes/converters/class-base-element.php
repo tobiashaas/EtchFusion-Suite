@@ -100,7 +100,7 @@ abstract class EFS_Base_Element {
 				if ( $etch_data['id'] === $style_id && isset( $etch_data['selector'] ) ) {
 					// Remove leading dot from selector
 					$class = ltrim( $etch_data['selector'], '.' );
-					if ( $this->is_acss_selector_name( $class ) ) {
+					if ( $this->is_acss_selector_name( $class ) && ! $this->is_available_acss_selector_name( $class ) ) {
 						break;
 					}
 					$classes[] = $class;
@@ -624,6 +624,55 @@ abstract class EFS_Base_Element {
 		}
 
 		return preg_match( '/^[a-zA-Z0-9_-]+$/', $name ) ? $name : '';
+	}
+
+	/**
+	 * Check if ACSS class should stay as class attribute (not filtered as utility).
+	 *
+	 * @param string $class_name Normalized class name.
+	 * @return bool
+	 */
+	protected function is_preserved_background_class( $class_name ) {
+		$class_name = trim( (string) $class_name );
+		if ( '' === $class_name ) {
+			return false;
+		}
+
+		return 0 === strpos( $class_name, 'bg--' )
+			|| 'is-bg' === $class_name
+			|| 0 === strpos( $class_name, 'is-bg-' );
+	}
+
+	/**
+	 * Check if ACSS selector currently exists in the imported ACSS stylesheet map.
+	 *
+	 * @param string $class_name Selector without leading dot.
+	 * @return bool
+	 */
+	protected function is_available_acss_selector_name( $class_name ) {
+		$class_name = trim( (string) $class_name );
+		if ( '' === $class_name ) {
+			return false;
+		}
+
+		static $available = null;
+		if ( null === $available ) {
+			$available = array();
+			$map       = get_option( 'efs_acss_inline_style_map', array() );
+			if ( is_array( $map ) ) {
+				foreach ( array_keys( $map ) as $key ) {
+					if ( ! is_scalar( $key ) ) {
+						continue;
+					}
+					$name = $this->normalize_class_name_token( (string) $key );
+					if ( '' !== $name ) {
+						$available[ $name ] = true;
+					}
+				}
+			}
+		}
+
+		return isset( $available[ $class_name ] );
 	}
 
 	/**
