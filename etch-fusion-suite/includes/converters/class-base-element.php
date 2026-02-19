@@ -196,8 +196,9 @@ abstract class EFS_Base_Element {
 	 * @return string Label
 	 */
 	protected function get_label( $element ) {
-		$raw_label = $element['label'] ?? ucfirst( $this->element_type );
-		return $this->sanitize_label( $raw_label, ucfirst( $this->element_type ) );
+		$default_label = $this->get_default_element_label();
+		$raw_label     = $element['label'] ?? $default_label;
+		return $this->sanitize_label( $raw_label, $default_label );
 	}
 
 	/**
@@ -239,11 +240,16 @@ abstract class EFS_Base_Element {
 	 */
 	protected function build_attributes( $label, $style_ids, $etch_attributes, $tag = 'div', $element = array() ) {
 		$etch_attributes   = $this->merge_pending_acss_inline_style( $etch_attributes, $element );
-		$label             = $this->sanitize_label( $label, ucfirst( $this->element_type ) );
+		$label             = $this->sanitize_label( $label, $this->get_default_element_label() );
 		$custom_attributes = $this->extract_custom_attributes( $element );
 		if ( ! empty( $custom_attributes ) ) {
 			$etch_attributes = array_merge( $custom_attributes, (array) $etch_attributes );
 		}
+		$resolved_id = $this->resolve_element_id_attribute( $element, (array) $etch_attributes );
+		if ( '' !== $resolved_id ) {
+			$etch_attributes['id'] = $resolved_id;
+		}
+		$etch_attributes = $this->normalize_id_reference_attributes( (array) $etch_attributes );
 
 		return array(
 			'metadata'   => array(
@@ -253,6 +259,20 @@ abstract class EFS_Base_Element {
 			'attributes' => $this->normalize_attributes( $etch_attributes ),
 			'styles'     => $this->normalize_style_ids( $style_ids ),
 		);
+	}
+
+	/**
+	 * Build a null-safe default label from the converter element type.
+	 *
+	 * @return string
+	 */
+	protected function get_default_element_label() {
+		$element_type = is_scalar( $this->element_type ) ? trim( (string) $this->element_type ) : '';
+		if ( '' === $element_type ) {
+			return 'Element';
+		}
+
+		return ucfirst( $element_type );
 	}
 
 	/**
@@ -295,6 +315,121 @@ abstract class EFS_Base_Element {
 		}
 
 		return $normalized;
+	}
+
+	/**
+	 * Resolve HTML id attribute for the current element.
+	 *
+	 * Priority:
+	 * 1) Existing `id` already present in attributes (e.g. custom attribute or converter override)
+	 * 2) Bricks settings id fields (`_cssId`, `cssId`, `id`)
+	 *
+	 * @param array $element Source Bricks element.
+	 * @param array $attributes Current Etch attributes.
+	 * @return string
+	 */
+	protected function resolve_element_id_attribute( $element, array $attributes ) {
+		$candidate = '';
+
+		if ( isset( $attributes['id'] ) && is_scalar( $attributes['id'] ) ) {
+			$candidate = (string) $attributes['id'];
+		}
+
+		if ( '' === trim( $candidate ) && is_array( $element ) ) {
+			$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+			foreach ( array( '_cssId', 'cssId', 'id' ) as $key ) {
+				if ( isset( $settings[ $key ] ) && is_scalar( $settings[ $key ] ) ) {
+					$candidate = (string) $settings[ $key ];
+					if ( '' !== trim( $candidate ) ) {
+						break;
+					}
+				}
+			}
+		}
+
+		return $this->normalize_html_id_token( $candidate );
+	}
+
+	/**
+	 * Normalize attribute values that reference element IDs.
+	 *
+	 * @param array $attributes Attribute map.
+	 * @return array
+	 */
+	protected function normalize_id_reference_attributes( array $attributes ) {
+		$id_ref_attributes = array(
+			'for',
+			'aria-labelledby',
+			'aria-describedby',
+			'aria-controls',
+			'aria-owns',
+			'aria-activedescendant',
+		);
+
+		foreach ( $id_ref_attributes as $name ) {
+			if ( ! isset( $attributes[ $name ] ) || ! is_scalar( $attributes[ $name ] ) ) {
+				continue;
+			}
+			$raw   = trim( (string) $attributes[ $name ] );
+			$parts = preg_split( '/\s+/', $raw );
+			$parts = is_array( $parts ) ? $parts : array( $raw );
+			$parts = array_map( array( $this, 'normalize_html_id_reference_token' ), $parts );
+			$parts = array_values(
+				array_filter(
+					$parts,
+					static function ( $part ) {
+						return '' !== trim( (string) $part );
+					}
+				)
+			);
+			$attributes[ $name ] = implode( ' ', $parts );
+		}
+
+		foreach ( array( 'href', 'xlink:href' ) as $name ) {
+			if ( ! isset( $attributes[ $name ] ) || ! is_scalar( $attributes[ $name ] ) ) {
+				continue;
+			}
+			$value = trim( (string) $attributes[ $name ] );
+			if ( '' === $value || 0 !== strpos( $value, '#' ) ) {
+				continue;
+			}
+			$attributes[ $name ] = '#' . $this->normalize_html_id_reference_token( substr( $value, 1 ) );
+		}
+
+		return $attributes;
+	}
+
+	/**
+	 * Normalize an ID token used as an element attribute.
+	 *
+	 * @param string $token Raw id token.
+	 * @return string
+	 */
+	protected function normalize_html_id_token( $token ) {
+		$token = trim( ltrim( (string) $token, '#' ) );
+		if ( '' === $token ) {
+			return '';
+		}
+
+		if ( preg_match( '/^brxe-(.+)$/i', $token, $matches ) ) {
+			$token = 'etch-' . $matches[1];
+		}
+
+		if ( preg_match( '/\s/', $token ) ) {
+			return '';
+		}
+
+		return $token;
+	}
+
+	/**
+	 * Normalize a token that references another element by ID.
+	 *
+	 * @param string $token Raw reference token.
+	 * @return string
+	 */
+	protected function normalize_html_id_reference_token( $token ) {
+		return $this->normalize_html_id_token( $token );
 	}
 
 	/**
@@ -353,23 +488,42 @@ abstract class EFS_Base_Element {
 		if ( ! empty( $settings['_cssGlobalClasses'] ) && is_array( $settings['_cssGlobalClasses'] ) ) {
 			foreach ( $settings['_cssGlobalClasses'] as $class_id ) {
 				$key = is_scalar( $class_id ) ? trim( (string) $class_id ) : '';
-				if ( '' === $key || empty( $this->style_map[ $key ]['id'] ) ) {
+				if ( '' === $key ) {
 					continue;
 				}
 
-				$selector = isset( $this->style_map[ $key ]['selector'] ) ? ltrim( (string) $this->style_map[ $key ]['selector'], '.' ) : '';
-				if ( '' === $selector || $this->is_utility_like_selector( $selector ) || $this->is_acss_selector_name( $selector ) ) {
+				$selector = '';
+				$style_id = '';
+				if ( isset( $this->style_map[ $key ] ) && is_array( $this->style_map[ $key ] ) ) {
+					$selector = isset( $this->style_map[ $key ]['selector'] ) ? ltrim( (string) $this->style_map[ $key ]['selector'], '.' ) : '';
+					$style_id = isset( $this->style_map[ $key ]['id'] ) ? trim( (string) $this->style_map[ $key ]['id'] ) : '';
+				} elseif ( isset( $this->style_map[ $key ] ) && is_scalar( $this->style_map[ $key ] ) ) {
+					// Legacy map format: Bricks ID => Etch style ID string.
+					$style_id = trim( (string) $this->style_map[ $key ] );
+				}
+
+				if ( '' === $selector ) {
+					$selector = $this->resolve_global_class_name_by_id( $key );
+				}
+
+				if ( '' === $selector || '' === $style_id || $this->is_utility_like_selector( $selector ) || $this->is_acss_selector_name( $selector ) || $this->is_modifier_like_selector( $selector ) ) {
 					continue;
 				}
 
-				$candidate_style_ids[] = (string) $this->style_map[ $key ]['id'];
+				$candidate_style_ids[] = $style_id;
 			}
 		}
 
 		if ( isset( $settings['_cssClasses'] ) && is_string( $settings['_cssClasses'] ) ) {
 			$tokens = array_values( array_filter( preg_split( '/\s+/', trim( $settings['_cssClasses'] ) ) ) );
 			foreach ( $tokens as $token ) {
-				if ( $this->is_utility_like_selector( $token ) || $this->is_acss_selector_name( $token ) ) {
+				if ( $this->is_utility_like_selector( $token ) || $this->is_acss_selector_name( $token ) || $this->is_modifier_like_selector( $token ) ) {
+					continue;
+				}
+
+				$fallback_style_id = $this->find_style_id_by_class_name( $token );
+				if ( '' !== $fallback_style_id ) {
+					$candidate_style_ids[] = $fallback_style_id;
 					continue;
 				}
 
@@ -392,6 +546,53 @@ abstract class EFS_Base_Element {
 	}
 
 	/**
+	 * Resolve an Etch style ID by class selector from current style map or etch_styles option.
+	 *
+	 * @param string $class_name Class selector token without leading dot.
+	 * @return string
+	 */
+	protected function find_style_id_by_class_name( $class_name ) {
+		$class_name = trim( (string) $class_name );
+		if ( '' === $class_name ) {
+			return '';
+		}
+
+		foreach ( $this->style_map as $style_data ) {
+			if ( ! is_array( $style_data ) ) {
+				continue;
+			}
+			$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
+			if ( $selector !== $class_name ) {
+				continue;
+			}
+			$style_id = isset( $style_data['id'] ) ? trim( (string) $style_data['id'] ) : '';
+			if ( '' !== $style_id ) {
+				return $style_id;
+			}
+		}
+
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $etch_styles ) ) {
+			return '';
+		}
+
+		foreach ( $etch_styles as $style_id => $style_data ) {
+			if ( ! is_array( $style_data ) ) {
+				continue;
+			}
+			$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
+			if ( $selector === $class_name ) {
+				$id = trim( (string) $style_id );
+				if ( '' !== $id ) {
+					return $id;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Identify utility classes that should not become merge targets.
 	 *
 	 * @param string $selector Class name without dot.
@@ -408,6 +609,25 @@ abstract class EFS_Base_Element {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Identify BEM-like modifier classes that should not be counted as merge targets.
+	 *
+	 * Examples:
+	 * - card--featured
+	 * - card__row--featured
+	 *
+	 * @param string $selector Class name without dot.
+	 * @return bool
+	 */
+	protected function is_modifier_like_selector( $selector ) {
+		$name = trim( (string) $selector );
+		if ( '' === $name ) {
+			return false;
+		}
+
+		return false !== strpos( $name, '--' );
 	}
 
 	/**
@@ -548,18 +768,6 @@ abstract class EFS_Base_Element {
 			if ( '' === $key || empty( $acss_inline_map[ $key ] ) ) {
 				continue;
 			}
-			$class_name = $this->resolve_global_class_name_by_id( $key );
-			// Keep ACSS background utility classes as classes only; no inline fallback needed.
-			if (
-				'' !== $class_name
-				&& (
-					0 === strpos( $class_name, 'bg--' )
-					|| 'is-bg' === $class_name
-					|| 0 === strpos( $class_name, 'is-bg-' )
-				)
-			) {
-				continue;
-			}
 			$declarations[] = trim( (string) $acss_inline_map[ $key ] );
 		}
 
@@ -624,23 +832,6 @@ abstract class EFS_Base_Element {
 		}
 
 		return preg_match( '/^[a-zA-Z0-9_-]+$/', $name ) ? $name : '';
-	}
-
-	/**
-	 * Check if ACSS class should stay as class attribute (not filtered as utility).
-	 *
-	 * @param string $class_name Normalized class name.
-	 * @return bool
-	 */
-	protected function is_preserved_background_class( $class_name ) {
-		$class_name = trim( (string) $class_name );
-		if ( '' === $class_name ) {
-			return false;
-		}
-
-		return 0 === strpos( $class_name, 'bg--' )
-			|| 'is-bg' === $class_name
-			|| 0 === strpos( $class_name, 'is-bg-' );
 	}
 
 	/**
