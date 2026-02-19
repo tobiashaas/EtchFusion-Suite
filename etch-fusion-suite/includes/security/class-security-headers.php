@@ -78,6 +78,7 @@ class EFS_Security_Headers {
 		$directives = apply_filters( 'efs_security_headers_csp_directives', $directives, $context );
 		$directives = $this->apply_bricks_builder_overrides( $directives );
 		$directives = $this->apply_etch_editor_overrides( $directives );
+		$directives = $this->apply_etch_frontend_overrides( $directives );
 
 		return $this->compile_csp_directives( $directives );
 	}
@@ -256,6 +257,27 @@ class EFS_Security_Headers {
 	}
 
 	/**
+	 * Apply CSP overrides for Etch-rendered frontend pages.
+	 *
+	 * Some Etch runtime bundles on migrated frontend pages use eval-like helpers and the
+	 * same font CDN as the editor. Without these allowances pages can throw CSP errors.
+	 *
+	 * @param array $directives Current directive map.
+	 * @return array
+	 */
+	protected function apply_etch_frontend_overrides( array $directives ) {
+		if ( $this->is_admin_page() || ! $this->is_etch_frontend_request() ) {
+			return $directives;
+		}
+
+		$directives = $this->ensure_csp_values( $directives, 'script-src', array( "'unsafe-eval'" ) );
+		$directives = $this->ensure_csp_values( $directives, 'worker-src', array( "'self'", 'blob:' ) );
+		$directives = $this->ensure_csp_values( $directives, 'font-src', array( 'https://r2cdn.perplexity.ai' ) );
+
+		return $directives;
+	}
+
+	/**
 	 * Determine whether the current request is loading the Etch visual editor.
 	 *
 	 * @return bool
@@ -270,6 +292,29 @@ class EFS_Security_Headers {
 		$etch_param = sanitize_text_field( (string) $etch_param );
 
 		return 'magic' === $etch_param || 'editor' === $etch_param;
+	}
+
+	/**
+	 * Determine whether current frontend request renders Etch blocks.
+	 *
+	 * @return bool
+	 */
+	private function is_etch_frontend_request() {
+		if ( ! function_exists( 'is_singular' ) || ! is_singular() ) {
+			return false;
+		}
+
+		$post = get_queried_object();
+		if ( ! ( $post instanceof \WP_Post ) ) {
+			return false;
+		}
+
+		$content = isset( $post->post_content ) ? (string) $post->post_content : '';
+		if ( '' === $content ) {
+			return false;
+		}
+
+		return false !== strpos( $content, '<!-- wp:etch/' );
 	}
 
 	/**

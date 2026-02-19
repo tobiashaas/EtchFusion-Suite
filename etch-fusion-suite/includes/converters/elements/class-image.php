@@ -38,6 +38,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 		$alt_text     = $element['settings']['alt'] ?? ( $image_data['alt'] ?? '' );
 		$caption      = $element['settings']['caption'] ?? '';
 		$figure_attrs = array();
+		$img_style    = $this->resolve_cover_img_style( $css_classes );
 
 		$alt_text = is_string( $alt_text ) ? $alt_text : '';
 		$caption  = is_string( $caption ) ? $caption : '';
@@ -53,7 +54,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 				}
 				$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element );
 
-				$img_block = $this->generate_dynamic_image_block( 0, $dynamic_src, $alt_text, $dynamic_media_id );
+				$img_block = $this->generate_dynamic_image_block( 0, $dynamic_src, $alt_text, $dynamic_media_id, $img_style );
 				return $this->generate_etch_element_block( $figure_block_attrs, array( $img_block ) );
 			}
 			// Unknown dynamic source — fall through to static handling (may return '' if no URL).
@@ -76,7 +77,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 
 		$figure_block_attrs = $this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element );
 
-		$img_block = $this->generate_dynamic_image_block( $image_id, $image_url, $alt_text );
+		$img_block = $this->generate_dynamic_image_block( $image_id, $image_url, $alt_text, false, $img_style );
 
 		$inner_blocks = array( $img_block );
 
@@ -140,7 +141,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 	 * @param bool   $dynamic_media_id Whether image_url carries a dynamic mediaId expression.
 	 * @return string
 	 */
-	private function generate_dynamic_image_block( $source_image_id, $image_url, $alt_text, $dynamic_media_id = false ) {
+	private function generate_dynamic_image_block( $source_image_id, $image_url, $alt_text, $dynamic_media_id = false, $img_style = '' ) {
 		$attributes = array();
 
 		$mapped_media_id = $this->get_mapped_target_media_id( (int) $source_image_id );
@@ -152,6 +153,9 @@ class EFS_Element_Image extends EFS_Base_Element {
 		} else {
 			$attributes['src'] = (string) $image_url;
 			$attributes['alt'] = (string) $alt_text;
+		}
+		if ( '' !== trim( (string) $img_style ) ) {
+			$attributes['style'] = trim( (string) $img_style );
 		}
 
 		$dynamic_attrs = array(
@@ -165,6 +169,32 @@ class EFS_Element_Image extends EFS_Base_Element {
 		$json = wp_json_encode( $dynamic_attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
 		return '<!-- wp:etch/dynamic-image ' . $json . " -->\n\n<!-- /wp:etch/dynamic-image -->";
+	}
+
+	/**
+	 * Resolve image inline style for cover-like figure wrappers.
+	 *
+	 * @param string $css_classes Wrapper classes.
+	 * @return string
+	 */
+	private function resolve_cover_img_style( $css_classes ) {
+		$tokens = preg_split( '/\s+/', trim( (string) $css_classes ) );
+		if ( ! is_array( $tokens ) ) {
+			return '';
+		}
+
+		foreach ( $tokens as $token ) {
+			$token = trim( (string) $token );
+			if ( '' === $token ) {
+				continue;
+			}
+
+			if ( false !== strpos( $token, '__image' ) || false !== strpos( $token, 'bg-image' ) || 'is-bg' === $token ) {
+				return 'object-fit: cover; inline-size: 100%; block-size: 100%;';
+			}
+		}
+
+		return '';
 	}
 
 	/**

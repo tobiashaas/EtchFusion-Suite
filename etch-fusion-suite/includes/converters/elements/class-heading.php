@@ -33,6 +33,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		$tag         = strtolower( $this->get_tag( $element, 'h3' ) );
 		$label       = $this->get_label( $element );
 		$text        = $element['settings']['text'] ?? 'Heading';
+		$link_data   = isset( $element['settings']['link'] ) ? $element['settings']['link'] : array();
 		$text        = is_string( $text ) ? $text : 'Heading';
 		$text        = wp_kses_post( $text );
 		$text        = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', $text );
@@ -49,8 +50,45 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		}
 
 		$attrs       = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
-		$inner_block = $this->generate_etch_text_block( $text );
+		$inner_block = $this->build_heading_inner_block( $text, $link_data );
 
 		return $this->generate_etch_element_block( $attrs, $inner_block );
+	}
+
+	/**
+	 * Build heading inner markup, preserving links when configured in Bricks.
+	 *
+	 * @param string       $text Heading text.
+	 * @param array|string $link_data Bricks link setting.
+	 * @return string
+	 */
+	private function build_heading_inner_block( $text, $link_data ) {
+		$link_url = '';
+		$new_tab  = false;
+
+		if ( is_array( $link_data ) ) {
+			$link_url = isset( $link_data['url'] ) && is_scalar( $link_data['url'] ) ? trim( (string) $link_data['url'] ) : '';
+			$new_tab  = ! empty( $link_data['newTab'] );
+		} elseif ( is_scalar( $link_data ) ) {
+			$link_url = trim( (string) $link_data );
+		}
+
+		if ( '' === $link_url ) {
+			return $this->generate_etch_text_block( $text );
+		}
+
+		$link_attributes = array( 'href' => $link_url );
+		if ( $new_tab ) {
+			$link_attributes['target'] = '_blank';
+			$link_attributes['rel']    = 'noopener noreferrer';
+		}
+
+		$text_html = '<a href="' . esc_url( $link_url ) . '"';
+		if ( $new_tab ) {
+			$text_html .= ' target="_blank" rel="noopener noreferrer"';
+		}
+		$text_html .= '>' . $text . '</a>';
+
+		return $this->generate_etch_text_block( $text_html );
 	}
 }

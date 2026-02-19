@@ -1,0 +1,23 @@
+# IDE / Editor
+.vscode/
+.idea/
+.fleet/
+*.code-workspace
+
+# AI coding tools / assistants
+.claude/
+.cursor/
+.windsurf/
+.windsruf/
+.codex/
+traycerAI.md
+
+# Local editor state
+.history/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

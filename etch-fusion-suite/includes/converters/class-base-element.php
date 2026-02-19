@@ -128,23 +128,30 @@ abstract class EFS_Base_Element {
 		$classes = array();
 		$element = is_array( $this->current_element ) ? $this->current_element : array();
 		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-		$raw      = isset( $settings['_cssClasses'] ) && is_scalar( $settings['_cssClasses'] ) ? trim( (string) $settings['_cssClasses'] ) : '';
+		$raw      = isset( $settings['_cssClasses'] ) ? $settings['_cssClasses'] : '';
 
-		if ( '' === $raw ) {
-			return $classes;
-		}
-
-		$tokens = preg_split( '/\s+/', $raw );
-		if ( ! is_array( $tokens ) ) {
-			return $classes;
-		}
-
-		foreach ( $tokens as $token ) {
-			$token = trim( (string) $token );
-			if ( '' === $token ) {
-				continue;
+		if ( is_string( $raw ) || is_numeric( $raw ) ) {
+			$tokens = preg_split( '/\s+/', trim( (string) $raw ) );
+			if ( is_array( $tokens ) ) {
+				foreach ( $tokens as $token ) {
+					$token = trim( (string) $token );
+					if ( '' === $token ) {
+						continue;
+					}
+					$classes[] = $token;
+				}
 			}
-			$classes[] = $token;
+		} elseif ( is_array( $raw ) ) {
+			foreach ( $raw as $token ) {
+				if ( ! is_scalar( $token ) ) {
+					continue;
+				}
+				$token = trim( (string) $token );
+				if ( '' === $token ) {
+					continue;
+				}
+				$classes[] = $token;
+			}
 		}
 
 		return $classes;
@@ -170,6 +177,10 @@ abstract class EFS_Base_Element {
 			}
 
 			$name = $this->resolve_global_class_name_by_id( $id );
+			// Some Bricks payloads store class names directly in _cssGlobalClasses.
+			if ( '' === $name ) {
+				$name = $this->normalize_class_name_token( $id );
+			}
 			if ( '' !== $name ) {
 				$classes[] = $name;
 			}
@@ -598,6 +609,21 @@ abstract class EFS_Base_Element {
 		}
 
 		return isset( $class_name_by_id[ $class_id ] ) ? (string) $class_name_by_id[ $class_id ] : '';
+	}
+
+	/**
+	 * Normalize a possible class token to a class name.
+	 *
+	 * @param string $token Raw token value.
+	 * @return string
+	 */
+	protected function normalize_class_name_token( $token ) {
+		$name = ltrim( preg_replace( '/^acss_import_/', '', trim( (string) $token ) ), '.' );
+		if ( '' === $name ) {
+			return '';
+		}
+
+		return preg_match( '/^[a-zA-Z0-9_-]+$/', $name ) ? $name : '';
 	}
 
 	/**
