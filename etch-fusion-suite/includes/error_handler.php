@@ -71,6 +71,11 @@ class EFS_Error_Handler {
 			'description' => 'API request exceeded timeout limit',
 			'solution'    => 'Increase timeout setting or check server resources',
 		),
+		'E107' => array(
+			'title'       => 'Failed to Send Post to Target',
+			'description' => 'Post could not be delivered to the target site after all retry attempts',
+			'solution'    => 'Check target site connectivity, verify the migration key is valid, then re-run or migrate the post individually',
+		),
 
 		// Migration Process Errors (E2xx)
 		'E201' => array(
@@ -251,6 +256,11 @@ class EFS_Error_Handler {
 			'title'       => 'Post Failed After Max Retries',
 			'description' => 'Post exhausted all retry attempts and was skipped',
 			'solution'    => 'Review the post manually and re-run or migrate it individually',
+		),
+		'W012' => array(
+			'title'       => 'Media Failed After Max Retries',
+			'description' => 'Media item exhausted all retry attempts and was skipped',
+			'solution'    => 'Review the media item manually and re-run or migrate it individually',
 		),
 	);
 

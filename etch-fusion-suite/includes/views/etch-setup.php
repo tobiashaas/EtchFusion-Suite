@@ -278,6 +278,10 @@ if ( '' === $etch_fusion_suite_generated_url
 					<dt><?php esc_html_e( 'Last Activity', 'etch-fusion-suite' ); ?></dt>
 					<dd data-efs-receiving-last-activity><?php esc_html_e( 'Not yet available', 'etch-fusion-suite' ); ?></dd>
 				</div>
+				<div>
+					<dt><?php esc_html_e( 'Elapsed', 'etch-fusion-suite' ); ?></dt>
+					<dd data-efs-receiving-elapsed hidden>—</dd>
+				</div>
 			</dl>
 
 			<p class="efs-etch-receiving-takeover__status" data-efs-receiving-status>

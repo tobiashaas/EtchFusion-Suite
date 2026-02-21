@@ -208,7 +208,7 @@ class EFS_CORS_Manager {
 		 *
 		 * @param array $headers Allowed request headers.
 		 */
-		$headers = apply_filters( 'efs_cors_allowed_headers', array( 'Content-Type', 'Authorization', 'X-WP-Nonce' ) );
+		$headers = apply_filters( 'efs_cors_allowed_headers', array( 'Content-Type', 'Authorization', 'X-WP-Nonce', 'X-EFS-Source-Origin', 'X-EFS-Items-Total' ) );
 
 		return $this->normalise_header_values( $headers );
 	}

@@ -30,11 +30,12 @@ class EFS_Content_Service {
 	/**
 	 * Analyze content statistics.
 	 *
+	 * @param array|null $post_types Optional. Post types to include in counts (passed to parser). When null/empty, default post types are used.
 	 * @return array
 	 */
-	public function analyze_content() {
-		$bricks_posts    = $this->content_parser->get_bricks_posts();
-		$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
+	public function analyze_content( $post_types = null ) {
+		$bricks_posts    = $this->content_parser->get_bricks_posts( $post_types );
+		$gutenberg_posts = $this->content_parser->get_gutenberg_posts( $post_types );
 		$media           = $this->content_parser->get_media();
 
 		return array(
@@ -55,20 +56,14 @@ class EFS_Content_Service {
 	 * @return array|\WP_Error
 	 */
 	public function migrate_posts( $target_url, $jwt_token, EFS_API_Client $api_client, $post_type_mappings = array(), $selected_post_types = array() ) {
-		$bricks_posts    = $this->content_parser->get_bricks_posts();
-		$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
+		$bricks_posts    = $this->content_parser->get_bricks_posts( $selected_post_types );
+		$gutenberg_posts = $this->content_parser->get_gutenberg_posts( $selected_post_types );
 		$media           = $this->content_parser->get_media();
 
 		$all_posts = array_merge(
 			is_array( $bricks_posts ) ? $bricks_posts : array(),
 			is_array( $gutenberg_posts ) ? $gutenberg_posts : array()
 		);
-
-		if ( ! empty( $selected_post_types ) ) {
-			$all_posts = array_filter( $all_posts, function ( $post ) use ( $selected_post_types ) {
-				return in_array( $post->post_type, $selected_post_types, true );
-			} );
-		}
 
 		if ( empty( $all_posts ) ) {
 			return array(
@@ -129,11 +124,10 @@ class EFS_Content_Service {
 
 		if ( empty( $etch_content ) ) {
 			$etch_content = '<!-- wp:paragraph --><p>Content migrated from Bricks (conversion pending)</p><!-- /wp:paragraph -->';
-			$this->error_handler->log_error(
-				'W002',
+			$this->error_handler->log_info(
+				'Bricks content found but conversion produced empty output — placeholder inserted',
 				array(
 					'post_id' => $post_id,
-					'action'  => 'Bricks content found but conversion produced empty output - using placeholder',
 				)
 			);
 		}
@@ -148,26 +142,29 @@ class EFS_Content_Service {
 	}
 
 	/**
+	 * @param array|null $post_types Optional. Post types to query (passed to parser).
 	 * @return array
 	 */
-	public function get_bricks_posts() {
-		return $this->content_parser->get_bricks_posts();
+	public function get_bricks_posts( $post_types = null ) {
+		return $this->content_parser->get_bricks_posts( $post_types );
 	}
 
 	/**
+	 * @param array|null $post_types Optional. Post types to query (passed to parser).
 	 * @return array
 	 */
-	public function get_gutenberg_posts() {
-		return $this->content_parser->get_gutenberg_posts();
+	public function get_gutenberg_posts( $post_types = null ) {
+		return $this->content_parser->get_gutenberg_posts( $post_types );
 	}
 
 	/**
+	 * @param array|null $post_types Optional. Post types to include (passed to parser).
 	 * @return array
 	 */
-	public function get_all_content() {
+	public function get_all_content( $post_types = null ) {
 		return array(
-			'bricks_posts'    => $this->get_bricks_posts(),
-			'gutenberg_posts' => $this->get_gutenberg_posts(),
+			'bricks_posts'    => $this->get_bricks_posts( $post_types ),
+			'gutenberg_posts' => $this->get_gutenberg_posts( $post_types ),
 			'media'           => $this->content_parser->get_media(),
 		);
 	}
@@ -239,15 +236,6 @@ class EFS_Content_Service {
 		$response     = $api_client->send_post( $target_url, $jwt_token, $post, $content, $target_post_type, $loop_presets );
 
 		if ( is_wp_error( $response ) ) {
-			$this->error_handler->log_error(
-				'E107',
-				array(
-					'post_id' => $post->ID,
-					'error'   => $response->get_error_message(),
-					'action'  => 'Failed to send post to target site',
-				)
-			);
-
 			return $response;
 		}
 

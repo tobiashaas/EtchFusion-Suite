@@ -55,11 +55,16 @@ class EFS_Migration_Token_Manager {
 	/**
 	 * Generate migration token (for API endpoint)
 	 *
-	 * @param string $target_url Target URL
-	 * @param int $expiration_seconds Token expiration time in seconds
-	 * @return array Token data with token, expires, and domain
+	 * @param string|null $target_url        Target URL (defaults to current site URL).
+	 * @param int|null    $expiration_seconds Token expiration in seconds.
+	 * @param string|null $source_url        Source site URL. When provided (reverse-generation
+	 *                                       flow), used as the token payload `domain` so that
+	 *                                       check_source_origin() on import endpoints validates
+	 *                                       X-EFS-Source-Origin headers from this caller.
+	 *                                       Defaults to home_url() (admin-generate flow).
+	 * @return array Token data with token, expires, and domain.
 	 */
-	public function generate_migration_token( $target_url = null, $expiration_seconds = null ) {
+	public function generate_migration_token( $target_url = null, $expiration_seconds = null, $source_url = null ) {
 		if ( empty( $expiration_seconds ) ) {
 			$expiration_seconds = self::TOKEN_EXPIRATION;
 		}
@@ -73,9 +78,16 @@ class EFS_Migration_Token_Manager {
 		$previous_token    = $this->migration_repository->get_token_value();
 		$had_previous      = ! empty( $previous_token );
 
+		// Reverse-generation flow: source_url is the calling site; store it as `domain`
+		// so that check_source_origin() can match X-EFS-Source-Origin on import endpoints.
+		// Falls back to home_url() for the admin-generate flow.
+		$domain = ( is_string( $source_url ) && '' !== trim( $source_url ) )
+			? esc_url_raw( trim( $source_url ) )
+			: $site_url;
+
 		$payload = array(
 			'target_url' => $target_url,
-			'domain'     => $site_url,
+			'domain'     => $domain,
 			'iat'        => $issued_at,
 			'exp'        => $expires_timestamp,
 			'jti'        => wp_generate_uuid4(),
@@ -97,7 +109,7 @@ class EFS_Migration_Token_Manager {
 		return array(
 			'token'                      => $token,
 			'expires'                    => $expires_timestamp,
-			'domain'                     => $site_url,
+			'domain'                     => $domain,
 			'created_at'                 => current_time( 'mysql' ),
 			'expires_at'                 => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 			'expiration_seconds'         => (int) $expiration_seconds,
@@ -223,8 +235,9 @@ class EFS_Migration_Token_Manager {
 			return array();
 		}
 
-		$domain = isset( $token_data['domain'] ) ? $token_data['domain'] : home_url();
-		$url    = $this->build_migration_url( $domain, $token );
+		// The migration URL always points to this (target) site regardless of which
+		// site's URL is stored in the token payload's `domain` field.
+		$url = $this->build_migration_url( home_url(), $token );
 		$expires_at = isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '';
 
 		return array(

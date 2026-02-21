@@ -159,6 +159,14 @@ class EFS_Content_Parser {
 			case 'iframe':
 				return $this->process_iframe_element( $element, $post_id );
 
+			case 'icon':
+				// Handled by EFS_Icon_Converter in conversion phase; pass through without logging.
+				return $this->process_generic_element( $element, $post_id );
+
+			case 'text-link':
+				// Handled by EFS_Element_TextLink in conversion phase; pass through without logging.
+				return $this->process_generic_element( $element, $post_id );
+
 			case 'gutenberg':
 				return $this->process_gutenberg_element( $element, $post_id );
 
@@ -453,13 +461,24 @@ class EFS_Content_Parser {
 	 * Get posts that have Bricks content
 	 * These posts have _bricks_page_content_2
 	 * Note: bricks_template posts don't have _bricks_editor_mode, so we only check for content
+	 *
+	 * @param array|null $post_types Optional. Post types to query. When non-empty, used as post_type (attachment stripped). When null/empty, uses post, page, bricks_template.
+	 * @return \WP_Post[]
 	 */
-	public function get_bricks_posts() {
+	public function get_bricks_posts( $post_types = null ) {
+		if ( is_array( $post_types ) && ! empty( $post_types ) ) {
+			$post_types   = array_diff( $post_types, array( 'attachment' ) );
+			$post_types   = array_values( array_unique( $post_types ) );
+			$post_type_arg = $post_types;
+		} else {
+			$post_type_arg = array( 'post', 'page', 'bricks_template' );
+		}
+
 		// Query for posts with Bricks meta data
 		// Only check for _bricks_page_content_2 (templates don't have _bricks_editor_mode)
 		// Note: 'any' doesn't include all CPTs, so we explicitly list post types
 		$args = array(
-			'post_type'   => array( 'post', 'page', 'bricks_template' ), // Explicitly include bricks_template
+			'post_type'   => $post_type_arg,
 			'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
 			'numberposts' => -1,
 			'meta_query'  => array(
@@ -492,11 +511,24 @@ class EFS_Content_Parser {
 	/**
 	 * Get posts that DON'T have Bricks content (Gutenberg/Classic Editor)
 	 * These are posts without _bricks_page_content_2 meta data
+	 *
+	 * @param array|null $post_types Optional. Post types to query. When non-empty, used as post_type (attachment and bricks_template stripped). When null/empty, uses post, page.
+	 * @return \WP_Post[]
 	 */
-	public function get_gutenberg_posts() {
+	public function get_gutenberg_posts( $post_types = null ) {
+		if ( is_array( $post_types ) && ! empty( $post_types ) ) {
+			$post_types    = array_diff( $post_types, array( 'attachment', 'bricks_template' ) );
+			$post_type_arg = array_values( $post_types );
+			if ( empty( $post_type_arg ) ) {
+				return array();
+			}
+		} else {
+			$post_type_arg = array( 'post', 'page' );
+		}
+
 		// Query for posts WITHOUT Bricks meta data
 		$args = array(
-			'post_type'   => array( 'post', 'page' ), // Only posts and pages, not CPTs
+			'post_type'   => $post_type_arg,
 			'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
 			'numberposts' => -1,
 			'meta_query'  => array(
@@ -526,10 +558,13 @@ class EFS_Content_Parser {
 	/**
 	 * Get ALL content (Bricks + Gutenberg + Media)
 	 * Used for total count
+	 *
+	 * @param array|null $post_types Optional. Post types to include (passed to get_bricks_posts and get_gutenberg_posts).
+	 * @return \WP_Post[]
 	 */
-	public function get_all_content() {
-		$bricks_posts    = $this->get_bricks_posts();
-		$gutenberg_posts = $this->get_gutenberg_posts();
+	public function get_all_content( $post_types = null ) {
+		$bricks_posts    = $this->get_bricks_posts( $post_types );
+		$gutenberg_posts = $this->get_gutenberg_posts( $post_types );
 		$media           = $this->get_media();
 
 		return array_merge( $bricks_posts, $gutenberg_posts, $media );

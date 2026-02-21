@@ -7,9 +7,11 @@
 
 namespace Bricks2Etch\Parsers;
 
+use Bricks2Etch\Converters\EFS_Base_Element;
 use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter;
 use Bricks2Etch\Converters\EFS_Element_Factory;
+use Bricks2Etch\Converters\Elements\EFS_Element_Div;
 use Bricks2Etch\Parsers\EFS_Content_Parser;
 
 // Prevent direct access
@@ -38,6 +40,12 @@ class EFS_Gutenberg_Generator {
 	 * Element factory instance (NEW - v0.5.0)
 	 */
 	private $element_factory;
+
+	/**
+	 * Shared EFS_Element_Div instance used to delegate brxe-block display fallback
+	 * to the canonical EFS_Base_Element::apply_brxe_block_display() helper.
+	 */
+	private $display_fallback_helper = null;
 
 	/**
 	 * Constructor
@@ -328,7 +336,10 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Ensure `.brxe-block` keeps Bricks' flex-container behavior when no layout class defines it.
+	 * Delegate brxe-block display fallback to the shared helper in EFS_Base_Element.
+	 *
+	 * All logic lives in EFS_Base_Element::apply_brxe_block_display() so the two
+	 * code paths (factory and legacy generator) share a single canonical implementation.
 	 *
 	 * @param array  $attributes Current Etch attributes.
 	 * @param array  $element    Source Bricks element.
@@ -337,305 +348,12 @@ class EFS_Gutenberg_Generator {
 	 * @return array
 	 */
 	private function apply_brxe_block_display_fallback( array $attributes, array $element, array $style_ids, $classes ) {
-		$class_list       = array_values( array_filter( preg_split( '/\s+/', trim( (string) $classes ) ) ) );
-		$is_block_element = 'block' === ( $element['name'] ?? '' );
-		// Fire for Bricks block-type elements OR when brxe-block appears explicitly in the class list.
-		if ( ! $is_block_element && ( empty( $class_list ) || ! in_array( 'brxe-block', $class_list, true ) ) ) {
-			return $attributes;
+		if ( null === $this->display_fallback_helper ) {
+			$style_map                     = get_option( 'efs_style_map', array() );
+			$this->display_fallback_helper = new EFS_Element_Div( $style_map );
 		}
 
-		$current_style  = isset( $attributes['style'] ) && is_scalar( $attributes['style'] ) ? (string) $attributes['style'] : '';
-		$current_layout = $this->get_layout_profile_from_css( $current_style );
-		if ( $current_layout['is_grid'] ) {
-			return $attributes;
-		}
-
-		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-		$display  = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
-		if ( in_array( $display, array( 'grid', 'inline-grid' ), true ) ) {
-			return $attributes;
-		}
-		$neighbor_classes = array();
-		foreach ( $class_list as $name ) {
-			$name = trim( (string) $name );
-			if ( '' === $name || 'brxe-block' === $name ) {
-				continue;
-			}
-			if ( $this->is_modifier_like_class_name( $name ) ) {
-				continue;
-			}
-			$neighbor_classes[] = $name;
-		}
-		$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
-
-		if ( 1 === count( $neighbor_classes ) ) {
-			$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
-			if ( $target_style_id ) {
-				$target_layout = $this->get_layout_profile_for_style_id( $target_style_id );
-				if ( $target_layout['is_grid'] ) {
-					return $attributes;
-				}
-				if ( $target_layout['is_flex'] ) {
-					return $attributes;
-				}
-
-				$declarations  = '';
-				$declarations .= 'display: flex;';
-				if ( ! $target_layout['has_flex_direction'] ) {
-					$declarations .= ( '' !== $declarations ? ' ' : '' ) . 'flex-direction: column;';
-				}
-
-				if ( '' !== $declarations ) {
-					$this->append_declarations_to_style_id( $target_style_id, $declarations );
-					$this->error_handler->log_warning(
-						'W006',
-						array(
-							'patched_class' => $neighbor_classes[0],
-							'declarations'  => $declarations,
-						)
-					);
-				}
-
-				return $attributes;
-			}
-		}
-
-		$style_layout         = $this->get_layout_profile_for_style_ids( $style_ids );
-		$inline_declarations  = '';
-		$display_is_derivable = $style_layout['is_flex']
-			|| $style_layout['is_grid']
-			|| $current_layout['is_flex']
-			|| in_array( $display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true );
-
-		if ( $display_is_derivable ) {
-			$inline_declarations = '';
-		} elseif ( $current_layout['has_flex_direction'] || $style_layout['has_flex_direction'] ) {
-			$inline_declarations = 'display: flex;';
-		} else {
-			$inline_declarations = 'display: flex; flex-direction: column;';
-		}
-
-		if ( '' === $inline_declarations ) {
-			return $attributes;
-		}
-
-		if ( '' !== trim( $current_style ) && ';' !== substr( rtrim( $current_style ), -1 ) ) {
-			$current_style .= ';';
-		}
-		$attributes['style'] = trim( $current_style . ' ' . $inline_declarations );
-		$this->error_handler->log_warning(
-			'W006',
-			array(
-				'element_id'   => $element['id'] ?? '',
-				'inline_style' => $inline_declarations,
-			)
-		);
-
-		return $attributes;
-	}
-
-	/**
-	 * Determine whether a class token is a BEM-like modifier class.
-	 *
-	 * @param string $class_name Class name token.
-	 * @return bool
-	 */
-	private function is_modifier_like_class_name( $class_name ) {
-		$class_name = trim( (string) $class_name );
-		if ( '' === $class_name ) {
-			return false;
-		}
-
-		return false !== strpos( $class_name, '--' );
-	}
-
-	/**
-	 * Resolve style ID by class selector from style map.
-	 *
-	 * @param string $class_name Class name without leading dot.
-	 * @return string
-	 */
-	private function find_style_id_by_class_name( $class_name ) {
-		$class_name = trim( (string) $class_name );
-		if ( '' === $class_name ) {
-			return '';
-		}
-
-		$style_map = get_option( 'efs_style_map', array() );
-		if ( ! is_array( $style_map ) ) {
-			return '';
-		}
-
-		foreach ( $style_map as $style_data ) {
-			if ( ! is_array( $style_data ) ) {
-				continue;
-			}
-			$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
-			if ( $selector !== $class_name ) {
-				continue;
-			}
-			$style_id = isset( $style_data['id'] ) ? trim( (string) $style_data['id'] ) : '';
-			if ( '' !== $style_id ) {
-				return $style_id;
-			}
-		}
-
-		// Fallback: direct selector lookup from Etch styles (covers legacy/incomplete style_map states).
-		$etch_styles = get_option( 'etch_styles', array() );
-		if ( is_array( $etch_styles ) ) {
-			foreach ( $etch_styles as $style_id => $style_data ) {
-				if ( ! is_array( $style_data ) ) {
-					continue;
-				}
-				$selector = isset( $style_data['selector'] ) ? ltrim( trim( (string) $style_data['selector'] ), '.' ) : '';
-				if ( $selector !== $class_name ) {
-					continue;
-				}
-				$id = trim( (string) $style_id );
-				if ( '' !== $id ) {
-					return $id;
-				}
-			}
-		}
-
-		return '';
-	}
-
-	/**
-	 * Get layout profile for one style ID.
-	 *
-	 * @param string $style_id Etch style ID.
-	 * @return array<string,bool>
-	 */
-	private function get_layout_profile_for_style_id( $style_id ) {
-		$style_id = trim( (string) $style_id );
-		if ( '' === $style_id ) {
-			return array(
-				'is_grid'            => false,
-				'is_flex'            => false,
-				'has_flex_direction' => false,
-			);
-		}
-
-		$etch_styles = get_option( 'etch_styles', array() );
-		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
-			return array(
-				'is_grid'            => false,
-				'is_flex'            => false,
-				'has_flex_direction' => false,
-			);
-		}
-
-		$css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
-			? (string) $etch_styles[ $style_id ]['css']
-			: '';
-
-		return $this->get_layout_profile_from_css( $css );
-	}
-
-	/**
-	 * Append declarations to a style ID once per request.
-	 *
-	 * @param string $style_id Etch style ID.
-	 * @param string $declarations CSS declarations to append.
-	 * @return void
-	 */
-	private function append_declarations_to_style_id( $style_id, $declarations ) {
-		$style_id     = trim( (string) $style_id );
-		$declarations = trim( (string) $declarations );
-		if ( '' === $style_id || '' === $declarations ) {
-			return;
-		}
-
-		static $writes = array();
-		$write_key     = $style_id . '|' . md5( $declarations );
-		if ( isset( $writes[ $write_key ] ) ) {
-			return;
-		}
-
-		$etch_styles = get_option( 'etch_styles', array() );
-		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
-			return;
-		}
-
-		$current_css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
-			? trim( (string) $etch_styles[ $style_id ]['css'] )
-			: '';
-
-		if ( false !== stripos( $current_css, trim( $declarations, ';' ) ) ) {
-			$writes[ $write_key ] = true;
-			return;
-		}
-
-		if ( '' !== $current_css && ';' !== substr( $current_css, -1 ) ) {
-			$current_css .= ';';
-		}
-		$etch_styles[ $style_id ]['css'] = trim( $current_css . ' ' . $declarations );
-		update_option( 'etch_styles', $etch_styles );
-		$writes[ $write_key ] = true;
-	}
-
-	/**
-	 * Aggregate layout profile across style IDs.
-	 *
-	 * @param array $style_ids Etch style IDs.
-	 * @return array<string,bool>
-	 */
-	private function get_layout_profile_for_style_ids( array $style_ids ) {
-		$profile = array(
-			'is_grid'            => false,
-			'is_flex'            => false,
-			'has_flex_direction' => false,
-		);
-
-		if ( empty( $style_ids ) ) {
-			return $profile;
-		}
-
-		static $etch_styles = null;
-		if ( null === $etch_styles ) {
-			$etch_styles = get_option( 'etch_styles', array() );
-			if ( ! is_array( $etch_styles ) ) {
-				$etch_styles = array();
-			}
-		}
-
-		foreach ( $style_ids as $style_id ) {
-			if ( ! is_scalar( $style_id ) ) {
-				continue;
-			}
-
-			$key = trim( (string) $style_id );
-			if ( '' === $key || empty( $etch_styles[ $key ] ) || ! is_array( $etch_styles[ $key ] ) ) {
-				continue;
-			}
-
-			$css = isset( $etch_styles[ $key ]['css'] ) && is_scalar( $etch_styles[ $key ]['css'] )
-				? (string) $etch_styles[ $key ]['css']
-				: '';
-
-			$item_profile                  = $this->get_layout_profile_from_css( $css );
-			$profile['is_grid']            = $profile['is_grid'] || $item_profile['is_grid'];
-			$profile['is_flex']            = $profile['is_flex'] || $item_profile['is_flex'];
-			$profile['has_flex_direction'] = $profile['has_flex_direction'] || $item_profile['has_flex_direction'];
-		}
-
-		return $profile;
-	}
-
-	/**
-	 * Read flex/grid/flex-direction state from a CSS string.
-	 *
-	 * @param string $css Raw CSS.
-	 * @return array<string,bool>
-	 */
-	private function get_layout_profile_from_css( $css ) {
-		$css = (string) $css;
-		return array(
-			'is_grid'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?grid\b/i', $css ),
-			'is_flex'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?flex\b/i', $css ),
-			'has_flex_direction' => (bool) preg_match( '/\bflex-direction\s*:/i', $css ),
-		);
+		return $this->display_fallback_helper->apply_brxe_block_display( $style_ids, $attributes, $element, $classes );
 	}
 
 	/**
@@ -737,7 +455,8 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
-		$tag = strtolower( (string) ( $element['settings']['tag'] ?? 'h3' ) );
+		$text = EFS_Base_Element::decode_html_entities_to_plain( $text );
+		$tag  = strtolower( (string) ( $element['settings']['tag'] ?? 'h3' ) );
 		if ( ! preg_match( '/^h[1-6]$/', $tag ) ) {
 			$tag = 'h3';
 		}
@@ -860,7 +579,8 @@ class EFS_Gutenberg_Generator {
 		);
 		$attrs                         = $this->build_flat_fallback_attrs( $fallback_element, 'a', $link_attributes );
 
-		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( (string) $text ) ) );
+		$text = EFS_Base_Element::decode_html_entities_to_plain( (string) $text );
+		return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $text ) ) );
 	}
 
 	/**
@@ -1049,8 +769,9 @@ class EFS_Gutenberg_Generator {
 		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
-		$style_map             = get_option( 'efs_style_map', array() );
-		$this->element_factory = new EFS_Element_Factory( $style_map, $this->error_handler );
+		$style_map                     = get_option( 'efs_style_map', array() );
+		$this->element_factory         = new EFS_Element_Factory( $style_map, $this->error_handler );
+		$this->display_fallback_helper = new EFS_Element_Div( $style_map );
 		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
 
 		// Build element lookup map (id => element)
@@ -1098,11 +819,10 @@ class EFS_Gutenberg_Generator {
 		}
 
 		if ( empty( $bricks_content ) || ! is_array( $bricks_content ) ) {
-			$this->error_handler->log_error(
-				'I020',
+			$this->error_handler->log_info(
+				'No Bricks content found for conversion',
 				array(
 					'post_id'      => $post->ID,
-					'action'       => 'No Bricks content found for conversion',
 					'content_type' => gettype( $bricks_content ),
 				)
 			);
@@ -1117,11 +837,10 @@ class EFS_Gutenberg_Generator {
 		$this->error_handler->log_info( 'Gutenberg Generator: Generated HTML length ' . strlen( $gutenberg_html ) );
 
 		if ( empty( $gutenberg_html ) ) {
-			$this->error_handler->log_error(
-				'I022',
+			$this->error_handler->log_info(
+				'Failed to generate Gutenberg blocks',
 				array(
 					'post_id' => $post->ID,
-					'action'  => 'Failed to generate Gutenberg blocks',
 				)
 			);
 			return false;
@@ -1142,12 +861,11 @@ class EFS_Gutenberg_Generator {
 		$target_url = $settings['target_url'] ?? '';
 
 		if ( empty( $target_url ) ) {
-			$this->error_handler->log_error(
-				'I024',
+			$this->error_handler->log_info(
+				'Failed to send blocks — missing target URL/API key',
 				array(
 					'post_id' => $post->ID,
-					'error'   => 'No target URL configured',
-					'action'  => 'Failed to send blocks to Etch API',
+					'reason'  => 'No target URL configured',
 				)
 			);
 			return false;
@@ -1157,12 +875,11 @@ class EFS_Gutenberg_Generator {
 		$api_key = $settings['api_key'] ?? '';
 
 		if ( empty( $api_key ) ) {
-			$this->error_handler->log_error(
-				'I024',
+			$this->error_handler->log_info(
+				'Failed to send blocks — missing target URL/API key',
 				array(
 					'post_id' => $post->ID,
-					'error'   => 'No API key found in settings',
-					'action'  => 'Failed to send blocks to Etch API',
+					'reason'  => 'No API key found in settings',
 				)
 			);
 			return false;
@@ -1440,50 +1157,50 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
-		if ( 'posts' === $preset_key ) {
-			foreach ( $loops as $existing_id => $loop ) {
-				if ( ! is_array( $loop ) ) {
-					continue;
-				}
-
-				$loop_key  = isset( $loop['key'] ) ? sanitize_key( (string) $loop['key'] ) : '';
-				$loop_name = isset( $loop['name'] ) ? strtolower( trim( (string) $loop['name'] ) ) : '';
-				if ( 'posts' === $loop_key || 'posts' === $loop_name || 'efs_posts' === $loop_name ) {
-					return (string) $existing_id;
-				}
+		$context_slug = $this->derive_loop_context_slug( $element );
+		if ( '' === $context_slug ) {
+			$context_slug = sanitize_key( $preset_key );
+			if ( '' === $context_slug ) {
+				$context_slug = 'posts';
 			}
 		}
+
+		$config_json = wp_json_encode( $config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$config_hash = is_string( $config_json ) ? substr( md5( $config_json ), 0, 8 ) : '';
 
 		foreach ( $loops as $existing_id => $loop ) {
 			if ( ! is_array( $loop ) || ! isset( $loop['config'] ) || ! is_array( $loop['config'] ) ) {
 				continue;
 			}
-
 			$existing_json = wp_json_encode( $loop['config'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-			$current_json  = wp_json_encode( $config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-			if ( is_string( $existing_json ) && is_string( $current_json ) && $existing_json === $current_json ) {
+			if ( ! is_string( $existing_json ) || $existing_json !== $config_json ) {
+				continue;
+			}
+			$existing_context = isset( $loop['context_slug'] ) ? (string) $loop['context_slug'] : '';
+			if ( '' === $existing_context ) {
+				$existing_context = 'posts';
+				if ( 'posts' !== $preset_key ) {
+					$existing_context = sanitize_key( $preset_key );
+				}
+			}
+			if ( $existing_context === $context_slug ) {
 				return (string) $existing_id;
 			}
 		}
 
-		$loop_id = 'posts';
-		$name    = 'EFS_posts';
-		$key     = 'posts';
-		if ( 'posts' !== $preset_key ) {
-			$hash    = substr( md5( wp_json_encode( $config ) ), 0, 8 );
-			$loop_id = 'efs_' . sanitize_key( $preset_key ) . '_' . $hash;
-			$name    = 'EFS_' . sanitize_text_field( $preset_key );
-			$key     = sanitize_key( $preset_key );
-			if ( '' === $key ) {
-				$key = 'posts';
-			}
+		$loop_id = $context_slug . '_' . $config_hash;
+		$name    = $context_slug;
+		$key     = 'posts' === $preset_key ? 'posts' : sanitize_key( $preset_key );
+		if ( '' === $key ) {
+			$key = 'posts';
 		}
 
 		$loops[ $loop_id ] = array(
-			'name'   => $name,
-			'key'    => $key,
-			'global' => true,
-			'config' => $config,
+			'name'         => $name,
+			'key'          => $key,
+			'global'       => true,
+			'config'       => $config,
+			'context_slug' => $context_slug,
 		);
 
 		update_option( 'etch_loops', $loops );
@@ -1661,6 +1378,7 @@ class EFS_Gutenberg_Generator {
 					$tag = 'h3';
 				}
 				$attrs = $this->build_flat_fallback_attrs( $element, $tag );
+				$content = EFS_Base_Element::decode_html_entities_to_plain( $content );
 				return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $content ) ) );
 
 			case 'paragraph':
@@ -1692,7 +1410,8 @@ class EFS_Gutenberg_Generator {
 					$link_attributes['target'] = sanitize_key( (string) $etch_data['target'] );
 				}
 
-				$attrs = $this->build_flat_fallback_attrs( $element, 'a', $link_attributes );
+				$attrs   = $this->build_flat_fallback_attrs( $element, 'a', $link_attributes );
+				$content = EFS_Base_Element::decode_html_entities_to_plain( $content );
 				return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $content ) ) );
 
 			default:
@@ -1888,6 +1607,29 @@ class EFS_Gutenberg_Generator {
 		}
 
 		return $normalized;
+	}
+
+	/**
+	 * Derive a URL-safe slug from the element label for use as loop context (e.g. "Feature Card Alpha" → "feature-card-alpha").
+	 *
+	 * @param array $element Bricks element with optional 'label' key.
+	 * @return string Slug or empty string if no usable label.
+	 */
+	private function derive_loop_context_slug( $element ) {
+		$label = isset( $element['label'] ) && is_scalar( $element['label'] ) ? trim( (string) $element['label'] ) : '';
+		if ( '' === $label ) {
+			return '';
+		}
+		$cleaned = $this->sanitize_element_label( $label, '' );
+		if ( '' === $cleaned ) {
+			return '';
+		}
+		$slug = strtolower( $cleaned );
+		$slug = preg_replace( '/[^a-z0-9\s-]/', '', $slug );
+		$slug = preg_replace( '/\s+/', '-', $slug );
+		$slug = preg_replace( '/-+/', '-', $slug );
+		$slug = trim( $slug, '-' );
+		return $slug;
 	}
 
 	/**

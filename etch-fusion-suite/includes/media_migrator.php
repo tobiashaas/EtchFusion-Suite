@@ -83,12 +83,12 @@ class EFS_Media_Migrator {
 				$result = $this->migrate_single_media( $source_media_id, $media_data, $target_url, $jwt_token );
 
 				if ( is_wp_error( $result ) ) {
-					$this->error_handler->log_error(
-						'E401',
+					$this->error_handler->log_warning(
+						'W012',
 						array(
 							'media_id'    => $media_id,
 							'source_id'   => $source_media_id,
-							'media_title' => $media_data['title'],
+							'title'       => $media_data['title'],
 							'error'       => $result->get_error_message(),
 							'action'      => 'Failed to migrate media file',
 						)
@@ -219,11 +219,12 @@ class EFS_Media_Migrator {
 		$result = $this->migrate_single_media( $media_id, $media_data, $target_url, $jwt_token );
 
 		if ( is_wp_error( $result ) ) {
-			$this->error_handler->log_error(
-				'E401',
+			$this->error_handler->log_warning(
+				'W012',
 				array(
 					'media_id'    => $media_id,
-					'media_title' => $media_data['title'],
+					'source_id'   => $media_id,
+					'title'       => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
 					'error'       => $result->get_error_message(),
 					'action'      => 'Failed to migrate media file',
 				)

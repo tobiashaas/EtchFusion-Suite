@@ -35,6 +35,7 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		$text        = $element['settings']['text'] ?? 'Heading';
 		$link_data   = isset( $element['settings']['link'] ) ? $element['settings']['link'] : array();
 		$text        = is_string( $text ) ? $text : 'Heading';
+		$text        = $this->decode_html_entities_once( $text );
 		$text        = wp_kses_post( $text );
 		$text        = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', $text );
 		$valid_tags  = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' );
@@ -78,14 +79,6 @@ class EFS_Element_Heading extends EFS_Base_Element {
 		}
 
 		$link_attributes = array( 'href' => $link_url );
-		if ( $new_tab ) {
-			$link_attributes['target'] = '_blank';
-			$link_attributes['rel']    = 'noopener noreferrer';
-		}
-
-		$link_attributes = array(
-			'href' => $link_url,
-		);
 		if ( $new_tab ) {
 			$link_attributes['target'] = '_blank';
 			$link_attributes['rel']    = 'noopener noreferrer';

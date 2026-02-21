@@ -3,6 +3,7 @@ import { showToast } from './ui.js';
 import { perfMetrics } from './utilities/perf-metrics.js';
 import { updateTabTitle, resetTabTitle } from './utilities/tab-title.js';
 import { createProgressChip, updateProgressChip, removeProgressChip } from './utilities/progress-chip.js';
+import { formatElapsed, formatEta } from './utilities/time-format.js';
 
 const ACTION_VALIDATE_URL = 'efs_wizard_validate_url';
 const ACTION_VALIDATE_TOKEN = 'efs_validate_migration_token';
@@ -118,6 +119,7 @@ const createWizard = (root) => {
 		progressPercent: root.querySelector('[data-efs-wizard-progress-percent]'),
 		progressStatus: root.querySelector('[data-efs-wizard-progress-status]'),
 		progressItems: root.querySelector('[data-efs-wizard-items]'),
+		progressElapsed: root.querySelector('[data-efs-wizard-elapsed]'),
 		progressSteps: root.querySelector('[data-efs-wizard-step-status]'),
 		retryButton: root.querySelector('[data-efs-retry-migration]'),
 		progressCancelButton: root.querySelector('[data-efs-progress-cancel]'),
@@ -685,6 +687,32 @@ const createWizard = (root) => {
 			}
 		}
 
+		if (refs.progressElapsed) {
+			const startedAtRaw = progress?.started_at;
+			const startedAt = typeof startedAtRaw === 'string' && startedAtRaw.trim() !== ''
+				? startedAtRaw.trim().replace(' ', 'T')
+				: '';
+			const startedMs = startedAt ? new Date(startedAt).getTime() : NaN;
+			const elapsedSec = Number.isFinite(startedMs) && startedMs > 0
+				? Math.max(0, Math.floor((Date.now() - startedMs) / 1000))
+				: null;
+			const etaSec = progress?.estimated_time_remaining != null
+				? Number(progress.estimated_time_remaining)
+				: null;
+			const etaStr = formatEta(etaSec);
+			if (elapsedSec != null) {
+				let text = `Elapsed: ${formatElapsed(elapsedSec)}`;
+				if (etaStr) {
+					text += `  •  ${etaStr}`;
+				}
+				refs.progressElapsed.textContent = text;
+				refs.progressElapsed.hidden = false;
+			} else {
+				refs.progressElapsed.textContent = '';
+				refs.progressElapsed.hidden = true;
+			}
+		}
+
 		if (refs.progressSteps) {
 			const steps = normalizeSteps(payload?.steps || progress?.steps || []);
 			refs.progressSteps.innerHTML = steps.map((step) => {
@@ -1041,42 +1069,83 @@ const createWizard = (root) => {
 		state.migrationUrl = url;
 
 		if (!url) {
-			throw new Error('Please paste a migration key before continuing.');
+			throw new Error('Please enter the target site URL or paste a migration key before continuing.');
 		}
 
 		runtime.validatingConnect = true;
 		updateNavigationState();
-		showToast('Validating… This may take a few seconds.', 'info');
+		showToast('Connecting to target site…', 'info');
 
 		try {
-			const parsed = parseMigrationUrl(url);
-			if (runtime.validatedMigrationUrl && runtime.validatedMigrationUrl !== parsed.normalizedUrl) {
+			let token = '';
+			let targetUrl = '';
+
+			// Detect input format: a full migration URL contains an embedded token;
+			// a bare target URL (e.g. https://mysite.com) triggers the reverse-generation flow.
+			try {
+				const parsed = parseMigrationUrl(url);
+				token = parsed.token;
+				targetUrl = parsed.origin;
+			} catch (parseError) {
+				// No embedded token — treat the input as the target site base URL.
+				try {
+					targetUrl = new URL(url.includes('://') ? url : `https://${url}`).origin;
+				} catch (urlError) {
+					throw new Error('Invalid URL. Enter the target site URL (e.g. https://mysite.com) or paste a migration URL.');
+				}
+			}
+
+			if (runtime.validatedMigrationUrl && runtime.validatedMigrationUrl !== targetUrl) {
 				resetDiscoveryState({ clearConnection: true });
 			}
 
-			const urlResult = await post(ACTION_VALIDATE_URL, {
-				wizard_nonce: wizardNonce,
-				migration_url: parsed.normalizedUrl,
-			});
+			if (token) {
+				// Legacy flow: embedded token was parsed — validate it against the target.
+				const urlResult = await post(ACTION_VALIDATE_URL, {
+					wizard_nonce: wizardNonce,
+					migration_url: url,
+				});
+				if (urlResult?.warning) {
+					setMessage(refs.connectMessage, urlResult.warning, 'warning');
+				}
 
-			if (urlResult?.warning) {
-				setMessage(refs.connectMessage, urlResult.warning, 'warning');
+				const validation = await post(ACTION_VALIDATE_TOKEN, {
+					migration_key: token,
+					target_url: targetUrl,
+				});
+				if (!validation?.valid) {
+					throw new Error('The migration token could not be validated.');
+				}
+			} else {
+				// Reverse-generation flow: request a fresh token directly from the target.
+				// The token is generated and stored on the target; domain = source URL so
+				// that X-EFS-Source-Origin is validated on import endpoints.
+				const sourceUrl = window.efsData?.site_url || window.location.origin;
+				const generateUrl = `${targetUrl}/wp-json/efs/v1/generate-key?source_url=${encodeURIComponent(sourceUrl)}`;
+
+				let tokenRes;
+				try {
+					tokenRes = await fetch(generateUrl, { credentials: 'omit' });
+				} catch (fetchError) {
+					throw new Error(`Could not reach target site at ${targetUrl}. Check the URL and ensure the plugin is active on the target.`);
+				}
+
+				if (!tokenRes.ok) {
+					throw new Error(`Target site rejected the connection (HTTP ${tokenRes.status}). Verify the target URL and CORS settings.`);
+				}
+
+				const tokenData = await tokenRes.json();
+				token = tokenData?.migration_key || tokenData?.token || '';
+				if (!token) {
+					throw new Error('Target did not return a migration token. Ensure Etch Fusion Suite is active on the target site.');
+				}
 			}
 
-			const validation = await post(ACTION_VALIDATE_TOKEN, {
-				migration_key: parsed.token,
-				target_url: parsed.origin,
-			});
-
-			if (!validation?.valid) {
-				throw new Error('The migration token could not be validated.');
-			}
-
-			state.migrationKey = parsed.token;
-			state.targetUrl = parsed.origin;
-			runtime.validatedMigrationUrl = parsed.normalizedUrl;
+			state.migrationKey = token;
+			state.targetUrl = targetUrl;
+			runtime.validatedMigrationUrl = targetUrl;
 			if (refs.keyInput) {
-				refs.keyInput.value = parsed.token;
+				refs.keyInput.value = token;
 			}
 
 			setMessage(refs.connectMessage, 'Connection successful.', 'success');

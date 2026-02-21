@@ -29,7 +29,7 @@ class EFS_Migration_Service {
 	/**
 	 * Running progress with no updates for this period is stale.
 	 */
-	private const PROGRESS_STALE_TTL = 300;
+	private const PROGRESS_STALE_TTL = 600;
 	private const MAX_RETRIES        = 3;
 
 	/** @var EFS_Error_Handler */
@@ -390,10 +390,11 @@ class EFS_Migration_Service {
 			return new \WP_Error( 'migration_not_found', __( 'No active migration found for this ID.', 'etch-fusion-suite' ) );
 		}
 
-		$target        = isset( $active['target_url'] ) ? $active['target_url'] : '';
-		$migration_key = isset( $active['migration_key'] ) ? $active['migration_key'] : '';
-		$batch_size    = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
-		$options       = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$target               = isset( $active['target_url'] ) ? $active['target_url'] : '';
+		$migration_key        = isset( $active['migration_key'] ) ? $active['migration_key'] : '';
+		$batch_size           = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
+		$options              = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$selected_post_types  = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
 
 		try {
 			$this->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
@@ -415,7 +416,7 @@ class EFS_Migration_Service {
 			}
 
 			$this->update_progress( 'analyzing', 20, __( 'Analyzing content...', 'etch-fusion-suite' ) );
-			$analysis = $this->content_service->analyze_content();
+			$analysis = $this->content_service->analyze_content( $selected_post_types );
 			$this->update_progress(
 				'analyzing',
 				25,
@@ -440,27 +441,17 @@ class EFS_Migration_Service {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
 
-			$steps               = $this->get_steps_state();
-			$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-			$include_media       = ! empty( $options['include_media'] ) && isset( $steps['media'] );
-			$media_ids           = $include_media ? $this->media_service->get_media_ids( $selected_post_types ) : array();
+			$steps         = $this->get_steps_state();
+			$include_media = ! empty( $options['include_media'] ) && isset( $steps['media'] );
+			$media_ids     = $include_media ? $this->media_service->get_media_ids( $selected_post_types ) : array();
 
 			// Collect post IDs for JS-driven batch loop.
-			$bricks_posts    = $this->content_parser->get_bricks_posts();
-			$gutenberg_posts = $this->content_parser->get_gutenberg_posts();
+			$bricks_posts    = $this->content_parser->get_bricks_posts( $selected_post_types );
+			$gutenberg_posts = $this->content_parser->get_gutenberg_posts( $selected_post_types );
 			$all_posts       = array_merge(
 				is_array( $bricks_posts ) ? $bricks_posts : array(),
 				is_array( $gutenberg_posts ) ? $gutenberg_posts : array()
 			);
-
-			if ( ! empty( $selected_post_types ) ) {
-				$all_posts = array_filter(
-					$all_posts,
-					function ( $post ) use ( $selected_post_types ) {
-						return in_array( $post->post_type, $selected_post_types, true );
-					}
-				);
-			}
 
 			$post_ids    = array_values(
 				array_map(
@@ -551,7 +542,9 @@ class EFS_Migration_Service {
 	}
 
 	private function spawn_migration_background_request( $migration_id, $nonce ) {
-		$bg_token = function_exists( 'wp_generate_password' ) ? wp_generate_password( 32, true ) : bin2hex( random_bytes( 16 ) );
+		// Use hex token only: wp_generate_password with special chars can produce %XX sequences
+		// that sanitize_text_field strips on the receiving end, causing token mismatch → 400.
+		$bg_token = bin2hex( random_bytes( 16 ) );
 		set_transient( 'efs_bg_' . $migration_id, $bg_token, 120 );
 
 		$url  = $this->get_spawn_url();
@@ -561,14 +554,26 @@ class EFS_Migration_Service {
 			'bg_token'     => $bg_token,
 		);
 
-		wp_remote_post(
+		$response = wp_remote_post(
 			$url,
 			array(
-				'timeout'  => 0.01,
-				'blocking' => false,
-				'body'     => $body,
+				'timeout'     => 5,
+				'blocking'    => false,
+				'redirection' => 0,
+				'body'        => $body,
 			)
 		);
+
+		if ( is_wp_error( $response ) ) {
+			$this->error_handler->log_warning(
+				'W013',
+				array(
+					'message' => 'Background spawn request failed (' . $response->get_error_message() . '). Falling back to synchronous execution.',
+					'action'  => 'spawn_migration_background_request',
+				)
+			);
+			$this->run_migration_execution( $migration_id );
+		}
 	}
 
 	/**
@@ -692,6 +697,9 @@ class EFS_Migration_Service {
 			$current_item_id     = null;
 			$current_item_title  = '';
 
+			// Send the combined media + posts total so the receiving-side ETA covers both phases.
+			$total_posts_for_combined = isset( $checkpoint['total_count'] ) ? (int) $checkpoint['total_count'] : 0;
+			$this->api_client->set_items_total( $total_media_count + $total_posts_for_combined );
 			foreach ( $current_media_batch as $media_id ) {
 				$media_id         = (int) $media_id;
 				$media_id_key     = (string) $media_id;
@@ -786,6 +794,9 @@ class EFS_Migration_Service {
 
 		$current_batch = array_splice( $remaining_post_ids, 0, $batch_size );
 
+		// Send the combined media + posts total so the receiving-side ETA covers both phases.
+		$total_media_for_combined = isset( $checkpoint['total_media_count'] ) ? (int) $checkpoint['total_media_count'] : 0;
+		$this->api_client->set_items_total( $total_media_for_combined + $total_count );
 		foreach ( $current_batch as $post_id ) {
 			$post_id = (int) $post_id;
 			$result  = $this->content_service->convert_bricks_to_gutenberg( $post_id, $this->api_client, $target_url, $migration_key, $post_type_mappings );
@@ -816,6 +827,15 @@ class EFS_Migration_Service {
 							'attempts_made' => $current_attempts,
 							'error_message' => $result->get_error_message(),
 							'action'        => 'Batch post conversion failed after max retries',
+						)
+					);
+					$this->error_handler->log_error(
+						'E107',
+						array(
+							'post_id'       => $post_id,
+							'attempts_made' => $current_attempts,
+							'error_message' => $result->get_error_message(),
+							'action'        => 'Failed to send post to target site after all retry attempts',
 						)
 					);
 				}
@@ -1320,12 +1340,9 @@ class EFS_Migration_Service {
 	 * @return true|\WP_Error
 	 */
 	private function finalize_migration( array $results ) {
-		$this->error_handler->log_error(
-			'I010',
-			array(
-				'action'  => 'Finalizing migration',
-				'results' => $results,
-			)
+		$this->error_handler->log_info(
+			'Finalizing migration',
+			array( 'results' => $results )
 		);
 
 		if ( ! $this->migration_runs_repository ) {
@@ -1416,7 +1433,7 @@ class EFS_Migration_Service {
 			'migrationId'            => $migration_id,
 			'timestamp_started_at'   => $started_at,
 			'timestamp_completed_at' => $completed_at,
-			'source_site'            => $target_url,
+			'source_site'            => home_url(),
 			'target_url'             => $target_url,
 			'status'                 => $status,
 			'counts_by_post_type'    => $counts_by_post_type,
@@ -1568,7 +1585,7 @@ class EFS_Migration_Service {
 			'migrationId'            => $migration_id,
 			'timestamp_started_at'   => $started_at,
 			'timestamp_completed_at' => $completed_at,
-			'source_site'            => get_site_url(),
+			'source_site'            => home_url(),
 			'target_url'             => $target_url,
 			'status'                 => 'failed',
 			'counts_by_post_type'    => array(),
@@ -1647,7 +1664,10 @@ class EFS_Migration_Service {
 				continue;
 			}
 
+			$this->touch_progress_heartbeat();
 			$result = $migrator->migrate( $target_url, $jwt_token );
+			$this->touch_progress_heartbeat();
+
 			if ( is_wp_error( $result ) ) {
 				$this->error_handler->log_error(
 					'E201',
@@ -1708,6 +1728,19 @@ class EFS_Migration_Service {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Refresh `last_updated` in stored progress to prevent stale detection during long-running phases.
+	 * Only updates if migration is actively running.
+	 */
+	private function touch_progress_heartbeat() {
+		$progress = $this->migration_repository->get_progress();
+		if ( is_array( $progress ) && isset( $progress['status'] ) && in_array( $progress['status'], array( 'running', 'receiving' ), true ) ) {
+			$progress['last_updated'] = current_time( 'mysql' );
+			$progress['is_stale']     = false;
+			$this->migration_repository->save_progress( $progress );
+		}
 	}
 
 	/**

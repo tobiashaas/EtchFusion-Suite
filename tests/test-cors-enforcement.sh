@@ -93,11 +93,38 @@ echo ""
 # Test handle_key_migration endpoint
 test_cors_rejection "$ETCH_URL" "GET" "/wp-json/b2e/v1/migrate?domain=test&token=test&expires=9999999999" "Key Migration Endpoint"
 
-# Test validate_migration_token endpoint
-test_cors_rejection "$ETCH_URL" "POST" "/wp-json/b2e/v1/validate" "Token Validation Endpoint"
+# Test validate_migration_token endpoint (legacy b2e/v1 namespace)
+test_cors_rejection "$ETCH_URL" "POST" "/wp-json/b2e/v1/validate" "Token Validation Endpoint (b2e/v1)"
 
 # Test test_auth endpoint
 test_cors_rejection "$ETCH_URL" "GET" "/wp-json/b2e/v1/auth/test" "Auth Test Endpoint"
+
+echo "=== Testing efs/v1/validate Endpoint (Current Namespace) ==="
+echo ""
+
+# Disallowed browser origin must be rejected (CORS guard via allow_public_request).
+test_cors_rejection "$ETCH_URL" "POST" "/wp-json/efs/v1/validate" "Token Validation Endpoint (efs/v1, disallowed origin)"
+
+# Server-to-server call without Origin header: must NOT return 403 (admin login is not required).
+echo "Testing: Token Validation Endpoint (efs/v1, no Origin header — server-to-server)"
+echo "  URL: $ETCH_URL/wp-json/efs/v1/validate"
+echo "  Method: POST"
+echo "  Origin: (none)"
+no_origin_response=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"migration_key":"invalid-key-for-reachability-test"}' \
+    "$ETCH_URL/wp-json/efs/v1/validate")
+no_origin_code=$(echo "$no_origin_response" | tail -n1)
+no_origin_body=$(echo "$no_origin_response" | head -n-1)
+if [ "$no_origin_code" != "403" ]; then
+    echo -e "  ${GREEN}✓ PASS${NC} - Endpoint reachable without WP login (HTTP $no_origin_code, not 403)"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "  ${RED}✗ FAIL${NC} - Got 403; endpoint must be accessible to non-logged-in server callers"
+    echo "  Response: $no_origin_body"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+echo ""
 
 echo "=== Testing Public Endpoints with Allowed Origin ==="
 echo ""

@@ -37,11 +37,10 @@ class EFS_CSS_Service {
 			$etch_styles = $this->css_converter->convert_bricks_classes_to_etch();
 
 			if ( empty( $etch_styles ) ) {
-				$this->error_handler->log_error(
-					'I008',
+				$this->error_handler->log_info(
+					'No CSS classes found to migrate',
 					array(
-						'message' => 'No CSS classes found to migrate',
-						'action'  => 'CSS migration skipped',
+						'action' => 'CSS migration skipped',
 					)
 				);
 
@@ -66,12 +65,11 @@ class EFS_CSS_Service {
 				return $response;
 			}
 
-			$this->error_handler->log_error(
-				'I009',
+			$this->error_handler->log_info(
+				'CSS migration completed successfully',
 				array(
 					'css_classes_found' => count( $etch_styles ),
 					'css_class_names'   => array_keys( $etch_styles ),
-					'action'            => 'CSS migration completed successfully',
 				)
 			);
 

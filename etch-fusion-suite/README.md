@@ -972,6 +972,9 @@ Cross-Origin Resource Sharing (CORS) uses a whitelist-based policy instead of wi
 
 **Configure CORS Origins:**
 
+- On the **target** site, tighten the whitelist to the **source** domain only (e.g. only the Bricks site URL) so that only the legitimate migration source can call import/receive endpoints.
+- Admin-only activation and deactivating the plugin after migration is recommended to limit exposure (tokens expire in 8h and data is cleaned up on deactivate).
+
 ```php
 $settings_repository = $container->get('settings_repository');
 $settings_repository->save_cors_allowed_origins([
@@ -1062,7 +1065,7 @@ Environment-aware HTTPS requirement for Application Passwords:
 
 **For Production:**
 
-1. **Configure CORS**: Add your production domains to the whitelist
+1. **Configure CORS**: Add your production domains to the whitelist; on the target site, restrict `cors_allowed_origins` to the source domain only.
 2. **Use HTTPS**: Always use HTTPS for API communication
 3. **Monitor Logs**: Regularly review security audit logs
 4. **Rotate Keys**: Periodically rotate API keys

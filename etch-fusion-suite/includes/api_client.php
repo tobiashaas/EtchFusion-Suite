@@ -22,10 +22,28 @@ class EFS_API_Client {
 	private $error_handler;
 
 	/**
+	 * Total items count to include in outgoing requests as X-EFS-Items-Total header.
+	 *
+	 * @var int
+	 */
+	private $items_total = 0;
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( EFS_Error_Handler $error_handler ) {
 		$this->error_handler = $error_handler;
+	}
+
+	/**
+	 * Set the total items count for the current migration phase.
+	 * The value is injected as X-EFS-Items-Total on subsequent requests.
+	 *
+	 * @param int $total Total number of items in the current phase.
+	 * @return void
+	 */
+	public function set_items_total( int $total ): void {
+		$this->items_total = max( 0, $total );
 	}
 
 	/**
@@ -115,6 +133,9 @@ class EFS_API_Client {
 		$source_origin = is_string( home_url() ) && '' !== home_url() ? esc_url_raw( home_url() ) : '';
 		if ( '' !== $source_origin ) {
 			$args['headers']['X-EFS-Source-Origin'] = $source_origin;
+		}
+		if ( $this->items_total > 0 ) {
+			$args['headers']['X-EFS-Items-Total'] = (string) $this->items_total;
 		}
 
 		if ( $data && in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) {
