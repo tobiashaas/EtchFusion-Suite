@@ -65,6 +65,16 @@ interface Migrator_Interface {
 	public function get_priority();
 
 	/**
+	 * Whether a failure of this migrator should abort the entire migration.
+	 * Structural migrators (CPT) return true; optional ones (ACF, MetaBox,
+	 * Custom Fields) return false so a failure is logged as a warning and
+	 * the migration continues.
+	 *
+	 * @return bool
+	 */
+	public function is_required(): bool;
+
+	/**
 	 * Validates migrator preconditions before migration runs.
 	 *
 	 * Implementations should confirm required plugins are active, the

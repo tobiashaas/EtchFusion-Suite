@@ -27,3 +27,6 @@ local-backups/**
 .env
 .env.local
 .env.*.local
+
+# Local debug/test scripts (must never be deployed)
+test_*.php

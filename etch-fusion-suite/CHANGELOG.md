@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **`test_grid_span.php` Debug-Skript entfernt (2026-02-21)**: Datei gab rohe WordPress-Option-Daten (alle Bricks Global Classes) und CSS-Converter-Ergebnisse ohne Authentifizierungs- oder ABSPATH-Guard aus. Datei gelöscht; `test_*.php` in `.gitignore` aufgenommen, damit lokale Debug-Skripte nie versehentlich committed werden.
+
+- **Loopback-Spawn: `sslverify => false` auf lokale/dev-Umgebungen beschränkt (2026-02-21)**: Die HEAD-Probe und der non-blocking POST in `spawn_migration_background_request()` setzten `sslverify => false` global. In Produktion besitzt `admin_url()` eine gültige HTTPS-URL mit echtem Zertifikat — dort muss TLS-Verifikation aktiv bleiben. Fix: `sslverify` wird jetzt über `wp_get_environment_type()` gesteuert (`local`/`development` → Verifikation überspringen, sonst aktiviert). Ein Filter `etch_fusion_suite_loopback_skip_ssl_verify` erlaubt atypischen Hosting-Setups eine Überschreibung.
+
+### Fixed
+- **Migration: `start_migration_async()` blockiert Browser ~11 s durch langsame HEAD-Probe + DNS-Lookups (2026-02-21)**
+  - Root cause 1: Die blocking HEAD-Probe in `spawn_migration_background_request()` hatte einen Timeout von 4 s. In Docker-on-Windows-Umgebungen (wp-env) antwortet der Loopback teilweise erst nach 3–4 s → der Browser erhält die AJAX-Response erst nach 11 s und verlässt die Seite vorher.
+  - Root cause 2: `etch_fusion_suite_resolve_bricks_internal_host()` löste `gethostbyname('wordpress')` und `gethostbyname('bricks')` bei jedem Request neu auf; in Umgebungen mit langsamen DNS-Timeouts kostet das mehrere Sekunden.
+  - Fix 1: HEAD-Probe-Timeout von 4 s auf 1 s reduziert (`class-migration-service.php`). Ein Server, der in 1 s nicht antwortet, wird als nicht erreichbar behandelt → Fallback auf synchrone Ausführung.
+  - Fix 2: Ergebnis von `etch_fusion_suite_resolve_bricks_internal_host()` wird jetzt in einer statischen PHP-Variable (request-level) **und** einem 5-Minuten-Transient (cross-request) gecacht. Wiederholte DNS-Lookups im gleichen oder nachfolgenden Requests sind damit sofort aus dem Cache bedient.
+
+- **Migration resume: Seiten-Reload während media/posts-Phase startet Batch-Loop nicht sofort (2026-02-21)**
+  - Root cause: `autoResumeMigration()` rief nach dem Progress-Fetch immer `startPolling()` auf, auch wenn `current_step` bereits `media` oder `posts` war (d. h. die Batch-Phase bereits lief). Dadurch wartete der Browser einen weiteren Polling-Intervall (3 s), bevor er in den Batch-Loop wechselte.
+  - Fix: In `autoResumeMigration()` wird `current_step` aus dem Progress-Fetch ausgelesen. Ist er `media` oder `posts` (und Status `running`), wird `runBatchLoop()` direkt aufgerufen statt `startPolling()` zu starten (`bricks-wizard.js`).
+
 ## [0.12.4] - 2026-02-21
 
 ### Fixed

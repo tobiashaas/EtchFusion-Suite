@@ -128,10 +128,10 @@ class ElementConvertersSchemaMigrationTest extends WP_UnitTestCase {
 		);
 
 		$result = $converter->convert( $element, array() );
-		$this->assertStringContainsString( '"tag":"i"', $result );
-		$this->assertStringContainsString( 'fa-solid', $result );
-		$this->assertStringContainsString( 'fa-star', $result );
-		$this->assertStringContainsString( '"aria-hidden":"true"', $result );
+		// Font-icon based Bricks icons are intentionally converted to empty SVG
+		// placeholder blocks (no icon-font specific attributes carried over).
+		$this->assertStringContainsString( 'wp:etch/svg', $result );
+		$this->assertStringContainsString( '"tag":"svg"', $result );
 		$this->assertStringNotContainsString( '[Icon:', $result );
 		$this->assertStringNotContainsString( 'etchData', $result );
 	}

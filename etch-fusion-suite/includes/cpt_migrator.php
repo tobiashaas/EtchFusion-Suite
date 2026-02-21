@@ -35,6 +35,11 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	}
 
 	/** @inheritDoc */
+	public function is_required(): bool {
+		return true;
+	}
+
+	/** @inheritDoc */
 	public function validate() {
 		$errors = array();
 

@@ -41,18 +41,18 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	<div class="efs-wizard-panels">
 		<section class="is-active" data-efs-step-panel="1">
 			<h3><?php esc_html_e( 'Connect to Etch Site', 'etch-fusion-suite' ); ?></h3>
-			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'Paste the migration key from your Etch site here. We will validate the key and token before you continue.', 'etch-fusion-suite' ); ?></p>
+			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'Paste the connection URL from your Etch target site. You can generate it there via "Generate Connection URL" — the migration key will be created automatically in the background.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-wizard-connect-key">
 				<textarea
 					id="efs-wizard-migration-url"
-					rows="8"
+					rows="3"
 					data-efs-wizard-url
-					aria-label="<?php esc_attr_e( 'Migration key from Etch site', 'etch-fusion-suite' ); ?>"
-					placeholder="<?php esc_attr_e( 'Paste the key from your Etch target site here.', 'etch-fusion-suite' ); ?>"
+					aria-label="<?php esc_attr_e( 'Connection URL from Etch site', 'etch-fusion-suite' ); ?>"
+					placeholder="<?php esc_attr_e( 'https://your-etch-site.com/?_efs_pair=...', 'etch-fusion-suite' ); ?>"
 				><?php echo esc_textarea( $etch_fusion_suite_url ); ?></textarea>
 				<div class="efs-actions efs-actions--inline efs-wizard-connect-key__actions">
-					<button type="button" class="button" data-efs-paste-migration-url aria-label="<?php esc_attr_e( 'Paste key from clipboard', 'etch-fusion-suite' ); ?>">
-						<?php esc_html_e( 'Paste Key', 'etch-fusion-suite' ); ?>
+					<button type="button" class="button" data-efs-paste-migration-url aria-label="<?php esc_attr_e( 'Paste connection URL from clipboard', 'etch-fusion-suite' ); ?>">
+						<?php esc_html_e( 'Paste URL', 'etch-fusion-suite' ); ?>
 					</button>
 				</div>
 			</div>

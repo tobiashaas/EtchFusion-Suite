@@ -689,8 +689,11 @@ const createWizard = (root) => {
 
 		if (refs.progressElapsed) {
 			const startedAtRaw = progress?.started_at;
+			// Append 'Z' so the browser parses the WP UTC datetime as UTC, not local time.
+			// Without 'Z', new Date('2026-02-21T04:35:42') is treated as local time,
+			// producing a constant offset equal to the browser UTC offset (e.g. +360 min for UTC+6).
 			const startedAt = typeof startedAtRaw === 'string' && startedAtRaw.trim() !== ''
-				? startedAtRaw.trim().replace(' ', 'T')
+				? startedAtRaw.trim().replace(' ', 'T') + 'Z'
 				: '';
 			const startedMs = startedAt ? new Date(startedAt).getTime() : NaN;
 			const elapsedSec = Number.isFinite(startedMs) && startedMs > 0
@@ -933,6 +936,7 @@ const createWizard = (root) => {
 		stopPolling();
 		runtime.migrationRunning = true;
 		runtime.pollingFailCount = 0;
+		const pollingStartTime = Date.now();
 
 		const poll = async () => {
 			try {
@@ -985,6 +989,18 @@ const createWizard = (root) => {
 						refs.retryButton.hidden = false;
 					}
 					showResult('error', 'Migration did not start (e.g. background request could not reach the server). Try again or check server configuration.');
+					return;
+				}
+
+				// Early client-side detection: if after 60 s progress is still 0%, the
+				// background process likely never started (loopback blocked, etc.).
+				const elapsedSeconds = (Date.now() - pollingStartTime) / 1000;
+				if (percentage === 0 && status === 'running' && elapsedSeconds > 60) {
+					runtime.migrationRunning = false;
+					if (refs.retryButton) {
+						refs.retryButton.hidden = false;
+					}
+					showResult('error', 'Migration did not start within 60 seconds. The server may not be able to reach itself (loopback request). Check server logs or try again.');
 					return;
 				}
 
@@ -1118,10 +1134,23 @@ const createWizard = (root) => {
 				}
 			} else {
 				// Reverse-generation flow: request a fresh token directly from the target.
-				// The token is generated and stored on the target; domain = source URL so
-				// that X-EFS-Source-Origin is validated on import endpoints.
+				// The connection URL from the Etch side embeds the one-time pairing code as
+				// ?_efs_pair=<raw_code>. Extract it automatically — no separate input needed.
+				let pairingCode = '';
+				try {
+					const parsedInput = new URL(url.includes('://') ? url : `https://${url}`);
+					pairingCode = parsedInput.searchParams.get('_efs_pair') || '';
+				} catch (_parseErr) {
+					// ignore — pairingCode stays empty
+				}
+				if (!pairingCode) {
+					throw new Error('Paste the connection URL from the target site (generated via "Generate Connection URL" on the Etch dashboard).');
+				}
+
 				const sourceUrl = window.efsData?.site_url || window.location.origin;
-				const generateUrl = `${targetUrl}/wp-json/efs/v1/generate-key?source_url=${encodeURIComponent(sourceUrl)}`;
+				const generateUrl = `${targetUrl}/wp-json/efs/v1/generate-key`
+					+ `?source_url=${encodeURIComponent(sourceUrl)}`
+					+ `&pairing_code=${encodeURIComponent(pairingCode)}`;
 
 				let tokenRes;
 				try {
@@ -1545,6 +1574,32 @@ const createWizard = (root) => {
 			const pollStatus = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
 			const pollPercentage = Number(payload?.progress?.percentage ?? 0);
 			const isRunning = pollStatus === 'running' || pollStatus === 'receiving';
+			const isStale = pollStatus === 'stale' || Boolean(payload?.progress?.is_stale || payload?.is_stale);
+			const pollCurrentStep = String(payload?.progress?.current_step || '').toLowerCase();
+
+			// Stale but checkpoint phase is media/posts: auto-resume via server (resets stale
+			// flag) then start the batch loop directly — no user interaction required.
+			if (isStale && (pollCurrentStep === 'media' || pollCurrentStep === 'posts')) {
+				state.migrationId = payload?.migrationId || migrationId;
+				try {
+					const resumed = await post(ACTION_RESUME_MIGRATION, { migration_id: state.migrationId });
+					if (resumed?.resumed) {
+						await setStep(4, { skipSave: true });
+						if (refs.progressTakeover) {
+							refs.progressTakeover.hidden = false;
+						}
+						renderProgress(resumed);
+						stopPolling();
+						runtime.migrationRunning = true;
+						await runBatchLoop(state.migrationId);
+						return true;
+					}
+				} catch (e) {
+					// No valid checkpoint — fall through to return false.
+				}
+				return false;
+			}
+
 			if (payload?.completed || pollStatus === 'completed' || pollStatus === 'error' || pollPercentage >= 100 || !isRunning) {
 				return false;
 			}
@@ -1555,7 +1610,17 @@ const createWizard = (root) => {
 				refs.progressTakeover.hidden = false;
 			}
 			renderProgress(payload);
-			startPolling(state.migrationId);
+
+			// If the background phase already completed (checkpoint saved) and the JS batch
+			// loop should take over, start it directly instead of waiting for one polling round-trip.
+			const resumeStep = String(payload?.progress?.current_step || '').toLowerCase();
+			if ((resumeStep === 'media' || resumeStep === 'posts') && isRunning) {
+				stopPolling();
+				runtime.migrationRunning = true;
+				await runBatchLoop(state.migrationId);
+			} else {
+				startPolling(state.migrationId);
+			}
 			return true;
 		} catch (error) {
 			return false;

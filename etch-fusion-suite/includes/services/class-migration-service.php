@@ -209,6 +209,7 @@ class EFS_Migration_Service {
 			if ( is_wp_error( $migrator_result ) ) {
 				return $migrator_result;
 			}
+			$sync_migrator_warnings = isset( $migrator_result['warnings'] ) ? $migrator_result['warnings'] : array();
 
 			$steps        = $this->get_steps_state();
 			$media_result = array( 'skipped' => true );
@@ -247,7 +248,7 @@ class EFS_Migration_Service {
 			}
 
 			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
-			$finalization_result = $this->finalize_migration( $posts_result );
+			$finalization_result = $this->finalize_migration( $posts_result, $sync_migrator_warnings );
 			if ( is_wp_error( $finalization_result ) ) {
 				return $finalization_result;
 			}
@@ -390,11 +391,11 @@ class EFS_Migration_Service {
 			return new \WP_Error( 'migration_not_found', __( 'No active migration found for this ID.', 'etch-fusion-suite' ) );
 		}
 
-		$target               = isset( $active['target_url'] ) ? $active['target_url'] : '';
-		$migration_key        = isset( $active['migration_key'] ) ? $active['migration_key'] : '';
-		$batch_size           = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
-		$options              = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
-		$selected_post_types  = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+		$target              = isset( $active['target_url'] ) ? $active['target_url'] : '';
+		$migration_key       = isset( $active['migration_key'] ) ? $active['migration_key'] : '';
+		$batch_size          = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
+		$options             = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
 
 		try {
 			$this->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
@@ -434,6 +435,7 @@ class EFS_Migration_Service {
 			if ( is_wp_error( $migrator_result ) ) {
 				return $migrator_result;
 			}
+			$async_migrator_warnings = isset( $migrator_result['warnings'] ) ? $migrator_result['warnings'] : array();
 
 			$this->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
@@ -479,6 +481,7 @@ class EFS_Migration_Service {
 					'total_count'            => $total_count,
 					'current_item_id'        => null,
 					'current_item_title'     => '',
+					'migrator_warnings'      => $async_migrator_warnings,
 				)
 			);
 
@@ -554,12 +557,50 @@ class EFS_Migration_Service {
 			'bg_token'     => $bg_token,
 		);
 
+		// Skip SSL verification only in local/development environments (e.g. Docker with
+		// self-signed certs). In production the spawn URL is an HTTPS admin-ajax endpoint
+		// with a valid certificate and verification must stay enabled.
+		// Filterable so site owners can override for atypical hosting setups.
+		$skip_ssl_verify = in_array( wp_get_environment_type(), array( 'local', 'development' ), true )
+			|| (bool) apply_filters( 'etch_fusion_suite_loopback_skip_ssl_verify', false );
+
+		// Quick loopback reachability check (blocking, 1 s timeout) before the non-blocking
+		// fire-and-forget. Many local/Docker environments cannot reach admin-ajax.php via
+		// wp_remote_post() with blocking=false because the OS or container networking drops
+		// the connection silently — the call returns no WP_Error but the request never lands.
+		// A HEAD probe reveals this and lets us fall back to synchronous execution instead.
+		$probe = wp_remote_head(
+			$url,
+			array(
+				'timeout'     => 1,
+				'blocking'    => true,
+				'redirection' => 0,
+				'sslverify'   => ! $skip_ssl_verify,
+			)
+		);
+
+		if ( is_wp_error( $probe ) ) {
+			$this->error_handler->log_warning(
+				'W013',
+				array(
+					'message' => 'Loopback probe failed (' . $probe->get_error_message() . '). Falling back to synchronous execution.',
+					'url'     => $url,
+					'action'  => 'spawn_migration_background_request',
+				)
+			);
+			// Probe failed → loopback unreachable, run inline instead.
+			$this->run_migration_execution( $migration_id );
+			return;
+		}
+
+		// Loopback is reachable — fire the real non-blocking spawn.
 		$response = wp_remote_post(
 			$url,
 			array(
 				'timeout'     => 5,
 				'blocking'    => false,
 				'redirection' => 0,
+				'sslverify'   => ! $skip_ssl_verify,
 				'body'        => $body,
 			)
 		);
@@ -892,15 +933,17 @@ class EFS_Migration_Service {
 			}
 
 			$posts_result = array(
-				'total'                   => $total_count,
-				'migrated'                => $processed_count,
-				'failed_post_ids_final'   => $failed_post_ids_final,
-				'failed_media_ids_final'  => $failed_media_ids_final,
-				'failed_media_count'      => $failed_media_count,
+				'total'                  => $total_count,
+				'migrated'               => $processed_count,
+				'failed_post_ids_final'  => $failed_post_ids_final,
+				'failed_media_ids_final' => $failed_media_ids_final,
+				'failed_media_count'     => $failed_media_count,
 			);
 
 			$this->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
-			$this->finalize_migration( $posts_result );
+			$checkpoint              = $this->migration_repository->get_checkpoint();
+			$batch_migrator_warnings = isset( $checkpoint['migrator_warnings'] ) ? $checkpoint['migrator_warnings'] : array();
+			$this->finalize_migration( $posts_result, $batch_migrator_warnings );
 			$this->update_progress( 'completed', 100, $completion_message );
 			$this->store_active_migration( array() );
 			$this->migration_repository->delete_checkpoint();
@@ -917,7 +960,7 @@ class EFS_Migration_Service {
 				'progress'              => $this->get_progress_data(),
 				'steps'                 => $this->get_steps_state(),
 				'message'               => $completion_message,
-				'failed_media_count'     => $failed_media_count,
+				'failed_media_count'    => $failed_media_count,
 				'failed_media_ids'      => $failed_media_ids_final,
 				'failed_post_ids_final' => $failed_post_ids_final,
 			);
@@ -1335,11 +1378,12 @@ class EFS_Migration_Service {
 	/**
 	 * Finalize migration and persist a run record.
 	 *
-	 * @param array $results Posts migration results (total, migrated).
+	 * @param array $results           Posts migration results (total, migrated).
+	 * @param array $migrator_warnings Optional migrator types that failed non-fatally.
 	 *
 	 * @return true|\WP_Error
 	 */
-	private function finalize_migration( array $results ) {
+	private function finalize_migration( array $results, array $migrator_warnings = array() ) {
 		$this->error_handler->log_info(
 			'Finalizing migration',
 			array( 'results' => $results )
@@ -1363,12 +1407,12 @@ class EFS_Migration_Service {
 		$failed_post_ids_final = isset( $results['failed_post_ids_final'] ) && is_array( $results['failed_post_ids_final'] )
 			? array_values( $results['failed_post_ids_final'] )
 			: array();
-		$failed_posts_count = count( $failed_post_ids_final );
+		$failed_posts_count    = count( $failed_post_ids_final );
 
 		$failed_media_ids_final = isset( $results['failed_media_ids_final'] ) && is_array( $results['failed_media_ids_final'] )
 			? array_values( $results['failed_media_ids_final'] )
 			: array();
-		$failed_media_count = isset( $results['failed_media_count'] ) ? (int) $results['failed_media_count'] : count( $failed_media_ids_final );
+		$failed_media_count     = isset( $results['failed_media_count'] ) ? (int) $results['failed_media_count'] : count( $failed_media_ids_final );
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
@@ -1426,26 +1470,27 @@ class EFS_Migration_Service {
 			)
 			: null;
 
-		$status       = ( $warnings_count > 0 || $failed_media_count > 0 ) ? 'success_with_warnings' : 'success';
+		$status       = ( $warnings_count > 0 || $failed_media_count > 0 || ! empty( $migrator_warnings ) ) ? 'success_with_warnings' : 'success';
 		$duration_sec = ( $started_ts > 0 ) ? max( 0, time() - $started_ts ) : 0;
 
 		$record = array(
-			'migrationId'            => $migration_id,
-			'timestamp_started_at'   => $started_at,
-			'timestamp_completed_at' => $completed_at,
-			'source_site'            => home_url(),
-			'target_url'             => $target_url,
-			'status'                 => $status,
-			'counts_by_post_type'    => $counts_by_post_type,
-			'post_type_mappings'     => $post_type_mappings,
-			'failed_posts_count'     => $failed_posts_count,
-			'failed_post_ids'        => $failed_post_ids_final,
-			'failed_media_count'     => $failed_media_count,
-			'failed_media_ids'       => $failed_media_ids_final,
-			'warnings_count'         => $warnings_count,
-			'warnings_summary'       => $warnings_summary,
-			'errors_summary'         => $errors_summary,
-			'duration_sec'           => $duration_sec,
+			'migrationId'                => $migration_id,
+			'timestamp_started_at'       => $started_at,
+			'timestamp_completed_at'     => $completed_at,
+			'source_site'                => home_url(),
+			'target_url'                 => $target_url,
+			'status'                     => $status,
+			'counts_by_post_type'        => $counts_by_post_type,
+			'post_type_mappings'         => $post_type_mappings,
+			'failed_posts_count'         => $failed_posts_count,
+			'failed_post_ids'            => $failed_post_ids_final,
+			'failed_media_count'         => $failed_media_count,
+			'failed_media_ids'           => $failed_media_ids_final,
+			'warnings_count'             => $warnings_count,
+			'warnings_summary'           => $warnings_summary,
+			'errors_summary'             => $errors_summary,
+			'duration_sec'               => $duration_sec,
+			'optional_migrator_warnings' => $migrator_warnings,
 		);
 
 		$this->migration_runs_repository->save_run( $record );
@@ -1604,7 +1649,7 @@ class EFS_Migration_Service {
 	 *
 	 * @param string $target_url
 	 * @param string $jwt_token
-	 * @return bool|\WP_Error
+	 * @return array|\WP_Error
 	 */
 	private function execute_migrators( $target_url, $jwt_token ) {
 		$supported_migrators = $this->migrator_registry->get_supported();
@@ -1630,12 +1675,13 @@ class EFS_Migration_Service {
 			}
 		}
 
-		$count           = count( $enabled_migrators );
-		$base_percentage = 30;
-		$end_percentage  = 60;
-		$range           = max( 1, $end_percentage - $base_percentage );
-		$increment       = $count > 0 ? $range / $count : 0;
-		$index           = 0;
+		$count             = count( $enabled_migrators );
+		$base_percentage   = 30;
+		$end_percentage    = 60;
+		$range             = max( 1, $end_percentage - $base_percentage );
+		$increment         = $count > 0 ? $range / $count : 0;
+		$index             = 0;
+		$migrator_warnings = array();
 
 		foreach ( $enabled_migrators as $migrator ) {
 			$progress = (int) floor( $base_percentage + ( $increment * $index ) );
@@ -1669,22 +1715,39 @@ class EFS_Migration_Service {
 			$this->touch_progress_heartbeat();
 
 			if ( is_wp_error( $result ) ) {
-				$this->error_handler->log_error(
-					'E201',
-					array(
-						'migrator' => $migrator->get_type(),
-						'error'    => $result->get_error_message(),
-						'action'   => 'Migrator execution failed',
-					)
-				);
+				if ( $migrator->is_required() ) {
+					$this->error_handler->log_error(
+						'E201',
+						array(
+							'migrator' => $migrator->get_type(),
+							'error'    => $result->get_error_message(),
+							'action'   => 'Migrator execution failed',
+						)
+					);
 
-				return $result;
+					return $result;
+				} else {
+					$this->error_handler->log_warning(
+						'W014',
+						array(
+							'migrator' => $migrator->get_type(),
+							'error'    => $result->get_error_message(),
+							'action'   => 'Optional migrator failed; migration continues',
+						)
+					);
+					$migrator_warnings[] = $migrator->get_type();
+					++$index;
+					continue;
+				}
 			}
 
 			++$index;
 		}
 
-		return true;
+		return array(
+			'success'  => true,
+			'warnings' => $migrator_warnings,
+		);
 	}
 
 	/**

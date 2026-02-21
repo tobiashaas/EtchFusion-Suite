@@ -42,6 +42,10 @@ class EFS_Element_Image extends EFS_Base_Element {
 
 		$alt_text = is_string( $alt_text ) ? $alt_text : '';
 		$caption  = is_string( $caption ) ? $caption : '';
+		// Bricks uses "none" as a CSS no-content sentinel — treat it as no caption.
+		if ( 'none' === strtolower( trim( $caption ) ) ) {
+			$caption = '';
+		}
 
 		// When the image source is dynamic data (e.g. {featured_image}), emit an Etch
 		// dynamic-image block with a resolved data-source attribute instead of a static URL.
@@ -213,7 +217,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 						if ( ! is_array( $class_data ) || empty( $class_data['id'] ) ) {
 							continue;
 						}
-						$id                          = trim( (string) $class_data['id'] );
+						$id                           = trim( (string) $class_data['id'] );
 						$global_class_settings[ $id ] = isset( $class_data['settings'] ) && is_array( $class_data['settings'] )
 							? $class_data['settings']
 							: array();
@@ -268,4 +272,3 @@ class EFS_Element_Image extends EFS_Base_Element {
 		return (int) $mappings[ $source_image_id ];
 	}
 }
-

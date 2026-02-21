@@ -56,7 +56,8 @@ class TextConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'First', $result );
 		$this->assertStringContainsString( 'Second', $result );
 		$this->assertStringContainsString( 'Third', $result );
-		$this->assertSame( 3, substr_count( $result, '<!-- wp:etch/element ' ) );
+		// 1 outer wrapper + 3 inner paragraph blocks = 4 etch/element occurrences.
+		$this->assertSame( 4, substr_count( $result, '<!-- wp:etch/element ' ) );
 		$this->assertSame( 3, substr_count( $result, 'wp:etch/text' ) );
 	}
 
@@ -90,7 +91,8 @@ class TextConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Intro', $result );
 		$this->assertStringContainsString( 'Point 1', $result );
 		$this->assertStringContainsString( 'Conclusion', $result );
-		$this->assertSame( 3, substr_count( $result, '<!-- wp:etch/element ' ) );
+		// 1 outer wrapper + 3 inner blocks (p, ul, p) = 4 etch/element occurrences.
+		$this->assertSame( 4, substr_count( $result, '<!-- wp:etch/element ' ) );
 		$this->assertSame( 3, substr_count( $result, 'wp:etch/text' ) );
 	}
 

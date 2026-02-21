@@ -28,9 +28,10 @@ function runWpCli(environmentArgs, commandArgs) {
   return runWpEnv(['run', ...environmentArgs, 'wp', ...commandArgs]);
 }
 
-function generateMigrationKey(targetUrl) {
+function generateMigrationKey(targetUrl, sourceUrl) {
   console.log('> Generating migration key on Etch instance...');
-  const cmd = `echo etch_fusion_suite_container()->get('token_manager')->generate_migration_token('${targetUrl}')['token'];`;
+  const sourceArg = sourceUrl ? `'${sourceUrl}'` : 'null';
+  const cmd = `echo etch_fusion_suite_container()->get('token_manager')->generate_migration_token('${targetUrl}', null, ${sourceArg})['token'];`;
   const rawOutput = runWpCli(['tests-cli'], ['eval', cmd]).trim();
   const match = rawOutput.match(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
   const key = match ? match[0] : '';
@@ -116,7 +117,8 @@ async function main() {
   }
 
   const targetUrl = 'http://localhost:8889';
-  const migrationKey = generateMigrationKey(targetUrl);
+  const sourceUrl = 'http://localhost:8888';
+  const migrationKey = generateMigrationKey(targetUrl, sourceUrl);
   triggerMigration(migrationKey, targetUrl);
   const progress = await waitForCompletion();
 

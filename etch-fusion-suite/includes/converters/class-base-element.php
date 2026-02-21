@@ -125,8 +125,8 @@ abstract class EFS_Base_Element {
 	 * @return array<int,string>
 	 */
 	protected function get_custom_css_class_tokens() {
-		$classes = array();
-		$element = is_array( $this->current_element ) ? $this->current_element : array();
+		$classes  = array();
+		$element  = is_array( $this->current_element ) ? $this->current_element : array();
 		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
 		$raw      = isset( $settings['_cssClasses'] ) ? $settings['_cssClasses'] : '';
 
@@ -176,6 +176,13 @@ abstract class EFS_Base_Element {
 				continue;
 			}
 
+			// Skip IDs that are already handled by the style_map — their selector
+			// class has been added via get_css_classes() and adding the raw ID
+			// again would produce duplicates like "mapped-class bricks-global-1".
+			if ( isset( $this->style_map[ $id ] ) ) {
+				continue;
+			}
+
 			$name = $this->resolve_global_class_name_by_id( $id );
 			// Some Bricks payloads store class names directly in _cssGlobalClasses.
 			if ( '' === $name ) {
@@ -209,8 +216,8 @@ abstract class EFS_Base_Element {
 	 * @return string HTML tag
 	 */
 	protected function get_tag( $element, $fallback_tag = 'div' ) {
-		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-		$tag      = $settings['tag'] ?? $fallback_tag;
+		$settings   = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$tag        = $settings['tag'] ?? $fallback_tag;
 		$custom_tag = isset( $settings['customTag'] ) && is_string( $settings['customTag'] ) ? trim( $settings['customTag'] ) : '';
 
 		if ( ! is_string( $tag ) || '' === trim( $tag ) ) {
@@ -370,11 +377,11 @@ abstract class EFS_Base_Element {
 			if ( ! isset( $attributes[ $name ] ) || ! is_scalar( $attributes[ $name ] ) ) {
 				continue;
 			}
-			$raw   = trim( (string) $attributes[ $name ] );
-			$parts = preg_split( '/\s+/', $raw );
-			$parts = is_array( $parts ) ? $parts : array( $raw );
-			$parts = array_map( array( $this, 'normalize_html_id_reference_token' ), $parts );
-			$parts = array_values(
+			$raw                 = trim( (string) $attributes[ $name ] );
+			$parts               = preg_split( '/\s+/', $raw );
+			$parts               = is_array( $parts ) ? $parts : array( $raw );
+			$parts               = array_map( array( $this, 'normalize_html_id_reference_token' ), $parts );
+			$parts               = array_values(
 				array_filter(
 					$parts,
 					static function ( $part ) {
@@ -790,7 +797,11 @@ abstract class EFS_Base_Element {
 	 */
 	protected function get_layout_profile_for_style_id( $style_id ) {
 		$style_id = trim( (string) $style_id );
-		$empty    = array( 'is_grid' => false, 'is_flex' => false, 'has_flex_direction' => false );
+		$empty    = array(
+			'is_grid'            => false,
+			'is_flex'            => false,
+			'has_flex_direction' => false,
+		);
 		if ( '' === $style_id ) {
 			return $empty;
 		}
@@ -813,7 +824,11 @@ abstract class EFS_Base_Element {
 	 * @return array<string,bool>
 	 */
 	protected function get_layout_profile_for_style_ids( array $style_ids ) {
-		$profile = array( 'is_grid' => false, 'is_flex' => false, 'has_flex_direction' => false );
+		$profile = array(
+			'is_grid'            => false,
+			'is_flex'            => false,
+			'has_flex_direction' => false,
+		);
 		if ( empty( $style_ids ) ) {
 			return $profile;
 		}

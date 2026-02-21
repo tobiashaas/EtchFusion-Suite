@@ -216,8 +216,8 @@ class CodeConverterTest extends WP_UnitTestCase {
 		// CSS block.
 		$this->assertStringContainsString( '<style>.red { color: red; }</style>', $result );
 		$this->assertStringContainsString( '(CSS)', $result );
-		// HTML block with remaining content.
-		$this->assertStringContainsString( '<div class="red">Hi</div>', $result );
+		// HTML block with remaining content (quotes are JSON-escaped in the block comment).
+		$this->assertStringContainsString( '<div class=\"red\">Hi</div>', $result );
 	}
 
 	public function test_css_field_and_style_tag_combined(): void {
@@ -317,6 +317,7 @@ class CodeConverterTest extends WP_UnitTestCase {
 			),
 		);
 		$result = $converter->convert( $element, array(), array() );
-		$this->assertStringContainsString( '<style>:root { --primary: #333; }</style>', $result );
+		// "--" is replaced by "\u002d\u002d" to keep Gutenberg block comments parse-safe.
+		$this->assertStringContainsString( ':root { \u002d\u002dprimary: #333; }', $result );
 	}
 }

@@ -141,6 +141,8 @@ class EFS_Admin_Interface {
 			$localized_context['ajaxUrl'] = admin_url( 'admin-ajax.php' );
 			// Nonce is generated here and consumed by verify_request() in all AJAX handlers (nonce action matches $nonce_action).
 			$localized_context['nonce']          = wp_create_nonce( 'efs_nonce' );
+			$localized_context['rest_url']       = rest_url();
+			$localized_context['rest_nonce']     = wp_create_nonce( 'wp_rest' );
 			$localized_context['framer_enabled'] = isset( $localized_context['framer_enabled'] ) ? (bool) $localized_context['framer_enabled'] : false;
 
 			if ( isset( $localized_context['template_extractor_enabled'] ) ) {

@@ -115,7 +115,7 @@ const bootstrap = () => {
 
     // Resume migration if in progress
     const progress = window.efsData?.progress_data || {};
-    const localizedMigrationId = window.efsData?.migrationId || progress?.migrationId;
+    const localizedMigrationId = window.efsData?.migrationId || window.efsData?.migration_id || progress?.migrationId;
     const completed = window.efsData?.completed || progress?.completed || false;
 
     if (localizedMigrationId && !completed) {

@@ -354,8 +354,8 @@ class EFS_CSS_Converter {
 			)
 		);
 
-		$selected_post_types = $this->get_selected_post_types_from_active_migration();
-		$referenced_class_ids = $this->collect_referenced_global_class_ids( $selected_post_types );
+		$selected_post_types            = $this->get_selected_post_types_from_active_migration();
+		$referenced_class_ids           = $this->collect_referenced_global_class_ids( $selected_post_types );
 		$restrict_to_referenced_classes = (bool) apply_filters(
 			'etch_fusion_suite_css_restrict_to_referenced_classes',
 			true,
@@ -751,7 +751,7 @@ class EFS_CSS_Converter {
 			if ( ! file_exists( $css_path ) || ! is_readable( $css_path ) ) {
 				$stylesheet = '';
 			} else {
-				$contents = file_get_contents( $css_path );
+				$contents   = file_get_contents( $css_path );
 				$stylesheet = false !== $contents ? (string) $contents : '';
 			}
 		}
@@ -767,8 +767,8 @@ class EFS_CSS_Converter {
 			return '';
 		}
 
-		$declarations = trim( (string) $match[1] );
-		$declarations = $this->normalize_acss_deprecated_hsl_tokens( $declarations );
+		$declarations         = trim( (string) $match[1] );
+		$declarations         = $this->normalize_acss_deprecated_hsl_tokens( $declarations );
 		$cache[ $class_name ] = $declarations;
 		return $declarations;
 	}
@@ -1132,7 +1132,7 @@ class EFS_CSS_Converter {
 						$style_id     = 'id_' . substr( md5( '#' . $selector_id ), 0, 8 );
 
 						if ( isset( $result['styles'][ $style_id ] ) ) {
-							$existing_css = trim( (string) $result['styles'][ $style_id ]['css'] );
+							$existing_css                         = trim( (string) $result['styles'][ $style_id ]['css'] );
 							$result['styles'][ $style_id ]['css'] = trim( $existing_css . "\n  " . $combined_css );
 						} else {
 							$result['styles'][ $style_id ] = array(
@@ -1149,8 +1149,8 @@ class EFS_CSS_Converter {
 				$bricks_root_selector = $this->get_bricks_element_root_selector( $element );
 
 				if ( ! empty( $settings['_cssCustom'] ) && is_string( $settings['_cssCustom'] ) ) {
-					$custom_css = str_replace( '%root%', $bricks_root_selector, $settings['_cssCustom'] );
-					$custom_css = $this->normalize_deprecated_hsl_references( $custom_css );
+					$custom_css            = str_replace( '%root%', $bricks_root_selector, $settings['_cssCustom'] );
+					$custom_css            = $this->normalize_deprecated_hsl_references( $custom_css );
 					$result['custom_css'] .= "\n" . $custom_css . "\n";
 				}
 
@@ -1626,7 +1626,7 @@ class EFS_CSS_Converter {
 			return $content;
 		}
 
-		return '"' . addcslashes( $content, "\\\"" ) . '"';
+		return '"' . addcslashes( $content, '\\"' ) . '"';
 	}
 
 	/**
@@ -1993,7 +1993,7 @@ class EFS_CSS_Converter {
 	 * Convert flexbox properties
 	 */
 	private function convert_flexbox( $settings ) {
-		$css = array();
+		$css                         = array();
 		$has_flex_container_property = false;
 		$has_display_defined         = ! empty( $settings['_display'] );
 		$has_flex_direction_defined  = false;
@@ -2002,43 +2002,43 @@ class EFS_CSS_Converter {
 		// _direction is an alias for _flexDirection in Bricks
 		$flex_direction = $settings['_flexDirection'] ?? $settings['_direction'] ?? '';
 		if ( ! empty( $flex_direction ) ) {
-			$css[] = 'flex-direction: ' . $flex_direction . ';';
+			$css[]                       = 'flex-direction: ' . $flex_direction . ';';
 			$has_flex_container_property = true;
 			$has_flex_direction_defined  = true;
 		}
 
 		if ( ! empty( $settings['_flexWrap'] ) ) {
-			$css[] = 'flex-wrap: ' . $settings['_flexWrap'] . ';';
+			$css[]                       = 'flex-wrap: ' . $settings['_flexWrap'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_justifyContent'] ) ) {
-			$css[] = 'justify-content: ' . $settings['_justifyContent'] . ';';
+			$css[]                       = 'justify-content: ' . $settings['_justifyContent'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_alignItems'] ) ) {
-			$css[] = 'align-items: ' . $settings['_alignItems'] . ';';
+			$css[]                       = 'align-items: ' . $settings['_alignItems'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_alignContent'] ) ) {
-			$css[] = 'align-content: ' . $settings['_alignContent'] . ';';
+			$css[]                       = 'align-content: ' . $settings['_alignContent'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_rowGap'] ) ) {
-			$css[] = 'row-gap: ' . $settings['_rowGap'] . ';';
+			$css[]                       = 'row-gap: ' . $settings['_rowGap'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_columnGap'] ) ) {
-			$css[] = 'column-gap: ' . $settings['_columnGap'] . ';';
+			$css[]                       = 'column-gap: ' . $settings['_columnGap'] . ';';
 			$has_flex_container_property = true;
 		}
 
 		if ( ! empty( $settings['_gap'] ) ) {
-			$css[] = 'gap: ' . $settings['_gap'] . ';';
+			$css[]                       = 'gap: ' . $settings['_gap'] . ';';
 			$has_flex_container_property = true;
 		}
 
@@ -2152,7 +2152,7 @@ class EFS_CSS_Converter {
 		// See also normalize_invalid_grid_placement() which sanitises raw Bricks CSS strings that contain
 		// the invalid shorthand "grid-column: span <n> / -1" (Bricks bug: mixes span + explicit line).
 		$has_column_lines = ! empty( $settings['_gridItemColumnStart'] ) || ! empty( $settings['_gridItemColumnEnd'] );
-		$has_row_lines   = ! empty( $settings['_gridItemRowStart'] ) || ! empty( $settings['_gridItemRowEnd'] );
+		$has_row_lines    = ! empty( $settings['_gridItemRowStart'] ) || ! empty( $settings['_gridItemRowEnd'] );
 
 		if ( $has_column_lines ) {
 			if ( ! empty( $settings['_gridItemColumnStart'] ) ) {
@@ -2312,7 +2312,7 @@ class EFS_CSS_Converter {
 				'left'   => '_left',
 			)
 		);
-		$css = array_merge(
+		$css          = array_merge(
 			$css,
 			$this->build_logical_quad_declarations(
 				'inset',
@@ -2833,7 +2833,7 @@ class EFS_CSS_Converter {
 			return $css;
 		}
 
-		$block_equal = null !== $top && null !== $bottom && (string) $top === (string) $bottom;
+		$block_equal  = null !== $top && null !== $bottom && (string) $top === (string) $bottom;
 		$inline_equal = null !== $right && null !== $left && (string) $right === (string) $left;
 
 		if ( $block_equal ) {
@@ -2937,7 +2937,7 @@ class EFS_CSS_Converter {
 	 * Now handles media queries and nested rules properly
 	 */
 	private function parse_custom_css_stylesheet( $stylesheet, $style_map = array() ) {
-		$styles = array();
+		$styles     = array();
 		$stylesheet = $this->normalize_bricks_id_selectors_in_css( (string) $stylesheet );
 
 		// Find ALL unique class names in the stylesheet
@@ -3026,8 +3026,8 @@ class EFS_CSS_Converter {
 				continue;
 			}
 
-			$converted_css = $this->convert_nested_id_selectors_to_ampersand( $id_css, $id_name );
-			$style_id      = 'id_' . substr( md5( '#' . $id_name ), 0, 8 );
+			$converted_css       = $this->convert_nested_id_selectors_to_ampersand( $id_css, $id_name );
+			$style_id            = 'id_' . substr( md5( '#' . $id_name ), 0, 8 );
 			$styles[ $style_id ] = array(
 				'type'       => 'class',
 				'selector'   => '#' . $id_name,
@@ -3148,8 +3148,8 @@ class EFS_CSS_Converter {
 			}
 
 			if ( $in_media ) {
-				$brace_count += substr_count( $line, '{' );
-				$brace_count -= substr_count( $line, '}' );
+				$brace_count   += substr_count( $line, '{' );
+				$brace_count   -= substr_count( $line, '}' );
 				$media_content .= $line . "\n";
 
 				if ( 0 === $brace_count ) {
@@ -3668,6 +3668,46 @@ class EFS_CSS_Converter {
 	 * @param string $class_name Base class name.
 	 * @return string
 	 */
+	/**
+	 * Split a CSS selector list by commas, ignoring commas inside parentheses.
+	 *
+	 * Prevents `:is(svg, i)` from being split into [':is(svg', 'i)'].
+	 *
+	 * @param string $selector Raw selector string.
+	 * @return array<int,string> Trimmed selector parts.
+	 */
+	private function split_selector_by_comma_respecting_parens( $selector ) {
+		$parts   = array();
+		$depth   = 0;
+		$current = '';
+
+		for ( $i = 0, $len = strlen( $selector ); $i < $len; $i++ ) {
+			$ch = $selector[ $i ];
+			if ( '(' === $ch ) {
+				++$depth;
+				$current .= $ch;
+			} elseif ( ')' === $ch ) {
+				--$depth;
+				$current .= $ch;
+			} elseif ( ',' === $ch && 0 === $depth ) {
+				$trimmed = trim( $current );
+				if ( '' !== $trimmed ) {
+					$parts[] = $trimmed;
+				}
+				$current = '';
+			} else {
+				$current .= $ch;
+			}
+		}
+
+		$trimmed = trim( $current );
+		if ( '' !== $trimmed ) {
+			$parts[] = $trimmed;
+		}
+
+		return $parts;
+	}
+
 	private function normalize_selector_suffix_with_ampersand( $selector_suffix, $class_name ) {
 		$raw    = (string) $selector_suffix;
 		$suffix = trim( $raw );
@@ -3684,7 +3724,8 @@ class EFS_CSS_Converter {
 		$suffix        = preg_replace( $class_pattern, '&', $suffix );
 		$suffix        = is_string( $suffix ) ? $suffix : trim( $raw );
 
-		$parts = array_map( 'trim', explode( ',', $suffix ) );
+		// Split on commas only outside parentheses so that `:is(svg, i)` stays intact.
+		$parts = $this->split_selector_by_comma_respecting_parens( $suffix );
 		$parts = array_filter(
 			$parts,
 			static function ( $part ) {

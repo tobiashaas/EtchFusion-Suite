@@ -151,11 +151,6 @@ class EFS_Element_Video extends EFS_Base_Element {
 			$label = 'Video';
 		}
 
-		$figcaption_block = $this->generate_etch_element_block(
-			$this->build_attributes( 'Video Caption', array(), array( 'class' => 'hidden-accessible' ), 'figcaption' ),
-			$this->generate_etch_text_block( wp_kses_post( $description ) )
-		);
-
 		$video_attrs  = $this->build_html5_video_attributes( $settings, $width, $height );
 		$source_block = $this->generate_etch_element_block(
 			$this->build_attributes(
@@ -169,14 +164,22 @@ class EFS_Element_Video extends EFS_Base_Element {
 			)
 		);
 
-		$video_block = $this->generate_etch_element_block(
+		$video_block  = $this->generate_etch_element_block(
 			$this->build_attributes( 'Video Element', array(), $video_attrs, 'video' ),
 			array( $source_block )
 		);
+		$inner_blocks = array( $video_block );
+
+		if ( '' !== trim( $description ) ) {
+			$inner_blocks[] = $this->generate_etch_element_block(
+				$this->build_attributes( 'Video Caption', array(), array( 'class' => 'hidden-accessible' ), 'figcaption' ),
+				$this->generate_etch_text_block( wp_kses_post( $description ) )
+			);
+		}
 
 		return $this->generate_etch_element_block(
 			$this->build_attributes( $label, $style_ids, $figure_attrs, 'figure', $element ),
-			array( $figcaption_block, $video_block )
+			$inner_blocks
 		);
 	}
 

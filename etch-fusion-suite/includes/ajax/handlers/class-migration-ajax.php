@@ -75,15 +75,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration start aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Start migration aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
@@ -135,16 +127,16 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				}
 
 				if ( $migration_repository ) {
-					$progress                   = $migration_repository->get_progress();
-					$current_percentage         = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
-					$progress['migrationId']    = $migration_id;
-					$progress['status']         = 'error';
-					$progress['percentage']     = $current_percentage;
-					$progress['message']        = sprintf( 'Fatal error during migration: %s', $error['message'] ?? '' );
-					$progress['last_updated']   = current_time( 'mysql' );
-					$progress['current_step']   = 'error';
-					$progress['completed_at']   = current_time( 'mysql' );
-					$progress['is_stale']       = false;
+					$progress                         = $migration_repository->get_progress();
+					$current_percentage               = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
+					$progress['migrationId']          = $migration_id;
+					$progress['status']               = 'error';
+					$progress['percentage']           = $current_percentage;
+					$progress['message']              = sprintf( 'Fatal error during migration: %s', $error['message'] ?? '' );
+					$progress['last_updated']         = current_time( 'mysql' );
+					$progress['current_step']         = 'error';
+					$progress['completed_at']         = current_time( 'mysql' );
+					$progress['is_stale']             = false;
 					$progress['current_phase_status'] = 'failed';
 					$migration_repository->save_progress( $progress );
 					$migration_repository->save_active_migration( array() );
@@ -166,6 +158,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$result = $this->migration_controller->run_migration_execution( $migration_id, $bg_token );
 		if ( is_wp_error( $result ) ) {
+			$this->save_background_error( $migration_repository, $migration_id, $result->get_error_message() );
 			wp_die( '0', 400 );
 		}
 
@@ -186,6 +179,38 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	/**
+	 * Persist an error-state into the progress record from the background handler.
+	 *
+	 * Called when the background process cannot start or the execution returns WP_Error.
+	 * Without this, the client would have to wait for the 600-second stale TTL before
+	 * seeing any feedback.
+	 *
+	 * @param mixed  $migration_repository Repository instance or null.
+	 * @param string $migration_id         Active migration identifier.
+	 * @param string $message              Human-readable error description.
+	 * @return void
+	 */
+	private function save_background_error( $migration_repository, $migration_id, $message ) {
+		if ( ! $migration_repository || '' === $migration_id ) {
+			return;
+		}
+		$progress = $migration_repository->get_progress();
+		if ( ! is_array( $progress ) ) {
+			$progress = array();
+		}
+		$progress['migrationId']          = $migration_id;
+		$progress['status']               = 'error';
+		$progress['current_step']         = 'error';
+		$progress['current_phase_status'] = 'failed';
+		$progress['message']              = $message;
+		$progress['last_updated']         = current_time( 'mysql' );
+		$progress['completed_at']         = current_time( 'mysql' );
+		$progress['is_stale']             = false;
+		$migration_repository->save_progress( $progress );
+		$migration_repository->save_active_migration( array() );
+	}
+
+	/**
 	 * Get migration progress.
 	 */
 	public function get_progress() {
@@ -197,20 +222,17 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration progress aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Get migration progress aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
+		$migration_id = $this->get_post( 'migrationId', '', 'text' );
+		if ( '' === $migration_id ) {
+			$migration_id = $this->get_post( 'migration_id', '', 'text' );
+		}
+
 		$payload = array(
-			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'migrationId' => $migration_id,
 		);
 
 		$result = $this->migration_controller->get_progress( $payload );
@@ -230,20 +252,17 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration batch aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Process migration batch aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
+		$batch_migration_id = $this->get_post( 'migrationId', '', 'text' );
+		if ( '' === $batch_migration_id ) {
+			$batch_migration_id = $this->get_post( 'migration_id', '', 'text' );
+		}
+
 		$payload = array(
-			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'migrationId' => $batch_migration_id,
 			'batch'       => $this->get_post( 'batch', array(), 'array' ),
 			'batch_size'  => $this->get_post( 'batch_size', 10, 'int' ),
 		);
@@ -265,20 +284,17 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration resume aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Resume migration aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
+		$resume_migration_id = $this->get_post( 'migrationId', '', 'text' );
+		if ( '' === $resume_migration_id ) {
+			$resume_migration_id = $this->get_post( 'migration_id', '', 'text' );
+		}
+
 		$payload = array(
-			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'migrationId' => $resume_migration_id,
 		);
 
 		$result = $this->migration_controller->resume_migration( $payload );
@@ -298,20 +314,17 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration cancel aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Cancel migration aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
+		$cancel_migration_id = $this->get_post( 'migrationId', '', 'text' );
+		if ( '' === $cancel_migration_id ) {
+			$cancel_migration_id = $this->get_post( 'migration_id', '', 'text' );
+		}
+
 		$payload = array(
-			'migrationId' => $this->get_post( 'migration_id', '', 'text' ),
+			'migrationId' => $cancel_migration_id,
 		);
 
 		$result = $this->migration_controller->cancel_migration( $payload );
@@ -331,15 +344,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration report aborted: controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_migration_controller( 'Generate migration report aborted: migration controller unavailable.' ) ) {
 			return;
 		}
 
@@ -360,15 +365,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		if ( ! $this->settings_controller instanceof EFS_Settings_Controller ) {
-			$this->log_security_event( 'ajax_action', 'Migration key generation aborted: settings controller unavailable.' );
-			wp_send_json_error(
-				array(
-					'message' => __( 'Settings service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
-					'code'    => 'service_unavailable',
-				),
-				503
-			);
+		if ( ! $this->require_settings_controller() ) {
 			return;
 		}
 
@@ -379,6 +376,48 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$result = $this->settings_controller->generate_migration_key( $payload );
 
 		$this->send_controller_response( $result, 'migration_key_failed', 'Migration key generated.' );
+	}
+
+	/**
+	 * Guard: ensure migration controller is available before proceeding.
+	 *
+	 * @param string $log_message Optional audit log message override.
+	 * @return bool True when controller is available, false after sending a 503 JSON error.
+	 */
+	protected function require_migration_controller( $log_message = 'Migration controller unavailable.' ) {
+		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
+			$this->log_security_event( 'ajax_action', $log_message );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Migration service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Guard: ensure settings controller is available before proceeding.
+	 *
+	 * @param string $log_message Optional audit log message override.
+	 * @return bool True when controller is available, false after sending a 503 JSON error.
+	 */
+	protected function require_settings_controller( $log_message = 'Migration key generation aborted: settings controller unavailable.' ) {
+		if ( ! $this->settings_controller instanceof EFS_Settings_Controller ) {
+			$this->log_security_event( 'ajax_action', $log_message );
+			wp_send_json_error(
+				array(
+					'message' => __( 'Settings service unavailable. Please ensure the service container is initialised.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return false;
+		}
+		return true;
 	}
 
 	/**

@@ -25,6 +25,27 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'progress_repository',
+			function ( $c ) {
+				return $c->get( 'migration_repository' );
+			}
+		);
+
+		$container->singleton(
+			'checkpoint_repository',
+			function ( $c ) {
+				return $c->get( 'migration_repository' );
+			}
+		);
+
+		$container->singleton(
+			'token_repository',
+			function ( $c ) {
+				return $c->get( 'migration_repository' );
+			}
+		);
+
+		$container->singleton(
 			'migration_runs_repository',
 			function ( $c ) {
 				return new \Bricks2Etch\Repositories\EFS_Migration_Runs_Repository();
@@ -575,6 +596,9 @@ class EFS_Service_Provider {
 		return array(
 			'settings_repository',
 			'migration_repository',
+			'progress_repository',
+			'checkpoint_repository',
+			'token_repository',
 			'migration_runs_repository',
 			'style_repository',
 			'cors_manager',

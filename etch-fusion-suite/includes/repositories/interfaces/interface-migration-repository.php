@@ -2,7 +2,8 @@
 /**
  * Migration Repository Interface
  *
- * Defines the contract for managing migration progress, steps, stats, and tokens.
+ * Composite interface that combines progress, checkpoint, and token repository
+ * contracts into a single contract for the migration repository implementation.
  *
  * @package Bricks2Etch\Repositories\Interfaces
  * @since 1.0.0
@@ -10,189 +11,16 @@
 
 namespace Bricks2Etch\Repositories\Interfaces;
 
+use Bricks2Etch\Repositories\Interfaces\Progress_Repository_Interface;
+use Bricks2Etch\Repositories\Interfaces\Checkpoint_Repository_Interface;
+use Bricks2Etch\Repositories\Interfaces\Token_Repository_Interface;
+
 /**
  * Interface Migration_Repository_Interface
  *
- * Provides methods for accessing and managing migration-related data.
+ * Composite interface extending Progress_Repository_Interface,
+ * Checkpoint_Repository_Interface, and Token_Repository_Interface.
+ * All 24 methods are inherited from the three sub-interfaces.
  */
-interface Migration_Repository_Interface {
-
-	/**
-	 * Get migration progress.
-	 *
-	 * @return array Progress data array.
-	 */
-	public function get_progress(): array;
-
-	/**
-	 * Save migration progress.
-	 *
-	 * @param array $progress Progress data to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_progress( array $progress ): bool;
-
-	/**
-	 * Delete migration progress.
-	 *
-	 * @return bool True on success, false on failure.
-	 */
-	public function delete_progress(): bool;
-
-	/**
-	 * Get migration steps.
-	 *
-	 * @return array Steps data array.
-	 */
-	public function get_steps(): array;
-
-	/**
-	 * Save migration steps.
-	 *
-	 * @param array $steps Steps data to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_steps( array $steps ): bool;
-
-	/**
-	 * Delete migration steps.
-	 *
-	 * @return bool True on success, false on failure.
-	 */
-	public function delete_steps(): bool;
-
-	/**
-	 * Get migration statistics.
-	 *
-	 * @return array Stats data array.
-	 */
-	public function get_stats(): array;
-
-	/**
-	 * Save migration statistics.
-	 *
-	 * @param array $stats Stats data to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_stats( array $stats ): bool;
-
-	/**
-	 * Get token data.
-	 *
-	 * @return array Token data array.
-	 */
-	public function get_token_data(): array;
-
-	/**
-	 * Save token data.
-	 *
-	 * @param array $token_data Token data to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_token_data( array $token_data ): bool;
-
-	/**
-	 * Store active migration metadata.
-	 *
-	 * @param array $data Migration metadata to persist.
-	 * @return bool
-	 */
-	public function save_active_migration( array $data ): bool;
-
-	/**
-	 * Retrieve active migration metadata.
-	 *
-	 * @return array
-	 */
-	public function get_active_migration(): array;
-
-	/**
-	 * Save receiving state for target-site imports.
-	 *
-	 * @param array $state Receiving state payload.
-	 * @return bool
-	 */
-	public function save_receiving_state( array $state ): bool;
-
-	/**
-	 * Get receiving state for target-site imports.
-	 *
-	 * @return array
-	 */
-	public function get_receiving_state(): array;
-
-	/**
-	 * Clear receiving state.
-	 *
-	 * @return bool
-	 */
-	public function clear_receiving_state(): bool;
-
-	/**
-	 * Get token value.
-	 *
-	 * @return string Token value or empty string if not set.
-	 */
-	public function get_token_value(): string;
-
-	/**
-	 * Save token value.
-	 *
-	 * @param string $token Token value to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_token_value( string $token ): bool;
-
-	/**
-	 * Delete token data and value.
-	 *
-	 * @return bool True on success, false on failure.
-	 */
-	public function delete_token_data(): bool;
-
-	/**
-	 * Get imported data by type.
-	 *
-	 * @param string $type Data type: 'cpts', 'acf_field_groups', or 'metabox_configs'.
-	 * @return array Imported data array.
-	 */
-	public function get_imported_data( string $type ): array;
-
-	/**
-	 * Save imported data by type.
-	 *
-	 * @param string $type Data type: 'cpts', 'acf_field_groups', or 'metabox_configs'.
-	 * @param array  $data Data to save.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_imported_data( string $type, array $data ): bool;
-
-	/**
-	 * Cleanup expired token transients.
-	 *
-	 * @return int Number of expired transients deleted.
-	 */
-	public function cleanup_expired_tokens(): int;
-
-	/**
-	 * Save migration checkpoint for JS-driven batch loop.
-	 *
-	 * @param array $checkpoint Checkpoint data.
-	 * @return bool True on success, false on failure.
-	 */
-	public function save_checkpoint( array $checkpoint ): bool;
-
-	/**
-	 * Get migration checkpoint.
-	 *
-	 * @return array Checkpoint data, or empty array if none exists.
-	 */
-	public function get_checkpoint(): array;
-
-	/**
-	 * Delete migration checkpoint.
-	 *
-	 * @return bool True on success, false on failure.
-	 */
-	public function delete_checkpoint(): bool;
+interface Migration_Repository_Interface extends Progress_Repository_Interface, Checkpoint_Repository_Interface, Token_Repository_Interface {
 }

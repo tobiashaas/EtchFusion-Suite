@@ -77,6 +77,11 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 		return $this->priority;
 	}
 
+	/** @inheritDoc */
+	public function is_required(): bool {
+		return false;
+	}
+
 	/**
 	 * Helper to determine plugin availability by function/class name.
 	 *

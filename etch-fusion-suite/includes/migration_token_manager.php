@@ -125,6 +125,38 @@ class EFS_Migration_Token_Manager {
 	}
 
 	/**
+	 * Generate a one-time pairing code stored as a transient (15 min TTL).
+	 * Returns the raw code (8 hex chars, displayed as "A3F7-K2M9").
+	 *
+	 * @return string
+	 */
+	public function generate_pairing_code(): string {
+		$code = bin2hex( random_bytes( 4 ) ); // 8 hex chars, e.g. "a3f7k2m9"
+		set_transient( 'efs_pairing_code', $code, 15 * MINUTE_IN_SECONDS );
+		return $code;
+	}
+
+	/**
+	 * Validate and consume a pairing code (one-time use).
+	 * Normalises input: strips dash, lowercases before comparing.
+	 *
+	 * @param string $code Pairing code to validate.
+	 * @return true|\WP_Error True on success, WP_Error on failure.
+	 */
+	public function validate_and_consume_pairing_code( string $code ) {
+		$stored = get_transient( 'efs_pairing_code' );
+		if ( false === $stored || '' === $stored ) {
+			return new \WP_Error( 'invalid_pairing_code', 'No active pairing code. Please generate a new one on the target site.' );
+		}
+		$normalise = static fn( $v ) => strtolower( str_replace( '-', '', (string) $v ) );
+		if ( ! hash_equals( $normalise( $stored ), $normalise( $code ) ) ) {
+			return new \WP_Error( 'invalid_pairing_code', 'Invalid pairing code.' );
+		}
+		delete_transient( 'efs_pairing_code' ); // one-time use
+		return true;
+	}
+
+	/**
 	 * Generate migration URL with embedded token
 	 *
 	 * @param string $target_domain Target domain
@@ -237,13 +269,13 @@ class EFS_Migration_Token_Manager {
 
 		// The migration URL always points to this (target) site regardless of which
 		// site's URL is stored in the token payload's `domain` field.
-		$url = $this->build_migration_url( home_url(), $token );
+		$url        = $this->build_migration_url( home_url(), $token );
 		$expires_at = isset( $token_data['expires_at'] ) ? (string) $token_data['expires_at'] : '';
 
 		return array(
-			'migration_url'       => $url,
-			'expires_at'          => $expires_at,
-			'expiration_seconds'  => max( 0, $expires_ts - time() ),
+			'migration_url'      => $url,
+			'expires_at'         => $expires_at,
+			'expiration_seconds' => max( 0, $expires_ts - time() ),
 		);
 	}
 

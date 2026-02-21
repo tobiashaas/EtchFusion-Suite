@@ -114,12 +114,30 @@ if ( ! function_exists( 'etch_fusion_suite_resolve_bricks_internal_host' ) ) {
 	/**
 	 * Resolve Bricks WordPress host inside Docker (wp-env: service "WordPress", port 80).
 	 *
+	 * Result is cached in a static variable (per-request) and a transient (5 min, cross-request)
+	 * to avoid repeated slow DNS lookups in Docker-on-Windows environments.
+	 *
 	 * @return string|null HTTP base URL (e.g. http://wordpress) or null when not in Docker.
 	 */
 	function etch_fusion_suite_resolve_bricks_internal_host() {
+		static $cache = array();
+
 		$candidates = array( 'wordpress', 'bricks' );
 		$candidates = apply_filters( 'etch_fusion_suite_bricks_internal_host_candidates', $candidates );
 
+		$cache_key = 'efs_bricks_host_' . substr( md5( implode( ',', $candidates ) ), 0, 8 );
+
+		if ( array_key_exists( $cache_key, $cache ) ) {
+			return $cache[ $cache_key ];
+		}
+
+		$transient = get_transient( $cache_key );
+		if ( false !== $transient ) {
+			$cache[ $cache_key ] = '' !== $transient ? $transient : null;
+			return $cache[ $cache_key ];
+		}
+
+		$result = null;
 		foreach ( $candidates as $candidate ) {
 			if ( ! is_string( $candidate ) || '' === trim( $candidate ) ) {
 				continue;
@@ -131,11 +149,15 @@ if ( ! function_exists( 'etch_fusion_suite_resolve_bricks_internal_host' ) ) {
 			}
 
 			if ( filter_var( $resolved, FILTER_VALIDATE_IP ) ) {
-				return sprintf( 'http://%s', $candidate );
+				$result = sprintf( 'http://%s', $candidate );
+				break;
 			}
 		}
 
-		return null;
+		set_transient( $cache_key, null !== $result ? $result : '', 300 );
+		$cache[ $cache_key ] = $result;
+
+		return $result;
 	}
 }
 

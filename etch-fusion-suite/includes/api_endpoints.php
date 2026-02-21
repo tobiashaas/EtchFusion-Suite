@@ -640,8 +640,8 @@ class EFS_API_Endpoints {
 			}
 
 			/** @var EFS_Migration_Token_Manager $token_manager */
-			$token_manager      = self::resolve( 'token_manager' );
-			$validation_result  = $token_manager ? $token_manager->validate_migration_token( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
+			$token_manager     = self::resolve( 'token_manager' );
+			$validation_result = $token_manager ? $token_manager->validate_migration_token( $migration_key ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
 			if ( is_wp_error( $validation_result ) ) {
 				$error_code = $validation_result->get_error_code();
@@ -652,8 +652,8 @@ class EFS_API_Endpoints {
 
 			$validated_token = $migration_key;
 			$payload         = is_array( $validation_result ) ? $validation_result : array();
-			$target  = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
-			$source  = $payload['domain'] ?? '';
+			$target          = ! empty( $target_url ) ? $target_url : ( $payload['target_url'] ?? '' );
+			$source          = $payload['domain'] ?? '';
 
 			if ( empty( $target ) ) {
 				return new \WP_Error( 'missing_target', __( 'Target URL could not be determined from migration key.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
@@ -690,6 +690,37 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Generate a one-time pairing code (admin-only REST endpoint).
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function generate_pairing_code_endpoint( $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		$rate = self::check_rate_limit( 'generate_pairing_code', 5, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$token_manager = self::resolve( 'token_manager' );
+		if ( ! $token_manager ) {
+			return new \WP_Error( 'token_manager_unavailable', 'Token manager unavailable.', array( 'status' => 500 ) );
+		}
+
+		$code = $token_manager->generate_pairing_code();
+
+		return new \WP_REST_Response(
+			array(
+				'success'    => true,
+				'code'       => strtoupper( substr( $code, 0, 4 ) ) . '-' . strtoupper( substr( $code, 4 ) ),
+				'raw_code'   => $code,
+				'expires_in' => 15 * MINUTE_IN_SECONDS,
+				'expires_at' => gmdate( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS ),
+			),
+			200
+		);
+	}
+
+	/**
 	 * Generate migration key endpoint.
 	 *
 	 * Supports two call patterns:
@@ -715,6 +746,20 @@ class EFS_API_Endpoints {
 		$cors = self::check_cors_origin();
 		if ( is_wp_error( $cors ) ) {
 			return $cors;
+		}
+
+		// Pairing code validation (required).
+		$pairing_code = $request->get_param( 'pairing_code' );
+		$pairing_code = is_string( $pairing_code ) ? trim( $pairing_code ) : '';
+		if ( '' === $pairing_code ) {
+			return new \WP_Error( 'missing_pairing_code', 'A pairing code is required.', array( 'status' => 403 ) );
+		}
+		$token_manager_for_pairing = self::resolve( 'token_manager' );
+		if ( $token_manager_for_pairing ) {
+			$pairing_check = $token_manager_for_pairing->validate_and_consume_pairing_code( $pairing_code );
+			if ( is_wp_error( $pairing_check ) ) {
+				return new \WP_Error( 'invalid_pairing_code', $pairing_check->get_error_message(), array( 'status' => 403 ) );
+			}
 		}
 
 		$source_url = $request->get_param( 'source_url' );
@@ -1097,7 +1142,7 @@ class EFS_API_Endpoints {
 		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
 		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
 
-		$source_site       = '';
+		$source_site        = '';
 		$items_total_header = 0;
 		if ( $request instanceof \WP_REST_Request ) {
 			$header = $request->get_header( 'X-EFS-Source-Origin' );
@@ -1495,10 +1540,10 @@ class EFS_API_Endpoints {
 					self::resolve( 'error_handler' )->log_warning(
 						'W009',
 						array(
-							'source_id'            => $source_post_id,
-							'target_id'            => $existing->ID,
-							'requested_post_type'  => $post_type,
-							'kept_post_type'       => $existing->post_type,
+							'source_id'           => $source_post_id,
+							'target_id'           => $existing->ID,
+							'requested_post_type' => $post_type,
+							'kept_post_type'      => $existing->post_type,
 						)
 					);
 				}
@@ -1842,6 +1887,16 @@ class EFS_API_Endpoints {
 				// tied to the source origin via X-EFS-Source-Origin on import endpoints.
 				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
 				'methods'             => \WP_REST_Server::READABLE . ', ' . \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/generate-pairing-code',
+			array(
+				'callback'            => array( __CLASS__, 'generate_pairing_code_endpoint' ),
+				'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
 

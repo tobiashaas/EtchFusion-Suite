@@ -39,7 +39,7 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
 		$this->assertStringContainsString( 'wp:etch/element', $result );
-		$this->assertStringContainsString( 'youtube.com/embed/dQw4w9WgXcQ', $result );
+		$this->assertStringContainsString( 'youtube-nocookie.com/embed/dQw4w9WgXcQ', $result );
 		$this->assertStringContainsString( '"tag":"iframe"', $result );
 		$this->assertStringContainsString( '"data-etch-element":"iframe"', $result );
 		$this->assertStringContainsString( 'Video (YouTube)', $result );
@@ -177,7 +177,7 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"type":"video/mp4"', $result );
 	}
 
-	public function test_html5_video_empty_figcaption(): void {
+	public function test_html5_video_no_figcaption_when_empty(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
 			'name'     => 'video',
@@ -188,8 +188,11 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
-		$this->assertStringContainsString( '"tag":"figcaption"', $result );
-		$this->assertStringContainsString( '"content":""', $result );
+		// No description → no figcaption block should be emitted.
+		$this->assertStringNotContainsString( '"tag":"figcaption"', $result );
+		// Video and source must still be present.
+		$this->assertStringContainsString( '"tag":"video"', $result );
+		$this->assertStringContainsString( '"tag":"source"', $result );
 	}
 
 	public function test_html5_video_poster_and_playsinline(): void {

@@ -38,6 +38,7 @@ spl_autoload_register(
 			'Templates\\'                => 'templates/',
 			'Migrators\\Interfaces\\'    => 'migrators/interfaces/',
 			'Migrators\\'                => '',
+			'Converters\\Interfaces\\'   => 'converters/interfaces/',
 			'Converters\\Elements\\'     => 'converters/elements/',
 			'Converters\\'               => 'converters/',
 			'Security\\'                 => 'security/',

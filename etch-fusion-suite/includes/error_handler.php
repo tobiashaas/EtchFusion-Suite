@@ -262,6 +262,11 @@ class EFS_Error_Handler {
 			'description' => 'Media item exhausted all retry attempts and was skipped',
 			'solution'    => 'Review the media item manually and re-run or migrate it individually',
 		),
+		'W014' => array(
+			'title'       => 'Optional Migrator Failed',
+			'description' => 'An optional migrator (ACF, MetaBox, or Custom Fields) failed; migration continued',
+			'solution'    => 'Review the warning context for the migrator type and error message; re-run or configure the plugin on the target site',
+		),
 	);
 
 	/**
