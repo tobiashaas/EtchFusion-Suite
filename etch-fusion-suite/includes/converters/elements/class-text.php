@@ -77,12 +77,12 @@ class EFS_Element_Text extends EFS_Base_Element {
 		libxml_clear_errors();
 
 		if ( ! $loaded ) {
-			return '';
+			return $this->build_single_block_fallback( $html, $element );
 		}
 
 		$body = $dom->getElementsByTagName( 'body' )->item( 0 );
 		if ( ! $body ) {
-			return '';
+			return $this->build_single_block_fallback( $html, $element );
 		}
 
 		$blocks        = array();
@@ -118,7 +118,14 @@ class EFS_Element_Text extends EFS_Base_Element {
 		$this->flush_inline_buffer( $inline_buffer, $element, $blocks );
 
 		if ( empty( $blocks ) ) {
-			return '';
+			return $this->build_single_block_fallback( $html, $element );
+		}
+
+		// If DOM parsing truncated content (e.g. due to quotes or malformed HTML), use full HTML as single block.
+		$parsed_text_len = mb_strlen( wp_strip_all_tags( implode( ' ', $blocks ) ) );
+		$original_text_len = mb_strlen( wp_strip_all_tags( $html ) );
+		if ( $original_text_len > 0 && $parsed_text_len < (int) ( 0.8 * $original_text_len ) ) {
+			return $this->build_single_block_fallback( $html, $element );
 		}
 
 		$wrapper_style_ids = $this->get_style_ids( $element );
@@ -140,6 +147,39 @@ class EFS_Element_Text extends EFS_Base_Element {
 		);
 
 		return $this->generate_etch_element_block( $wrapper, implode( "\n", $blocks ) );
+	}
+
+	/**
+	 * Fallback when DOM parsing fails or truncates: output full HTML as a single paragraph block.
+	 * Prevents content loss (e.g. text after "cutout" or malformed HTML).
+	 *
+	 * @param string $html    Raw HTML from Bricks settings.
+	 * @param array  $element Bricks element.
+	 * @return string Gutenberg block HTML.
+	 */
+	private function build_single_block_fallback( $html, $element ) {
+		$sanitized = wp_kses_post( $html );
+		$sanitized = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', (string) $sanitized );
+		$block     = $this->generate_block( 'p', $sanitized, $element );
+
+		$wrapper_style_ids = $this->get_style_ids( $element );
+		$wrapper_classes   = array_filter( preg_split( '/\s+/', trim( (string) $this->get_css_classes( $wrapper_style_ids ) ) ) );
+		$wrapper_classes[] = 'smart-spacing';
+		$wrapper_classes   = array_values( array_unique( array_filter( $wrapper_classes ) ) );
+		$wrapper_attrs     = array();
+		if ( ! empty( $wrapper_classes ) ) {
+			$wrapper_attrs['class'] = implode( ' ', $wrapper_classes );
+		}
+
+		$wrapper = $this->build_attributes(
+			$this->get_label( $element ),
+			$wrapper_style_ids,
+			$wrapper_attrs,
+			'div',
+			$element
+		);
+
+		return $this->generate_etch_element_block( $wrapper, $block );
 	}
 
 	/**

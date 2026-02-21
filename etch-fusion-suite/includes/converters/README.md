@@ -546,6 +546,7 @@ Konvertiert Frames fr-notes Elemente in HTML-Kommentare zur Migrations-Nachverfo
 - ✅ Verschachtelte Listen (ul/ol > li als innerBlocks)
 - ✅ CSS-Klassen erhalten (von Bricks + aus HTML)
 - ✅ Inline-Elemente in Paragraphs gewrappt
+- ✅ **Fallback:** Wenn DOM-Parsing fehlschlägt oder stark kürzt (>20 % Textverlust), wird der komplette HTML-Text als ein Block ausgegeben (verhindert Abschneiden z. B. bei Anführungszeichen wie in „cutout“).
 
 **Beispiel:**
 
@@ -733,9 +734,11 @@ $tag = $this->get_tag($element, 'div');  // Liest aus settings.tag
 $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 ```
 
-### **Problem: Rich Text generiert nur einen Block statt mehrere**
+### **Problem: Rich Text wurde abgeschnitten (z. B. Text nach „cutout“ fehlte)**
 
-**Lösung:** Prüfe ob HTML korrekt geparst wird. `class-text.php` verwendet DOMDocument. Bei Parsing-Fehlern wird leerer String zurückgegeben.
+**Ursache:** `DOMDocument::loadHTML()` kann bei bestimmten HTML-Strukturen oder Anführungszeichen den Inhalt kürzen oder fehlerhaft parsen.
+
+**Lösung:** In `class-text.php` gibt es einen Fallback: Schlägt das DOM-Parsing fehl oder liefert es deutlich weniger Text als das Original (<80 %), wird der gesamte HTML-String als ein einziger Paragraph-Block ausgegeben. So geht kein Text verloren.
 
 ---
 

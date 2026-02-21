@@ -12,7 +12,8 @@ $style_map = get_option('efs_style_map', array());
 echo "Style map loaded: " . count($style_map) . " entries\n\n";
 
 // Create factory
-$factory = new \Bricks2Etch\Converters\EFS_Element_Factory($style_map);
+$registry = new \Bricks2Etch\Converters\EFS_Converter_Registry();
+$factory = new \Bricks2Etch\Converters\EFS_Element_Factory( $registry, $style_map );
 
 // Test 1: Container with ul tag
 echo "--- Test 1: Container with ul tag ---\n";

@@ -23,6 +23,7 @@ spl_autoload_register(
 		// Map namespace to directory structure
 		$namespace_map = array(
 			'Container\\'                => 'container/',
+			'Services\\Interfaces\\'     => 'services/interfaces/',
 			'Services\\'                 => 'services/',
 			'Repositories\\Interfaces\\' => 'repositories/interfaces/',
 			'Repositories\\'             => 'repositories/',
@@ -66,6 +67,7 @@ spl_autoload_register(
 					$slug . '.php',
 					'class-' . $underscore_slug . '.php',
 					$underscore_slug . '.php',
+					'interface-' . $slug . '.php',
 				);
 
 				if ( $slug_no_prefix !== $slug ) {

@@ -75,6 +75,7 @@ require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-provider.
 use Bricks2Etch\Api\EFS_API_Endpoints;
 use Bricks2Etch\Container\EFS_Service_Container;
 use Bricks2Etch\Container\EFS_Service_Provider;
+use Bricks2Etch\Converters\EFS_Converter_Discovery;
 use Bricks2Etch\Migrators\EFS_Migrator_Discovery;
 use Bricks2Etch\Migrators\EFS_Migrator_Registry;
 
@@ -147,6 +148,7 @@ class Etch_Fusion_Suite_Plugin {
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
 		add_action( 'plugins_loaded', array( $this, 'init_migrators' ), 20 );
+		add_action( 'plugins_loaded', array( $this, 'init_converters' ), 20 );
 
 		// Enable Application Passwords with environment-based HTTPS requirement
 		add_filter( 'wp_is_application_passwords_available', array( $this, 'enable_application_passwords' ) );
@@ -179,6 +181,17 @@ class Etch_Fusion_Suite_Plugin {
 		if ( $container->has( 'github_updater' ) ) {
 			$this->github_updater = $container->get( 'github_updater' );
 			$this->github_updater->init();
+		}
+	}
+
+	/**
+	 * Initialize converter discovery workflow
+	 */
+	public function init_converters() {
+		$container = etch_fusion_suite_container();
+
+		if ( $container->has( 'converter_registry' ) ) {
+			EFS_Converter_Discovery::discover_converters( $container->get( 'converter_registry' ) );
 		}
 	}
 

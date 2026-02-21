@@ -92,7 +92,8 @@ foreach ($hooks as $hook) {
 
 echo "\n--- Testing Factory ---\n";
 try {
-    $factory = new \Bricks2Etch\Converters\EFS_Element_Factory([]);
+    $registry = new \Bricks2Etch\Converters\EFS_Converter_Registry();
+    $factory  = new \Bricks2Etch\Converters\EFS_Element_Factory( $registry, [] );
     echo "✅ Factory created successfully\n";
     
     // Test 1: Heading

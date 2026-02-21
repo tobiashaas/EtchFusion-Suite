@@ -251,7 +251,9 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 
 		$this->component_map   = $this->get_component_mapping();
-		$this->element_factory = new EFS_Element_Factory( $this->style_map, $this->error_handler );
+		$_cm_container         = etch_fusion_suite_container();
+		$_cm_registry          = $_cm_container->has( 'converter_registry' ) ? $_cm_container->get( 'converter_registry' ) : new \Bricks2Etch\Converters\EFS_Converter_Registry();
+		$this->element_factory = new EFS_Element_Factory( $_cm_registry, $this->style_map, $this->error_handler );
 
 		$reference_chain = array();
 		foreach ( $components as $component ) {
@@ -626,7 +628,9 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 
 		if ( ! $this->element_factory ) {
-			$this->element_factory = new EFS_Element_Factory( $this->style_map, $this->error_handler );
+			$_cm2_container        = etch_fusion_suite_container();
+			$_cm2_registry         = $_cm2_container->has( 'converter_registry' ) ? $_cm2_container->get( 'converter_registry' ) : new \Bricks2Etch\Converters\EFS_Converter_Registry();
+			$this->element_factory = new EFS_Element_Factory( $_cm2_registry, $this->style_map, $this->error_handler );
 		}
 		$converted = $this->element_factory->convert_element( $element_to_convert, array( $children ) );
 		return null !== $converted ? $converted : '';

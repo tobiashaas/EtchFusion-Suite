@@ -14,6 +14,8 @@ use Bricks2Etch\Converters\Elements\EFS_Element_Container;
 use Bricks2Etch\Converters\Elements\EFS_Element_Section;
 use Bricks2Etch\Converters\Elements\EFS_Element_Condition;
 use Bricks2Etch\Converters\Elements\EFS_Element_Heading;
+use Bricks2Etch\Converters\Interfaces\Needs_Error_Handler;
+use Bricks2Etch\Converters\EFS_Converter_Registry;
 use Bricks2Etch\Converters\Elements\EFS_Element_Paragraph;
 use Bricks2Etch\Converters\Elements\EFS_Element_Text;
 use Bricks2Etch\Converters\Elements\EFS_Element_Image;
@@ -37,9 +39,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EFS_Element_Factory {
 
 	/**
-	 * Map Bricks element types to converter classes.
+	 * Built-in map of Bricks element types to converter classes.
+	 * Public so EFS_Converter_Discovery can read it without reflection.
 	 */
-	private const TYPE_MAP = array(
+	public const BUILT_IN_CONVERTERS = array(
 		'container'  => EFS_Element_Container::class,
 		'section'    => EFS_Element_Section::class,
 		'condition'  => EFS_Element_Condition::class,
@@ -79,12 +82,21 @@ class EFS_Element_Factory {
 	private $error_handler;
 
 	/**
+	 * Converter registry for extensible type lookup.
+	 *
+	 * @var EFS_Converter_Registry
+	 */
+	private $registry;
+
+	/**
 	 * Constructor
 	 *
-	 * @param array                  $style_map Style map for CSS classes.
+	 * @param EFS_Converter_Registry $registry      Converter registry (required; no nullable fallback).
+	 * @param array                  $style_map     Style map for CSS classes.
 	 * @param EFS_Error_Handler|null $error_handler Optional error handler instance.
 	 */
-	public function __construct( $style_map = array(), ?EFS_Error_Handler $error_handler = null ) {
+	public function __construct( EFS_Converter_Registry $registry, $style_map = array(), ?EFS_Error_Handler $error_handler = null ) {
+		$this->registry      = $registry;
 		$this->style_map     = $style_map;
 		$this->error_handler = $error_handler;
 		$this->load_converters();
@@ -115,8 +127,9 @@ class EFS_Element_Factory {
 			return null;
 		}
 
-		// Get converter class
-		$converter_class = self::TYPE_MAP[ $element_type ] ?? null;
+		// Registry is always non-null (invariant set in constructor).
+		// If the registry doesn't have the type, fall back to the built-in map.
+		$converter_class = $this->registry->get( $element_type ) ?? ( self::BUILT_IN_CONVERTERS[ $element_type ] ?? null );
 
 		if ( ! $converter_class ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs missing converter for unsupported element types during development
@@ -126,7 +139,7 @@ class EFS_Element_Factory {
 
 		// Create converter instance (with caching)
 		if ( ! isset( $this->converters[ $converter_class ] ) ) {
-			if ( EFS_Element_Condition::class === $converter_class ) {
+			if ( is_a( $converter_class, Needs_Error_Handler::class, true ) ) {
 				$this->converters[ $converter_class ] = new $converter_class( $this->style_map, $this->error_handler );
 			} else {
 				$this->converters[ $converter_class ] = new $converter_class( $this->style_map );

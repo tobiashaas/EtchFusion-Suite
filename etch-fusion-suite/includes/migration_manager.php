@@ -21,8 +21,10 @@ use Bricks2Etch\Parsers\EFS_Dynamic_Data_Converter;
 use Bricks2Etch\Parsers\EFS_Gutenberg_Generator;
 use Bricks2Etch\Services\EFS_Content_Service;
 use Bricks2Etch\Services\EFS_CSS_Service;
+use Bricks2Etch\Services\EFS_Media_Phase_Handler;
 use Bricks2Etch\Services\EFS_Media_Service;
 use Bricks2Etch\Services\EFS_Migration_Service;
+use Bricks2Etch\Services\EFS_Posts_Phase_Handler;
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
 
 // Prevent direct access
@@ -46,11 +48,16 @@ class EFS_Migration_Manager {
 	public function __construct( ?EFS_Migration_Service $migration_service = null, ?Migration_Repository_Interface $migration_repository = null ) {
 		if ( $migration_service ) {
 			$this->migration_service = $migration_service;
-
 			return;
 		}
 
-		// Instantiate migration repository if not provided
+		// Prefer the service container (always available in a properly bootstrapped plugin).
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			$this->migration_service = etch_fusion_suite_container()->get( 'migration_service' );
+			return;
+		}
+
+		// Fallback for non-container contexts (legacy / test paths).
 		if ( ! $migration_repository ) {
 			$migration_repository = new \Bricks2Etch\Repositories\EFS_WordPress_Migration_Repository();
 		}
@@ -62,7 +69,6 @@ class EFS_Migration_Manager {
 		$dynamic_data_converter = new EFS_Dynamic_Data_Converter( $error_handler );
 		$gutenberg_generator    = new EFS_Gutenberg_Generator( $error_handler, $dynamic_data_converter, $content_parser );
 
-		// Instantiate style repository for CSS converter
 		$style_repository = new \Bricks2Etch\Repositories\EFS_WordPress_Style_Repository();
 		$css_converter    = new EFS_CSS_Converter( $error_handler, $style_repository );
 
@@ -83,17 +89,90 @@ class EFS_Migration_Manager {
 		$migrator_registry->register( $metabox_migrator );
 		$migrator_registry->register( new EFS_Custom_Fields_Migrator( $error_handler, $api_client ) );
 
-		$this->migration_service = new EFS_Migration_Service(
+		$migrator_executor   = new \Bricks2Etch\Services\EFS_Migrator_Executor( $migrator_registry, $error_handler );
+		$steps_manager       = new \Bricks2Etch\Services\EFS_Steps_Manager( $plugin_detector );
+		$progress_manager    = new \Bricks2Etch\Services\EFS_Progress_Manager( $migration_repository, $steps_manager );
+		$run_finalizer    = new \Bricks2Etch\Services\EFS_Migration_Run_Finalizer(
+			$progress_manager,
+			$migration_repository,
+			null,
 			$error_handler,
-			$plugin_detector,
+			$content_service
+		);
+		$async_runner     = new \Bricks2Etch\Services\EFS_Async_Migration_Runner(
+			$migrator_executor,
+			$progress_manager,
+			$run_finalizer,
+			$css_service,
+			$media_service,
+			$content_service,
 			$content_parser,
+			$api_client,
+			$migration_repository,
+			$error_handler,
+			$plugin_detector
+		);
+		$spawn_handler    = new \Bricks2Etch\Services\EFS_Background_Spawn_Handler( $error_handler, $async_runner );
+		$starter          = new \Bricks2Etch\Services\EFS_Migration_Starter(
+			$token_manager,
+			$progress_manager,
+			$run_finalizer,
+			$migrator_executor,
 			$css_service,
 			$media_service,
 			$content_service,
 			$api_client,
-			$migrator_registry,
+			$spawn_handler,
+			$error_handler,
+			$plugin_detector,
+			$migration_repository
+		);
+		$batch_phase_runner = new \Bricks2Etch\Services\EFS_Batch_Phase_Runner(
+			$error_handler,
+			$run_finalizer,
+			$progress_manager,
 			$migration_repository,
-			$token_manager
+			$api_client
+		);
+		$legacy_batch     = new \Bricks2Etch\Services\EFS_Legacy_Batch_Fallback(
+			$media_service,
+			$content_service,
+			$api_client,
+			$error_handler,
+			$progress_manager,
+			$migration_repository,
+			null,
+			$run_finalizer
+		);
+		$media_phase_handler = new EFS_Media_Phase_Handler( $media_service, $error_handler );
+		$posts_phase_handler = new EFS_Posts_Phase_Handler( $content_service, $error_handler );
+		$batch_processor  = new \Bricks2Etch\Services\EFS_Batch_Processor(
+			array( $media_phase_handler, $posts_phase_handler ),
+			$migration_repository,
+			$progress_manager,
+			$api_client,
+			$error_handler,
+			null,
+			null,
+			$batch_phase_runner
+		);
+		$orchestrator     = new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
+			$starter,
+			$async_runner,
+			$progress_manager,
+			$migration_repository,
+			$plugin_detector,
+			$token_manager,
+			$content_service,
+			$api_client,
+			$error_handler
+		);
+
+		$this->migration_service = new EFS_Migration_Service(
+			$orchestrator,
+			$batch_processor,
+			$legacy_batch,
+			$migration_repository
 		);
 	}
 

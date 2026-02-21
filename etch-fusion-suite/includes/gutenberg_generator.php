@@ -769,8 +769,10 @@ class EFS_Gutenberg_Generator {
 		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
-		$style_map                     = get_option( 'efs_style_map', array() );
-		$this->element_factory         = new EFS_Element_Factory( $style_map, $this->error_handler );
+		$style_map           = get_option( 'efs_style_map', array() );
+		$_gg_container       = etch_fusion_suite_container();
+		$_gg_registry        = $_gg_container->has( 'converter_registry' ) ? $_gg_container->get( 'converter_registry' ) : new \Bricks2Etch\Converters\EFS_Converter_Registry();
+		$this->element_factory         = new EFS_Element_Factory( $_gg_registry, $style_map, $this->error_handler );
 		$this->display_fallback_helper = new EFS_Element_Div( $style_map );
 		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
 

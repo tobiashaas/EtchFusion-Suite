@@ -165,9 +165,16 @@ class EFS_Service_Provider {
 
 		// Converter Services
 		$container->singleton(
+			'converter_registry',
+			function ( $c ) {
+				return new \Bricks2Etch\Converters\EFS_Converter_Registry();
+			}
+		);
+
+		$container->singleton(
 			'element_factory',
 			function ( $c ) {
-				return new \Bricks2Etch\Converters\EFS_Element_Factory( array(), $c->get( 'error_handler' ) );
+				return new \Bricks2Etch\Converters\EFS_Element_Factory( $c->get( 'converter_registry' ), array(), $c->get( 'error_handler' ) );
 			}
 		);
 
@@ -343,20 +350,180 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
-			'migration_service',
+			'media_phase_handler',
 			function ( $c ) {
-				return new \Bricks2Etch\Services\EFS_Migration_Service(
+				return new \Bricks2Etch\Services\EFS_Media_Phase_Handler( $c->get( 'media_service' ), $c->get( 'error_handler' ) );
+			}
+		);
+
+		$container->singleton(
+			'posts_phase_handler',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Posts_Phase_Handler( $c->get( 'content_service' ), $c->get( 'error_handler' ) );
+			}
+		);
+
+		$container->singleton(
+			'migrator_executor',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migrator_Executor(
+					$c->get( 'migrator_registry' ),
+					$c->get( 'error_handler' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'steps_manager',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Steps_Manager(
+					$c->get( 'plugin_detector' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'progress_manager',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Progress_Manager(
+					$c->get( 'progress_repository' ),
+					$c->get( 'steps_manager' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'run_finalizer',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migration_Run_Finalizer(
+					$c->get( 'progress_manager' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'migration_runs_repository' ),
 					$c->get( 'error_handler' ),
-					$c->get( 'plugin_detector' ),
+					$c->get( 'content_service' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'async_migration_runner',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Async_Migration_Runner(
+					$c->get( 'migrator_executor' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'run_finalizer' ),
+					$c->get( 'css_service' ),
+					$c->get( 'media_service' ),
+					$c->get( 'content_service' ),
 					$c->get( 'content_parser' ),
+					$c->get( 'api_client' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'plugin_detector' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'background_spawn_handler',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Background_Spawn_Handler(
+					$c->get( 'error_handler' ),
+					$c->get( 'async_migration_runner' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'migration_starter',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migration_Starter(
+					$c->get( 'token_manager' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'run_finalizer' ),
+					$c->get( 'migrator_executor' ),
 					$c->get( 'css_service' ),
 					$c->get( 'media_service' ),
 					$c->get( 'content_service' ),
 					$c->get( 'api_client' ),
-					$c->get( 'migrator_registry' ),
+					$c->get( 'background_spawn_handler' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'plugin_detector' ),
+					$c->get( 'migration_repository' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'batch_phase_runner',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Batch_Phase_Runner(
+					$c->get( 'error_handler' ),
+					$c->get( 'run_finalizer' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'checkpoint_repository' ),
+					$c->get( 'api_client' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'batch_processor',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Batch_Processor(
+					array( $c->get( 'media_phase_handler' ), $c->get( 'posts_phase_handler' ) ),
+					$c->get( 'checkpoint_repository' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'api_client' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'migration_runs_repository' ),
+					$c->get( 'run_finalizer' ),
+					$c->get( 'batch_phase_runner' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'legacy_batch_fallback',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Legacy_Batch_Fallback(
+					$c->get( 'media_service' ),
+					$c->get( 'content_service' ),
+					$c->get( 'api_client' ),
+					$c->get( 'error_handler' ),
+					$c->get( 'progress_manager' ),
 					$c->get( 'migration_repository' ),
+					$c->get( 'migration_runs_repository' ),
+					$c->get( 'run_finalizer' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'migration_orchestrator',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
+					$c->get( 'migration_starter' ),
+					$c->get( 'async_migration_runner' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'migration_repository' ),
+					$c->get( 'plugin_detector' ),
 					$c->get( 'token_manager' ),
-					$c->get( 'migration_runs_repository' )
+					$c->get( 'content_service' ),
+					$c->get( 'api_client' ),
+					$c->get( 'error_handler' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'migration_service',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migration_Service(
+					$c->get( 'migration_orchestrator' ),
+					$c->get( 'batch_processor' ),
+					$c->get( 'legacy_batch_fallback' ),
+					$c->get( 'migration_repository' )
 				);
 			}
 		);
@@ -614,6 +781,7 @@ class EFS_Service_Provider {
 			'content_parser',
 			'dynamic_data_converter',
 			'css_converter',
+			'converter_registry',
 			'element_factory',
 			'gutenberg_generator',
 			'media_migrator',
@@ -633,6 +801,19 @@ class EFS_Service_Provider {
 			'css_service',
 			'media_service',
 			'content_service',
+			'media_phase_handler',
+			'posts_phase_handler',
+			'migrator_executor',
+			'steps_manager',
+			'progress_manager',
+			'run_finalizer',
+			'async_migration_runner',
+			'background_spawn_handler',
+			'migration_starter',
+			'batch_phase_runner',
+			'batch_processor',
+			'legacy_batch_fallback',
+			'migration_orchestrator',
 			'migration_service',
 			'wizard_state_service',
 			'settings_controller',

@@ -11,13 +11,14 @@
 namespace Bricks2Etch\Converters\Elements;
 
 use Bricks2Etch\Converters\EFS_Base_Element;
+use Bricks2Etch\Converters\Interfaces\Needs_Error_Handler;
 use Bricks2Etch\Core\EFS_Error_Handler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class EFS_Element_Condition extends EFS_Base_Element {
+class EFS_Element_Condition extends EFS_Base_Element implements Needs_Error_Handler {
 
 	protected $element_type = 'condition';
 

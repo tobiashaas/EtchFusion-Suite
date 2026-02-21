@@ -20,7 +20,8 @@ $style_map = get_option('efs_style_map', array());
 echo "Style map loaded: " . count($style_map) . " entries\n\n";
 
 // Create factory
-$factory = new \Bricks2Etch\Converters\EFS_Element_Factory($style_map);
+$registry = new \Bricks2Etch\Converters\EFS_Converter_Registry();
+$factory = new \Bricks2Etch\Converters\EFS_Element_Factory( $registry, $style_map );
 
 // Test 1: Container with ul tag
 echo "--- Test 1: Container with ul tag ---\n";
@@ -502,7 +503,7 @@ echo "\n--- Test 19: End-to-End with Style Map ---\n";
 $style_map_phase2 = array(
     'bTySclink1' => array('id' => 'etch-link-style', 'selector' => '.my-link-class')
 );
-$factory_with_styles = new \Bricks2Etch\Converters\EFS_Element_Factory($style_map_phase2);
+$factory_with_styles = new \Bricks2Etch\Converters\EFS_Element_Factory( $registry, $style_map_phase2 );
 $textlink_styled = array(
     'id' => 'tl2',
     'name' => 'text-link',
@@ -601,7 +602,7 @@ if ($integration_ok) {
 
 echo "\n--- Test 30: Integration - Style map CSS class propagation ---\n";
 $style_map_test = array('bTySclink1' => array('id' => 'etch-link-style', 'selector' => '.my-link-class'));
-$factory_style = new \Bricks2Etch\Converters\EFS_Element_Factory($style_map_test);
+$factory_style = new \Bricks2Etch\Converters\EFS_Element_Factory( $registry, $style_map_test );
 $el_styled = array('id' => 'tl-style', 'name' => 'text-link', 'settings' => array('text' => 'Styled', 'link' => array('url' => 'https://example.org'), '_cssGlobalClasses' => array('bTySclink1')));
 $result = $factory_style->convert_element($el_styled, array());
 $has_etch_data = $result && strpos($result, 'etchData') !== false;
