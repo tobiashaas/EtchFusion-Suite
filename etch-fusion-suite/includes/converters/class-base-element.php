@@ -639,13 +639,93 @@ abstract class EFS_Base_Element {
 	 * when no display property is already defined for the element's associated styles
 	 * and appends the equivalent declarations.
 	 *
-	 * @param array $style_ids       Etch style IDs resolved for the element.
-	 * @param array $etch_attributes Current attribute array being built.
-	 * @param array $element         Source Bricks element data.
+	 * When `$classes` is provided the method additionally gates on whether the
+	 * element name is `block` or the `brxe-block` class appears in the class list,
+	 * and uses layout-profile analysis for more accurate flex/grid detection.
+	 * Callers that already gate on element type (e.g. EFS_Element_Div) may omit
+	 * `$classes` and the simple path is used instead.
+	 *
+	 * @param array  $style_ids       Etch style IDs resolved for the element.
+	 * @param array  $etch_attributes Current attribute array being built.
+	 * @param array  $element         Source Bricks element data.
+	 * @param string $classes         Optional merged class string; enables class-list detection.
 	 * @return array Updated attributes.
 	 */
-	protected function apply_brxe_block_display( array $style_ids, array $etch_attributes, array $element ) {
-		// Check if any resolved Etch style already defines a display property.
+	public function apply_brxe_block_display( array $style_ids, array $etch_attributes, array $element, $classes = '' ) {
+		if ( '' !== $classes ) {
+			// Generator path: gate on element name OR brxe-block presence in class list.
+			$class_list       = array_values( array_filter( preg_split( '/\s+/', trim( (string) $classes ) ) ) );
+			$is_block_element = 'block' === ( $element['name'] ?? '' );
+			if ( ! $is_block_element && ( empty( $class_list ) || ! in_array( 'brxe-block', $class_list, true ) ) ) {
+				return $etch_attributes;
+			}
+
+			$current_style  = isset( $etch_attributes['style'] ) && is_scalar( $etch_attributes['style'] ) ? (string) $etch_attributes['style'] : '';
+			$current_layout = $this->get_layout_profile_from_css( $current_style );
+			if ( $current_layout['is_grid'] ) {
+				return $etch_attributes;
+			}
+
+			$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+			$display  = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
+			if ( in_array( $display, array( 'grid', 'inline-grid' ), true ) ) {
+				return $etch_attributes;
+			}
+
+			// Try to patch a single identifiable neighbor class style before falling back to inline.
+			$neighbor_classes = array();
+			foreach ( $class_list as $name ) {
+				$name = trim( (string) $name );
+				if ( '' === $name || 'brxe-block' === $name ) {
+					continue;
+				}
+				if ( $this->is_modifier_like_selector( $name ) ) {
+					continue;
+				}
+				$neighbor_classes[] = $name;
+			}
+			$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
+
+			if ( 1 === count( $neighbor_classes ) ) {
+				$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
+				if ( $target_style_id ) {
+					$target_layout = $this->get_layout_profile_for_style_id( $target_style_id );
+					if ( $target_layout['is_grid'] || $target_layout['is_flex'] ) {
+						return $etch_attributes;
+					}
+					$declarations = 'display: flex;';
+					if ( ! $target_layout['has_flex_direction'] ) {
+						$declarations .= ' flex-direction: column;';
+					}
+					$this->append_declarations_to_style_id( $target_style_id, $declarations );
+					return $etch_attributes;
+				}
+			}
+
+			$style_layout         = $this->get_layout_profile_for_style_ids( $style_ids );
+			$display_is_derivable = $style_layout['is_flex']
+				|| $style_layout['is_grid']
+				|| $current_layout['is_flex']
+				|| in_array( $display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true );
+
+			if ( $display_is_derivable ) {
+				return $etch_attributes;
+			}
+
+			if ( $current_layout['has_flex_direction'] || $style_layout['has_flex_direction'] ) {
+				$inline_declarations = 'display: flex;';
+			} else {
+				$inline_declarations = 'display: flex; flex-direction: column;';
+			}
+
+			if ( '' !== trim( $current_style ) && ';' !== substr( rtrim( $current_style ), -1 ) ) {
+				$current_style .= ';';
+			}
+			$etch_attributes['style'] = trim( $current_style . ' ' . $inline_declarations );
+			return $etch_attributes;
+		}
+
+		// Simple path: caller has already gated on element type being block.
 		$etch_styles = get_option( 'etch_styles', array() );
 		$etch_styles = is_array( $etch_styles ) ? $etch_styles : array();
 
@@ -660,36 +740,106 @@ abstract class EFS_Base_Element {
 			}
 		}
 
-		// Check existing inline style.
 		$current_style = isset( $etch_attributes['style'] ) && is_scalar( $etch_attributes['style'] )
 			? trim( (string) $etch_attributes['style'] ) : '';
 		if ( preg_match( '/\bdisplay\s*:/i', $current_style ) ) {
 			return $etch_attributes;
 		}
 
-		// Respect explicit display set in Bricks element settings.
 		$settings       = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
 		$bricks_display = isset( $settings['_display'] ) ? strtolower( trim( (string) $settings['_display'] ) ) : '';
 		if ( in_array( $bricks_display, array( 'flex', 'inline-flex', 'grid', 'inline-grid' ), true ) ) {
 			return $etch_attributes;
 		}
 
-		$declarations = 'display: flex; flex-direction: column;';
-
-		// Prefer patching the primary neighbor style over using an inline declaration.
+		$declarations    = 'display: flex; flex-direction: column;';
 		$target_style_id = $this->resolve_single_neighbor_style_id( $element );
 		if ( '' !== $target_style_id ) {
 			$this->append_declarations_to_style_id( $target_style_id, $declarations );
 			return $etch_attributes;
 		}
 
-		// Fall back to an inline style attribute.
 		if ( '' !== $current_style && ';' !== substr( rtrim( $current_style ), -1 ) ) {
 			$current_style .= ';';
 		}
 		$etch_attributes['style'] = trim( $current_style . ' ' . $declarations );
 
 		return $etch_attributes;
+	}
+
+	/**
+	 * Read flex/grid/flex-direction state from a CSS string.
+	 *
+	 * @param string $css Raw CSS declarations.
+	 * @return array<string,bool>
+	 */
+	protected function get_layout_profile_from_css( $css ) {
+		$css = (string) $css;
+		return array(
+			'is_grid'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?grid\b/i', $css ),
+			'is_flex'            => (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?flex\b/i', $css ),
+			'has_flex_direction' => (bool) preg_match( '/\bflex-direction\s*:/i', $css ),
+		);
+	}
+
+	/**
+	 * Get layout profile for a single Etch style ID.
+	 *
+	 * @param string $style_id Etch style ID.
+	 * @return array<string,bool>
+	 */
+	protected function get_layout_profile_for_style_id( $style_id ) {
+		$style_id = trim( (string) $style_id );
+		$empty    = array( 'is_grid' => false, 'is_flex' => false, 'has_flex_direction' => false );
+		if ( '' === $style_id ) {
+			return $empty;
+		}
+
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $etch_styles ) || empty( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
+			return $empty;
+		}
+
+		$css = isset( $etch_styles[ $style_id ]['css'] ) && is_scalar( $etch_styles[ $style_id ]['css'] )
+			? (string) $etch_styles[ $style_id ]['css'] : '';
+
+		return $this->get_layout_profile_from_css( $css );
+	}
+
+	/**
+	 * Aggregate layout profile across multiple Etch style IDs.
+	 *
+	 * @param array $style_ids Etch style IDs.
+	 * @return array<string,bool>
+	 */
+	protected function get_layout_profile_for_style_ids( array $style_ids ) {
+		$profile = array( 'is_grid' => false, 'is_flex' => false, 'has_flex_direction' => false );
+		if ( empty( $style_ids ) ) {
+			return $profile;
+		}
+
+		$etch_styles = get_option( 'etch_styles', array() );
+		if ( ! is_array( $etch_styles ) ) {
+			return $profile;
+		}
+
+		foreach ( $style_ids as $style_id ) {
+			if ( ! is_scalar( $style_id ) ) {
+				continue;
+			}
+			$key = trim( (string) $style_id );
+			if ( '' === $key || empty( $etch_styles[ $key ] ) || ! is_array( $etch_styles[ $key ] ) ) {
+				continue;
+			}
+			$css                           = isset( $etch_styles[ $key ]['css'] ) && is_scalar( $etch_styles[ $key ]['css'] )
+				? (string) $etch_styles[ $key ]['css'] : '';
+			$item                          = $this->get_layout_profile_from_css( $css );
+			$profile['is_grid']            = $profile['is_grid'] || $item['is_grid'];
+			$profile['is_flex']            = $profile['is_flex'] || $item['is_flex'];
+			$profile['has_flex_direction'] = $profile['has_flex_direction'] || $item['has_flex_direction'];
+		}
+
+		return $profile;
 	}
 
 	/**
@@ -930,6 +1080,37 @@ abstract class EFS_Base_Element {
 		return '<!-- wp:etch/element ' . $attrs_json . ' -->' . "\n" .
 			$content . "\n" .
 			'<!-- /wp:etch/element -->';
+	}
+
+	/**
+	 * Normalize HTML entities so content is stored as plain text (avoids double encoding on output).
+	 * Decodes repeatedly until stable so already double-encoded strings (e.g. &amp;amp;) become &.
+	 *
+	 * @param string $text Raw or entity-encoded text from Bricks/source.
+	 * @return string Plain text safe for single encoding when output.
+	 */
+	protected function decode_html_entities_once( $text ) {
+		return self::decode_html_entities_to_plain( $text );
+	}
+
+	/**
+	 * Normalize HTML entities to plain text (avoids double encoding when output is escaped).
+	 * Public static so other layers (e.g. Gutenberg generator) can use it.
+	 *
+	 * @param string $text Raw or entity-encoded text from Bricks/source.
+	 * @return string Plain text.
+	 */
+	public static function decode_html_entities_to_plain( $text ) {
+		$text = (string) $text;
+		if ( '' === $text ) {
+			return '';
+		}
+		$decoded = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		while ( $decoded !== $text ) {
+			$text    = $decoded;
+			$decoded = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		}
+		return $text;
 	}
 
 	/**

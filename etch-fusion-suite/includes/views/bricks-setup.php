@@ -72,9 +72,6 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<div class="efs-wizard-summary" data-efs-discovery-summary hidden>
 				<div class="efs-wizard-summary__content">
 					<h4><?php esc_html_e( 'Dynamic Data Summary', 'etch-fusion-suite' ); ?></h4>
-					<p class="description">
-						<?php esc_html_e( 'Available Keys: Templates use this.key. Taxonomies use taxonomy.key and term.key. Loops use item.key by default (but you control the key).', 'etch-fusion-suite' ); ?>
-					</p>
 					<p class="efs-wizard-summary__grade" data-efs-summary-grade></p>
 					<div class="efs-wizard-summary__breakdown" data-efs-summary-breakdown></div>
 				</div>
@@ -154,6 +151,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p class="efs-wizard-progress__percent" data-efs-wizard-progress-percent>0%</p>
 			<p class="efs-wizard-progress__status" data-efs-wizard-progress-status><?php esc_html_e( 'Preparing migration...', 'etch-fusion-suite' ); ?></p>
 			<p class="efs-wizard-progress__items" data-efs-wizard-items></p>
+			<p class="efs-wizard-progress__elapsed" data-efs-wizard-elapsed hidden></p>
 			<ol class="efs-steps" data-efs-wizard-step-status></ol>
 			<div class="efs-actions efs-actions--inline">
 				<button type="button" class="button" data-efs-retry-migration hidden><?php esc_html_e( 'Retry Migration', 'etch-fusion-suite' ); ?></button>

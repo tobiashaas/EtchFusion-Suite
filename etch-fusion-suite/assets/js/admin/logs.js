@@ -173,10 +173,10 @@ const renderMigrationRuns = (runs = []) => {
             meta.appendChild(time);
         }
 
-        if (run.source_site) {
+        if (run.target_url || run.source_site) {
             const site = document.createElement('span');
             site.className = 'efs-log-entry__code';
-            site.textContent = run.source_site;
+            site.textContent = run.target_url || run.source_site;
             meta.appendChild(site);
         }
 
@@ -256,6 +256,20 @@ const renderMigrationRuns = (runs = []) => {
                     mappingsList.appendChild(item);
                 });
                 details.appendChild(mappingsList);
+            }
+
+            if (run.target_url) {
+                const targetP = document.createElement('p');
+                targetP.className = 'efs-log-entry__target-url';
+                targetP.textContent = `Target: ${run.target_url}`;
+                details.appendChild(targetP);
+            }
+
+            if (run.source_site) {
+                const sourceP = document.createElement('p');
+                sourceP.className = 'efs-log-entry__source-site';
+                sourceP.textContent = `Source: ${run.source_site}`;
+                details.appendChild(sourceP);
             }
 
             if (run.errors_summary) {

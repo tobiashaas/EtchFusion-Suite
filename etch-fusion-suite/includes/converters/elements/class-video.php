@@ -103,6 +103,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 			'width'             => $width,
 			'height'            => $height,
 			'frameborder'       => '0',
+			'loading'           => 'lazy',
+			'referrerpolicy'    => 'strict-origin-when-cross-origin',
 			'allow'             => 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
 			'allowfullscreen'   => 'true',
 		);
@@ -319,7 +321,7 @@ class EFS_Element_Video extends EFS_Base_Element {
 		$params['muted']    = ! empty( $settings['muted'] ) ? '1' : '0';
 		$params['controls'] = isset( $settings['controls'] ) && $settings['controls'] ? '1' : '0';
 		$query              = http_build_query( $params );
-		return 'https://www.youtube.com/embed/' . $video_id . ( '' !== $query ? '?' . $query : '' );
+		return 'https://www.youtube-nocookie.com/embed/' . $video_id . ( '' !== $query ? '?' . $query : '' );
 	}
 
 	/**

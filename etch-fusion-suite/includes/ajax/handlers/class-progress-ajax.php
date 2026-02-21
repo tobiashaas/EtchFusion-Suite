@@ -140,19 +140,32 @@ class EFS_Progress_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$state = $repository->get_receiving_state();
+		$state          = $repository->get_receiving_state();
+		$items_total    = isset( $state['items_total'] ) ? (int) $state['items_total'] : 0;
+		$items_received = isset( $state['items_received'] ) ? (int) $state['items_received'] : 0;
+		$started_at_str = isset( $state['started_at'] ) ? (string) $state['started_at'] : '';
+		$started_ts     = '' !== $started_at_str ? strtotime( $started_at_str ) : 0;
+		$elapsed        = $started_ts > 0 ? max( 1, time() - $started_ts ) : 0;
+
+		$eta = null;
+		if ( $items_total > 0 && $items_received > 0 && $elapsed > 0 && $items_received < $items_total ) {
+			$rate = $items_received / $elapsed;
+			$eta  = (int) round( ( $items_total - $items_received ) / $rate );
+		}
+
 		wp_send_json_success(
 			array(
-				'status'                  => isset( $state['status'] ) ? $state['status'] : 'idle',
-				'source_site'             => isset( $state['source_site'] ) ? $state['source_site'] : '',
-				'migration_id'            => isset( $state['migration_id'] ) ? $state['migration_id'] : '',
-				'current_phase'           => isset( $state['current_phase'] ) ? $state['current_phase'] : '',
-				'items_received'          => isset( $state['items_received'] ) ? (int) $state['items_received'] : 0,
-				'started_at'              => isset( $state['started_at'] ) ? $state['started_at'] : '',
-				'last_activity'           => isset( $state['last_activity'] ) ? $state['last_activity'] : '',
-				'last_updated'            => isset( $state['last_updated'] ) ? $state['last_updated'] : '',
-				'is_stale'                => ! empty( $state['is_stale'] ),
-				'estimated_time_remaining' => null,
+				'status'                   => isset( $state['status'] ) ? $state['status'] : 'idle',
+				'source_site'              => isset( $state['source_site'] ) ? $state['source_site'] : '',
+				'migration_id'             => isset( $state['migration_id'] ) ? $state['migration_id'] : '',
+				'current_phase'            => isset( $state['current_phase'] ) ? $state['current_phase'] : '',
+				'items_received'           => $items_received,
+				'items_total'              => $items_total,
+				'started_at'               => $started_at_str,
+				'last_activity'            => isset( $state['last_activity'] ) ? $state['last_activity'] : '',
+				'last_updated'             => isset( $state['last_updated'] ) ? $state['last_updated'] : '',
+				'is_stale'                 => ! empty( $state['is_stale'] ),
+				'estimated_time_remaining' => $eta,
 			)
 		);
 	}

@@ -50,7 +50,10 @@ test.describe('Admin Dashboard Etch Receiving Status', () => {
               migration_id: 'mig-1',
               current_phase: 'posts',
               items_received: 12,
+              items_total: 20,
+              estimated_time_remaining: 45,
               last_activity: '2026-02-16 21:00:00',
+              started_at: new Date(Date.now() - 30000).toISOString().replace('T', ' ').slice(0, 19),
               is_stale: false,
             }),
           );
@@ -63,7 +66,9 @@ test.describe('Admin Dashboard Etch Receiving Status', () => {
             source_site: 'https://bricks.local',
             migration_id: 'mig-1',
             current_phase: 'posts',
-            items_received: 12,
+            items_received: 20,
+            items_total: 20,
+            estimated_time_remaining: null,
             last_activity: '2026-02-16 21:01:00',
             is_stale: false,
           }),
@@ -89,6 +94,55 @@ test.describe('Admin Dashboard Etch Receiving Status', () => {
       await page.waitForTimeout(9000);
       await expect(page.locator('[data-efs-receiving-title]')).toContainText('Migration Received', { timeout: 15000 });
       await expect(page.locator('[data-efs-view-received-content]')).toBeVisible();
+    } finally {
+      await context.close().catch(() => undefined);
+    }
+  });
+
+  test('renders elapsed time and ETA when items_total is provided', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: ETCH_URL,
+      storageState: ETCH_AUTH_FILE,
+    });
+    const page = await context.newPage();
+    try {
+      await page.route('**/wp-admin/admin-ajax.php', async (route) => {
+        const request = route.request();
+        const postData = request.postData() ?? '';
+        const params = new URLSearchParams(postData);
+        const action = params.get('action') ?? '';
+
+        if (action !== 'efs_get_receiving_status') {
+          await route.fallback();
+          return;
+        }
+
+        await route.fulfill(
+          jsonSuccess({
+            status: 'receiving',
+            source_site: 'https://bricks.local',
+            migration_id: 'mig-eta',
+            current_phase: 'posts',
+            items_received: 10,
+            items_total: 20,
+            estimated_time_remaining: 45,
+            started_at: new Date(Date.now() - 30000).toISOString().replace('T', ' ').slice(0, 19),
+            last_activity: new Date().toISOString().replace('T', ' ').slice(0, 19),
+            is_stale: false,
+          }),
+        );
+      });
+
+      await openEtchDashboard(page);
+      const receivingDisplay = page.locator('[data-efs-receiving-display]');
+      if ((await receivingDisplay.count()) === 0) {
+        await context.close().catch(() => undefined);
+        test.skip(true, 'Receiving UI is not rendered in this environment setup.');
+      }
+
+      await expect(receivingDisplay).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('[data-efs-receiving-elapsed]'))
+        .toContainText(/Elapsed:.*remaining/i, { timeout: 15000 });
     } finally {
       await context.close().catch(() => undefined);
     }

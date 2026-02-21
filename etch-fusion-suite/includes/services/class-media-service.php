@@ -45,8 +45,8 @@ class EFS_Media_Service {
 				return $result;
 			}
 
-			$this->error_handler->log_error(
-				'I007',
+			$this->error_handler->log_info(
+				'Media Files Migration Summary',
 				array(
 					'action'  => 'Media Files Migration Summary',
 					'summary' => $result,

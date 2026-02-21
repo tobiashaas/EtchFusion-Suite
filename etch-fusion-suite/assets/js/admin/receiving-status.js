@@ -1,4 +1,5 @@
 import { post } from './api.js';
+import { formatElapsed, formatEta } from './utilities/time-format.js';
 
 const ACTION_GET_RECEIVING_STATUS = 'efs_get_receiving_status';
 const ACTION_DISMISS_MIGRATION_RUN = 'efs_dismiss_migration_run';
@@ -92,8 +93,11 @@ const createUiModel = (payload = {}) => {
     const items = Number(payload?.items_received) || 0;
     const lastActivityRaw = String(payload?.last_activity || '').trim();
     const lastActivity = lastActivityRaw || ACTIVITY_FALLBACK;
+    const startedAt = String(payload?.started_at || '').trim();
     const migrationId = String(payload?.migration_id || '').trim();
     const hasSignal = migrationId !== '' || sourceRaw !== '' || items > 0 || lastActivityRaw !== '';
+    const itemsTotal = Number(payload?.items_total) || 0;
+    const etaSec = Number(payload?.estimated_time_remaining) || null;
 
     return {
         status,
@@ -101,10 +105,13 @@ const createUiModel = (payload = {}) => {
         phase,
         items,
         lastActivity,
+        startedAt,
         migrationId,
         sourceRaw,
         lastActivityRaw,
         hasSignal,
+        itemsTotal,
+        etaSec,
         isStale: status === 'stale',
         title: formatTitle(status, status === 'stale'),
         subtitle: formatSubtitle(status, status === 'stale'),
@@ -127,6 +134,7 @@ export const initReceivingStatus = () => {
         phase: root.querySelector('[data-efs-receiving-phase]'),
         items: root.querySelector('[data-efs-receiving-items]'),
         lastActivity: root.querySelector('[data-efs-receiving-last-activity]'),
+        elapsed: root.querySelector('[data-efs-receiving-elapsed]'),
         status: root.querySelector('[data-efs-receiving-status]'),
         bannerText: root.querySelector('[data-efs-receiving-banner-text]'),
         minimize: root.querySelector('[data-efs-receiving-minimize]'),
@@ -213,6 +221,23 @@ export const initReceivingStatus = () => {
         }
         if (elements.lastActivity) {
             elements.lastActivity.textContent = model.lastActivity;
+        }
+        if (elements.elapsed) {
+            const startedAt = model.startedAt;
+            const startedMs = startedAt ? new Date(startedAt.replace(' ', 'T')).getTime() : NaN;
+            const elapsedSec = Number.isFinite(startedMs) && startedMs > 0
+                ? Math.max(0, Math.floor((Date.now() - startedMs) / 1000))
+                : null;
+            if (model.status === 'receiving' && elapsedSec != null) {
+                const etaStr = formatEta(model.etaSec);
+                const text = etaStr
+                    ? `Elapsed: ${formatElapsed(elapsedSec)} • ${etaStr}`
+                    : `Elapsed: ${formatElapsed(elapsedSec)}`;
+                elements.elapsed.textContent = text;
+                elements.elapsed.hidden = false;
+            } else {
+                elements.elapsed.hidden = true;
+            }
         }
         if (elements.status) {
             elements.status.textContent = model.statusCopy;

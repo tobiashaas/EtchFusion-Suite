@@ -502,6 +502,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$normalized['migration_id']   = sanitize_text_field( (string) ( $normalized['migration_id'] ?? '' ) );
 		$normalized['current_phase']  = sanitize_key( (string) ( $normalized['current_phase'] ?? '' ) );
 		$normalized['items_received'] = max( 0, absint( $normalized['items_received'] ?? 0 ) );
+		$normalized['items_total']    = max( 0, absint( $normalized['items_total'] ?? 0 ) );
 		$normalized['started_at']     = sanitize_text_field( (string) ( $normalized['started_at'] ?? '' ) );
 		$normalized['last_activity']  = sanitize_text_field( (string) ( $normalized['last_activity'] ?? '' ) );
 		$normalized['last_updated']   = sanitize_text_field( (string) ( $normalized['last_updated'] ?? '' ) );
@@ -540,6 +541,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			'last_updated'   => '',
 			'current_phase'  => '',
 			'items_received' => 0,
+			'items_total'    => 0,
 			'is_stale'       => false,
 		);
 	}

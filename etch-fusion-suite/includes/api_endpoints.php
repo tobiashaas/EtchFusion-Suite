@@ -690,8 +690,20 @@ class EFS_API_Endpoints {
 	}
 
 	/**
-	 * Generate migration key endpoint
-	 * Creates a new migration token and returns the migration key URL
+	 * Generate migration key endpoint.
+	 *
+	 * Supports two call patterns:
+	 *
+	 * 1. Admin-generate (legacy): target admin calls this with optional `target_url`.
+	 *    Token domain = home_url() (this site).
+	 *
+	 * 2. Reverse-generation (new): source dashboard calls this with `source_url` set
+	 *    to the source site's home URL. Token is generated and stored on this (target)
+	 *    site; domain = source_url so that check_source_origin() validates import calls.
+	 *    Response includes an `endpoints` map so the source can discover REST paths.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function generate_migration_key( $request ) {
 		$rate = self::check_rate_limit( 'generate_migration_key', 10, 60 );
@@ -699,10 +711,23 @@ class EFS_API_Endpoints {
 			return $rate;
 		}
 
+		// CORS check — source browser calls this cross-origin in the reverse-generation flow.
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$source_url = $request->get_param( 'source_url' );
+		$source_url = ( is_string( $source_url ) && '' !== trim( $source_url ) )
+			? esc_url_raw( trim( $source_url ) )
+			: '';
+
 		try {
 			/** @var EFS_Migration_Token_Manager $token_manager */
 			$token_manager = self::resolve( 'token_manager' );
-			$token_data    = $token_manager ? $token_manager->generate_migration_token( $request->get_param( 'target_url' ) ) : new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
+			$token_data    = $token_manager
+				? $token_manager->generate_migration_token( null, null, $source_url )
+				: new \WP_Error( 'token_manager_unavailable', __( 'Token manager unavailable.', 'etch-fusion-suite' ) );
 
 			if ( is_wp_error( $token_data ) ) {
 				return new \WP_Error( 'token_generation_failed', $token_data->get_error_message(), array( 'status' => 500 ) );
@@ -714,7 +739,7 @@ class EFS_API_Endpoints {
 					'message'                    => $token_data['message'] ?? __( 'Migration key generated.', 'etch-fusion-suite' ),
 					'migration_key'              => $token_data['token'],
 					'migration_url'              => $token_data['migration_url'] ?? '',
-					'domain'                     => home_url(),
+					'domain'                     => $token_data['domain'] ?? home_url(),
 					'expires'                    => $token_data['expires'],
 					'expires_at'                 => $token_data['expires_at'],
 					'expiration_seconds'         => $token_data['expiration_seconds'] ?? EFS_Migration_Token_Manager::TOKEN_EXPIRATION,
@@ -725,6 +750,17 @@ class EFS_API_Endpoints {
 					'treat_as_password_note'     => $token_data['treat_as_password_note'] ?? '',
 					'invalidated_previous_token' => $token_data['invalidated_previous_token'] ?? false,
 					'payload'                    => $token_data['payload'],
+					// Endpoint map returned to the source so it can discover REST paths.
+					'endpoints'                  => array(
+						'exportPostTypes' => '/wp-json/efs/v1/export/post-types',
+						'importCpts'      => '/wp-json/efs/v1/import/cpts',
+						'importAcf'       => '/wp-json/efs/v1/import/acf-field-groups',
+						'importMetabox'   => '/wp-json/efs/v1/import/metabox-configs',
+						'importCss'       => '/wp-json/efs/v1/import/css-classes',
+						'importPost'      => '/wp-json/efs/v1/import/post',
+						'importPostMeta'  => '/wp-json/efs/v1/import/post-meta',
+						'receiveMedia'    => '/wp-json/efs/v1/receive-media',
+					),
 				),
 				200
 			);
@@ -965,6 +1001,63 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Normalize origin URL for comparison (scheme + host + port + path, no trailing slash).
+	 *
+	 * @param string $url Raw URL or origin.
+	 * @return string Normalized string; empty if unparseable.
+	 */
+	private static function normalize_origin_for_compare( $url ) {
+		$url = is_string( $url ) ? trim( $url ) : '';
+		if ( '' === $url ) {
+			return '';
+		}
+		$parsed = parse_url( $url );
+		if ( ! is_array( $parsed ) || empty( $parsed['host'] ) ) {
+			return rtrim( $url, '/' );
+		}
+		$scheme = isset( $parsed['scheme'] ) ? strtolower( $parsed['scheme'] ) : 'http';
+		$host   = strtolower( $parsed['host'] );
+		$port   = isset( $parsed['port'] ) ? (int) $parsed['port'] : null;
+		$path   = isset( $parsed['path'] ) && '' !== $parsed['path'] ? $parsed['path'] : '/';
+		$path   = rtrim( $path, '/' );
+		if ( '' === $path ) {
+			$path = '/';
+		}
+		$default_port = ( 'https' === $scheme ) ? 443 : 80;
+		$port_suffix  = ( null !== $port && $port !== $default_port ) ? ':' . $port : '';
+		return $scheme . '://' . $host . $port_suffix . $path;
+	}
+
+	/**
+	 * Verify X-EFS-Source-Origin header matches the token's domain (SEC-001 hardening).
+	 *
+	 * Call after token validation in import/receive handlers. Blocks abuse from
+	 * external origins while preserving source→target migration calls.
+	 * Comparison uses normalized origins (scheme/host/port/path) to avoid 403 from
+	 * trailing slash or case differences.
+	 *
+	 * @param \WP_REST_Request $request      REST request.
+	 * @param array           $token_payload Validated token payload (must contain 'domain').
+	 * @return true|\WP_Error True if header matches; WP_Error 403 on mismatch or missing.
+	 */
+	private static function check_source_origin( $request, array $token_payload ) {
+		$expected_source = isset( $token_payload['domain'] ) ? (string) $token_payload['domain'] : '';
+		$expected_source = self::normalize_origin_for_compare( $expected_source );
+		$source_header   = $request->get_header( 'X-EFS-Source-Origin' );
+		$source_header   = self::normalize_origin_for_compare( $source_header );
+
+		if ( '' === $expected_source ) {
+			return new \WP_Error( 'source_mismatch', __( 'Source origin invalid.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
+		if ( '' === $source_header || ! hash_equals( $expected_source, $source_header ) ) {
+			return new \WP_Error( 'source_mismatch', __( 'Source origin invalid.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Resolve migration repository from container fallback.
 	 *
 	 * @return \Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface|null
@@ -1004,12 +1097,15 @@ class EFS_API_Endpoints {
 		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
 		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
 
-		$source_site = '';
+		$source_site       = '';
+		$items_total_header = 0;
 		if ( $request instanceof \WP_REST_Request ) {
 			$header = $request->get_header( 'X-EFS-Source-Origin' );
 			if ( is_string( $header ) && '' !== trim( $header ) ) {
 				$source_site = esc_url_raw( trim( $header ) );
 			}
+			$items_total_raw    = $request->get_header( 'X-EFS-Items-Total' );
+			$items_total_header = is_string( $items_total_raw ) ? (int) $items_total_raw : 0;
 		}
 		if ( '' === $source_site && isset( $token_payload['domain'] ) ) {
 			$source_site = esc_url_raw( (string) $token_payload['domain'] );
@@ -1025,6 +1121,7 @@ class EFS_API_Endpoints {
 				'last_updated'   => $now,
 				'current_phase'  => sanitize_key( $phase ),
 				'items_received' => max( 0, $items + $items_increment ),
+				'items_total'    => $items_total_header > 0 ? $items_total_header : (int) ( $current['items_total'] ?? 0 ),
 				'is_stale'       => false,
 			)
 		);
@@ -1032,7 +1129,8 @@ class EFS_API_Endpoints {
 
 	/**
 	 * Export list of post types available on this site (for mapping dropdown on source).
-	 * GET, requires Bearer token. Returns slug + label for post, page, and public/UI CPTs (e.g. etch_template).
+	 * GET, public read-only discovery endpoint; protected by rate limiting and global CORS enforcement.
+	 * No token required — the source dashboard fetches this before a migration token exists.
 	 *
 	 * @param \WP_REST_Request $request REST request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -1041,11 +1139,6 @@ class EFS_API_Endpoints {
 		$rate = self::check_rate_limit( 'export_post_types', 60, 60 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
-		}
-
-		$token = self::validate_bearer_migration_token( $request );
-		if ( is_wp_error( $token ) ) {
-			return $token;
 		}
 
 		$post_types = get_post_types(
@@ -1098,6 +1191,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
 		self::touch_receiving_state( $token, 'cpts', 0, $request );
 
 		$data = $request->get_json_params();
@@ -1142,6 +1239,10 @@ class EFS_API_Endpoints {
 		$token = self::validate_bearer_migration_token( $request );
 		if ( is_wp_error( $token ) ) {
 			return $token;
+		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
 		}
 		self::touch_receiving_state( $token, 'acf', 0, $request );
 
@@ -1188,6 +1289,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
 		self::touch_receiving_state( $token, 'metabox', 0, $request );
 
 		$data = $request->get_json_params();
@@ -1233,6 +1338,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
 		self::touch_receiving_state( $token, 'css', 0, $request );
 
 		$data = $request->get_json_params();
@@ -1277,6 +1386,10 @@ class EFS_API_Endpoints {
 		$token = self::validate_bearer_migration_token( $request );
 		if ( is_wp_error( $token ) ) {
 			return $token;
+		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
 		}
 		self::touch_receiving_state( $token, 'posts', 1, $request );
 
@@ -1392,7 +1505,18 @@ class EFS_API_Endpoints {
 			}
 		}
 
+		// Block grammar must survive wp_insert_post verbatim.
+		// wp_insert_post applies content_save_pre → wp_kses_post internally, which encodes
+		// HTML comment delimiters (<!-- → &lt;!--) when the JSON attribute value contains
+		// allowed HTML tags (e.g. <b>). Bypass kses for block content only; content was
+		// already sanitised by wp_kses_post on the source before conversion.
+		if ( $is_block_content ) {
+			kses_remove_filters();
+		}
 		$post_id = wp_insert_post( $postarr, true );
+		if ( $is_block_content ) {
+			kses_init_filters();
+		}
 		if ( is_wp_error( $post_id ) ) {
 			return new \WP_Error( 'post_import_failed', $post_id->get_error_message(), array( 'status' => 500 ) );
 		}
@@ -1486,6 +1610,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
 		self::touch_receiving_state( $token, 'posts', 0, $request );
 
 		$payload = $request->get_json_params();
@@ -1561,6 +1689,10 @@ class EFS_API_Endpoints {
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
 		self::touch_receiving_state( $token, 'media', 1, $request );
 
 		$payload = $request->get_json_params();
@@ -1622,7 +1754,7 @@ class EFS_API_Endpoints {
 				'/template/extract',
 				array(
 					'callback'            => array( __CLASS__, 'extract_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 					'methods'             => \WP_REST_Server::CREATABLE,
 				)
 			);
@@ -1632,7 +1764,7 @@ class EFS_API_Endpoints {
 				'/template/saved',
 				array(
 					'callback'            => array( __CLASS__, 'get_saved_templates_rest' ),
-					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 					'methods'             => \WP_REST_Server::READABLE,
 				)
 			);
@@ -1642,7 +1774,7 @@ class EFS_API_Endpoints {
 				'/template/preview/(?P<id>\d+)',
 				array(
 					'callback'            => array( __CLASS__, 'preview_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 					'args'                => array(
 						'id' => array(
 							'required'          => true,
@@ -1658,7 +1790,7 @@ class EFS_API_Endpoints {
 				'/template/(?P<id>\d+)',
 				array(
 					'callback'            => array( __CLASS__, 'delete_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 					'args'                => array(
 						'id' => array(
 							'required'          => true,
@@ -1674,7 +1806,7 @@ class EFS_API_Endpoints {
 				'/template/import',
 				array(
 					'callback'            => array( __CLASS__, 'import_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 					'methods'             => \WP_REST_Server::CREATABLE,
 				)
 			);
@@ -1695,7 +1827,7 @@ class EFS_API_Endpoints {
 			'/migrate',
 			array(
 				'callback'            => array( __CLASS__, 'handle_key_migration' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
 				'methods'             => \WP_REST_Server::READABLE,
 			)
 		);
@@ -1705,8 +1837,11 @@ class EFS_API_Endpoints {
 			'/generate-key',
 			array(
 				'callback'            => array( __CLASS__, 'generate_migration_key' ),
+				// Public: source dashboard calls this cross-origin (reverse-generation flow).
+				// CORS allowlist + rate limiting are the access controls; token writes are
+				// tied to the source origin via X-EFS-Source-Origin on import endpoints.
 				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
-				'methods'             => \WP_REST_Server::CREATABLE,
+				'methods'             => \WP_REST_Server::READABLE . ', ' . \WP_REST_Server::CREATABLE,
 			)
 		);
 
@@ -1715,7 +1850,7 @@ class EFS_API_Endpoints {
 			'/validate',
 			array(
 				'callback'            => array( __CLASS__, 'validate_migration_token' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_admin_or_body_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1735,7 +1870,7 @@ class EFS_API_Endpoints {
 			'/export/post-types',
 			array(
 				'callback'            => array( __CLASS__, 'export_post_types' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => '__return_true', // Public read-only discovery; rate-limited + CORS-enforced globally.
 				'methods'             => \WP_REST_Server::READABLE,
 			)
 		);
@@ -1745,7 +1880,7 @@ class EFS_API_Endpoints {
 			'/import/cpts',
 			array(
 				'callback'            => array( __CLASS__, 'import_cpts' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1755,7 +1890,7 @@ class EFS_API_Endpoints {
 			'/import/acf-field-groups',
 			array(
 				'callback'            => array( __CLASS__, 'import_acf_field_groups' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1765,7 +1900,7 @@ class EFS_API_Endpoints {
 			'/import/metabox-configs',
 			array(
 				'callback'            => array( __CLASS__, 'import_metabox_configs' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1775,7 +1910,7 @@ class EFS_API_Endpoints {
 			'/import/css-classes',
 			array(
 				'callback'            => array( __CLASS__, 'import_css_classes' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1785,7 +1920,7 @@ class EFS_API_Endpoints {
 			'/import/post',
 			array(
 				'callback'            => array( __CLASS__, 'import_post' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1795,7 +1930,7 @@ class EFS_API_Endpoints {
 			'/import/post-meta',
 			array(
 				'callback'            => array( __CLASS__, 'import_post_meta' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1805,7 +1940,7 @@ class EFS_API_Endpoints {
 			'/receive-media',
 			array(
 				'callback'            => array( __CLASS__, 'receive_media' ),
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -1814,6 +1949,11 @@ class EFS_API_Endpoints {
 	/**
 	 * Permission callback allowing public access while enforcing CORS.
 	 *
+	 * Used only for genuinely public read-only endpoints (e.g. /status, /auth/validate,
+	 * /export/post-types). Sensitive write endpoints (/validate, all /import/*, /receive-media)
+	 * use require_admin_or_body_migration_token_permission or require_migration_token_permission
+	 * so that unauthenticated requests are rejected before the handler executes.
+	 *
 	 * @param \WP_REST_Request $request REST request.
 	 * @return bool|\WP_Error
 	 */
@@ -1821,6 +1961,101 @@ class EFS_API_Endpoints {
 		$cors = self::check_cors_origin();
 		if ( is_wp_error( $cors ) ) {
 			return $cors;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Permission callback requiring WordPress administrator capability.
+	 *
+	 * Enforces that the caller is a logged-in user with manage_options capability,
+	 * authenticated via WordPress cookie + REST nonce or application password.
+	 * Use this for admin-browser-facing routes such as key generation, migration
+	 * triggering, and template management.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public static function require_admin_permission( $request ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to access this endpoint.', 'etch-fusion-suite' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Permission callback requiring a valid Bearer migration token.
+	 *
+	 * Used for cross-site server-to-server endpoints called by the source
+	 * site's migration process. Access is controlled by the signed migration
+	 * token rather than a WordPress user session, since the calling server
+	 * has no cookie session on this site.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public static function require_migration_token_permission( $request ) {
+		$token_result = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token_result ) ) {
+			return $token_result;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Permission callback accepting a logged-in admin OR a valid migration token in the request body.
+	 *
+	 * Used for the /validate endpoint which may be called either by a browser admin
+	 * session (cookie + nonce) or by a server-to-server request that includes the
+	 * migration_key in the JSON body. Unauthenticated requests — those presenting
+	 * neither a manage_options WordPress session nor a verifiable token — are
+	 * rejected before the handler executes.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public static function require_admin_or_body_migration_token_permission( $request ) {
+		// Accept logged-in administrators (cookie + REST nonce or application password).
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		// Accept requests that carry a valid migration token in the JSON body.
+		$body = $request->get_json_params();
+		$body = is_array( $body ) ? $body : array();
+
+		if ( empty( $body['migration_key'] ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'Authentication required: provide admin credentials or a valid migration token.', 'etch-fusion-suite' ),
+				array( 'status' => 401 )
+			);
+		}
+
+		/** @var EFS_Migration_Token_Manager $token_manager */
+		$token_manager = self::resolve( 'token_manager' );
+		if ( ! $token_manager ) {
+			return new \WP_Error(
+				'token_manager_unavailable',
+				__( 'Token manager unavailable.', 'etch-fusion-suite' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$result = $token_manager->validate_migration_token( sanitize_text_field( $body['migration_key'] ) );
+		if ( is_wp_error( $result ) ) {
+			return new \WP_Error(
+				'rest_forbidden',
+				__( 'Invalid or expired migration token.', 'etch-fusion-suite' ),
+				array( 'status' => 401 )
+			);
 		}
 
 		return true;
