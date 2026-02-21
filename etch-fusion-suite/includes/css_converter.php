@@ -416,7 +416,7 @@ class EFS_CSS_Converter {
 			$bricks_id  = $class['id'];
 			$settings   = isset( $class['settings'] ) && is_array( $class['settings'] ) ? $class['settings'] : array();
 
-			// Collect main custom CSS
+			// Collect main custom CSS (1:1 from Bricks; post-migration cleanup runs later)
 			if ( ! empty( $settings['_cssCustom'] ) ) {
 				$custom_css             = str_replace( '%root%', '.' . $class_name, $settings['_cssCustom'] );
 				$custom_css             = $this->normalize_deprecated_hsl_references( $custom_css );
@@ -433,7 +433,7 @@ class EFS_CSS_Converter {
 					$media_query = $this->get_media_query_for_breakpoint( $breakpoint );
 
 					if ( $media_query ) {
-						// Extract just the CSS properties (remove the class wrapper)
+						// Extract just the CSS properties (remove the class wrapper); 1:1 from Bricks
 						$custom_css = str_replace( '%root%', '.' . $class_name, $value );
 						$custom_css = $this->normalize_deprecated_hsl_references( $custom_css );
 
@@ -641,12 +641,12 @@ class EFS_CSS_Converter {
 			}
 		}
 
-		// Save style map for use during content migration
+		// Single post-migration CSS cleanup over complete styles (invalid grid shorthands, etc.)
 		foreach ( $etch_styles as $style_key => $style_data ) {
 			if ( ! is_array( $style_data ) || empty( $style_data['css'] ) || ! is_string( $style_data['css'] ) ) {
 				continue;
 			}
-			$etch_styles[ $style_key ]['css'] = $this->normalize_deprecated_hsl_references( $style_data['css'] );
+			$etch_styles[ $style_key ]['css'] = $this->normalize_final_css( $style_data['css'] );
 		}
 
 		// Save style map for use during content migration
@@ -841,6 +841,36 @@ class EFS_CSS_Converter {
 		);
 
 		return is_string( $normalized_parts ) ? $normalized_parts : $normalized;
+	}
+
+	/**
+	 * Post-migration CSS cleanup: run once over complete CSS before save.
+	 * Import is 1:1 from Bricks; this pass fixes invalid or inconsistent patterns
+	 * (e.g. grid shorthand). Extend here for future normalizations (shorthands, etc.).
+	 *
+	 * @param string $css CSS fragment (one style block).
+	 * @return string
+	 */
+	private function normalize_final_css( $css ) {
+		$css = $this->normalize_deprecated_hsl_references( $css );
+		$css = $this->normalize_invalid_grid_placement( $css );
+		return $css;
+	}
+
+	/**
+	 * Fix invalid grid shorthand that mixes span with line numbers (e.g. "grid-column: span 1 / -1").
+	 * Valid CSS is either "grid-column: 1 / -1" (line-based) or "grid-column: span 1;" (span-based).
+	 *
+	 * @param string $css CSS fragment.
+	 * @return string
+	 */
+	private function normalize_invalid_grid_placement( $css ) {
+		if ( '' === $css || ( false === strpos( $css, 'grid-column' ) && false === strpos( $css, 'grid-row' ) ) ) {
+			return $css;
+		}
+		$out = preg_replace( '/grid-column\s*:\s*span\s+(\d+)\s*\/\s*([^;]+?)(;|\s*})/i', 'grid-column: $1 / $2$3', $css );
+		$out = preg_replace( '/grid-row\s*:\s*span\s+(\d+)\s*\/\s*([^;]+?)(;|\s*})/i', 'grid-row: $1 / $2$3', is_string( $out ) ? $out : $css );
+		return is_string( $out ) ? $out : $css;
 	}
 
 	/**
@@ -1315,7 +1345,7 @@ class EFS_CSS_Converter {
 	private function convert_responsive_variants( $settings, $class_name = '' ) {
 		$responsive_css = '';
 
-		$breakpoints = $this->get_breakpoint_media_query_map();
+		$breakpoints = $this->get_breakpoint_media_query_map( true );
 		if ( empty( $breakpoints ) ) {
 			return $responsive_css;
 		}
@@ -2097,29 +2127,71 @@ class EFS_CSS_Converter {
 			$css[] = 'grid-auto-flow: ' . $settings['_gridAutoFlow'] . ';';
 		}
 
-		// Grid item placement
-		if ( ! empty( $settings['_gridItemColumnSpan'] ) ) {
-			$css[] = 'grid-column: span ' . $settings['_gridItemColumnSpan'] . ';';
+		// Grid item placement.
+		//
+		// Bricks stores grid placement in two competing ways:
+		//   a) Explicit line-based:  _gridItemColumnStart / _gridItemColumnEnd  → preferred, maps 1:1 to CSS.
+		//   b) Span-based:           _gridItemColumnSpan                        → needs interpretation (see below).
+		//
+		// Line-based always wins when present (it carries the most precise intent).
+		//
+		// _gridItemColumnSpan / _gridItemRowSpan value rules:
+		//   - Non-numeric string (e.g. "full", "content"):
+		//       Bricks refers to a CSS Named Grid Area defined by [name-start] / [name-end] lines.
+		//       Output: "grid-column: <name>;" — the browser resolves the start/end lines automatically.
+		//       NOTE: do NOT add "span" here; "span full" is invalid because there is no line named "full",
+		//       only "full-start" and "full-end". The area-shorthand form "grid-column: full" is correct.
+		//   - Numeric 1:
+		//       Bricks uses span=1 ambiguously — it often means "place at line 1" rather than "span 1 column".
+		//       Output: "grid-column: 1;" (line-based, not span).
+		//       TODO: revisit if a layout breaks because of this. A true single-column span should be
+		//       "grid-column: span 1;" but that is indistinguishable from Bricks's "line 1" case here.
+		//   - Numeric > 1 (e.g. 2, 3):
+		//       Straight CSS span. Output: "grid-column: span <n>;".
+		//
+		// See also normalize_invalid_grid_placement() which sanitises raw Bricks CSS strings that contain
+		// the invalid shorthand "grid-column: span <n> / -1" (Bricks bug: mixes span + explicit line).
+		$has_column_lines = ! empty( $settings['_gridItemColumnStart'] ) || ! empty( $settings['_gridItemColumnEnd'] );
+		$has_row_lines   = ! empty( $settings['_gridItemRowStart'] ) || ! empty( $settings['_gridItemRowEnd'] );
+
+		if ( $has_column_lines ) {
+			if ( ! empty( $settings['_gridItemColumnStart'] ) ) {
+				$css[] = 'grid-column-start: ' . $settings['_gridItemColumnStart'] . ';';
+			}
+			if ( ! empty( $settings['_gridItemColumnEnd'] ) ) {
+				$css[] = 'grid-column-end: ' . $settings['_gridItemColumnEnd'] . ';';
+			}
+		} elseif ( ! empty( $settings['_gridItemColumnSpan'] ) ) {
+			$n = $settings['_gridItemColumnSpan'];
+			if ( ! is_numeric( $n ) ) {
+				// Named grid area → no "span", use area-shorthand (e.g. "grid-column: full;").
+				$css[] = 'grid-column: ' . $n . ';';
+			} elseif ( 1 === (int) $n ) {
+				// Ambiguous: treat as line 1 (see comment above).
+				$css[] = 'grid-column: 1;';
+			} else {
+				$css[] = 'grid-column: span ' . $n . ';';
+			}
 		}
 
-		if ( ! empty( $settings['_gridItemRowSpan'] ) ) {
-			$css[] = 'grid-row: span ' . $settings['_gridItemRowSpan'] . ';';
-		}
-
-		if ( ! empty( $settings['_gridItemColumnStart'] ) ) {
-			$css[] = 'grid-column-start: ' . $settings['_gridItemColumnStart'] . ';';
-		}
-
-		if ( ! empty( $settings['_gridItemColumnEnd'] ) ) {
-			$css[] = 'grid-column-end: ' . $settings['_gridItemColumnEnd'] . ';';
-		}
-
-		if ( ! empty( $settings['_gridItemRowStart'] ) ) {
-			$css[] = 'grid-row-start: ' . $settings['_gridItemRowStart'] . ';';
-		}
-
-		if ( ! empty( $settings['_gridItemRowEnd'] ) ) {
-			$css[] = 'grid-row-end: ' . $settings['_gridItemRowEnd'] . ';';
+		if ( $has_row_lines ) {
+			if ( ! empty( $settings['_gridItemRowStart'] ) ) {
+				$css[] = 'grid-row-start: ' . $settings['_gridItemRowStart'] . ';';
+			}
+			if ( ! empty( $settings['_gridItemRowEnd'] ) ) {
+				$css[] = 'grid-row-end: ' . $settings['_gridItemRowEnd'] . ';';
+			}
+		} elseif ( ! empty( $settings['_gridItemRowSpan'] ) ) {
+			$n = $settings['_gridItemRowSpan'];
+			if ( ! is_numeric( $n ) ) {
+				// Named grid area → no "span", use area-shorthand (e.g. "grid-row: full;").
+				$css[] = 'grid-row: ' . $n . ';';
+			} elseif ( 1 === (int) $n ) {
+				// Ambiguous: treat as line 1 (see comment above).
+				$css[] = 'grid-row: 1;';
+			} else {
+				$css[] = 'grid-row: span ' . $n . ';';
+			}
 		}
 
 		return $css;
@@ -3274,11 +3346,26 @@ class EFS_CSS_Converter {
 		$class_token   = '/\.' . preg_quote( $class_name, '/' ) . '(?![a-zA-Z0-9_-])/';
 
 		while ( $pos < $length ) {
-			// Find next @media
-			$media_pos = strpos( $css, '@media', $pos );
-			if ( false === $media_pos ) {
+			// Find next @media or @container — whichever comes first.
+			$pos_media     = strpos( $css, '@media', $pos );
+			$pos_container = strpos( $css, '@container', $pos );
+
+			if ( false === $pos_media && false === $pos_container ) {
 				break;
 			}
+
+			if ( false === $pos_media ) {
+				$media_pos  = $pos_container;
+				$at_keyword = '@container';
+			} elseif ( false === $pos_container || $pos_media <= $pos_container ) {
+				$media_pos  = $pos_media;
+				$at_keyword = '@media';
+			} else {
+				$media_pos  = $pos_container;
+				$at_keyword = '@container';
+			}
+
+			$at_keyword_len = strlen( $at_keyword );
 
 			// Find opening brace
 			$open_brace = strpos( $css, '{', $media_pos );
@@ -3286,8 +3373,9 @@ class EFS_CSS_Converter {
 				break;
 			}
 
-			// Extract media condition
-			$media_condition = trim( substr( $css, $media_pos + 6, $open_brace - $media_pos - 6 ) );
+			// Extract condition and normalise px → to-rem() for Etch.
+			$media_condition = trim( substr( $css, $media_pos + $at_keyword_len, $open_brace - $media_pos - $at_keyword_len ) );
+			$media_condition = $this->normalize_media_condition_to_etch( $media_condition );
 
 			// Count braces to find matching closing brace
 			$brace_count   = 1;
@@ -3307,13 +3395,13 @@ class EFS_CSS_Converter {
 				// Extract content (without outer braces)
 				$media_content = substr( $css, $content_start, $i - $content_start - 1 );
 
-				// Check if this media query contains our class
+				// Check if this at-rule contains our class
 				if ( preg_match( $class_token, $media_content ) ) {
 					// Convert selectors to & syntax
 					$converted_content = $this->convert_selectors_in_media_query( $media_content, $class_name );
 
 					$media_queries[] = array(
-						'condition' => '@media ' . $media_condition,
+						'condition' => $at_keyword . ' ' . $media_condition,
 						'css'       => trim( $converted_content ),
 						'original'  => substr( $css, $media_pos, $i - $media_pos ),
 					);
@@ -3340,17 +3428,34 @@ class EFS_CSS_Converter {
 		$id_token      = '/#' . preg_quote( $id_name, '/' ) . '(?![a-zA-Z0-9_-])/';
 
 		while ( $pos < $length ) {
-			$media_pos = strpos( $css, '@media', $pos );
-			if ( false === $media_pos ) {
+			// Find next @media or @container — whichever comes first.
+			$pos_media     = strpos( $css, '@media', $pos );
+			$pos_container = strpos( $css, '@container', $pos );
+
+			if ( false === $pos_media && false === $pos_container ) {
 				break;
 			}
+
+			if ( false === $pos_media ) {
+				$media_pos  = $pos_container;
+				$at_keyword = '@container';
+			} elseif ( false === $pos_container || $pos_media <= $pos_container ) {
+				$media_pos  = $pos_media;
+				$at_keyword = '@media';
+			} else {
+				$media_pos  = $pos_container;
+				$at_keyword = '@container';
+			}
+
+			$at_keyword_len = strlen( $at_keyword );
 
 			$open_brace = strpos( $css, '{', $media_pos );
 			if ( false === $open_brace ) {
 				break;
 			}
 
-			$media_condition = trim( substr( $css, $media_pos + 6, $open_brace - $media_pos - 6 ) );
+			$media_condition = trim( substr( $css, $media_pos + $at_keyword_len, $open_brace - $media_pos - $at_keyword_len ) );
+			$media_condition = $this->normalize_media_condition_to_etch( $media_condition );
 			$brace_count     = 1;
 			$i               = $open_brace + 1;
 			$content_start   = $i;
@@ -3369,7 +3474,7 @@ class EFS_CSS_Converter {
 				if ( preg_match( $id_token, $media_content ) ) {
 					$converted_content = $this->convert_selectors_in_media_query_for_id( $media_content, $id_name );
 					$media_queries[]   = array(
-						'condition' => '@media ' . $media_condition,
+						'condition' => $at_keyword . ' ' . $media_condition,
 						'css'       => trim( $converted_content ),
 						'original'  => substr( $css, $media_pos, $i - $media_pos ),
 					);
@@ -3380,6 +3485,66 @@ class EFS_CSS_Converter {
 		}
 
 		return $media_queries;
+	}
+
+	/**
+	 * Normalize a raw @media / @container condition from Bricks CSS to Etch's to-rem() syntax.
+	 *
+	 * Handles three px-based patterns:
+	 *
+	 * 1. Legacy media query syntax (Bricks default output):
+	 *      (min-width: 1200px)       →  (width >= to-rem(1200px))
+	 *      (max-width: 767px)        →  (width <= to-rem(767px))
+	 *
+	 * 2. Modern range media query syntax:
+	 *      (width >= 1200px)         →  (width >= to-rem(1200px))
+	 *      (width <= 767px)          →  (width <= to-rem(767px))
+	 *
+	 * 3. Container query range syntax (inline-size / block-size):
+	 *      (inline-size >= 329px)    →  (inline-size >= to-rem(329px))
+	 *      (inline-size <= 329px)    →  (inline-size <= to-rem(329px))
+	 *      (block-size >= 200px)     →  (block-size  >= to-rem(200px))
+	 *
+	 * Conditions that already contain to-rem() are left untouched (no double-conversion).
+	 * Non-px units (em, rem, %, vw, …) and unrecognised query types are passed through as-is.
+	 *
+	 * @param string $condition Raw condition string extracted from the CSS (without @media/@container).
+	 * @return string Etch-normalised condition.
+	 */
+	private function normalize_media_condition_to_etch( $condition ) {
+		$condition = (string) $condition;
+
+		// Already converted — bail early.
+		if ( false !== strpos( $condition, 'to-rem(' ) ) {
+			return $condition;
+		}
+
+		// 1. Legacy: (min-width: Xpx) → (width >= to-rem(Xpx))
+		$condition = preg_replace(
+			'/\(\s*min-width\s*:\s*(\d+(?:\.\d+)?)px\s*\)/',
+			'(width >= to-rem($1px))',
+			$condition
+		);
+		$condition = is_string( $condition ) ? $condition : (string) $condition;
+
+		// 2. Legacy: (max-width: Xpx) → (width <= to-rem(Xpx))
+		$condition = preg_replace(
+			'/\(\s*max-width\s*:\s*(\d+(?:\.\d+)?)px\s*\)/',
+			'(width <= to-rem($1px))',
+			$condition
+		);
+		$condition = is_string( $condition ) ? $condition : (string) $condition;
+
+		// 3. Range syntax for media and container queries:
+		//    (width|inline-size|block-size  >=|<=|>|<  Xpx) → same with to-rem(Xpx)
+		$condition = preg_replace(
+			'/\(\s*(width|inline-size|block-size)\s*(>=|<=|>|<)\s*(\d+(?:\.\d+)?)px\s*\)/',
+			'($1 $2 to-rem($3px))',
+			$condition
+		);
+		$condition = is_string( $condition ) ? $condition : (string) $condition;
+
+		return $condition;
 	}
 
 	/**
@@ -3504,14 +3669,20 @@ class EFS_CSS_Converter {
 	 * @return string
 	 */
 	private function normalize_selector_suffix_with_ampersand( $selector_suffix, $class_name ) {
-		$suffix = trim( (string) $selector_suffix );
+		$raw    = (string) $selector_suffix;
+		$suffix = trim( $raw );
 		if ( '' === $suffix ) {
 			return '';
 		}
 
+		// A leading whitespace in the raw suffix means the selector had a space between the
+		// class name and the next token (e.g. ".cls [attr]" = descendant), whereas no leading
+		// whitespace means it's attached directly to the same element (".cls[attr]").
+		$is_descendant_context = ( $raw !== $suffix && preg_match( '/^\s/', $raw ) );
+
 		$class_pattern = '/\.' . preg_quote( $class_name, '/' ) . '\b/i';
 		$suffix        = preg_replace( $class_pattern, '&', $suffix );
-		$suffix        = is_string( $suffix ) ? $suffix : trim( (string) $selector_suffix );
+		$suffix        = is_string( $suffix ) ? $suffix : trim( $raw );
 
 		$parts = array_map( 'trim', explode( ',', $suffix ) );
 		$parts = array_filter(
@@ -3532,9 +3703,13 @@ class EFS_CSS_Converter {
 				continue;
 			}
 
-			// Add space after & for combinators and descendant selectors.
-			if ( preg_match( '/^[>+~]/', $part ) || preg_match( '/^[.#\[]/', $part ) ) {
+			// Combinators (>, +, ~) always need a space: "& > *".
+			if ( preg_match( '/^[>+~]/', $part ) ) {
 				$normalized_parts[] = '& ' . $part;
+			} elseif ( preg_match( '/^[.#\[]/', $part ) ) {
+				// Descendant context (".cls [attr]"): keep space → "& [attr]".
+				// Same-element context (".cls[attr]"): no space  → "&[attr]".
+				$normalized_parts[] = ( $is_descendant_context ? '& ' : '&' ) . $part;
 			} else {
 				$normalized_parts[] = '&' . $part;
 			}
