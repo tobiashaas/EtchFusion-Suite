@@ -1,0 +1,5 @@
+# Ignore all backup files in this directory — they can be very large.
+*.sql
+*.sql.gz
+*.tar.gz
+*.zip
