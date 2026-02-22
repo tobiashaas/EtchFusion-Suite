@@ -46,7 +46,7 @@ class EFS_Debug_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Dev-only endpoint gated by WP_DEBUG and manage_options.
-		$sql = isset( $_POST['sql'] ) ? wp_unslash( $_POST['sql'] ) : '';
+		$sql = isset( $_POST['sql'] ) ? sanitize_text_field( wp_unslash( $_POST['sql'] ) ) : '';
 		$sql = is_string( $sql ) ? trim( $sql ) : '';
 
 		if ( '' === $sql || 0 !== strpos( strtoupper( $sql ), 'SELECT' ) ) {
@@ -61,6 +61,7 @@ class EFS_Debug_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		global $wpdb;
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Dev-only SELECT runner; query validated above (SELECT only).
 		$rows = $wpdb->get_results( $sql, ARRAY_A );
 		wp_send_json( is_array( $rows ) ? $rows : array() );
 	}

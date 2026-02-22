@@ -33,11 +33,11 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	/**
 	 * Cache expiration for stats/tokens (10 minutes).
 	 */
-	const CACHE_EXPIRATION_LONG = 600;
-	const OPTION_TOKEN_DATA     = 'efs_migration_token';
-	const OPTION_TOKEN_VALUE    = 'efs_migration_token_value';
-	const OPTION_TOKEN_EXPIRES  = 'efs_migration_token_expires';
-	const RECEIVING_STALE_TTL    = 300;
+	const CACHE_EXPIRATION_LONG   = 600;
+	const OPTION_TOKEN_DATA       = 'efs_migration_token';
+	const OPTION_TOKEN_VALUE      = 'efs_migration_token_value';
+	const OPTION_TOKEN_EXPIRES    = 'efs_migration_token_expires';
+	const RECEIVING_STALE_TTL     = 300;
 	const RECEIVING_RETENTION_TTL = 3600;
 
 	/**
@@ -486,11 +486,11 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 * @return array
 	 */
 	private function normalize_receiving_state( array $state ): array {
-		$now         = current_time( 'mysql' );
-		$defaults    = $this->idle_receiving_state();
-		$normalized  = array_merge( $defaults, $state );
-		$status      = sanitize_key( (string) ( $normalized['status'] ?? 'idle' ) );
-		$allowed     = array( 'idle', 'receiving', 'stale', 'completed' );
+		$now          = current_time( 'mysql' );
+		$defaults     = $this->idle_receiving_state();
+		$normalized   = array_merge( $defaults, $state );
+		$status       = sanitize_key( (string) ( $normalized['status'] ?? 'idle' ) );
+		$allowed      = array( 'idle', 'receiving', 'stale', 'completed' );
 		$is_receiving = 'receiving' === $status;
 
 		if ( ! in_array( $status, $allowed, true ) ) {

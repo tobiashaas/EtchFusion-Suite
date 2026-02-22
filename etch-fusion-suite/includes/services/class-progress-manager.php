@@ -63,21 +63,21 @@ class EFS_Progress_Manager {
 		$initial_status = 'headless' === $validated_mode ? 'queued' : 'running';
 
 		$progress = array(
-			'migrationId'              => sanitize_text_field( $migration_id ),
-			'status'                   => $initial_status,
-			'current_step'             => 'validation',
-			'current_phase_name'       => 'Validation',
-			'current_phase_status'     => 'pending',
-			'percentage'               => 0,
-			'started_at'               => current_time( 'mysql' ),
-			'last_updated'             => current_time( 'mysql' ),
-			'completed_at'             => null,
-			'items_processed'          => 0,
-			'items_total'              => 0,
-			'mode'                     => $validated_mode,
-			'action_scheduler_id'      => null,
-			'headless_job_count'       => 0,
-			'is_stale'                 => false,
+			'migrationId'          => sanitize_text_field( $migration_id ),
+			'status'               => $initial_status,
+			'current_step'         => 'validation',
+			'current_phase_name'   => 'Validation',
+			'current_phase_status' => 'pending',
+			'percentage'           => 0,
+			'started_at'           => current_time( 'mysql' ),
+			'last_updated'         => current_time( 'mysql' ),
+			'completed_at'         => null,
+			'items_processed'      => 0,
+			'items_total'          => 0,
+			'mode'                 => $validated_mode,
+			'action_scheduler_id'  => null,
+			'headless_job_count'   => 0,
+			'is_stale'             => false,
 		);
 
 		$this->progress_repository->save_progress( $progress );
@@ -172,8 +172,8 @@ class EFS_Progress_Manager {
 
 		$status = isset( $progress['status'] ) ? (string) $progress['status'] : '';
 		if ( in_array( $status, array( 'running', 'receiving' ), true ) ) {
-			$stale_ttl       = $this->get_stale_ttl( $progress['mode'] ?? 'browser' );
-			$last_updated_ts = strtotime( $progress['last_updated'] );
+			$stale_ttl            = $this->get_stale_ttl( $progress['mode'] ?? 'browser' );
+			$last_updated_ts      = strtotime( $progress['last_updated'] );
 			$progress['is_stale'] = ( $last_updated_ts && ( time() - $last_updated_ts ) >= $stale_ttl );
 			if ( $progress['is_stale'] ) {
 				$progress['status'] = 'stale';
@@ -270,7 +270,7 @@ class EFS_Progress_Manager {
 		if ( ! is_array( $progress ) ) {
 			$progress = array();
 		}
-		$count = isset( $progress['headless_job_count'] ) ? max( 0, (int) $progress['headless_job_count'] ) : 0;
+		$count                          = isset( $progress['headless_job_count'] ) ? max( 0, (int) $progress['headless_job_count'] ) : 0;
 		$progress['headless_job_count'] = $count + 1;
 		$this->progress_repository->save_progress( $progress );
 		return $progress['headless_job_count'];
@@ -296,5 +296,4 @@ class EFS_Progress_Manager {
 		$stats['status']         = 'completed';
 		$this->progress_repository->save_stats( $stats );
 	}
-
 }

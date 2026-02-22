@@ -29,15 +29,15 @@ class EFS_Converter_Registry {
 	 *
 	 * Silently ignores duplicate registrations (first-one-wins).
 	 *
-	 * @param string $type  Bricks element type identifier.
-	 * @param string $class Fully-qualified converter class name.
+	 * @param string $type       Bricks element type identifier.
+	 * @param string $class_name Fully-qualified converter class name.
 	 * @return void
 	 */
-	public function register( string $type, string $class ): void {
+	public function register( string $type, string $class_name ): void {
 		if ( isset( $this->converters[ $type ] ) ) {
 			return;
 		}
-		$this->converters[ $type ] = $class;
+		$this->converters[ $type ] = $class_name;
 	}
 
 	/**

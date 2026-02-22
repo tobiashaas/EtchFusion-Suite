@@ -159,14 +159,14 @@ abstract class EFS_Base_Element {
 			$tokens = preg_split( '/\s+/', trim( (string) $raw ) );
 			if ( is_array( $tokens ) ) {
 				foreach ( $tokens as $token ) {
-			$token = trim( (string) $token );
-				if ( '' === $token || $this->is_utility_like_selector( $token ) ) {
-					continue;
+					$token = trim( (string) $token );
+					if ( '' === $token || $this->is_utility_like_selector( $token ) ) {
+						continue;
+					}
+					$classes[] = preg_replace( '/^fr-/', '', $token );
 				}
-				$classes[] = preg_replace( '/^fr-/', '', $token );
 			}
-		}
-	} elseif ( is_array( $raw ) ) {
+		} elseif ( is_array( $raw ) ) {
 			foreach ( $raw as $token ) {
 				if ( ! is_scalar( $token ) ) {
 					continue;
@@ -714,40 +714,40 @@ abstract class EFS_Base_Element {
 				return $etch_attributes;
 			}
 
-		// Try to patch a single identifiable neighbor class style before falling back to inline.
-		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-accessible', 'smart-spacing' );
-		$neighbor_classes = array();
-		foreach ( $class_list as $name ) {
-			$name = trim( (string) $name );
-			if ( '' === $name || 'brxe-block' === $name ) {
-				continue;
-			}
-			if ( $this->is_modifier_like_selector( $name ) ) {
-				continue;
-			}
-			// Skip ACSS utility classes — they are not semantic targets for display injection.
-			$is_utility = false;
-			foreach ( $utility_prefixes as $prefix ) {
-				if ( 0 === strpos( $name, $prefix ) || $name === $prefix ) {
-					$is_utility = true;
-					break;
+			// Try to patch a single identifiable neighbor class style before falling back to inline.
+			$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-accessible', 'smart-spacing' );
+			$neighbor_classes = array();
+			foreach ( $class_list as $name ) {
+				$name = trim( (string) $name );
+				if ( '' === $name || 'brxe-block' === $name ) {
+					continue;
 				}
+				if ( $this->is_modifier_like_selector( $name ) ) {
+					continue;
+				}
+				// Skip ACSS utility classes — they are not semantic targets for display injection.
+				$is_utility = false;
+				foreach ( $utility_prefixes as $prefix ) {
+					if ( 0 === strpos( $name, $prefix ) || $name === $prefix ) {
+						$is_utility = true;
+						break;
+					}
+				}
+				if ( $is_utility ) {
+					continue;
+				}
+				$neighbor_classes[] = $name;
 			}
-			if ( $is_utility ) {
-				continue;
-			}
-			$neighbor_classes[] = $name;
-		}
 			$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
 
-		if ( 1 === count( $neighbor_classes ) ) {
-			$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
-			if ( $target_style_id ) {
-				// The CSS migration phase injects display:flex into the semantic class.
-				// Skip the inline-style fallback — return without setting any style attribute.
-				return $etch_attributes;
+			if ( 1 === count( $neighbor_classes ) ) {
+				$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
+				if ( $target_style_id ) {
+					// The CSS migration phase injects display:flex into the semantic class.
+					// Skip the inline-style fallback — return without setting any style attribute.
+					return $etch_attributes;
+				}
 			}
-		}
 
 			$style_layout         = $this->get_layout_profile_for_style_ids( $style_ids );
 			$display_is_derivable = $style_layout['is_flex']
@@ -1205,8 +1205,8 @@ abstract class EFS_Base_Element {
 	 */
 	protected function generate_etch_raw_html_block( $html, $label = '' ) {
 		$attrs = array(
-			'content'  => (string) $html,
-			'unsafe'   => false,
+			'content' => (string) $html,
+			'unsafe'  => false,
 		);
 		if ( '' !== $label ) {
 			$attrs['metadata'] = array( 'name' => $label );

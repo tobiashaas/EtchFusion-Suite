@@ -373,8 +373,8 @@ class EFS_Gutenberg_Generator {
 	 * @return string
 	 */
 	private function resolve_element_tag( $element, $default_tag = 'div' ) {
-		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-		$raw_tag  = $element['etch_data']['tag'] ?? ( $settings['tag'] ?? $default_tag );
+		$settings   = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+		$raw_tag    = $element['etch_data']['tag'] ?? ( $settings['tag'] ?? $default_tag );
 		$custom_tag = isset( $settings['customTag'] ) ? trim( (string) $settings['customTag'] ) : '';
 
 		if ( 'custom' === strtolower( trim( (string) $raw_tag ) ) && '' !== $custom_tag ) {
@@ -769,9 +769,9 @@ class EFS_Gutenberg_Generator {
 		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks with modular converters' );
 
 		// Initialize element factory with style map (NEW - v0.5.0)
-		$style_map           = get_option( 'efs_style_map', array() );
-		$_gg_container       = etch_fusion_suite_container();
-		$_gg_registry        = $_gg_container->has( 'converter_registry' ) ? $_gg_container->get( 'converter_registry' ) : new \Bricks2Etch\Converters\EFS_Converter_Registry();
+		$style_map                     = get_option( 'efs_style_map', array() );
+		$_gg_container                 = etch_fusion_suite_container();
+		$_gg_registry                  = $_gg_container->has( 'converter_registry' ) ? $_gg_container->get( 'converter_registry' ) : new \Bricks2Etch\Converters\EFS_Converter_Registry();
 		$this->element_factory         = new EFS_Element_Factory( $_gg_registry, $style_map, $this->error_handler );
 		$this->display_fallback_helper = new EFS_Element_Div( $style_map );
 		$this->error_handler->log_info( 'Gutenberg Generator: Element factory initialized with ' . count( $style_map ) . ' style map entries' );
@@ -1018,13 +1018,13 @@ class EFS_Gutenberg_Generator {
 			$result = $this->element_factory->convert_element( $element, $children, $context );
 
 			if ( $result ) {
-				$is_loop_element  = ! empty( $element['settings']['hasLoop'] ) && ! empty( $element['settings']['query'] ) && is_array( $element['settings']['query'] );
-				$dynamic_context  = $is_loop_element ? array(
+				$is_loop_element = ! empty( $element['settings']['hasLoop'] ) && ! empty( $element['settings']['query'] ) && is_array( $element['settings']['query'] );
+				$dynamic_context = $is_loop_element ? array(
 					'scope'      => 'loop',
 					'loop_alias' => 'item',
 					'loop_query' => $element['settings']['query'],
 				) : array();
-				$result = $this->dynamic_data_converter->convert_content( $result, $dynamic_context );
+				$result          = $this->dynamic_data_converter->convert_content( $result, $dynamic_context );
 				return $this->wrap_loop_block_if_needed( $element, $result );
 			}
 
@@ -1379,7 +1379,7 @@ class EFS_Gutenberg_Generator {
 				if ( ! preg_match( '/^h[1-6]$/', $tag ) ) {
 					$tag = 'h3';
 				}
-				$attrs = $this->build_flat_fallback_attrs( $element, $tag );
+				$attrs   = $this->build_flat_fallback_attrs( $element, $tag );
 				$content = EFS_Base_Element::decode_html_entities_to_plain( $content );
 				return $this->serialize_etch_element_block( $attrs, esc_html( wp_strip_all_tags( $content ) ) );
 

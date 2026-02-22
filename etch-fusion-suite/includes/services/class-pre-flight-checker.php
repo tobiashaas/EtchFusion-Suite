@@ -103,7 +103,7 @@ class EFS_Pre_Flight_Checker {
 				'id'      => 'execution_time',
 				'status'  => 'ok',
 				'value'   => $max_exec,
-				'message' => $max_exec === 0
+				'message' => 0 === $max_exec
 					? __( 'max_execution_time is unlimited.', 'etch-fusion-suite' )
 					: sprintf(
 						/* translators: %d: max execution time in seconds */

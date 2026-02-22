@@ -65,7 +65,10 @@ class EFS_Migrator_Executor {
 				)
 			);
 
-			return array( 'success' => true, 'warnings' => array() );
+			return array(
+				'success'  => true,
+				'warnings' => array(),
+			);
 		}
 
 		$enabled_migrators = array();

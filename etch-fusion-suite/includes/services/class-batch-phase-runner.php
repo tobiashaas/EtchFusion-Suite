@@ -92,11 +92,11 @@ class EFS_Batch_Phase_Runner {
 		string $migration_key,
 		array $active_migration_options
 	) {
-		$is_cron_context = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
-		$is_ajax_context = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
-		$migration_id_for_shutdown       = $migration_id;
-		$progress_manager_for_shutdown   = $this->progress_manager;
-		$migration_logger_for_shutdown   = $this->migration_logger;
+		$is_cron_context               = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
+		$is_ajax_context               = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
+		$migration_id_for_shutdown     = $migration_id;
+		$progress_manager_for_shutdown = $this->progress_manager;
+		$migration_logger_for_shutdown = $this->migration_logger;
 		register_shutdown_function(
 			function () use ( $migration_id_for_shutdown, $progress_manager_for_shutdown, $migration_logger_for_shutdown ) {
 				$error = error_get_last();
@@ -163,7 +163,15 @@ class EFS_Batch_Phase_Runner {
 
 			if ( is_wp_error( $result ) ) {
 				if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
-					$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), [ 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ] );
+					$this->migration_logger->log(
+						$migration_id,
+						'warning',
+						'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+						array(
+							'post_id' => $id,
+							'attempt' => $attempts[ $id_key ],
+						)
+					);
 					$remaining[] = $id;
 					if ( 'posts' === $phase ) {
 						$this->error_handler->log_warning(
@@ -177,7 +185,15 @@ class EFS_Batch_Phase_Runner {
 						);
 					}
 				} else {
-					$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), [ 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ] );
+					$this->migration_logger->log(
+						$migration_id,
+						'warning',
+						'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+						array(
+							'post_id' => $id,
+							'attempt' => $attempts[ $id_key ],
+						)
+					);
 					$failed_ids[] = $id;
 					if ( 'media' === $phase ) {
 						$this->error_handler->log_warning(
@@ -214,15 +230,15 @@ class EFS_Batch_Phase_Runner {
 			}
 
 			++$processed_count;
-			$checkpoint['current_item_id'] = $id;
-			$wp_post                       = get_post( $id );
+			$checkpoint['current_item_id']    = $id;
+			$wp_post                          = get_post( $id );
 			$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
 
 			$memory_limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
 			if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
 				$memory_pressure = true;
-				$unprocessed = array_slice( $current_batch, $loop_idx + 1 );
-				$remaining   = array_merge( $unprocessed, $remaining );
+				$unprocessed     = array_slice( $current_batch, $loop_idx + 1 );
+				$remaining       = array_merge( $unprocessed, $remaining );
 				break;
 			}
 		}
@@ -329,8 +345,8 @@ class EFS_Batch_Phase_Runner {
 				$total_selected      = array_sum( $totals_by_type );
 				$remaining_to_assign = min( $processed_count, $total_selected );
 				foreach ( $totals_by_type as $post_type => $type_total ) {
-					$type_migrated        = min( (int) $type_total, (int) $remaining_to_assign );
-					$remaining_to_assign -= $type_migrated;
+					$type_migrated                     = min( (int) $type_total, (int) $remaining_to_assign );
+					$remaining_to_assign              -= $type_migrated;
 					$counts_by_post_type[ $post_type ] = array(
 						'total'    => max( 0, (int) $type_total ),
 						'migrated' => max( 0, (int) $type_migrated ),

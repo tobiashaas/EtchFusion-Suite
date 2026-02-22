@@ -164,7 +164,7 @@ class EFS_Batch_Processor {
 	 * Release batch lock on shutdown (e.g. fatal error).
 	 */
 	public static function release_lock_on_shutdown(): void {
-		if ( self::$shutdown_lock_key !== null ) {
+		if ( null !== self::$shutdown_lock_key ) {
 			delete_option( self::$shutdown_lock_key );
 			self::$shutdown_lock_key = null;
 		}

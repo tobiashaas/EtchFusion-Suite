@@ -49,10 +49,10 @@ class EFS_Dashboard_Controller {
 	}
 
 	public function get_dashboard_context() {
-		$env = $this->detect_environment();
+		$env                 = $this->detect_environment();
 		$env['etch_version'] = '';
 		if ( ! empty( $env['is_etch_site'] ) && method_exists( $this->plugin_detector, 'get_plugin_versions' ) ) {
-			$versions = $this->plugin_detector->get_plugin_versions();
+			$versions            = $this->plugin_detector->get_plugin_versions();
 			$env['etch_version'] = isset( $versions['etch'] ) ? sanitize_text_field( (string) $versions['etch'] ) : '';
 		}
 
@@ -113,10 +113,10 @@ class EFS_Dashboard_Controller {
 			);
 		}
 
-		$progress_data = isset( $progress['progress'] ) && is_array( $progress['progress'] ) ? $progress['progress'] : $this->get_default_progress();
-		$steps_data    = isset( $progress['steps'] ) && is_array( $progress['steps'] ) ? $progress['steps'] : array();
-		$migration_id  = isset( $progress['migrationId'] ) ? sanitize_text_field( $progress['migrationId'] ) : '';
-		$completed     = isset( $progress['completed'] ) ? (bool) $progress['completed'] : false;
+		$progress_data          = isset( $progress['progress'] ) && is_array( $progress['progress'] ) ? $progress['progress'] : $this->get_default_progress();
+		$steps_data             = isset( $progress['steps'] ) && is_array( $progress['steps'] ) ? $progress['steps'] : array();
+		$migration_id           = isset( $progress['migrationId'] ) ? sanitize_text_field( $progress['migrationId'] ) : '';
+		$completed              = isset( $progress['completed'] ) ? (bool) $progress['completed'] : false;
 		$progress_data['steps'] = $steps_data;
 
 		return array(

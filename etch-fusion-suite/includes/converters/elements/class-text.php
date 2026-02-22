@@ -221,7 +221,7 @@ class EFS_Element_Text extends EFS_Base_Element {
 	 * @return string
 	 */
 	private function generate_block( $tag, $content, $element, $node = null ) {
-		$content = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', (string) $content );
+		$content        = preg_replace( '/(?:\x{00A0}|&nbsp;|&#160;)+$/u', '', (string) $content );
 		$style_ids      = array();
 		$merged_classes = $this->merge_classes( '', $node );
 		$etch_attrs     = array();
@@ -237,7 +237,7 @@ class EFS_Element_Text extends EFS_Base_Element {
 		}
 
 		// etch/text is plain-text only — use etch/raw-html when content contains markup.
-		$inner = $content !== strip_tags( $content )
+		$inner = strip_tags( $content ) !== $content
 			? $this->generate_etch_raw_html_block( $content )
 			: $this->generate_etch_text_block( $content );
 

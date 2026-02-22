@@ -425,7 +425,10 @@ class EFS_Migration_Token_Manager {
 			$decoded       = JWT::decode( $token, new Key( $this->get_secret_key(), 'HS256' ) );
 			$payload_array = (array) $decoded;
 			return array(
-				'header'  => array( 'alg' => 'HS256', 'typ' => 'JWT' ),
+				'header'  => array(
+					'alg' => 'HS256',
+					'typ' => 'JWT',
+				),
 				'payload' => $payload_array,
 			);
 		} catch ( ExpiredException $e ) {
@@ -490,5 +493,4 @@ class EFS_Migration_Token_Manager {
 
 		return $secret;
 	}
-
 }

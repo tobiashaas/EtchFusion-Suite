@@ -118,10 +118,10 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		wp_send_json_success(
 			array(
-				'message'         => __( 'Wizard state saved.', 'etch-fusion-suite' ),
-				'wizard_nonce'    => $wizard_nonce,
-				'state'           => $state,
-				'expires_in'      => $service->get_expiration_seconds(),
+				'message'          => __( 'Wizard state saved.', 'etch-fusion-suite' ),
+				'wizard_nonce'     => $wizard_nonce,
+				'state'            => $state,
+				'expires_in'       => $service->get_expiration_seconds(),
 				'expires_in_human' => human_time_diff( time(), time() + $service->get_expiration_seconds() ),
 			)
 		);
@@ -169,9 +169,9 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		wp_send_json_success(
 			array(
-				'wizard_nonce'    => $wizard_nonce,
-				'state'           => $state,
-				'expires_in'      => $service->get_expiration_seconds(),
+				'wizard_nonce'     => $wizard_nonce,
+				'state'            => $state,
+				'expires_in'       => $service->get_expiration_seconds(),
 				'expires_in_human' => human_time_diff( time(), time() + $service->get_expiration_seconds() ),
 			)
 		);
@@ -474,7 +474,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		$migration_key = $this->get_post( 'migration_key', '', 'raw' );
-		$target_url   = $this->get_post( 'target_url', '', 'url' );
+		$target_url    = $this->get_post( 'target_url', '', 'url' );
 		$migration_url = $this->get_post( 'migration_url', '', 'url' );
 
 		if ( '' !== $migration_url && ( '' === $target_url || '' === $migration_key ) ) {
@@ -528,7 +528,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			wp_send_json_error(
 				array(
 					'message' => $result->get_error_message(),
-					'code'    => $result->get_error_code() ?: 'api_error',
+					'code'    => $result->get_error_code() ? $result->get_error_code() : 'api_error',
 				),
 				502
 			);

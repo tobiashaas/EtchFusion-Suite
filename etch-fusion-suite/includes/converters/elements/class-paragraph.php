@@ -46,7 +46,7 @@ class EFS_Element_Paragraph extends EFS_Base_Element {
 
 		// etch/text is plain-text only. When the Bricks text field contains inline HTML
 		// (e.g. <b>, <strong>, <em>), use etch/raw-html so the markup renders correctly.
-		$has_html    = $text !== strip_tags( $text );
+		$has_html    = strip_tags( $text ) !== $text;
 		$inner_block = $has_html
 			? $this->generate_etch_raw_html_block( $text, $label )
 			: $this->generate_etch_text_block( $text );

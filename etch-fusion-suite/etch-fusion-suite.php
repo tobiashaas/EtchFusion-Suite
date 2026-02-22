@@ -422,7 +422,6 @@ class Etch_Fusion_Suite_Plugin {
 		// Flush rewrite rules
 		flush_rewrite_rules();
 	}
-
 }
 
 /**

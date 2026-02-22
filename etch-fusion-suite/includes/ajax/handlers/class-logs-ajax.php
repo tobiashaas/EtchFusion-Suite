@@ -135,26 +135,50 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$migration_id = $this->get_post( 'migration_id', '', 'text' );
 		if ( '' === $migration_id ) {
-			wp_send_json_error( array( 'message' => 'Missing migration_id', 'code' => 'missing_param' ), 400 );
+			wp_send_json_error(
+				array(
+					'message' => 'Missing migration_id',
+					'code'    => 'missing_param',
+				),
+				400
+			);
 			return;
 		}
 
 		if ( null === $this->migration_logger ) {
-			wp_send_json_error( array( 'message' => 'Logger service unavailable', 'code' => 'service_unavailable' ), 503 );
+			wp_send_json_error(
+				array(
+					'message' => 'Logger service unavailable',
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
 			return;
 		}
 
 		$log_path = $this->migration_logger->get_log_path( $migration_id );
 
 		if ( ! file_exists( $log_path ) ) {
-			wp_send_json_error( array( 'message' => 'Log file not found', 'code' => 'not_found' ), 404 );
+			wp_send_json_error(
+				array(
+					'message' => 'Log file not found',
+					'code'    => 'not_found',
+				),
+				404
+			);
 			return;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$content = file_get_contents( $log_path );
 		if ( false === $content ) {
-			wp_send_json_error( array( 'message' => 'Failed to read log file', 'code' => 'read_error' ), 500 );
+			wp_send_json_error(
+				array(
+					'message' => 'Failed to read log file',
+					'code'    => 'read_error',
+				),
+				500
+			);
 			return;
 		}
 
@@ -200,8 +224,8 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$this->audit_logger->log_security_event( 'logs_accessed', 'low', 'Audit log viewed in admin', array() );
 
-		$logs            = $this->audit_logger->get_security_logs();
-		$logs            = array_values(
+		$logs           = $this->audit_logger->get_security_logs();
+		$logs           = array_values(
 			array_filter(
 				$logs,
 				static function ( $entry ) {
@@ -209,7 +233,7 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				}
 			)
 		);
-		$migration_runs  = $this->migration_runs_repository ? $this->migration_runs_repository->get_runs( 50 ) : array();
+		$migration_runs = $this->migration_runs_repository ? $this->migration_runs_repository->get_runs( 50 ) : array();
 
 		wp_send_json_success(
 			array(

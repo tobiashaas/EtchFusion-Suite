@@ -236,20 +236,20 @@ class EFS_Element_Image extends EFS_Base_Element {
 				}
 			}
 
-		foreach ( $class_ids as $class_id ) {
-			$class_id = trim( (string) $class_id );
-			if ( '' === $class_id || ! isset( $global_class_settings[ $class_id ] ) ) {
-				continue;
-			}
-			$fit = isset( $global_class_settings[ $class_id ]['_objectFit'] )
+			foreach ( $class_ids as $class_id ) {
+				$class_id = trim( (string) $class_id );
+				if ( '' === $class_id || ! isset( $global_class_settings[ $class_id ] ) ) {
+					continue;
+				}
+				$fit = isset( $global_class_settings[ $class_id ]['_objectFit'] )
 				? strtolower( trim( (string) $global_class_settings[ $class_id ]['_objectFit'] ) )
 				: '';
-			if ( 'cover' === $fit ) {
-				// The CSS migration handles this via move_image_fit_properties_to_nested_img —
-				// no inline style needed; return empty to avoid duplicate styling.
-				return '';
+				if ( 'cover' === $fit ) {
+					// The CSS migration handles this via move_image_fit_properties_to_nested_img —
+					// no inline style needed; return empty to avoid duplicate styling.
+					return '';
+				}
 			}
-		}
 		}
 
 		// 3. Class-name heuristic for common patterns (__image, bg-image).

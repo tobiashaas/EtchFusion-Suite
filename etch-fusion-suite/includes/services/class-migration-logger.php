@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EFS_Migration_Logger {
 
 	/** @var array */
-	private $initialized_dirs = [];
+	private $initialized_dirs = array();
 
 	/**
 	 * Sanitize a migration ID for use in a file name.
@@ -111,18 +111,18 @@ class EFS_Migration_Logger {
 	 * @param string $message Human-readable log message.
 	 * @param array  $context Optional structured context data.
 	 */
-	public function log( string $migration_id, string $level, string $message, array $context = [] ): void {
+	public function log( string $migration_id, string $level, string $message, array $context = array() ): void {
 		if ( ! defined( 'WP_DEBUG_LOG' ) || WP_DEBUG_LOG !== true ) {
 			return;
 		}
 
 		$line = json_encode(
-			[
+			array(
 				'ts'    => current_time( 'Y-m-d H:i:s' ),
 				'level' => $level,
 				'msg'   => $message,
 				'ctx'   => $context,
-			],
+			),
 			JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
 		);
 

@@ -86,11 +86,11 @@ class EFS_Media_Migrator {
 					$this->error_handler->log_warning(
 						'W012',
 						array(
-							'media_id'    => $media_id,
-							'source_id'   => $source_media_id,
-							'title'       => $media_data['title'],
-							'error'       => $result->get_error_message(),
-							'action'      => 'Failed to migrate media file',
+							'media_id'  => $media_id,
+							'source_id' => $source_media_id,
+							'title'     => $media_data['title'],
+							'error'     => $result->get_error_message(),
+							'action'    => 'Failed to migrate media file',
 						)
 					);
 					continue;
@@ -222,11 +222,11 @@ class EFS_Media_Migrator {
 			$this->error_handler->log_warning(
 				'W012',
 				array(
-					'media_id'    => $media_id,
-					'source_id'   => $media_id,
-					'title'       => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
-					'error'       => $result->get_error_message(),
-					'action'      => 'Failed to migrate media file',
+					'media_id'  => $media_id,
+					'source_id' => $media_id,
+					'title'     => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
+					'error'     => $result->get_error_message(),
+					'action'    => 'Failed to migrate media file',
 				)
 			);
 			return array(

@@ -2,12 +2,12 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-$etch_fusion_suite_is_https    = isset( $is_https ) ? (bool) $is_https : is_ssl();
-$etch_fusion_suite_site_url    = isset( $site_url ) ? $site_url : home_url();
-$etch_fusion_suite_url_parts   = wp_parse_url( $etch_fusion_suite_site_url );
-$etch_fusion_suite_host        = isset( $etch_fusion_suite_url_parts['host'] ) ? strtolower( (string) $etch_fusion_suite_url_parts['host'] ) : '';
-$etch_fusion_suite_local_hosts = array( 'localhost', '127.0.0.1', '::1', '[::1]' );
-$etch_fusion_suite_is_local    = in_array( $etch_fusion_suite_host, $etch_fusion_suite_local_hosts, true );
+$etch_fusion_suite_is_https           = isset( $is_https ) ? (bool) $is_https : is_ssl();
+$etch_fusion_suite_site_url           = isset( $site_url ) ? $site_url : home_url();
+$etch_fusion_suite_url_parts          = wp_parse_url( $etch_fusion_suite_site_url );
+$etch_fusion_suite_host               = isset( $etch_fusion_suite_url_parts['host'] ) ? strtolower( (string) $etch_fusion_suite_url_parts['host'] ) : '';
+$etch_fusion_suite_local_hosts        = array( 'localhost', '127.0.0.1', '::1', '[::1]' );
+$etch_fusion_suite_is_local           = in_array( $etch_fusion_suite_host, $etch_fusion_suite_local_hosts, true );
 $etch_fusion_suite_show_https_warning = ! $etch_fusion_suite_is_https && ! $etch_fusion_suite_is_local;
 $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. Use HTTPS in production to protect migration credentials in transit.', 'etch-fusion-suite' );
 ?>

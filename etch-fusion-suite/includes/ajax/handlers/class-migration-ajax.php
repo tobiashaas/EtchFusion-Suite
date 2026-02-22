@@ -229,7 +229,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 		$action_scheduler_id = (int) $this->get_post( 'action_scheduler_id', 0, 'int' );
-		$migration_id       = $this->get_post( 'migration_id', '', 'text' );
+		$migration_id        = $this->get_post( 'migration_id', '', 'text' );
 		if ( function_exists( 'as_unschedule_action' ) ) {
 			as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
 		} elseif ( class_exists( 'EFS_Vendor_ActionScheduler' ) ) {

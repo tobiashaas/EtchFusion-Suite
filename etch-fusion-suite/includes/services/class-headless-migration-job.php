@@ -102,19 +102,19 @@ class EFS_Headless_Migration_Job {
 			}
 		}
 
-		$active = $this->progress_manager->get_active_migration();
-		$target_url  = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
-		$migration_key = isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
+		$active         = $this->progress_manager->get_active_migration();
+		$target_url     = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
+		$migration_key  = isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
 		$active_options = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
-		$batch_size = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
+		$batch_size     = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
 
 		if ( '' === $target_url || '' === $migration_key ) {
 			$this->migration_logger->log( $migration_id, 'error', 'Headless job: missing target_url or migration_key in active migration.' );
 			return;
 		}
 
-		$max_time  = (int) ini_get( 'max_execution_time' );
-		$budget    = $max_time > 0 ? (int) floor( 0.8 * $max_time ) : 0;
+		$max_time   = (int) ini_get( 'max_execution_time' );
+		$budget     = $max_time > 0 ? (int) floor( 0.8 * $max_time ) : 0;
 		$start_time = time();
 
 		for ( ; ; ) {

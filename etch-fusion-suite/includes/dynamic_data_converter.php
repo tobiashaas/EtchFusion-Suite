@@ -137,7 +137,7 @@ class EFS_Dynamic_Data_Converter {
 			$converted  = $this->replace_dynamic_root_in_expressions( $converted, 'this', $loop_alias );
 
 			// Note: for attachment loops {item.image.id} is kept as-is — Etch resolves
-		// it correctly for both post loops and attachment loops.
+			// it correctly for both post loops and attachment loops.
 		}
 
 		// Log unconverted tags

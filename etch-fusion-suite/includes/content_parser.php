@@ -448,7 +448,7 @@ class EFS_Content_Parser {
 				continue;
 			}
 
-			$value = isset( $entry['value'] ) && is_scalar( $entry['value'] )
+			$value               = isset( $entry['value'] ) && is_scalar( $entry['value'] )
 				? (string) $entry['value']
 				: '';
 			$normalized[ $name ] = $value;
@@ -467,8 +467,8 @@ class EFS_Content_Parser {
 	 */
 	public function get_bricks_posts( $post_types = null ) {
 		if ( is_array( $post_types ) && ! empty( $post_types ) ) {
-			$post_types   = array_diff( $post_types, array( 'attachment' ) );
-			$post_types   = array_values( array_unique( $post_types ) );
+			$post_types    = array_diff( $post_types, array( 'attachment' ) );
+			$post_types    = array_values( array_unique( $post_types ) );
 			$post_type_arg = $post_types;
 		} else {
 			$post_type_arg = array( 'post', 'page', 'bricks_template' );

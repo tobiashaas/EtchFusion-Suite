@@ -77,7 +77,7 @@ class EFS_Element_Condition extends EFS_Base_Element implements Needs_Error_Hand
 				$type = strtolower( trim( (string) $condition['condition'] ) );
 			}
 
-			$is_supported = in_array( $type, $supported_types, true );
+			$is_supported        = in_array( $type, $supported_types, true );
 			$is_unsupported_type = ( '' === $type )
 				|| 0 === strpos( $type, 'woocommerce_' )
 				|| 0 === strpos( $type, 'acf_' )
@@ -88,7 +88,7 @@ class EFS_Element_Condition extends EFS_Base_Element implements Needs_Error_Hand
 				continue;
 			}
 
-			$reported_type         = '' !== $type ? $type : 'unknown';
+			$reported_type          = '' !== $type ? $type : 'unknown';
 			$unsupported_comments[] = '<!-- [EFS] Condition not converted: ' . $reported_type . ' -->';
 			$this->log_condition_warning( $reported_type, $element_id );
 		}
@@ -110,7 +110,7 @@ class EFS_Element_Condition extends EFS_Base_Element implements Needs_Error_Hand
 			$etch_attributes['class'] = $css_classes;
 		}
 
-		$attrs                 = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
+		$attrs                  = $this->build_attributes( $label, $style_ids, $etch_attributes, $tag, $element );
 		$attrs['conditionType'] = 'bricks';
 		$attrs['conditions']    = $supported_conditions;
 

@@ -92,15 +92,15 @@ class EFS_Migration_Manager {
 		$migrator_executor   = new \Bricks2Etch\Services\EFS_Migrator_Executor( $migrator_registry, $error_handler );
 		$steps_manager       = new \Bricks2Etch\Services\EFS_Steps_Manager( $plugin_detector );
 		$progress_manager    = new \Bricks2Etch\Services\EFS_Progress_Manager( $migration_repository, $steps_manager );
-		$run_finalizer    = new \Bricks2Etch\Services\EFS_Migration_Run_Finalizer(
+		$run_finalizer       = new \Bricks2Etch\Services\EFS_Migration_Run_Finalizer(
 			$progress_manager,
 			$migration_repository,
 			null,
 			$error_handler,
 			$content_service
 		);
-		$migration_logger = new \Bricks2Etch\Services\EFS_Migration_Logger();
-		$async_runner     = new \Bricks2Etch\Services\EFS_Async_Migration_Runner(
+		$migration_logger    = new \Bricks2Etch\Services\EFS_Migration_Logger();
+		$async_runner        = new \Bricks2Etch\Services\EFS_Async_Migration_Runner(
 			$migrator_executor,
 			$progress_manager,
 			$run_finalizer,
@@ -114,7 +114,7 @@ class EFS_Migration_Manager {
 			$plugin_detector,
 			$migration_logger
 		);
-		$batch_phase_runner = new \Bricks2Etch\Services\EFS_Batch_Phase_Runner(
+		$batch_phase_runner  = new \Bricks2Etch\Services\EFS_Batch_Phase_Runner(
 			$error_handler,
 			$run_finalizer,
 			$progress_manager,
@@ -124,7 +124,7 @@ class EFS_Migration_Manager {
 		);
 		$media_phase_handler = new EFS_Media_Phase_Handler( $media_service, $error_handler );
 		$posts_phase_handler = new EFS_Posts_Phase_Handler( $content_service, $error_handler );
-		$batch_processor  = new \Bricks2Etch\Services\EFS_Batch_Processor(
+		$batch_processor     = new \Bricks2Etch\Services\EFS_Batch_Processor(
 			array( $media_phase_handler, $posts_phase_handler ),
 			$migration_repository,
 			$progress_manager,
@@ -134,14 +134,14 @@ class EFS_Migration_Manager {
 			null,
 			$batch_phase_runner
 		);
-		$headless_job     = new \Bricks2Etch\Services\EFS_Headless_Migration_Job(
+		$headless_job        = new \Bricks2Etch\Services\EFS_Headless_Migration_Job(
 			$async_runner,
 			$batch_processor,
 			$progress_manager,
 			$migration_logger,
 			$migration_repository
 		);
-		$starter          = new \Bricks2Etch\Services\EFS_Migration_Starter(
+		$starter             = new \Bricks2Etch\Services\EFS_Migration_Starter(
 			$token_manager,
 			$progress_manager,
 			$run_finalizer,
@@ -156,7 +156,7 @@ class EFS_Migration_Manager {
 			$migration_logger,
 			$headless_job
 		);
-		$orchestrator     = new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
+		$orchestrator        = new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
 			$starter,
 			$async_runner,
 			$progress_manager,
@@ -262,5 +262,4 @@ class EFS_Migration_Manager {
 	public function migrate_single_post( $post, $migration_key, $target_url = null ) {
 		return $this->migration_service->migrate_single_post( $post, $migration_key, $target_url );
 	}
-
 }

@@ -326,7 +326,7 @@ class EFS_Plugin_Detector {
 				$ref = new \ReflectionClass( 'Etch\Plugin' );
 				if ( $ref->hasConstant( 'VERSION' ) ) {
 					$v = $ref->getConstant( 'VERSION' );
-					if ( is_string( $v ) && $v !== '' ) {
+					if ( is_string( $v ) && '' !== $v ) {
 						return $v;
 					}
 				}

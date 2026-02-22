@@ -96,7 +96,7 @@ class EFS_Migration_Controller {
 			}
 		}
 
-		$nonce = isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : '';
+		$nonce  = isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : '';
 		$result = $this->manager->start_migration_async( $migration_key, $target_url, $batch, $options, $nonce );
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -137,18 +137,18 @@ class EFS_Migration_Controller {
 			return $result;
 		}
 
-		$progress = isset( $result['progress'] ) && is_array( $result['progress'] ) ? $result['progress'] : array();
-		$steps    = isset( $result['steps'] ) && is_array( $result['steps'] ) ? $result['steps'] : array();
+		$progress          = isset( $result['progress'] ) && is_array( $result['progress'] ) ? $result['progress'] : array();
+		$steps             = isset( $result['steps'] ) && is_array( $result['steps'] ) ? $result['steps'] : array();
 		$progress['steps'] = $steps;
 
 		return array(
-			'progress'    => $progress,
-			'steps'       => $steps,
-			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
-			'last_updated' => isset( $progress['last_updated'] ) ? $progress['last_updated'] : '',
-			'is_stale'    => ! empty( $progress['is_stale'] ),
+			'progress'                 => $progress,
+			'steps'                    => $steps,
+			'migrationId'              => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
+			'last_updated'             => isset( $progress['last_updated'] ) ? $progress['last_updated'] : '',
+			'is_stale'                 => ! empty( $progress['is_stale'] ),
 			'estimated_time_remaining' => isset( $progress['estimated_time_remaining'] ) ? $progress['estimated_time_remaining'] : null,
-			'completed'   => ! empty( $result['completed'] ),
+			'completed'                => ! empty( $result['completed'] ),
 		);
 	}
 
@@ -177,10 +177,10 @@ class EFS_Migration_Controller {
 	}
 
 	public function process_batch( array $data ) {
-		$migration_id            = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
-		$batch                   = isset( $data['batch'] ) ? (array) $data['batch'] : array();
-		$batch['batch_size']     = isset( $data['batch_size'] ) ? max( 1, (int) $data['batch_size'] ) : 10;
-		$result                  = $this->manager->process_batch( $migration_id, $batch );
+		$migration_id        = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		$batch               = isset( $data['batch'] ) ? (array) $data['batch'] : array();
+		$batch['batch_size'] = isset( $data['batch_size'] ) ? max( 1, (int) $data['batch_size'] ) : 10;
+		$result              = $this->manager->process_batch( $migration_id, $batch );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
