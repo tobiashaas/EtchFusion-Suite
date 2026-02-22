@@ -31,7 +31,7 @@ spl_autoload_register(
 			'Api\\'                      => '',
 			'Updater\\'                  => 'updater/',
 			'Controllers\\'              => 'controllers/',
-			'Admin\\'                    => 'admin/',
+			'Admin\\'                    => '',
 			'Ajax\\Handlers\\'           => 'ajax/handlers/',
 			'Ajax\\'                     => 'ajax/',
 			'Parsers\\'                  => '',
@@ -154,6 +154,17 @@ spl_autoload_register(
 				if ( 'Migrators\\' === $namespace ) {
 					foreach ( $files as $file ) {
 						$alt_path = $base_dir . 'migrators/' . $file;
+						if ( file_exists( $alt_path ) ) {
+							require_once $alt_path;
+							return;
+						}
+					}
+				}
+
+				// Special handling for Admin namespace - check admin/ subdirectory as fallback
+				if ( 'Admin\\' === $namespace ) {
+					foreach ( $files as $file ) {
+						$alt_path = $base_dir . 'admin/' . $file;
 						if ( file_exists( $alt_path ) ) {
 							require_once $alt_path;
 							return;
