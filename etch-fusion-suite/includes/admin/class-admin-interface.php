@@ -3,6 +3,8 @@
  * Admin Interface for Etch Fusion Suite
  *
  * Handles the WordPress admin menu and dashboard
+ *
+ * Located in includes/admin/ — resolved by the Admin namespace map in autoloader.php.
  */
 
 namespace Bricks2Etch\Admin;

@@ -3,6 +3,8 @@
  * Manual PSR-4 Autoloader (Composer Alternative)
  *
  * This file provides autoloading for namespaced classes without requiring Composer.
+ *
+ * Admin\ namespace → includes/admin/ (both EFS_Admin_Interface and EFS_Admin_Notice_Manager live here).
  */
 
 spl_autoload_register(
@@ -31,7 +33,7 @@ spl_autoload_register(
 			'Api\\'                      => '',
 			'Updater\\'                  => 'updater/',
 			'Controllers\\'              => 'controllers/',
-			'Admin\\'                    => '',
+			'Admin\\'                    => 'admin/',
 			'Ajax\\Handlers\\'           => 'ajax/handlers/',
 			'Ajax\\'                     => 'ajax/',
 			'Parsers\\'                  => '',
@@ -161,16 +163,6 @@ spl_autoload_register(
 					}
 				}
 
-				// Special handling for Admin namespace - check admin/ subdirectory as fallback
-				if ( 'Admin\\' === $namespace ) {
-					foreach ( $files as $file ) {
-						$alt_path = $base_dir . 'admin/' . $file;
-						if ( file_exists( $alt_path ) ) {
-							require_once $alt_path;
-							return;
-						}
-					}
-				}
 			}
 		}
 	}
