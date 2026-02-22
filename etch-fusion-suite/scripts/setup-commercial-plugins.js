@@ -229,16 +229,6 @@ const PLUGINS = [
     matches: (fileName) =>
       /^etch-theme.*\.zip$/i.test(fileName) &&
       !/^etch-theme-latest\.zip$/i.test(fileName)
-  },
-  {
-    id: 'wpvivid',
-    label: 'WPvivid',
-    required: false,
-    latestFile: 'wpvivid-latest.zip',
-    envVar: null,
-    matches: (fileName) =>
-      /^wpvivid.*\.zip$/i.test(fileName) &&
-      !/^wpvivid-latest\.zip$/i.test(fileName)
   }
 ];
 

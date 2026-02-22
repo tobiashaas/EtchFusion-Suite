@@ -6,7 +6,7 @@
     "require": {
         "php": "^8.1",
         "psr/container": "^2.0",
-        "firebase/php-jwt": "^6.10",
+        "firebase/php-jwt": "^7.0",
         "woocommerce/action-scheduler": "^3.8"
     },
     "require-dev": {
@@ -18,7 +18,7 @@
         "mockery/mockery": "^1.6",
         "phpstan/phpstan": "^1.12 || ^2.0",
         "szepeviktor/phpstan-wordpress": "^2.0",
-        "brianhenryie/strauss": "^0.19",
+        "brianhenryie/strauss": "^0.26",
         "roave/security-advisories": "dev-latest"
     },
     "autoload": {
@@ -61,15 +61,9 @@
             "delete_vendor_files": false
         }
     },
-    "audit": {
-        "ignore": {
-            "GHSA-2x45-7fc3-mxwq": "Pinned to ^6.10 per project requirement; advisory acknowledged.",
-            "PKSA-y2cr-5h3j-g3ys": "Pinned to ^6.10 per project requirement; advisory acknowledged."
-        }
-    },
     "scripts": {
-        "post-install-cmd": ["vendor/bin/strauss"],
-        "post-update-cmd": ["vendor/bin/strauss"],
+        "post-install-cmd": ["@php -r \"if (file_exists('vendor/bin/strauss')) { passthru('vendor/bin/strauss'); }\""],
+        "post-update-cmd": ["@php -r \"if (file_exists('vendor/bin/strauss')) { passthru('vendor/bin/strauss'); }\""],
         "lint": "phpcs",
         "lint:fix": "phpcbf",
         "phpcs": "vendor/bin/phpcs --standard=phpcs.xml.dist",

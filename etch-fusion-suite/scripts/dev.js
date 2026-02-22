@@ -196,52 +196,6 @@ async function detectBricksCliContainer() {
   throw new Error('Could not detect Bricks CLI container.');
 }
 
-async function ensureWpvividOnBricks() {
-  log('▶ Installing WPvivid Free + Pro on Bricks...');
-
-  const freeInstalled = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-installed', 'wpvivid-backuprestore']);
-  if (freeInstalled.code === 0) {
-    await runCommandWithRetry(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'activate', 'wpvivid-backuprestore']);
-  } else {
-    await runCommandWithRetry(WP_ENV_CMD, [
-      'run',
-      'cli',
-      'wp',
-      'plugin',
-      'install',
-      'https://downloads.wordpress.org/plugin/wpvivid-backuprestore.latest-stable.zip',
-      '--activate'
-    ]);
-  }
-
-  const proZipPath = join(__dirname, '..', 'local-plugins', 'wpvivid-latest.zip');
-  if (!fs.existsSync(proZipPath)) {
-    throw new Error(`Missing file: ${proZipPath}`);
-  }
-
-  const bricksCli = await detectBricksCliContainer();
-  await runCommandWithRetry('docker', ['cp', proZipPath, `${bricksCli}:/tmp/wpvivid-latest.zip`]);
-  await runCommandWithRetry(WP_ENV_CMD, [
-    'run',
-    'cli',
-    'wp',
-    'plugin',
-    'install',
-    '/tmp/wpvivid-latest.zip',
-    '--activate',
-    '--force'
-  ]);
-
-  const freeActive = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-active', 'wpvivid-backuprestore']);
-  const proActive = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'is-active', 'wpvivid-backup-pro']);
-
-  if (freeActive.code !== 0 || proActive.code !== 0) {
-    throw new Error('WPvivid activation verification failed on Bricks.');
-  }
-
-  log('✓ WPvivid Free + Pro are active on Bricks');
-}
-
 async function main() {
   const args = process.argv.slice(2);
   const skipComposer = args.includes('--skip-composer');
@@ -279,8 +233,7 @@ async function main() {
   
   log(`⏳ Waiting for Etch instance (port ${config.testsPort})...`);
   await waitForWordPress({ port: config.testsPort, timeout: 120 });
-  await ensureWpvividOnBricks();
-  
+
   if (!skipComposer) {
     log('▶ Installing Composer dependencies...');
     const hasComposer = await checkComposerInContainer();

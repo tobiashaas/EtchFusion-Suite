@@ -49,7 +49,7 @@ The project supports commercial plugins for local testing without committing the
 - **Frames Plugin**: Download from https://getframes.io/
 - **Automatic.css**: Download from https://automaticcss.com/
 
-Optional add-ons (including `frames-latest.zip`, `acss-latest.zip`, and `wpvivid-latest.zip`) are not referenced by default in `.wp-env.json`. Add them in `.wp-env.override.json` if you want `wp-env` to auto-install them.
+Optional add-ons (including `frames-latest.zip` and `acss-latest.zip`) are not referenced by default in `.wp-env.json`. Add them in `.wp-env.override.json` if you want `wp-env` to auto-install them.
 
 #### Setup Process
 
@@ -77,47 +77,6 @@ Create a `.env` file from `.env.example` and add your license keys:
 ```bash
 cp .env.example .env
 # Edit .env and add your license keys
-```
-
-### WPvivid Custom Content Backup Import
-
-Import real Bricks site data for testing without affecting users, plugins, or themes.
-
-#### Creating a Custom Content Backup
-
-1. Install WPvivid Backup Plugin on your live Bricks site
-2. Go to WPvivid Backup -> Backup & Restore
-3. Select "Custom Backup"
-4. Choose these items:
-   - `wp_posts`, `wp_postmeta`, `wp_options`
-   - `uploads`
-5. Do not select users, plugins, or themes
-6. Click "Backup Now"
-7. Download all backup parts (may be multiple files)
-
-#### Importing Backup
-
-1. Place all backup parts in `local-backups/` directory
-2. Run `npm run import:wpvivid`
-3. Follow the on-screen instructions
-4. The script will detect multi-part backups and guide you through import
-
-#### Backup Management
-
-```bash
-npm run backup:list      # List all available backups
-npm run backup:info      # Show detailed backup information
-npm run import:wpvivid   # Import latest backup
-```
-
-#### Real Data Migration Validation
-
-After restoring a WPvivid backup in the Bricks instance, run:
-
-```bash
-npm run test:migration
-npm run analyze:elements
-npm run report:migration-quality
 ```
 
 These commands provide:

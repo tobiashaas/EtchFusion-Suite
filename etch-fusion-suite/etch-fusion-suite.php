@@ -63,9 +63,12 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	}
 }
 
-// Plugin requires PSR Container. Accept prefixed (Strauss) or unprefixed (vendor/ + shims).
+// Plugin requires PSR Container OR vendor/autoload.php must be loadable.
+// When vendor-prefixed/ is present (Strauss), PSR Container is prefixed — check both.
 $etch_fusion_suite_psr_container_ok = interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' )
-	|| interface_exists( 'Psr\Container\ContainerInterface' );
+	|| interface_exists( 'Psr\Container\ContainerInterface' )
+	|| class_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' )
+	|| file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' );
 if ( ! $etch_fusion_suite_psr_container_ok ) {
 	add_action(
 		'admin_notices',

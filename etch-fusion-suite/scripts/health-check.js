@@ -458,11 +458,6 @@ async function runHealthCheck(environmentFilter = null) {
       }));
     }
 
-    if (env.environment === 'cli') {
-      checkPromises.push(checkPluginStatus(env.environment, env.name, 'wpvivid-backuprestore', {
-        required: false,
-        label: `${env.name} plugin wpvivid-backuprestore`
-      }));
     }
   }
 

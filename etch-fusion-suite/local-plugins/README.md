@@ -13,7 +13,6 @@ Store commercial plugin ZIPs in this folder for local development only. These fi
 - Frames Plugin: https://getframes.io/
 - Automatic.css: https://automaticcss.com/
 - Bricks Child Theme (if your workflow requires it)
-- WPvivid Backup Plugin (for backup import flow)
 
 ## Naming Examples
 
@@ -25,7 +24,6 @@ Versioned filenames are supported. Examples:
 - `etch-1.0.2.zip`
 - `etch-theme-0.0.2.zip`
 - `bricks-child-1.0.0.zip`
-- `wpvivid-backuprestore-0.9.99.zip`
 
 Run `npm run setup:commercial-plugins` to detect versions and generate normalized `*-latest.zip` files used by `.wp-env.json`.
 

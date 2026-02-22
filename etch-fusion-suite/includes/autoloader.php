@@ -31,7 +31,7 @@ spl_autoload_register(
 			'Api\\'                      => '',
 			'Updater\\'                  => 'updater/',
 			'Controllers\\'              => 'controllers/',
-			'Admin\\'                    => '',
+			'Admin\\'                    => 'admin/',
 			'Ajax\\Handlers\\'           => 'ajax/handlers/',
 			'Ajax\\'                     => 'ajax/',
 			'Parsers\\'                  => '',
