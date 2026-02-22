@@ -40,7 +40,8 @@ class EFS_Pre_Flight_Checker {
 	 * @return array{checks: array, has_hard_block: bool, has_soft_block: bool, checked_at: int}
 	 */
 	public function run_checks( string $target_url, string $mode ): array {
-		$cached = get_transient( self::CACHE_KEY );
+		$cache_key = self::CACHE_KEY . '_' . md5( $target_url . '|' . $mode );
+		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
 		}
@@ -139,13 +140,11 @@ class EFS_Pre_Flight_Checker {
 					continue;
 				}
 				$timestamp = (int) $timestamp;
-				if ( $timestamp > $now ) {
-					if ( null === $next_run || $timestamp < $next_run ) {
-						$next_run = $timestamp;
-					}
+				if ( null === $next_run || $timestamp < $next_run ) {
+					$next_run = $timestamp;
 				}
 			}
-			if ( null !== $next_run && ( $now - $next_run ) > 300 ) {
+			if ( null !== $next_run && $next_run < ( $now - 300 ) ) {
 				$checks[] = array(
 					'id'      => 'wp_cron_delay',
 					'status'  => 'info',
@@ -291,7 +290,7 @@ class EFS_Pre_Flight_Checker {
 			'checked_at'     => time(),
 		);
 
-		set_transient( self::CACHE_KEY, $result, self::CACHE_TTL );
+		set_transient( $cache_key, $result, self::CACHE_TTL );
 
 		return $result;
 	}
@@ -302,6 +301,13 @@ class EFS_Pre_Flight_Checker {
 	 * @return void
 	 */
 	public function invalidate_cache(): void {
-		delete_transient( self::CACHE_KEY );
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+				'_transient_' . self::CACHE_KEY . '_%',
+				'_transient_timeout_' . self::CACHE_KEY . '_%'
+			)
+		);
 	}
 }
