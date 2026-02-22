@@ -149,7 +149,7 @@ class EFS_Batch_Phase_Runner {
 		}
 
 		// Process each item in the batch.
-		foreach ( $current_batch as $id ) {
+		foreach ( $current_batch as $loop_idx => $id ) {
 			$id     = (int) $id;
 			$id_key = (string) $id;
 
@@ -221,6 +221,8 @@ class EFS_Batch_Phase_Runner {
 			$memory_limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
 			if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
 				$memory_pressure = true;
+				$unprocessed = array_slice( $current_batch, $loop_idx + 1 );
+				$remaining   = array_merge( $unprocessed, $remaining );
 				break;
 			}
 		}
