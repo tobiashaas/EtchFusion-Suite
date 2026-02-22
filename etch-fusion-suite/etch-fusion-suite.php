@@ -44,17 +44,17 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	require_once $etch_fusion_suite_vendor_prefixed;
 } else {
 	// Shim PSR Container interfaces under Strauss namespace for plugin code that expects prefixed names.
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false ) && interface_exists( 'Psr\Container\ContainerInterface', false ) ) {
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' ) && interface_exists( 'Psr\Container\ContainerInterface' ) ) {
 		class_alias( 'Psr\Container\ContainerInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' );
 	}
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface', false ) && interface_exists( 'Psr\Container\ContainerExceptionInterface', false ) ) {
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' ) && interface_exists( 'Psr\Container\ContainerExceptionInterface' ) ) {
 		class_alias( 'Psr\Container\ContainerExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' );
 	}
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface', false ) && interface_exists( 'Psr\Container\NotFoundExceptionInterface', false ) ) {
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' ) && interface_exists( 'Psr\Container\NotFoundExceptionInterface' ) ) {
 		class_alias( 'Psr\Container\NotFoundExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' );
 	}
 	// When using plain vendor/ (no Strauss), alias Firebase JWT so token manager works.
-	if ( ! class_exists( 'EtchFusionSuite\Vendor\Firebase\JWT\JWT', false ) && class_exists( 'Firebase\JWT\JWT', false ) ) {
+	if ( ! class_exists( 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' ) && class_exists( 'Firebase\JWT\JWT' ) ) {
 		class_alias( 'Firebase\JWT\JWT', 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' );
 		class_alias( 'Firebase\JWT\Key', 'EtchFusionSuite\Vendor\Firebase\JWT\Key' );
 		class_alias( 'Firebase\JWT\ExpiredException', 'EtchFusionSuite\Vendor\Firebase\JWT\ExpiredException' );
@@ -64,9 +64,8 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 }
 
 // Plugin requires PSR Container. Accept prefixed (Strauss) or unprefixed (vendor/ + shims).
-$etch_fusion_suite_psr_container_ok = interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false )
-	|| class_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false )
-	|| interface_exists( 'Psr\Container\ContainerInterface', false );
+$etch_fusion_suite_psr_container_ok = interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' )
+	|| interface_exists( 'Psr\Container\ContainerInterface' );
 if ( ! $etch_fusion_suite_psr_container_ok ) {
 	add_action(
 		'admin_notices',
