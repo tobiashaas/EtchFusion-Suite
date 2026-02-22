@@ -374,6 +374,7 @@ const clearLogs = async () => {
         showToast(data?.message || 'Logs cleared.', 'success');
         allSecurityLogs = [];
         allMigrationRuns = [];
+        stopAutoRefreshLogs();
         renderAll();
     } catch (error) {
         console.error('Clear logs failed', error);
