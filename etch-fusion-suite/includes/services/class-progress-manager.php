@@ -52,20 +52,26 @@ class EFS_Progress_Manager {
 	 *
 	 * @param string $migration_id Migration ID.
 	 * @param array  $options      Optional. selected_post_types, post_type_mappings, include_media.
+	 * @param string $mode         Execution mode: 'browser' or 'headless'. Default 'browser'.
 	 */
-	public function init_progress( string $migration_id, array $options = array() ): void {
+	public function init_progress( string $migration_id, array $options = array(), string $mode = 'browser' ): void {
+		$validated_mode = in_array( $mode, array( 'browser', 'headless' ), true ) ? $mode : 'browser';
+		$initial_status = 'headless' === $validated_mode ? 'queued' : 'running';
+
 		$progress = array(
 			'migrationId'              => sanitize_text_field( $migration_id ),
-			'status'                   => 'running',
+			'status'                   => $initial_status,
 			'current_step'             => 'validation',
 			'current_phase_name'       => 'Validation',
-			'current_phase_status'     => 'active',
+			'current_phase_status'     => 'pending',
 			'percentage'               => 0,
-			'started_at'       => current_time( 'mysql' ),
-			'last_updated'     => current_time( 'mysql' ),
-			'completed_at'     => null,
-			'items_processed'  => 0,
-			'items_total'      => 0,
+			'started_at'               => current_time( 'mysql' ),
+			'last_updated'             => current_time( 'mysql' ),
+			'completed_at'             => null,
+			'items_processed'          => 0,
+			'items_total'              => 0,
+			'mode'                     => $validated_mode,
+			'action_scheduler_id'      => null,
 		);
 
 		$this->progress_repository->save_progress( $progress );
@@ -113,6 +119,9 @@ class EFS_Progress_Manager {
 			$progress['current_phase_status'] = 'failed';
 			$progress['completed_at']         = current_time( 'mysql' );
 			$this->store_active_migration( array() );
+		} elseif ( 'queued' === $step ) {
+			$progress['status']               = 'queued';
+			$progress['current_phase_status'] = 'pending';
 		} else {
 			$progress['status']               = 'running';
 			$progress['current_phase_status'] = 'active';
@@ -230,6 +239,19 @@ class EFS_Progress_Manager {
 	 */
 	public function get_active_migration(): array {
 		return $this->progress_repository->get_active_migration();
+	}
+
+	/**
+	 * Store the Action Scheduler action ID in the progress data.
+	 *
+	 * @param int $action_id Action Scheduler action ID.
+	 */
+	public function set_action_scheduler_id( int $action_id ): void {
+		$progress = $this->progress_repository->get_progress();
+		if ( is_array( $progress ) ) {
+			$progress['action_scheduler_id'] = $action_id;
+			$this->progress_repository->save_progress( $progress );
+		}
 	}
 
 	/**

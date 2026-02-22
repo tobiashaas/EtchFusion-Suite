@@ -136,6 +136,30 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p class="efs-wizard-hint">
 				<?php esc_html_e( 'Scans selected posts + Bricks Templates (Header, Footer, Global Sections) to find referenced classes only. Uncheck to migrate ALL Bricks Global Classes.', 'etch-fusion-suite' ); ?>
 			</p>
+
+			<div class="efs-execution-mode" data-efs-execution-mode>
+				<p class="efs-wizard-section-label">
+					<?php esc_html_e( 'Execution Mode', 'etch-fusion-suite' ); ?>
+				</p>
+				<label class="efs-mode-option efs-mode-option--selected" data-efs-mode-option="browser">
+					<input type="radio" name="efs-execution-mode" value="browser" checked
+						data-efs-mode-radio />
+					<span class="efs-mode-title">&#x1F5A5; <?php esc_html_e( 'Browser Mode', 'etch-fusion-suite' ); ?></span>
+					<span class="efs-mode-hint">
+						<?php esc_html_e( 'Browser must stay open. Best for small migrations.', 'etch-fusion-suite' ); ?>
+					</span>
+				</label>
+				<label class="efs-mode-option" data-efs-mode-option="headless">
+					<input type="radio" name="efs-execution-mode" value="headless"
+						data-efs-mode-radio />
+					<span class="efs-mode-title">&#9881; <?php esc_html_e( 'Headless Mode', 'etch-fusion-suite' ); ?></span>
+					<span class="efs-mode-hint">
+						<?php esc_html_e( 'Runs server-side. Browser can be closed.', 'etch-fusion-suite' ); ?>
+					</span>
+					<span class="efs-cron-indicator" data-efs-cron-indicator hidden></span>
+				</label>
+			</div>
+
 			<p class="efs-wizard-message" data-efs-select-message hidden></p>
 		</section>
 
@@ -190,6 +214,23 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<div class="efs-actions efs-actions--inline">
 				<button type="button" class="efs-btn--primary" data-efs-start-new><?php esc_html_e( 'Finish', 'etch-fusion-suite' ); ?></button>
 				<button type="button" class="button" data-efs-open-logs><?php esc_html_e( 'View logs', 'etch-fusion-suite' ); ?></button>
+			</div>
+		</div>
+		<div class="efs-headless-screen" data-efs-headless-screen hidden>
+			<h3><?php esc_html_e( 'Headless Migration Running', 'etch-fusion-suite' ); ?></h3>
+			<span class="efs-badge">&#9881; <?php esc_html_e( 'Server-Side via Action Scheduler', 'etch-fusion-suite' ); ?></span>
+			<p><?php esc_html_e( 'The migration is running in the background. You can safely close this browser tab.', 'etch-fusion-suite' ); ?></p>
+			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+				<div class="efs-progress-fill" data-efs-headless-progress-fill style="width:0%"></div>
+			</div>
+			<p class="efs-wizard-progress__percent" data-efs-headless-progress-percent>0%</p>
+			<div class="efs-actions efs-actions--inline">
+				<button type="button" class="button" data-efs-view-logs>
+					<?php esc_html_e( 'View Logs', 'etch-fusion-suite' ); ?>
+				</button>
+				<button type="button" class="button" data-efs-cancel-headless>
+					<?php esc_html_e( 'Cancel Migration', 'etch-fusion-suite' ); ?>
+				</button>
 			</div>
 		</div>
 	</div>

@@ -55,11 +55,15 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from the migration key.', 'etch-fusion-suite' ) );
 		}
 
+		$raw_mode = isset( $data['mode'] ) ? sanitize_key( $data['mode'] ) : 'browser';
+		$mode     = in_array( $raw_mode, array( 'browser', 'headless' ), true ) ? $raw_mode : 'browser';
+
 		$options = array(
 			'selected_post_types'  => array(),
 			'post_type_mappings'   => array(),
 			'include_media'        => true,
 			'restrict_css_to_used' => true,
+			'mode'                 => $mode,
 		);
 		if ( isset( $data['include_media'] ) ) {
 			$options['include_media'] = filter_var( $data['include_media'], FILTER_VALIDATE_BOOLEAN );
@@ -94,21 +98,16 @@ class EFS_Migration_Controller {
 
 		$nonce = isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : '';
 		$result = $this->manager->start_migration_async( $migration_key, $target_url, $batch, $options, $nonce );
-		// #region agent log
-		$efs_log_ctrl = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
-		if ( $efs_log_ctrl ) {
-			file_put_contents( $efs_log_ctrl, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'start_migration_async result', 'data' => array( 'is_wp_error' => is_wp_error( $result ), 'code' => is_wp_error( $result ) ? $result->get_error_code() : null, 'message' => is_wp_error( $result ) ? $result->get_error_message() : null ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
-		}
-		// #endregion
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 		return array(
-			'message'    => isset( $result['message'] ) ? $result['message'] : __( 'Migration started.', 'etch-fusion-suite' ),
+			'message'     => isset( $result['message'] ) ? $result['message'] : __( 'Migration started.', 'etch-fusion-suite' ),
 			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
 			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
 			'token'       => $migration_key,
+			'queued'      => isset( $result['queued'] ) ? (bool) $result['queued'] : false,
 		);
 	}
 

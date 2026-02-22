@@ -57,6 +57,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
 		add_action( 'wp_ajax_efs_resume_migration', array( $this, 'resume_migration' ) );
 		add_action( 'wp_ajax_efs_cancel_migration', array( $this, 'cancel_migration' ) );
+		add_action( 'wp_ajax_efs_cancel_headless_job', array( $this, 'cancel_headless_job' ) );
 		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
 		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
 	}
@@ -87,6 +88,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			'include_media'        => $this->get_post( 'include_media', '1', 'text' ),
 			'restrict_css_to_used' => $this->get_post( 'restrict_css_to_used', '1', 'text' ),
 			'nonce'                => $this->get_post( 'nonce', '', 'raw' ),
+			'mode'                 => $this->get_post( 'mode', 'browser', 'text' ),
 		);
 
 		$result     = $this->migration_controller->start_migration( $payload );
@@ -260,6 +262,34 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$result = $this->settings_controller->generate_migration_key( $payload );
 
 		$this->send_controller_response( $result, 'migration_key_failed', 'Migration key generated.' );
+	}
+
+	/**
+	 * Cancel a headless (Action Scheduler) migration job.
+	 */
+	public function cancel_headless_job() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'migration_cancel_headless', 10, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		$action_scheduler_id = (int) $this->get_post( 'action_scheduler_id', 0, 'int' );
+		$migration_id        = $this->get_post( 'migration_id', '', 'text' );
+
+		if ( $action_scheduler_id > 0 ) {
+			if ( class_exists( 'ActionScheduler' ) ) {
+				\ActionScheduler::store()->cancel_action( $action_scheduler_id );
+			} elseif ( function_exists( 'as_unschedule_action' ) ) {
+				as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+			}
+		} elseif ( '' !== $migration_id && function_exists( 'as_unschedule_action' ) ) {
+			as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+		}
+
+		wp_send_json_success( array( 'cancelled' => true ) );
 	}
 
 	/**

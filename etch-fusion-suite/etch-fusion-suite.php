@@ -144,6 +144,17 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
+		// Initialize Action Scheduler before other plugins_loaded hooks.
+		add_action(
+			'plugins_loaded',
+			function () {
+				if ( class_exists( 'ActionScheduler' ) ) {
+					ActionScheduler::init();
+				}
+			},
+			1
+		);
+
 		// Initialize REST API endpoints immediately
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
@@ -225,6 +236,14 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Initialize AJAX handlers (NEW - v0.5.1)
 		$this->ajax_handler = $container->get( 'ajax_handler' );
+
+		// Boot headless migration job and admin notice manager (register their hooks).
+		if ( $container->has( 'headless_migration_job' ) ) {
+			$container->get( 'headless_migration_job' );
+		}
+		if ( $container->has( 'admin_notice_manager' ) ) {
+			$container->get( 'admin_notice_manager' );
+		}
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $container->has( 'debug_ajax' ) ) {
 			$container->get( 'debug_ajax' );

@@ -6,7 +6,8 @@
     "require": {
         "php": "^8.1",
         "psr/container": "^2.0",
-        "firebase/php-jwt": "^6.10"
+        "firebase/php-jwt": "^6.10",
+        "woocommerce/action-scheduler": "^3.8"
     },
     "require-dev": {
         "wp-coding-standards/wpcs": "^3.1",

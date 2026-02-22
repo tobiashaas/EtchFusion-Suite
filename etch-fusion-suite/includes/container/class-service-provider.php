@@ -433,6 +433,19 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'headless_migration_job',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Headless_Migration_Job(
+					$c->get( 'async_migration_runner' ),
+					$c->get( 'batch_processor' ),
+					$c->get( 'progress_manager' ),
+					$c->get( 'migration_logger' ),
+					$c->get( 'migration_repository' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'migration_starter',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Starter(
@@ -447,7 +460,8 @@ class EFS_Service_Provider {
 					$c->get( 'error_handler' ),
 					$c->get( 'plugin_detector' ),
 					$c->get( 'migration_repository' ),
-					$c->get( 'migration_logger' )
+					$c->get( 'migration_logger' ),
+					$c->get( 'headless_migration_job' )
 				);
 			}
 		);
@@ -756,6 +770,15 @@ class EFS_Service_Provider {
 				);
 			}
 		);
+
+		$container->singleton(
+			'admin_notice_manager',
+			function ( $c ) {
+				return new \Bricks2Etch\Admin\EFS_Admin_Notice_Manager(
+					$c->get( 'progress_manager' )
+				);
+			}
+		);
 	}
 	/**
 	 * List of provided services.
@@ -812,6 +835,7 @@ class EFS_Service_Provider {
 			'progress_manager',
 			'run_finalizer',
 			'async_migration_runner',
+			'headless_migration_job',
 			'migration_starter',
 			'batch_phase_runner',
 			'batch_processor',
@@ -837,6 +861,7 @@ class EFS_Service_Provider {
 			'debug_ajax',
 			'ajax_handler',
 			'admin_interface',
+			'admin_notice_manager',
 		);
 	}
 }

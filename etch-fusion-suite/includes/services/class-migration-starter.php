@@ -64,6 +64,9 @@ class EFS_Migration_Starter {
 	/** @var EFS_Migration_Logger */
 	private $migration_logger;
 
+	/** @var EFS_Headless_Migration_Job */
+	private $headless_job;
+
 	/**
 	 * @param EFS_Migration_Token_Manager    $token_manager       Non-nullable; caller must ensure token manager is configured.
 	 * @param EFS_Progress_Manager           $progress_manager
@@ -77,6 +80,7 @@ class EFS_Migration_Starter {
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param Migration_Repository_Interface $migration_repository
 	 * @param EFS_Migration_Logger           $migration_logger
+	 * @param EFS_Headless_Migration_Job     $headless_job
 	 */
 	public function __construct(
 		EFS_Migration_Token_Manager $token_manager,
@@ -90,7 +94,8 @@ class EFS_Migration_Starter {
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
 		Migration_Repository_Interface $migration_repository,
-		EFS_Migration_Logger $migration_logger
+		EFS_Migration_Logger $migration_logger,
+		EFS_Headless_Migration_Job $headless_job
 	) {
 		$this->token_manager        = $token_manager;
 		$this->progress_manager     = $progress_manager;
@@ -104,6 +109,7 @@ class EFS_Migration_Starter {
 		$this->plugin_detector      = $plugin_detector;
 		$this->migration_repository = $migration_repository;
 		$this->migration_logger     = $migration_logger;
+		$this->headless_job         = $headless_job;
 	}
 
 	/**
@@ -348,9 +354,10 @@ class EFS_Migration_Starter {
 			$payload = $context['payload'];
 			$expires = $context['expires'];
 
+			$mode         = isset( $options['mode'] ) && in_array( $options['mode'], array( 'browser', 'headless' ), true ) ? $options['mode'] : 'browser';
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
 			$migration_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'efs_migration_', true );
-			$this->progress_manager->init_progress( $migration_id, $options );
+			$this->progress_manager->init_progress( $migration_id, $options, $mode );
 			$this->progress_manager->store_active_migration(
 				array(
 					'migration_id'  => $migration_id,
@@ -360,10 +367,24 @@ class EFS_Migration_Starter {
 					'issued_at'     => $payload['iat'] ?? time(),
 					'expires_at'    => $expires,
 					'options'       => $options,
+					'mode'          => $mode,
 				)
 			);
 			$selected_post_types_async = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-			$this->migration_logger->log( $migration_id, 'info', 'Migration started, mode: async, post_types: ' . implode( ', ', $selected_post_types_async ) );
+			$this->migration_logger->log( $migration_id, 'info', 'Migration started, mode: ' . $mode . ', post_types: ' . implode( ', ', $selected_post_types_async ) );
+
+			if ( 'headless' === $mode ) {
+				$action_id = $this->headless_job->enqueue_job( $migration_id );
+				$this->progress_manager->set_action_scheduler_id( $action_id );
+				$this->migration_logger->log( $migration_id, 'info', 'Headless migration queued, action_id: ' . $action_id );
+
+				return array(
+					'queued'      => true,
+					'migrationId' => $migration_id,
+					'progress'    => $this->progress_manager->get_progress_data(),
+					'steps'       => $this->progress_manager->get_steps_state(),
+				);
+			}
 
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),

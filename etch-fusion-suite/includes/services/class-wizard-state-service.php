@@ -207,6 +207,10 @@ class EFS_Wizard_State_Service {
 			$merged['batch_size'] = $incoming['batch_size'];
 		}
 
+		if ( array_key_exists( 'mode', $incoming ) ) {
+			$merged['mode'] = in_array( $incoming['mode'], array( 'browser', 'headless' ), true ) ? $incoming['mode'] : 'browser';
+		}
+
 		return $this->normalize_state( $merged );
 	}
 
@@ -243,6 +247,10 @@ class EFS_Wizard_State_Service {
 			$batch_size = 500;
 		}
 
+		$mode = isset( $state['mode'] ) && in_array( $state['mode'], array( 'browser', 'headless' ), true )
+			? $state['mode']
+			: 'browser';
+
 		$normalized['current_step']        = $current_step;
 		$normalized['migration_url']       = $migration_url;
 		$normalized['migration_key']       = $migration_key;
@@ -252,6 +260,7 @@ class EFS_Wizard_State_Service {
 		$normalized['post_type_mappings']  = $mappings;
 		$normalized['include_media']       = $include_media;
 		$normalized['batch_size']          = $batch_size;
+		$normalized['mode']                = $mode;
 
 		return $normalized;
 	}
@@ -272,6 +281,7 @@ class EFS_Wizard_State_Service {
 			'post_type_mappings'  => array(),
 			'include_media'       => true,
 			'batch_size'          => 50,
+			'mode'                => 'browser',
 		);
 	}
 

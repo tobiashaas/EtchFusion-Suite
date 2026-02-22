@@ -44,6 +44,8 @@ const defaultState = () => ({
 	progressMinimized: false,
 	preflight: null,
 	preflightConfirmed: false,
+	mode: 'browser',
+	actionSchedulerId: null,
 });
 
 const humanize = (value) => String(value || '')
@@ -148,6 +150,12 @@ const createWizard = (root) => {
 		preflightOverride: root.querySelector('[data-efs-preflight-override]'),
 		preflightConfirm: root.querySelector('[data-efs-preflight-confirm]'),
 		preflightRecheck: root.querySelector('[data-efs-preflight-recheck]'),
+		modeRadios: Array.from(root.querySelectorAll('[data-efs-mode-radio]')),
+		cronIndicator: root.querySelector('[data-efs-cron-indicator]'),
+		headlessScreen: root.querySelector('[data-efs-headless-screen]'),
+		headlessProgressFill: root.querySelector('[data-efs-headless-progress-fill]'),
+		headlessProgressPercent: root.querySelector('[data-efs-headless-progress-percent]'),
+		cancelHeadlessButton: root.querySelector('[data-efs-cancel-headless]'),
 	};
 
 	const wizardNonce = root.getAttribute('data-efs-state-nonce') || window.efsData?.nonce || '';
@@ -254,6 +262,33 @@ const createWizard = (root) => {
 		}
 
 		updateNavigationState();
+
+		// Initialize headless radio disabled state based on WP Cron preflight result.
+		const wpCronResult = result.checks?.find((c) => c.id === 'wp_cron');
+		const headlessRadio = refs.modeRadios.find((r) => r instanceof HTMLInputElement && r.value === 'headless');
+		if (headlessRadio) {
+			if (wpCronResult && wpCronResult.status !== 'ok') {
+				headlessRadio.disabled = true;
+				if (state.mode === 'headless') {
+					state.mode = 'browser';
+					refs.modeRadios.forEach((r) => {
+						if (r instanceof HTMLInputElement) {
+							r.checked = r.value === 'browser';
+						}
+						const modeLabel = r?.closest('[data-efs-mode-option]');
+						if (modeLabel) {
+							modeLabel.classList.toggle('efs-mode-option--selected', r instanceof HTMLInputElement && r.value === 'browser');
+						}
+					});
+				}
+				if (refs.cronIndicator) {
+					refs.cronIndicator.hidden = false;
+					refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
+				}
+			} else {
+				headlessRadio.disabled = false;
+			}
+		}
 	};
 
 	const runPreflightCheck = async (targetUrl = '', mode = 'browser') => {
@@ -391,6 +426,7 @@ const createWizard = (root) => {
 					include_media: state.includeMedia,
 					restrict_css_to_used: state.restrictCssToUsed,
 					batch_size: state.batchSize,
+					mode: state.mode || 'browser',
 				}),
 			});
 		} catch (error) {
@@ -864,6 +900,16 @@ const createWizard = (root) => {
 				return `<li class="efs-migration-step ${statusClass}">${label}</li>`;
 			}).join('');
 		}
+
+		// When headless screen is visible, also sync its progress indicators.
+		if (state.mode === 'headless' && refs.headlessScreen && !refs.headlessScreen.hidden) {
+			if (refs.headlessProgressFill) {
+				refs.headlessProgressFill.style.width = `${Math.max(0, Math.min(percentage, 100))}%`;
+			}
+			if (refs.headlessProgressPercent) {
+				refs.headlessProgressPercent.textContent = `${Math.round(percentage)}%`;
+			}
+		}
 	};
 
 	const showResult = (type, subtitle) => {
@@ -1102,6 +1148,12 @@ const createWizard = (root) => {
 				runtime.lastPollTime = performance.now();
 
 				state.migrationId = payload?.migrationId || migrationId;
+
+				// Keep action_scheduler_id up to date for cancel support.
+				if (payload?.progress?.action_scheduler_id) {
+					state.actionSchedulerId = payload.progress.action_scheduler_id;
+				}
+
 				renderProgress(payload);
 
 				const status = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
@@ -1151,7 +1203,8 @@ const createWizard = (root) => {
 				}
 
 				// Background phase complete: switch to JS-driven batch loop (media or posts).
-				if ((currentStep === 'media' || currentStep === 'posts') && status === 'running') {
+				// In headless mode the server handles batching — keep polling instead.
+				if ((currentStep === 'media' || currentStep === 'posts') && status === 'running' && state.mode !== 'headless') {
 					stopPolling();
 					await runBatchLoop(migrationId);
 					return;
@@ -1368,12 +1421,19 @@ const createWizard = (root) => {
 				post_type_mappings: state.postTypeMappings,
 				include_media: state.includeMedia ? '1' : '0',
 				restrict_css_to_used: state.restrictCssToUsed ? '1' : '0',
+				mode: state.mode || 'browser',
 			});
 
 			state.migrationId = payload?.migrationId ?? payload?.migration_id ?? '';
 			if (!state.migrationId) {
 				throw new Error('Migration did not return an ID.');
 			}
+
+			// Store action scheduler ID if returned in progress data.
+			if (payload?.progress?.action_scheduler_id) {
+				state.actionSchedulerId = payload.progress.action_scheduler_id;
+			}
+
 			const totalItems = getDiscoveryPostTypes(state.discoveryData)
 				.filter((pt) => state.selectedPostTypes.includes(pt.slug))
 				.reduce((sum, pt) => sum + pt.count, 0);
@@ -1381,7 +1441,6 @@ const createWizard = (root) => {
 			runtime.lastProcessedCount = undefined;
 			runtime.lastPollTime = undefined;
 
-			reopenProgress();
 			await setStep(4);
 			if (refs.progressTakeover) {
 				if (refs.progressTakeover.parentNode !== document.body) {
@@ -1389,6 +1448,26 @@ const createWizard = (root) => {
 				}
 				refs.progressTakeover.hidden = false;
 			}
+
+			// Headless mode: show headless screen instead of browser progress panel.
+			if (payload?.queued === true && state.mode === 'headless') {
+				if (refs.headlessScreen) {
+					refs.headlessScreen.hidden = false;
+				}
+				const pct = Number(payload?.progress?.percentage || 0);
+				if (refs.headlessProgressFill) {
+					refs.headlessProgressFill.style.width = `${pct}%`;
+				}
+				if (refs.headlessProgressPercent) {
+					refs.headlessProgressPercent.textContent = `${Math.round(pct)}%`;
+				}
+				await saveWizardState();
+				// Keep polling while the browser is open so the UI stays updated.
+				startPolling(state.migrationId);
+				return;
+			}
+
+			reopenProgress();
 			renderProgress(payload);
 			await saveWizardState();
 			startPolling(state.migrationId);
@@ -1411,6 +1490,22 @@ const createWizard = (root) => {
 		runtime.progressChip = null;
 
 		Object.assign(state, defaultState());
+
+		// Reset headless-specific state.
+		state.mode = 'browser';
+		state.actionSchedulerId = null;
+		refs.modeRadios.forEach((radio) => {
+			if (radio instanceof HTMLInputElement) {
+				radio.checked = radio.value === 'browser';
+				radio.disabled = false;
+			}
+		});
+		if (refs.headlessScreen) {
+			refs.headlessScreen.hidden = true;
+		}
+		if (refs.cronIndicator) {
+			refs.cronIndicator.hidden = true;
+		}
 
 		if (refs.urlInput) {
 			refs.urlInput.value = '';
@@ -1657,6 +1752,94 @@ const createWizard = (root) => {
 
 		refs.openLogsButton?.addEventListener('click', openLogsTab);
 		refs.startNewButton?.addEventListener('click', resetWizard);
+
+		// Mode radio buttons.
+		refs.modeRadios.forEach((radio) => {
+			radio?.addEventListener('change', async () => {
+				if (!(radio instanceof HTMLInputElement) || !radio.checked) {
+					return;
+				}
+				const newMode = radio.value === 'headless' ? 'headless' : 'browser';
+
+				// Prevent selecting headless when WP Cron is unavailable.
+				if (newMode === 'headless') {
+					const wpCronCheck = state.preflight?.checks?.find((c) => c.id === 'wp_cron');
+					if (wpCronCheck && wpCronCheck.status !== 'ok') {
+						// Revert selection to browser.
+						state.mode = 'browser';
+						refs.modeRadios.forEach((r) => {
+							if (r instanceof HTMLInputElement) {
+								r.checked = r.value === 'browser';
+							}
+							const modeLabel = r?.closest('[data-efs-mode-option]');
+							if (modeLabel) {
+								modeLabel.classList.toggle('efs-mode-option--selected', r instanceof HTMLInputElement && r.value === 'browser');
+							}
+						});
+						if (refs.cronIndicator) {
+							refs.cronIndicator.hidden = false;
+							refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
+						}
+						radio.disabled = true;
+						updateNavigationState();
+						await saveWizardState();
+						return;
+					}
+				}
+
+				state.mode = newMode;
+
+				// Update label selected state.
+				refs.modeRadios.forEach((r) => {
+					const label = r?.closest('[data-efs-mode-option]');
+					if (label) {
+						label.classList.toggle('efs-mode-option--selected', r === radio);
+					}
+				});
+
+				// Update WP Cron indicator for headless option.
+				if (refs.cronIndicator) {
+					if (newMode === 'headless') {
+						const wpCronCheck = state.preflight?.checks?.find((c) => c.id === 'wp_cron');
+						if (wpCronCheck) {
+							refs.cronIndicator.hidden = false;
+							if (wpCronCheck.status === 'ok') {
+								refs.cronIndicator.textContent = '\u2705 WP Cron active';
+							} else {
+								refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
+								radio.disabled = true;
+							}
+						} else {
+							refs.cronIndicator.hidden = true;
+						}
+					} else {
+						refs.cronIndicator.hidden = true;
+					}
+				}
+
+				updateNavigationState();
+				await saveWizardState();
+			});
+		});
+
+		// Cancel headless job button.
+		refs.cancelHeadlessButton?.addEventListener('click', async () => {
+			try {
+				const migrationId = state.migrationId || '';
+				await post(ACTION_CANCEL_MIGRATION, { migration_id: migrationId });
+				await post('efs_cancel_headless_job', {
+					action_scheduler_id: state.actionSchedulerId || 0,
+					migration_id: migrationId,
+				});
+				showToast('Headless migration cancelled.', 'info');
+			} catch (error) {
+				showToast(error?.message || 'Unable to cancel migration.', 'error');
+			}
+			await resetWizard();
+		});
+
+		// View logs button in headless screen.
+		root.querySelector('[data-efs-view-logs]')?.addEventListener('click', openLogsTab);
 	};
 
 	const restoreState = async () => {
@@ -1692,6 +1875,16 @@ const createWizard = (root) => {
 				refs.restrictCssToUsed.checked = state.restrictCssToUsed;
 			}
 			state.batchSize = Number(saved.batch_size || state.batchSize);
+
+			if (saved.mode && ['browser', 'headless'].includes(saved.mode)) {
+				state.mode = saved.mode;
+			}
+			// Sync radio buttons to restored mode.
+			refs.modeRadios.forEach((radio) => {
+				if (radio instanceof HTMLInputElement) {
+					radio.checked = radio.value === state.mode;
+				}
+			});
 
 			if (refs.urlInput && state.migrationUrl) {
 				refs.urlInput.value = state.migrationUrl;
@@ -1780,6 +1973,19 @@ const createWizard = (root) => {
 				refs.progressTakeover.hidden = false;
 			}
 			renderProgress(payload);
+
+			// Headless mode: show headless screen and poll-only (no batch loop).
+			if ((payload?.progress?.mode === 'headless') || (pollStatus === 'queued')) {
+				state.mode = 'headless';
+				if (payload?.progress?.action_scheduler_id) {
+					state.actionSchedulerId = payload.progress.action_scheduler_id;
+				}
+				if (refs.headlessScreen) {
+					refs.headlessScreen.hidden = false;
+				}
+				startPolling(state.migrationId);
+				return true;
+			}
 
 			// If the background phase already completed (checkpoint saved) and the JS batch
 			// loop should take over, start it directly instead of waiting for one polling round-trip.

@@ -405,6 +405,11 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			$payload['batch_size'] = (int) $batch_size;
 		}
 
+		$mode = $this->get_post( 'mode', null, 'text' );
+		if ( null !== $mode && in_array( $mode, array( 'browser', 'headless' ), true ) ) {
+			$payload['mode'] = $mode;
+		}
+
 		return $payload;
 	}
 
