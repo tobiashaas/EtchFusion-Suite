@@ -150,7 +150,8 @@ class EFS_Migration_Starter {
 					'options'       => $options,
 				)
 			);
-			$this->migration_logger->log( $migration_id, 'info', 'Migration started', [ 'mode' => 'browser', 'options' => $options ] );
+			$selected_post_types_log = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+			$this->migration_logger->log( $migration_id, 'info', 'Migration started, mode: browser, post_types: ' . implode( ', ', $selected_post_types_log ) );
 
 			$this->progress_manager->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
 			$validation_result = $this->plugin_detector->validate_migration_requirements();
@@ -359,7 +360,8 @@ class EFS_Migration_Starter {
 					'options'       => $options,
 				)
 			);
-			$this->migration_logger->log( $migration_id, 'info', 'Migration started', [ 'mode' => 'async', 'options' => $options ] );
+			$selected_post_types_async = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
+			$this->migration_logger->log( $migration_id, 'info', 'Migration started, mode: async, post_types: ' . implode( ', ', $selected_post_types_async ) );
 
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),

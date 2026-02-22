@@ -277,7 +277,7 @@ class EFS_Async_Migration_Runner {
 				basename( $exception->getFile() ),
 				$exception->getLine()
 			);
-			$this->migration_logger->log( $migration_id, 'error', $error_message, [ 'migration_id' => $migration_id ] );
+			$this->migration_logger->log( $migration_id, 'error', $exception->getMessage() );
 			$this->error_handler->log_error(
 				'E201',
 				array(

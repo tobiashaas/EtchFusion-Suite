@@ -35,13 +35,13 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	/**
 	 * Constructor
 	 *
-	 * @param EFS_Migration_Logger|null                                               $migration_logger          Migration logger instance (optional).
 	 * @param EFS_Audit_Logger|null                                                   $audit_logger              Audit logger instance.
 	 * @param \Bricks2Etch\Repositories\EFS_Migration_Runs_Repository|null           $migration_runs_repository Migration runs repository (optional).
 	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null                            $rate_limiter              Rate limiter instance (optional).
 	 * @param \Bricks2Etch\Security\EFS_Input_Validator|null                         $input_validator           Input validator instance (optional).
+	 * @param EFS_Migration_Logger|null                                               $migration_logger          Migration logger instance (optional).
 	 */
-	public function __construct( ?EFS_Migration_Logger $migration_logger = null, ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null ) {
+	public function __construct( ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null, ?EFS_Migration_Logger $migration_logger = null ) {
 		$this->migration_logger          = $migration_logger;
 		$this->audit_logger              = $audit_logger;
 		$this->migration_runs_repository = $migration_runs_repository;
@@ -123,38 +123,34 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		$migration_id = $this->get_post( 'migration_id', '', 'text' );
+		if ( '' === $migration_id ) {
+			wp_send_json_error( array( 'message' => 'Missing migration_id', 'code' => 'missing_param' ), 400 );
+			return;
+		}
 
-		if ( '' === $migration_id || null === $this->migration_logger ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Migration ID is required.', 'etch-fusion-suite' ),
-					'code'    => 'missing_migration_id',
-				),
-				400
-			);
+		if ( null === $this->migration_logger ) {
+			wp_send_json_error( array( 'message' => 'Logger service unavailable', 'code' => 'service_unavailable' ), 503 );
 			return;
 		}
 
 		$log_path = $this->migration_logger->get_log_path( $migration_id );
 
 		if ( ! file_exists( $log_path ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Log not found.', 'etch-fusion-suite' ),
-					'code'    => 'log_not_found',
-				),
-				404
-			);
+			wp_send_json_error( array( 'message' => 'Log file not found', 'code' => 'not_found' ), 404 );
 			return;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$content = file_get_contents( $log_path );
+		if ( false === $content ) {
+			wp_send_json_error( array( 'message' => 'Failed to read log file', 'code' => 'read_error' ), 500 );
+			return;
+		}
 
 		wp_send_json_success(
 			array(
 				'content' => $content,
-				'url'     => $this->migration_logger->get_log_url( $migration_id ),
+				'log_url' => $this->migration_logger->get_log_url( $migration_id ),
 			)
 		);
 	}
