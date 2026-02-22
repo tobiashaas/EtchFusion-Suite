@@ -99,6 +99,7 @@ class EFS_Migration_Manager {
 			$error_handler,
 			$content_service
 		);
+		$migration_logger = new \Bricks2Etch\Services\EFS_Migration_Logger();
 		$async_runner     = new \Bricks2Etch\Services\EFS_Async_Migration_Runner(
 			$migrator_executor,
 			$progress_manager,
@@ -110,27 +111,16 @@ class EFS_Migration_Manager {
 			$api_client,
 			$migration_repository,
 			$error_handler,
-			$plugin_detector
-		);
-		$starter          = new \Bricks2Etch\Services\EFS_Migration_Starter(
-			$token_manager,
-			$progress_manager,
-			$run_finalizer,
-			$migrator_executor,
-			$css_service,
-			$media_service,
-			$content_service,
-			$api_client,
-			$error_handler,
 			$plugin_detector,
-			$migration_repository
+			$migration_logger
 		);
 		$batch_phase_runner = new \Bricks2Etch\Services\EFS_Batch_Phase_Runner(
 			$error_handler,
 			$run_finalizer,
 			$progress_manager,
 			$migration_repository,
-			$api_client
+			$api_client,
+			$migration_logger
 		);
 		$media_phase_handler = new EFS_Media_Phase_Handler( $media_service, $error_handler );
 		$posts_phase_handler = new EFS_Posts_Phase_Handler( $content_service, $error_handler );
@@ -143,6 +133,28 @@ class EFS_Migration_Manager {
 			null,
 			null,
 			$batch_phase_runner
+		);
+		$headless_job     = new \Bricks2Etch\Services\EFS_Headless_Migration_Job(
+			$async_runner,
+			$batch_processor,
+			$progress_manager,
+			$migration_logger,
+			$migration_repository
+		);
+		$starter          = new \Bricks2Etch\Services\EFS_Migration_Starter(
+			$token_manager,
+			$progress_manager,
+			$run_finalizer,
+			$migrator_executor,
+			$css_service,
+			$media_service,
+			$content_service,
+			$api_client,
+			$error_handler,
+			$plugin_detector,
+			$migration_repository,
+			$migration_logger,
+			$headless_job
 		);
 		$orchestrator     = new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
 			$starter,

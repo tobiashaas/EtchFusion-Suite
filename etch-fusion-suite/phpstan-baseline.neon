@@ -151,24 +151,6 @@ parameters:
 			path: includes/gutenberg_generator.php
 
 		-
-			message: '#^Class Bricks2Etch\\Services\\EFS_Async_Migration_Runner constructor invoked with 11 parameters, 12 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/migration_manager.php
-
-		-
-			message: '#^Class Bricks2Etch\\Services\\EFS_Batch_Phase_Runner constructor invoked with 5 parameters, 6 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/migration_manager.php
-
-		-
-			message: '#^Class Bricks2Etch\\Services\\EFS_Migration_Starter constructor invoked with 11 parameters, 13 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/migration_manager.php
-
-		-
 			message: '#^Call to static method decode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
 			identifier: class.notFound
 			count: 1
