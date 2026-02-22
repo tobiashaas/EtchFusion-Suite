@@ -9,6 +9,11 @@
 namespace Bricks2Etch\Core;
 
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\SignatureInvalidException;
+use Firebase\JWT\BeforeValidException;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -402,22 +407,7 @@ class EFS_Migration_Token_Manager {
 	 * @return string
 	 */
 	private function encode_jwt( array $payload ) {
-		$header = array(
-			'alg' => 'HS256',
-			'typ' => 'JWT',
-		);
-
-		$segments = array(
-			$this->base64url_encode( wp_json_encode( $header ) ),
-			$this->base64url_encode( wp_json_encode( $payload ) ),
-		);
-
-		$signing_input = implode( '.', $segments );
-		$signature     = hash_hmac( 'sha256', $signing_input, $this->get_secret_key(), true );
-
-		$segments[] = $this->base64url_encode( $signature );
-
-		return implode( '.', $segments );
+		return JWT::encode( $payload, $this->get_secret_key(), 'HS256' );
 	}
 
 	/**
@@ -431,38 +421,24 @@ class EFS_Migration_Token_Manager {
 			return new \WP_Error( 'invalid_token', 'Token is empty.' );
 		}
 
-		$parts = explode( '.', $token );
-
-		if ( 3 !== count( $parts ) ) {
+		try {
+			$decoded       = JWT::decode( $token, new Key( $this->get_secret_key(), 'HS256' ) );
+			$payload_array = (array) $decoded;
+			return array(
+				'header'  => array( 'alg' => 'HS256', 'typ' => 'JWT' ),
+				'payload' => $payload_array,
+			);
+		} catch ( ExpiredException $e ) {
+			return new \WP_Error( 'token_expired', 'Migration token has expired.' );
+		} catch ( SignatureInvalidException $e ) {
+			return new \WP_Error( 'token_invalid', 'Token signature mismatch.' );
+		} catch ( BeforeValidException $e ) {
+			return new \WP_Error( 'token_invalid', 'Token is not yet valid.' );
+		} catch ( \UnexpectedValueException $e ) {
 			return new \WP_Error( 'invalid_token', 'Malformed token provided.' );
+		} catch ( \Exception $e ) {
+			return new \WP_Error( 'token_decode_failed', $e->getMessage() );
 		}
-
-		list( $encoded_header, $encoded_payload, $encoded_signature ) = $parts;
-
-		$header = json_decode( $this->base64url_decode( $encoded_header ) ?? '', true );
-
-		if ( ! is_array( $header ) || ( $header['alg'] ?? '' ) !== 'HS256' ) {
-			return new \WP_Error( 'invalid_token', 'Unsupported token algorithm.' );
-		}
-
-		$payload_json = $this->base64url_decode( $encoded_payload );
-		$payload      = json_decode( $payload_json ?? '', true );
-
-		if ( ! is_array( $payload ) ) {
-			return new \WP_Error( 'invalid_token', 'Invalid token payload.' );
-		}
-
-		$signature          = $this->base64url_decode( $encoded_signature );
-		$expected_signature = hash_hmac( 'sha256', $encoded_header . '.' . $encoded_payload, $this->get_secret_key(), true );
-
-		if ( ! $signature || ! hash_equals( $expected_signature, $signature ) ) {
-			return new \WP_Error( 'invalid_token', 'Token signature mismatch.' );
-		}
-
-		return array(
-			'header'  => $header,
-			'payload' => $payload,
-		);
 	}
 
 	/**
@@ -484,8 +460,8 @@ class EFS_Migration_Token_Manager {
 
 		list( $encoded_header, $encoded_payload ) = $parts;
 
-		$header_json  = $this->base64url_decode( $encoded_header );
-		$payload_json = $this->base64url_decode( $encoded_payload );
+		$header_json  = JWT::urlsafeB64Decode( $encoded_header );
+		$payload_json = JWT::urlsafeB64Decode( $encoded_payload );
 		$header       = is_string( $header_json ) ? json_decode( $header_json, true ) : null;
 		$payload      = is_string( $payload_json ) ? json_decode( $payload_json, true ) : null;
 
@@ -515,35 +491,4 @@ class EFS_Migration_Token_Manager {
 		return $secret;
 	}
 
-	/**
-	 * Perform base64url encoding
-	 *
-	 * @param string $data Raw data
-	 * @return string
-	 */
-	private function base64url_encode( $data ) {
-		return rtrim( strtr( base64_encode( $data ), '+/', '-_' ), '=' );
-	}
-
-	/**
-	 * Perform base64url decoding
-	 *
-	 * @param string $data Base64url encoded string
-	 * @return string|null
-	 */
-	private function base64url_decode( $data ) {
-		if ( ! is_string( $data ) ) {
-			return null;
-		}
-
-		$remainder = strlen( $data ) % 4;
-
-		if ( $remainder > 0 ) {
-			$data .= str_repeat( '=', 4 - $remainder );
-		}
-
-		$decoded = base64_decode( strtr( $data, '-_', '+/' ) );
-
-		return false === $decoded ? null : $decoded;
-	}
 }

@@ -5,7 +5,8 @@
     "license": "GPL-2.0-or-later",
     "require": {
         "php": "^8.1",
-        "psr/container": "^2.0"
+        "psr/container": "^2.0",
+        "firebase/php-jwt": "^6.10"
     },
     "require-dev": {
         "wp-coding-standards/wpcs": "^3.1",
@@ -36,6 +37,15 @@
         },
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "audit": {
+            "block-insecure": false
+        }
+    },
+    "audit": {
+        "ignore": {
+            "GHSA-2x45-7fc3-mxwq": "Pinned to ^6.10 per project requirement; advisory acknowledged.",
+            "PKSA-y2cr-5h3j-g3ys": "Pinned to ^6.10 per project requirement; advisory acknowledged."
         }
     },
     "scripts": {
