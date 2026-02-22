@@ -1,0 +1,35 @@
+<!-- wp:etch/element {"metadata":{"name":"Hero Cali"},"tag":"section","attributes":{"data-etch-element":"section","class":"hero-cali bg--ultra-dark"},"styles":["etch-section-style","5a503a3","4c85c87"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Intro Foxtrot"},"tag":"div","attributes":{"data-etch-element":"container","class":"intro-foxtrot"},"styles":["etch-container-style","5a4acb4"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h1","attributes":{"class":"intro-foxtrot__heading hero-cali__heading"},"styles":["5a4acb7","5a50440"]} -->
+<!-- wp:etch/text {"content":"Discover the Golden State's Hidden Treasures"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading intro-foxtrot__accent-heading"},"styles":["5a338ac","5a4acb9"]} -->
+<!-- wp:etch/text {"content":"Accent Heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"intro-foxtrot__lede lede text--l"},"styles":["5a4acba"]} -->
+<!-- wp:etch/text {"content":"Beyond the iconic landmarks lies a California few travelers ever experience. From hidden redwood groves to desert oases, the Golden State harbors extraordinary treasures waiting for those willing to venture off the beaten path."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"CTA Links Bravo"},"tag":"div","attributes":{"class":"cta-links-bravo"},"styles":["5a3ce87"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Primary Action"},"tag":"a","attributes":{"href":"#","class":"btn--primary btn--primary"},"styles":["5a30b3e"]} -->
+<!-- wp:etch/text {"content":"Primary action"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Secondary Action"},"tag":"p","attributes":{"class":"cta-links-bravo__link btn--outline"},"styles":["5a3ce8a","5a30b3c"]} -->
+<!-- wp:etch/text {"content":"Secondary action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- MIGRATION NOTE: This frame is very media heavy. It's best for sites that have a lot of imagery. Using too few images will break the visual effect.Note:It's recommended to create a folder with something like Happy Files and loop through the folder using a query loop. You can find the looper element in the Background Wrapper.Can you use manual images?Yes, but it'll be very tedious to insert all of them and manage them. But yes, it's possible..is-bg class is not workingMake sure you have enabled the "Background Color" Classes in ACSS -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Background Wrapper"},"tag":"div","attributes":{"class":"hero-cali__bg-wrapper is-bg"},"styles":["5a503a7","5a503fb"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Background"},"tag":"div","attributes":{"class":"hero-cali__bg"},"styles":["5a503bf"]} -->
+<!-- wp:etch/loop {"loopId":"looper_7d804af2","itemId":"item"} -->
+<!-- wp:etch/element {"metadata":{"name":"Looper"},"tag":"div","attributes":{"class":"hero-cali__looper"},"styles":["5a50416"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"hero-cali__bg-image"},"styles":["5a503df"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"{item.image.id}"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/loop -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

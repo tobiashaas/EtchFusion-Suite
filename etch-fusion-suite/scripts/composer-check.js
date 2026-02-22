@@ -8,26 +8,19 @@
 const { spawn } = require('child_process');
 const { join } = require('path');
 
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 const AUTOLOAD_PATH = 'wp-content/plugins/etch-fusion-suite/vendor/autoload.php';
 const ENVS = ['cli', 'tests-cli'];
-
-function getWpEnvPath() {
-  if (process.platform !== 'win32') return WP_ENV_CMD;
-  const local = join(__dirname, '..', 'node_modules', '.bin', 'wp-env.cmd');
-  const fs = require('fs');
-  return fs.existsSync(local) ? local : WP_ENV_CMD;
-}
-
 function runCommandQuiet(command, args) {
   return new Promise((resolve, reject) => {
-    let child;
-    if (process.platform === 'win32' && (command === WP_ENV_CMD || command.endsWith('wp-env.cmd'))) {
-      const cmdLine = [command, ...args].map((a) => (/[\s"&|<>^]/.test(a) ? `"${String(a).replace(/"/g, '""')}"` : a)).join(' ');
-      child = spawn(cmdLine, [], { stdio: 'pipe', shell: true });
-    } else {
-      child = spawn(command, args, { stdio: 'pipe' });
-    }
+    const isWpEnv = command === 'wp-env' || command.endsWith('wp-env.cmd');
+    const isWin = process.platform === 'win32';
+    const child = isWpEnv
+      ? spawn(
+          isWin ? 'cmd' : 'npx',
+          isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+          { stdio: 'pipe', cwd: join(__dirname, '..') }
+        )
+      : spawn(command, args, { stdio: 'pipe' });
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (d) => { stdout += d.toString(); });
@@ -40,9 +33,8 @@ function runCommandQuiet(command, args) {
 async function main() {
   console.log('Composer vendor/autoload.php check (cli, tests-cli)\n');
   let anyFail = false;
-  const wpEnv = getWpEnvPath();
   for (const env of ENVS) {
-    const result = await runCommandQuiet(wpEnv, [
+    const result = await runCommandQuiet('wp-env', [
       'run',
       env,
       'test',

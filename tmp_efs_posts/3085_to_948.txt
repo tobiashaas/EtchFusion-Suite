@@ -1,0 +1,19 @@
+<!-- wp:etch/element {"metadata":{"name":"Hero November"},"tag":"section","attributes":{"data-etch-element":"section","class":"hero-november"},"styles":["etch-section-style","5a3c235"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Inner"},"tag":"div","attributes":{"data-etch-element":"container","class":"hero-november__inner"},"styles":["etch-container-style","5a3c219"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"hero-november__content"},"styles":["5a3c1ec"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h1","attributes":{"class":"hero-november__heading"},"styles":["5a3c1b9"]} -->
+<!-- wp:etch/text {"content":"This is just a placeholder headline designed to overlap the main image"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"hero-november__lede"},"styles":["5a3c1bb"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Media"},"tag":"div","attributes":{"class":"hero-november__media-wrapper"},"styles":["5a3c268"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"hero-november__media"},"styles":["5a3c294"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Horizontal-Small.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

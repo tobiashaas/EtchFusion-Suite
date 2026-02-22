@@ -53,21 +53,19 @@ async function main() {
     // In CI/CD, just check if containers are running and exit quickly
     try {
       const { spawn } = require('child_process');
-      const dockerCheck = spawn('docker', ['ps', '|', 'grep', 'wordpress'], { 
-        stdio: 'pipe',
-        shell: true 
-      });
-      
+      const dockerCheck = spawn('docker', ['ps'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '';
+      dockerCheck.stdout?.on('data', (d) => { stdout += d.toString(); });
       dockerCheck.on('close', (code) => {
-        if (code === 0) {
+        const running = code === 0 && /wordpress/i.test(stdout);
+        if (running) {
           console.log('✅ WordPress containers are running in CI/CD');
           console.log('⚠️ Skipping readiness check for CI/CD efficiency');
-          process.exit(0);
         } else {
           console.log('❌ WordPress containers not running');
           console.log('⚠️ Continuing without WordPress (CI/CD mode)');
-          process.exit(0);
         }
+        process.exit(0);
       });
       
       return;

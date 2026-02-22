@@ -1,0 +1,15 @@
+<!-- wp:etch/element {"metadata":{"name":"Testimonial Section Golf"},"tag":"section","attributes":{"data-etch-element":"section","class":"testimonial-section-golf"},"styles":["etch-section-style","5a3bd58"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Inner"},"tag":"div","attributes":{"data-etch-element":"container","class":"testimonial-section-golf__inner"},"styles":["etch-container-style","5a3be00"]} -->
+<!-- wp:etch/raw-html {"metadata":{"name":"Testimonial Slider Golf"},"content":"","unsafe":false} -->
+<!-- /wp:etch/raw-html -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Background Alpha (Read CSS Tab)"},"tag":"div","attributes":{"class":"background-alpha"},"styles":["5a40041"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"background-alpha__image"},"styles":["5a40065"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Horizontal-Big.svg","alt":"","style":"object-fit: cover; inline-size: 100%; block-size: 100%;"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"background-alpha__overlay"},"styles":["5a40085"]} -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

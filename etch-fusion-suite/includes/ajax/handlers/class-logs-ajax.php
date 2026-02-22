@@ -78,9 +78,9 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$this->audit_logger->log_security_event( 'logs_cleared', 'critical', 'Audit log cleared from admin interface', array() );
 
-		$result = $this->audit_logger->clear_security_logs();
+		$security_cleared = $this->audit_logger->clear_security_logs();
 
-		if ( ! $result ) {
+		if ( ! $security_cleared ) {
 			wp_send_json_error(
 				array(
 					'message' => __( 'Failed to clear audit logs.', 'etch-fusion-suite' ),
@@ -89,6 +89,10 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				500
 			);
 			return;
+		}
+
+		if ( $this->migration_runs_repository ) {
+			$this->migration_runs_repository->clear_runs();
 		}
 
 		wp_send_json_success(
@@ -122,6 +126,14 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		$this->audit_logger->log_security_event( 'logs_accessed', 'low', 'Audit log viewed in admin', array() );
 
 		$logs            = $this->audit_logger->get_security_logs();
+		$logs            = array_values(
+			array_filter(
+				$logs,
+				static function ( $entry ) {
+					return ( $entry['event_type'] ?? '' ) !== 'logs_accessed';
+				}
+			)
+		);
 		$migration_runs  = $this->migration_runs_repository ? $this->migration_runs_repository->get_runs( 50 ) : array();
 
 		wp_send_json_success(

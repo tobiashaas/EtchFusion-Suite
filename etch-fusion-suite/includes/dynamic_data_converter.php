@@ -27,10 +27,10 @@ class EFS_Dynamic_Data_Converter {
 	private $mapping = array(
 		// Post data
 		'post_title'        => 'this.title',
-		'post_content'      => 'this.content',
+		'post_content'      => 'this.content.stripTags()',
 		'post_excerpt'      => 'this.excerpt',
-		'post_date'         => 'this.date',
-		'post_modified'     => 'this.modified',
+		'post_date'         => "this.date.dateFormat('F j, Y')",
+		'post_modified'     => "this.modified.dateFormat('F j, Y')",
 		'post_author'       => 'this.author.name',
 		'post_id'           => 'this.id',
 		'post_slug'         => 'this.slug',
@@ -136,9 +136,8 @@ class EFS_Dynamic_Data_Converter {
 				: 'item';
 			$converted  = $this->replace_dynamic_root_in_expressions( $converted, 'this', $loop_alias );
 
-			if ( isset( $context['loop_query'] ) && $this->is_attachment_loop_query( $context['loop_query'] ) ) {
-				$converted = str_replace( '{' . $loop_alias . '.image.id}', '{' . $loop_alias . '.id}', $converted );
-			}
+			// Note: for attachment loops {item.image.id} is kept as-is — Etch resolves
+		// it correctly for both post loops and attachment loops.
 		}
 
 		// Log unconverted tags
@@ -237,7 +236,7 @@ class EFS_Dynamic_Data_Converter {
 	 * Convert basic dynamic data tags
 	 */
 	private function convert_basic_tags( $content ) {
-		// Convert basic dynamic data tags using simple string replacement
+		// Convert basic dynamic data tags using simple string replacement.
 		foreach ( $this->mapping as $bricks_tag => $etch_key ) {
 			$content = str_replace( '{' . $bricks_tag . '}', '{' . $etch_key . '}', $content );
 		}

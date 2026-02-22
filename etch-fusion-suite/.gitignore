@@ -30,3 +30,6 @@ local-backups/**
 
 # Local debug/test scripts (must never be deployed)
 test_*.php
+
+# Debug log artifacts
+debug-*.log

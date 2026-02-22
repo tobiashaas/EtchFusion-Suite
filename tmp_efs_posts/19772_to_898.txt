@@ -1,0 +1,45 @@
+<!-- wp:paragraph -->
+<p>This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Heading</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Traditionally our industry has used Lorem Ipsum, which is placeholder text written in Latin. Unfortunately, not everyone is familiar with Lorem Ipsum and that can lead to confusion. I can’t tell you how many times clients have asked me why their website is in another language!</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:image {"id":19277,"sizeSlug":"large","linkDestination":"none"} -->
+<figure class="wp-block-image size-large"><img src="https://bricks-frames.tobiashaas.dev/wp-content/uploads/fashion0000-1024x683.jpg" alt="" class="wp-image-19277"/></figure>
+<!-- /wp:image -->
+
+<!-- wp:list -->
+<ul><!-- wp:list-item -->
+<li>This is just a placeholder</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>We will change this out later</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>We’re using Website Ipsum</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>It’s just meant to fill space</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Until your content is ready</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>There are other placeholder text alternatives like Hipster Ipsum, Zombie Ipsum, Bacon Ipsum, and many more. While often hilarious, these placeholder passages can also lead to much of the same confusion.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>If you’re curious, this is Website Ipsum. It was specifically developed for the use on development websites. Other than being less confusing than other Ipsum’s, Website Ipsum is also formatted in patterns more similar to how real copy is formatted on the web today.</p>
+<!-- /wp:paragraph -->

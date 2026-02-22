@@ -466,6 +466,7 @@ class EFS_Media_Migrator {
 		if ( null === $api_client ) {
 			$api_client = new EFS_API_Client( $this->error_handler );
 		}
+
 		$result = $api_client->send_media_data( $target_url, $jwt_token, $media_payload );
 
 		if ( is_wp_error( $result ) ) {

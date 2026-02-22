@@ -3,29 +3,19 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { existsSync } = require('fs');
 
 const CWD = path.resolve(__dirname, '..');
 const FACTORY_PATH = path.resolve(CWD, 'includes/converters/class-element-factory.php');
 const BRICKS_META_KEY = '_bricks_page_content_2';
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 const SUPPORTED_ICON = 'OK';
 const UNSUPPORTED_ICON = 'NO';
-
-function getWpEnvPath() {
-  if (process.platform !== 'win32') return WP_ENV_CMD;
-  const local = path.join(CWD, 'node_modules', '.bin', 'wp-env.cmd');
-  return existsSync(local) ? local : WP_ENV_CMD;
-}
-
 function runWpEnv(args, allowFailure = false) {
-  const wpEnvPath = getWpEnvPath();
-  const spawnOptions = { encoding: 'utf8', cwd: CWD };
-  if (process.platform === 'win32') {
-    spawnOptions.shell = true;
-  }
-
-  const result = spawnSync(wpEnvPath, args, spawnOptions);
+  const isWin = process.platform === 'win32';
+  const result = spawnSync(
+    isWin ? 'cmd' : 'npx',
+    isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+    { encoding: 'utf8', cwd: CWD }
+  );
 
   if (result.error) {
     throw result.error;

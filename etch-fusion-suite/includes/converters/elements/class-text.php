@@ -121,13 +121,6 @@ class EFS_Element_Text extends EFS_Base_Element {
 			return $this->build_single_block_fallback( $html, $element );
 		}
 
-		// If DOM parsing truncated content (e.g. due to quotes or malformed HTML), use full HTML as single block.
-		$parsed_text_len = mb_strlen( wp_strip_all_tags( implode( ' ', $blocks ) ) );
-		$original_text_len = mb_strlen( wp_strip_all_tags( $html ) );
-		if ( $original_text_len > 0 && $parsed_text_len < (int) ( 0.8 * $original_text_len ) ) {
-			return $this->build_single_block_fallback( $html, $element );
-		}
-
 		$wrapper_style_ids = $this->get_style_ids( $element );
 		$wrapper_classes   = array_filter( preg_split( '/\s+/', trim( (string) $this->get_css_classes( $wrapper_style_ids ) ) ) );
 		$wrapper_classes[] = 'smart-spacing';
@@ -243,7 +236,12 @@ class EFS_Element_Text extends EFS_Base_Element {
 			return $this->generate_etch_element_block( $attrs );
 		}
 
-		return $this->generate_etch_element_block( $attrs, $this->generate_etch_text_block( $content ) );
+		// etch/text is plain-text only — use etch/raw-html when content contains markup.
+		$inner = $content !== strip_tags( $content )
+			? $this->generate_etch_raw_html_block( $content )
+			: $this->generate_etch_text_block( $content );
+
+		return $this->generate_etch_element_block( $attrs, $inner );
 	}
 
 	/**

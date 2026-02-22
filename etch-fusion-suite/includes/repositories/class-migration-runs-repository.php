@@ -78,6 +78,15 @@ class EFS_Migration_Runs_Repository {
 	}
 
 	/**
+	 * Delete all stored migration run records.
+	 *
+	 * @return bool True on success, false on failure.
+	 */
+	public function clear_runs(): bool {
+		return (bool) delete_option( self::OPTION_KEY );
+	}
+
+	/**
 	 * Filter runs to only those within the retention window.
 	 *
 	 * Records without timestamps are kept to avoid accidental data loss.

@@ -1,0 +1,466 @@
+<!-- wp:etch/element {"metadata":{"name":"Schedule Section Alpha"},"tag":"section","attributes":{"data-etch-element":"section","class":"schedule-section-alpha"},"styles":["etch-section-style","5a458c2"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Intro Charlie"},"tag":"div","attributes":{"data-etch-element":"container","class":"intro-charlie"},"styles":["etch-container-style","5a397ac"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Left"},"tag":"div","attributes":{"class":"intro-charlie__content-wrapper"},"styles":["5a3a8c4"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"intro-charlie__heading"},"styles":["5a397af"]} -->
+<!-- wp:etch/text {"content":"Section heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"intro-charlie__lede lede"},"styles":["5a397b1"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Sidebar"},"tag":"div","attributes":{"class":"intro-charlie__sidebar"},"styles":["5a3c78b"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"a","attributes":{"href":"#","class":"btn--outline btn--primary btn--primary"},"styles":["5a30b3c","5a30b3e"]} -->
+<!-- wp:etch/text {"content":"Call to action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Alpha"},"tag":"div","attributes":{"data-etch-element":"container","class":"schedule-alpha"},"styles":["etch-container-style","5a458a7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Inner"},"tag":"div","attributes":{"class":"schedule-alpha__inner"},"styles":["5a45b6e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Monday"},"tag":"div","attributes":{"data-schedule-column":"monday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Monday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Tuesday"},"tag":"div","attributes":{"data-schedule-column":"tuesday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Tuesday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Wednesday"},"tag":"div","attributes":{"data-schedule-column":"wednesday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Wednesday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Thursday"},"tag":"div","attributes":{"data-schedule-column":"thursday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Thursday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Friday"},"tag":"div","attributes":{"data-schedule-column":"friday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Friday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Saturday"},"tag":"div","attributes":{"data-schedule-column":"saturday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Saturday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Sunday"},"tag":"div","attributes":{"data-schedule-column":"sunday","class":"schedule-alpha__column-heading-wrapper"},"styles":["5a459dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Column Heading"},"tag":"span","attributes":{"class":"schedule-alpha__column-heading"},"styles":["5a459bb"]} -->
+<!-- wp:etch/text {"content":"Sunday"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"monday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Monday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/raw-html {"metadata":{"name":"Event Modal Alpha"},"content":"","unsafe":false} -->
+<!-- /wp:etch/raw-html -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"monday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Monday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"monday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Monday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"tuesday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Tuesday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"tuesday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Tuesday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"wednesday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Wednesday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"thursday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Thursday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Schedule Card Alpha"},"tag":"div","attributes":{"data-schedule-column":"thursday","class":"schedule-card-alpha"},"styles":["5a458e6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"schedule-card-alpha__header"},"styles":["5a45904"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Location"},"tag":"span","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__location"},"styles":["5a4599d","5a459a1"]} -->
+<!-- wp:etch/text {"content":"Location"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Time"},"tag":"time","attributes":{"class":"schedule-card-alpha__header-meta schedule-card-alpha__time"},"styles":["5a4599d","5a4599f"]} -->
+<!-- wp:etch/text {"content":"12:00pm"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"schedule-card-alpha__body"},"styles":["5a45907"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"schedule-card-alpha__heading"},"styles":["5a4593e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"button","attributes":{"class":"schedule-card-alpha__button"},"styles":["5a45b94","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"span","attributes":{"class":"schedule-card-alpha__button-label"},"styles":["5a45b98"]} -->
+<!-- wp:etch/text {"content":"Thursday Item"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Footer"},"tag":"div","attributes":{"class":"schedule-card-alpha__footer"},"styles":["5a45924"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatars"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatars"},"styles":["5a45957"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar Wrapper"},"tag":"div","attributes":{"class":"schedule-card-alpha__avatar-wrapper"},"styles":["5a4595a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Avatar"},"tag":"figure","attributes":{"class":"schedule-card-alpha__avatar"},"styles":["5a45978"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"943"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Duration"},"tag":"div","attributes":{"class":"schedule-card-alpha__duration"},"styles":["5a45996"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a45999"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label"},"tag":"p","attributes":{"class":"schedule-card-alpha__duration-label"},"styles":["5a4599b"]} -->
+<!-- wp:etch/text {"content":"60min"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

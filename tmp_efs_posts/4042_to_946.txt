@@ -1,0 +1,106 @@
+<!-- wp:etch/element {"metadata":{"name":"Feature Section November"},"tag":"section","attributes":{"data-etch-element":"section","class":"feature-section-november"},"styles":["etch-section-style","5a3d40e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Intro Alpha"},"tag":"div","attributes":{"data-etch-element":"container","class":"intro-alpha intro"},"styles":["etch-container-style","5a39564"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading intro-alpha__accent-heading"},"styles":["5a338ac","5a3956c"]} -->
+<!-- wp:etch/text {"content":"Accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"intro-alpha__heading"},"styles":["5a395a0"]} -->
+<!-- wp:etch/text {"content":"Your heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"intro-alpha__lede lede"},"styles":["5a395a4"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Grid November"},"tag":"div","attributes":{"data-etch-element":"container","class":"feature-grid-november"},"styles":["etch-container-style","5a3d42b"]} -->
+<!-- wp:etch/element {"metadata":{"name":"List"},"tag":"ul","attributes":{"class":"feature-grid-november__features-list"},"styles":["5a3d45d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Foxtrot"},"tag":"li","attributes":{"class":"feature-card-foxtrot"},"styles":["5a3aeff"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Media Wrapper"},"tag":"div","attributes":{"class":"feature-card-foxtrot__media-wrapper"},"styles":["5a3af19"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a3af4f"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Body"},"tag":"div","attributes":{"class":"feature-card-foxtrot__body"},"styles":["5a3af33"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-foxtrot__heading"},"styles":["5a3af4d"]} -->
+<!-- wp:etch/text {"content":"Feature heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"p","attributes":{"class":"feature-card-foxtrot__text"},"styles":["5a3af35"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Main Image"},"tag":"figure","attributes":{"class":"feature-grid-november__main-image"},"styles":["5a3d494"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Vertical-Small.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

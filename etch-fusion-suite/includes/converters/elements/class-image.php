@@ -40,6 +40,12 @@ class EFS_Element_Image extends EFS_Base_Element {
 		$figure_attrs = array();
 		$img_style    = $this->resolve_cover_img_style( $css_classes, $element );
 
+		// Prefer injecting the img cover style as nested CSS on the figure's Etch style
+		// rather than as an inline style attribute on the img element itself.
+		if ( '' !== $img_style && $this->inject_img_style_into_figure_style( $style_ids, $img_style ) ) {
+			$img_style = '';
+		}
+
 		$alt_text = is_string( $alt_text ) ? $alt_text : '';
 		$caption  = is_string( $caption ) ? $caption : '';
 		// Bricks uses "none" as a CSS no-content sentinel — treat it as no caption.
@@ -115,7 +121,8 @@ class EFS_Element_Image extends EFS_Base_Element {
 			'featured_image'    => '{this.image.id}',
 			'post_thumbnail'    => '{this.image.id}',
 			'woo_product_image' => '{this.image.id}',
-			'post_id'           => '{this.id}',
+			// In an image context, {post_id} resolves the post's featured image.
+			'post_id'           => '{this.image.id}',
 		);
 
 		if ( isset( $map[ $tag ] ) ) {
@@ -154,7 +161,11 @@ class EFS_Element_Image extends EFS_Base_Element {
 			$attributes['mediaId'] = (string) $mapped_media_id;
 		} elseif ( $dynamic_media_id ) {
 			$attributes['mediaId'] = (string) $image_url;
-			$attributes['alt']     = (string) $alt_text;
+			// Omit alt for dynamic images without explicit alt text — Etch resolves
+			// it automatically from the media library entry via the mediaId.
+			if ( '' !== trim( (string) $alt_text ) ) {
+				$attributes['alt'] = (string) $alt_text;
+			}
 		} else {
 			$attributes['src'] = (string) $image_url;
 			$attributes['alt'] = (string) $alt_text;
@@ -225,18 +236,20 @@ class EFS_Element_Image extends EFS_Base_Element {
 				}
 			}
 
-			foreach ( $class_ids as $class_id ) {
-				$class_id = trim( (string) $class_id );
-				if ( '' === $class_id || ! isset( $global_class_settings[ $class_id ] ) ) {
-					continue;
-				}
-				$fit = isset( $global_class_settings[ $class_id ]['_objectFit'] )
-					? strtolower( trim( (string) $global_class_settings[ $class_id ]['_objectFit'] ) )
-					: '';
-				if ( 'cover' === $fit ) {
-					return $cover_style;
-				}
+		foreach ( $class_ids as $class_id ) {
+			$class_id = trim( (string) $class_id );
+			if ( '' === $class_id || ! isset( $global_class_settings[ $class_id ] ) ) {
+				continue;
 			}
+			$fit = isset( $global_class_settings[ $class_id ]['_objectFit'] )
+				? strtolower( trim( (string) $global_class_settings[ $class_id ]['_objectFit'] ) )
+				: '';
+			if ( 'cover' === $fit ) {
+				// The CSS migration handles this via move_image_fit_properties_to_nested_img —
+				// no inline style needed; return empty to avoid duplicate styling.
+				return '';
+			}
+		}
 		}
 
 		// 3. Class-name heuristic for common patterns (__image, bg-image).
@@ -270,5 +283,51 @@ class EFS_Element_Image extends EFS_Base_Element {
 		}
 
 		return (int) $mappings[ $source_image_id ];
+	}
+
+	/**
+	 * Inject img cover-fit declarations as a nested CSS rule into the figure's Etch style.
+	 *
+	 * Appends "& img { <declarations> }" to the first non-internal style ID found in
+	 * $style_ids. Returns true on success so the caller can skip setting an inline style.
+	 *
+	 * @param array  $style_ids Figure element style IDs.
+	 * @param string $img_style CSS declarations for the img (e.g. "object-fit: cover; ...").
+	 * @return bool True if the nested rule was injected, false if no suitable style was found.
+	 */
+	private function inject_img_style_into_figure_style( array $style_ids, $img_style ) {
+		$img_style = trim( (string) $img_style );
+		if ( '' === $img_style ) {
+			return false;
+		}
+
+		$nested_rule = '& img { ' . rtrim( $img_style, ';' ) . '; }';
+
+		foreach ( $style_ids as $sid ) {
+			$sid = trim( (string) $sid );
+			if ( '' === $sid || 0 === strpos( $sid, 'etch-' ) ) {
+				continue;
+			}
+
+			$styles = get_option( 'etch_styles', array() );
+			if ( ! is_array( $styles ) || ! isset( $styles[ $sid ] ) || ! is_array( $styles[ $sid ] ) ) {
+				continue;
+			}
+
+			$current_css = isset( $styles[ $sid ]['css'] ) ? trim( (string) $styles[ $sid ]['css'] ) : '';
+
+			// Don't double-inject.
+			if ( false !== stripos( $current_css, '& img {' ) ) {
+				return true;
+			}
+
+			$styles[ $sid ]['css'] = '' !== $current_css
+				? $current_css . "\n\n" . $nested_rule
+				: $nested_rule;
+			update_option( 'etch_styles', $styles );
+			return true;
+		}
+
+		return false;
 	}
 }

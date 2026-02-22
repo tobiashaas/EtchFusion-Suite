@@ -25,8 +25,9 @@ class EFS_Progress_Manager {
 
 	/**
 	 * Running progress with no updates for this period is stale.
+	 * Allows a new migration to start after an abandoned/hung run.
 	 */
-	private const PROGRESS_STALE_TTL = 600;
+	private const PROGRESS_STALE_TTL = 120;
 
 	/** @var Progress_Repository_Interface */
 	private $progress_repository;
@@ -60,12 +61,11 @@ class EFS_Progress_Manager {
 			'current_phase_name'       => 'Validation',
 			'current_phase_status'     => 'active',
 			'percentage'               => 0,
-			'started_at'               => current_time( 'mysql' ),
-			'last_updated'             => current_time( 'mysql' ),
-			'completed_at'             => null,
-			'items_processed'          => 0,
-			'items_total'              => 0,
-			'estimated_time_remaining' => null,
+			'started_at'       => current_time( 'mysql' ),
+			'last_updated'     => current_time( 'mysql' ),
+			'completed_at'     => null,
+			'items_processed'  => 0,
+			'items_total'      => 0,
 		);
 
 		$this->progress_repository->save_progress( $progress );
@@ -103,16 +103,16 @@ class EFS_Progress_Manager {
 			$progress['items_total'] = max( 0, (int) $items_total );
 		}
 
-		$progress['estimated_time_remaining'] = $this->estimate_time_remaining( $progress );
-
 		if ( 'completed' === $step ) {
 			$progress['status']               = 'completed';
 			$progress['current_phase_status'] = 'completed';
 			$progress['completed_at']         = current_time( 'mysql' );
+			$this->store_active_migration( array() );
 		} elseif ( 'error' === $step ) {
 			$progress['status']               = 'error';
 			$progress['current_phase_status'] = 'failed';
 			$progress['completed_at']         = current_time( 'mysql' );
+			$this->store_active_migration( array() );
 		} else {
 			$progress['status']               = 'running';
 			$progress['current_phase_status'] = 'active';
@@ -166,8 +166,6 @@ class EFS_Progress_Manager {
 		} else {
 			$progress['is_stale'] = false;
 		}
-
-		$progress['estimated_time_remaining'] = $this->estimate_time_remaining( $progress );
 
 		return $progress;
 	}
@@ -255,30 +253,5 @@ class EFS_Progress_Manager {
 			$progress['last_updated'] = current_time( 'mysql' );
 			$this->progress_repository->save_progress( $progress );
 		}
-	}
-
-	/**
-	 * Estimate remaining time in seconds based on elapsed time and percentage.
-	 *
-	 * @param array $progress Progress payload.
-	 * @return int|null
-	 */
-	private function estimate_time_remaining( array $progress ): ?int {
-		$percentage = isset( $progress['percentage'] ) ? (float) $progress['percentage'] : 0.0;
-		$status     = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
-		if ( $percentage <= 0 || $percentage >= 100 || in_array( $status, array( 'completed', 'error', 'stale', 'idle' ), true ) ) {
-			return null;
-		}
-
-		$started_at = isset( $progress['started_at'] ) ? strtotime( (string) $progress['started_at'] ) : false;
-		if ( false === $started_at || $started_at <= 0 ) {
-			return null;
-		}
-
-		$elapsed = max( 1, time() - $started_at );
-		$total   = (int) round( $elapsed / ( $percentage / 100 ) );
-		$remain  = max( 0, $total - $elapsed );
-
-		return $remain;
 	}
 }

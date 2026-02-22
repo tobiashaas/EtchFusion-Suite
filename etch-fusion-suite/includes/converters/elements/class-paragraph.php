@@ -48,27 +48,9 @@ class EFS_Element_Paragraph extends EFS_Base_Element {
 		// (e.g. <b>, <strong>, <em>), use etch/raw-html so the markup renders correctly.
 		$has_html    = $text !== strip_tags( $text );
 		$inner_block = $has_html
-			? $this->generate_etch_raw_html_inline_block( $text, $label )
+			? $this->generate_etch_raw_html_block( $text, $label )
 			: $this->generate_etch_text_block( $text );
 
 		return $this->generate_etch_element_block( $attrs, $inner_block );
-	}
-
-	/**
-	 * Generate an etch/raw-html inner block for text that contains inline HTML markup.
-	 *
-	 * @param string $html  HTML text content (e.g. "<b>Bold</b> text").
-	 * @param string $label Human-readable label for the block.
-	 * @return string Gutenberg block markup.
-	 */
-	private function generate_etch_raw_html_inline_block( $html, $label ) {
-		$attrs      = array(
-			'content'  => $html,
-			'unsafe'   => false,
-			'metadata' => array( 'name' => $label ),
-		);
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" .
-			'<!-- /wp:etch/raw-html -->';
 	}
 }

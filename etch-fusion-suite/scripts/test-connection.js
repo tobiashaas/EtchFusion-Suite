@@ -2,15 +2,15 @@
 
 const { spawnSync } = require('child_process');
 const http = require('http');
-
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
+const path = require('path');
 
 function runWpEnv(args) {
-  const spawnOpts = { encoding: 'utf8' };
-  if (process.platform === 'win32') {
-    spawnOpts.shell = true;
-  }
-  const result = spawnSync(WP_ENV_CMD, args, spawnOpts);
+  const isWin = process.platform === 'win32';
+  const result = spawnSync(
+    isWin ? 'cmd' : 'npx',
+    isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+    { encoding: 'utf8', cwd: path.resolve(__dirname, '..') }
+  );
 
   if (result.error) {
     throw result.error;

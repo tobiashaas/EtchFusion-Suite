@@ -54,6 +54,7 @@ jobs:
           ./scripts/verify-yoda-conditions.sh
           ./scripts/verify-hook-prefixing.sh
           ./scripts/verify-datetime-functions.sh
+          ./scripts/verify-no-debug-filewrites.sh
         working-directory: etch-fusion-suite
 
   test:

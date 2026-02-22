@@ -12,7 +12,6 @@ function runWpEtch(args, { allowFailure = false } = {}) {
   const commandArgs = isWin
     ? ['/c', 'npx', 'wp-env', 'run', 'tests-cli', 'wp', ...args]
     : ['wp-env', 'run', 'tests-cli', 'wp', ...args];
-
   const result = spawnSync(command, commandArgs, {
     cwd: CWD,
     encoding: 'utf8',

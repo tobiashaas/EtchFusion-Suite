@@ -99,6 +99,7 @@ EOF
     ./scripts/verify-yoda-conditions.sh || exit 1
     ./scripts/verify-hook-prefixing.sh || exit 1
     ./scripts/verify-datetime-functions.sh || exit 1
+    ./scripts/verify-no-debug-filewrites.sh || exit 1
   fi
 
   popd >/dev/null

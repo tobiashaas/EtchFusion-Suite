@@ -6,16 +6,15 @@ const { spawnSync } = require('child_process');
 const { analyzeElements } = require('./analyze-elements');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 const DEFAULT_OUTPUT_DIR = path.join(ROOT_DIR, 'reports');
 
 function runWpEnv(args, allowFailure = false) {
-  const spawnOptions = { encoding: 'utf8', cwd: ROOT_DIR };
-  if (process.platform === 'win32') {
-    spawnOptions.shell = true;
-  }
-
-  const result = spawnSync(WP_ENV_CMD, args, spawnOptions);
+  const isWin = process.platform === 'win32';
+  const result = spawnSync(
+    isWin ? 'cmd' : 'npx',
+    isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+    { encoding: 'utf8', cwd: ROOT_DIR }
+  );
 
   if (result.error) {
     throw result.error;

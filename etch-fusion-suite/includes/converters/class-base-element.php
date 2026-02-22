@@ -100,6 +100,9 @@ abstract class EFS_Base_Element {
 				if ( $etch_data['id'] === $style_id && isset( $etch_data['selector'] ) ) {
 					// Remove leading dot from selector
 					$class = ltrim( $etch_data['selector'], '.' );
+					if ( $this->is_utility_like_selector( $class ) ) {
+						break;
+					}
 					if ( $this->is_acss_selector_name( $class ) && ! $this->is_available_acss_selector_name( $class ) ) {
 						break;
 					}
@@ -115,6 +118,28 @@ abstract class EFS_Base_Element {
 		$classes = array_merge( $classes, $this->get_custom_css_class_tokens() );
 
 		$classes = array_values( array_unique( array_filter( $classes ) ) );
+
+		// Sort: utility/ACSS classes to end so Etch Builder selects the semantic class first.
+		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-accessible', 'smart-spacing' );
+		usort(
+			$classes,
+			static function ( $a, $b ) use ( $utility_prefixes ) {
+				$a_util = false;
+				$b_util = false;
+				foreach ( $utility_prefixes as $prefix ) {
+					if ( 0 === strpos( $a, $prefix ) || $a === $prefix ) {
+						$a_util = true;
+					}
+					if ( 0 === strpos( $b, $prefix ) || $b === $prefix ) {
+						$b_util = true;
+					}
+				}
+				if ( $a_util === $b_util ) {
+					return 0;
+				}
+				return $a_util ? 1 : -1;
+			}
+		);
 
 		return implode( ' ', $classes );
 	}
@@ -134,23 +159,23 @@ abstract class EFS_Base_Element {
 			$tokens = preg_split( '/\s+/', trim( (string) $raw ) );
 			if ( is_array( $tokens ) ) {
 				foreach ( $tokens as $token ) {
-					$token = trim( (string) $token );
-					if ( '' === $token ) {
-						continue;
-					}
-					$classes[] = $token;
+			$token = trim( (string) $token );
+				if ( '' === $token || $this->is_utility_like_selector( $token ) ) {
+					continue;
 				}
+				$classes[] = preg_replace( '/^fr-/', '', $token );
 			}
-		} elseif ( is_array( $raw ) ) {
+		}
+	} elseif ( is_array( $raw ) ) {
 			foreach ( $raw as $token ) {
 				if ( ! is_scalar( $token ) ) {
 					continue;
 				}
 				$token = trim( (string) $token );
-				if ( '' === $token ) {
+				if ( '' === $token || $this->is_utility_like_selector( $token ) ) {
 					continue;
 				}
-				$classes[] = $token;
+				$classes[] = preg_replace( '/^fr-/', '', $token );
 			}
 		}
 
@@ -188,7 +213,9 @@ abstract class EFS_Base_Element {
 			if ( '' === $name ) {
 				$name = $this->normalize_class_name_token( $id );
 			}
-			if ( '' !== $name ) {
+			// Strip site-specific fr- prefix (naming convention, not semantic).
+			$name = preg_replace( '/^fr-/', '', $name );
+			if ( '' !== $name && ! $this->is_utility_like_selector( $name ) ) {
 				$classes[] = $name;
 			}
 		}
@@ -317,6 +344,14 @@ abstract class EFS_Base_Element {
 			$value = isset( $entry['value'] ) && is_scalar( $entry['value'] )
 				? (string) $entry['value']
 				: '';
+
+			// The HTML `datetime` attribute on <time> elements must be machine-readable
+			// (ISO 8601). Replace Bricks date tags here — before the general dynamic-data
+			// converter runs — so they use Y-m-d instead of the human-readable F j, Y format.
+			if ( 'datetime' === $name ) {
+				$value = str_replace( '{post_date}', "{this.date.dateFormat('Y-m-d')}", $value );
+				$value = str_replace( '{post_modified}', "{this.modified.dateFormat('Y-m-d')}", $value );
+			}
 
 			$normalized[ $name ] = $value;
 		}
@@ -679,35 +714,40 @@ abstract class EFS_Base_Element {
 				return $etch_attributes;
 			}
 
-			// Try to patch a single identifiable neighbor class style before falling back to inline.
-			$neighbor_classes = array();
-			foreach ( $class_list as $name ) {
-				$name = trim( (string) $name );
-				if ( '' === $name || 'brxe-block' === $name ) {
-					continue;
-				}
-				if ( $this->is_modifier_like_selector( $name ) ) {
-					continue;
-				}
-				$neighbor_classes[] = $name;
+		// Try to patch a single identifiable neighbor class style before falling back to inline.
+		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-accessible', 'smart-spacing' );
+		$neighbor_classes = array();
+		foreach ( $class_list as $name ) {
+			$name = trim( (string) $name );
+			if ( '' === $name || 'brxe-block' === $name ) {
+				continue;
 			}
+			if ( $this->is_modifier_like_selector( $name ) ) {
+				continue;
+			}
+			// Skip ACSS utility classes — they are not semantic targets for display injection.
+			$is_utility = false;
+			foreach ( $utility_prefixes as $prefix ) {
+				if ( 0 === strpos( $name, $prefix ) || $name === $prefix ) {
+					$is_utility = true;
+					break;
+				}
+			}
+			if ( $is_utility ) {
+				continue;
+			}
+			$neighbor_classes[] = $name;
+		}
 			$neighbor_classes = array_values( array_unique( $neighbor_classes ) );
 
-			if ( 1 === count( $neighbor_classes ) ) {
-				$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
-				if ( $target_style_id ) {
-					$target_layout = $this->get_layout_profile_for_style_id( $target_style_id );
-					if ( $target_layout['is_grid'] || $target_layout['is_flex'] ) {
-						return $etch_attributes;
-					}
-					$declarations = 'display: flex;';
-					if ( ! $target_layout['has_flex_direction'] ) {
-						$declarations .= ' flex-direction: column;';
-					}
-					$this->append_declarations_to_style_id( $target_style_id, $declarations );
-					return $etch_attributes;
-				}
+		if ( 1 === count( $neighbor_classes ) ) {
+			$target_style_id = $this->find_style_id_by_class_name( $neighbor_classes[0] );
+			if ( $target_style_id ) {
+				// The CSS migration phase injects display:flex into the semantic class.
+				// Skip the inline-style fallback — return without setting any style attribute.
+				return $etch_attributes;
 			}
+		}
 
 			$style_layout         = $this->get_layout_profile_for_style_ids( $style_ids );
 			$display_is_derivable = $style_layout['is_flex']
@@ -720,9 +760,9 @@ abstract class EFS_Base_Element {
 			}
 
 			if ( $current_layout['has_flex_direction'] || $style_layout['has_flex_direction'] ) {
-				$inline_declarations = 'display: flex;';
+				$inline_declarations = 'display: flex; inline-size: 100%;';
 			} else {
-				$inline_declarations = 'display: flex; flex-direction: column;';
+				$inline_declarations = 'display: flex; flex-direction: column; inline-size: 100%;';
 			}
 
 			if ( '' !== trim( $current_style ) && ';' !== substr( rtrim( $current_style ), -1 ) ) {
@@ -759,7 +799,7 @@ abstract class EFS_Base_Element {
 			return $etch_attributes;
 		}
 
-		$declarations    = 'display: flex; flex-direction: column;';
+		$declarations    = 'display: flex; flex-direction: column; inline-size: 100%;';
 		$target_style_id = $this->resolve_single_neighbor_style_id( $element );
 		if ( '' !== $target_style_id ) {
 			$this->append_declarations_to_style_id( $target_style_id, $declarations );
@@ -933,6 +973,20 @@ abstract class EFS_Base_Element {
 			if ( '' === $key || empty( $acss_inline_map[ $key ] ) ) {
 				continue;
 			}
+			$class_name = $this->resolve_global_class_name_by_id( $key );
+			// ACSS utility classes that must stay as class attributes and never be inlined.
+			// ACSS handles their styling on the target site.
+			if (
+				'' !== $class_name
+				&& (
+					0 === strpos( $class_name, 'bg--' )
+					|| 'is-bg' === $class_name
+					|| 0 === strpos( $class_name, 'is-bg-' )
+					|| 'hidden-accessible' === $class_name
+				)
+			) {
+				continue;
+			}
 			$declarations[] = trim( (string) $acss_inline_map[ $key ] );
 		}
 
@@ -940,7 +994,17 @@ abstract class EFS_Base_Element {
 			return '';
 		}
 
-		return implode( ' ', array_unique( array_filter( $declarations ) ) );
+		$css = implode( ' ', array_unique( array_filter( $declarations ) ) );
+
+		// Normalise to a single-line string safe for an HTML style="..." attribute:
+		// 1. Remove CSS block comments (/* ... */).
+		// 2. Collapse newlines + surrounding whitespace to a single space.
+		// 3. Collapse runs of whitespace to one space.
+		$css = preg_replace( '!/\*.*?\*/!s', '', $css );
+		$css = preg_replace( '/\r?\n\s*/', ' ', $css );
+		$css = preg_replace( '/\s{2,}/', ' ', $css );
+
+		return trim( $css );
 	}
 
 	/**
@@ -1126,6 +1190,29 @@ abstract class EFS_Base_Element {
 			$decoded = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		}
 		return $text;
+	}
+
+	/**
+	 * Generate an etch/raw-html inner block for content that contains inline HTML markup.
+	 *
+	 * Use this instead of generate_etch_text_block() whenever the content may include
+	 * tags like <em>, <b>, <i>, <strong>, <a>, <address>, etc. — etch/text treats its
+	 * content as plain text and would display those tags literally.
+	 *
+	 * @param string $html    HTML content (e.g. "Hello <em>world</em>").
+	 * @param string $label   Optional human-readable label for the block.
+	 * @return string Gutenberg block markup.
+	 */
+	protected function generate_etch_raw_html_block( $html, $label = '' ) {
+		$attrs = array(
+			'content'  => (string) $html,
+			'unsafe'   => false,
+		);
+		if ( '' !== $label ) {
+			$attrs['metadata'] = array( 'name' => $label );
+		}
+		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		return '<!-- wp:etch/raw-html ' . $attrs_json . ' -->' . "\n" . '<!-- /wp:etch/raw-html -->';
 	}
 
 	/**

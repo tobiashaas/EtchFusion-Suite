@@ -1,0 +1,71 @@
+<!-- wp:etch/element {"metadata":{"name":"Gallery"},"tag":"section","attributes":{"data-etch-element":"section","class":"gallery-10"},"styles":["etch-section-style","5a509ad"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Container"},"tag":"div","attributes":{"data-etch-element":"container","class":"gallery-10__container"},"styles":["etch-container-style","5a509cc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Container info"},"tag":"div","attributes":{"class":"gallery-10__container-info"},"styles":["5a50ae6"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Tagline"},"tag":"p","attributes":{"class":"gallery-10__tagline"},"styles":["5a50b07"]} -->
+<!-- wp:etch/text {"content":"Tagline"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"gallery-10__heading"},"styles":["5a50b20"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet "} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Description"},"tag":"p","attributes":{"class":"gallery-10__description"},"styles":["5a50b39"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Gallery"},"tag":"ul","attributes":{"class":"gallery-10__gallery"},"styles":["5a509fe"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image item"},"tag":"li","attributes":{"class":"gallery-10__gallery-item"},"styles":["5a50a23"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"gallery-10__gallery-img"},"styles":["5a50a5f"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2023/10/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"gallery-10__gallery-img-overlay"},"styles":["5a50aa7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon wrapper"},"tag":"div","attributes":{"class":"gallery-10__gallery-icon-wrapper"},"styles":["5a50ac8"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a50a81"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Image item"},"tag":"li","attributes":{"class":"gallery-10__gallery-item"},"styles":["5a50a23"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"gallery-10__gallery-img"},"styles":["5a50a5f"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2023/10/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"gallery-10__gallery-img-overlay"},"styles":["5a50aa7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon wrapper"},"tag":"div","attributes":{"class":"gallery-10__gallery-icon-wrapper"},"styles":["5a50ac8"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a50a81"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Image item"},"tag":"li","attributes":{"class":"gallery-10__gallery-item"},"styles":["5a50a23"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"gallery-10__gallery-img"},"styles":["5a50a5f"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2023/10/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"gallery-10__gallery-img-overlay"},"styles":["5a50aa7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon wrapper"},"tag":"div","attributes":{"class":"gallery-10__gallery-icon-wrapper"},"styles":["5a50ac8"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a50a81"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Image item"},"tag":"li","attributes":{"class":"gallery-10__gallery-item"},"styles":["5a50a23"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"gallery-10__gallery-img"},"styles":["5a50a5f"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2023/10/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"gallery-10__gallery-img-overlay"},"styles":["5a50aa7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon wrapper"},"tag":"div","attributes":{"class":"gallery-10__gallery-icon-wrapper"},"styles":["5a50ac8"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a50a81"]} -->
+<!-- /wp:etch/svg -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/raw-html {"content":"<style>/* \u002d\u002d The root styles must go in the element of the structure with the name \"Gallery\". \u002d\u002d*/ \n\n.gallery-10__gallery{\n\n  /* Gallery elements styles */\n  .gallery-10__gallery-item{\n    \n    /* Hover and focus link styles */\n    &:hover, &:focus-within{\n      .gallery-10__gallery-img-overlay{\n        opacity: 1;\n      }\n    }\n\n    /* Styles from the first image */\n    &:first-of-type{\n      grid-row: span 2;\n      grid-column: span 2;\n    }\n    \n    /* Styles from the second image */\n    &:nth-of-type(2){\n      grid-column: span 2;\n      aspect-ratio: 2 / 1;\n    }\n  }\n}</style>","unsafe":false,"metadata":{"name":"CSS Styles (CSS)"}} -->
+<!-- /wp:etch/raw-html -->

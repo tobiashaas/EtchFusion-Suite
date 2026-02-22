@@ -1293,12 +1293,13 @@ const createWizard = (root) => {
 	};
 
 	const handleCancel = async () => {
-		if (state.currentStep === 4 && state.migrationId) {
+		if (state.currentStep === 4) {
 			try {
+				const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || '';
 				await post(ACTION_CANCEL_MIGRATION, {
-					migration_id: state.migrationId,
+					migration_id: migrationId,
 				});
-				showToast('Migration cancellation requested.', 'info');
+				showToast('Migration cancelled.', 'info');
 			} catch (error) {
 				showToast(error?.message || 'Unable to cancel migration.', 'error');
 			}
@@ -1574,16 +1575,16 @@ const createWizard = (root) => {
 			const pollStatus = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
 			const pollPercentage = Number(payload?.progress?.percentage ?? 0);
 			const isRunning = pollStatus === 'running' || pollStatus === 'receiving';
-			const isStale = pollStatus === 'stale' || Boolean(payload?.progress?.is_stale || payload?.is_stale);
-			const pollCurrentStep = String(payload?.progress?.current_step || '').toLowerCase();
+		const isStale = pollStatus === 'stale' || Boolean(payload?.progress?.is_stale || payload?.is_stale);
+		const pollCurrentStep = String(payload?.progress?.current_step || '').toLowerCase();
 
-			// Stale but checkpoint phase is media/posts: auto-resume via server (resets stale
+		// Stale but checkpoint phase is media/posts: auto-resume via server (resets stale
 			// flag) then start the batch loop directly — no user interaction required.
 			if (isStale && (pollCurrentStep === 'media' || pollCurrentStep === 'posts')) {
 				state.migrationId = payload?.migrationId || migrationId;
 				try {
-					const resumed = await post(ACTION_RESUME_MIGRATION, { migration_id: state.migrationId });
-					if (resumed?.resumed) {
+				const resumed = await post(ACTION_RESUME_MIGRATION, { migration_id: state.migrationId });
+				if (resumed?.resumed) {
 						await setStep(4, { skipSave: true });
 						if (refs.progressTakeover) {
 							refs.progressTakeover.hidden = false;

@@ -1,0 +1,72 @@
+<!-- wp:etch/element {"metadata":{"name":"Hero"},"tag":"section","attributes":{"data-etch-element":"section","class":"hero-section-frankfurt"},"styles":["etch-section-style","5a50b51"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Container"},"tag":"div","attributes":{"data-etch-element":"container","class":"hero-section-frankfurt__container"},"styles":["etch-container-style","5a50b72"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Container info"},"tag":"div","attributes":{"class":"hero-section-frankfurt__container-info"},"styles":["5a50b98"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Inner container"},"tag":"div","attributes":{"class":"hero-section-frankfurt__inner-container-info"},"styles":["5a50bb5"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Tagline"},"tag":"p","attributes":{"class":"hero-section-frankfurt__tagline"},"styles":["5a50be5"]} -->
+<!-- wp:etch/text {"content":"Tagline"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"hero-section-frankfurt__heading"},"styles":["5a50c0c"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet consectetur adipiscing"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Description"},"tag":"p","attributes":{"class":"hero-section-frankfurt__description"},"styles":["5a50c26"]} -->
+<!-- wp:etch/text {"content":"Aliqua id fugiat nostrud irure ex duis ea quis id quis ad et. Sunt qui esse pariatur duis deserunt mollit dolore cillum minim tempor enim elit aute irure tempor cupidatat."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Container buttons"},"tag":"div","attributes":{"class":"hero-section-frankfurt__container-btn"},"styles":["5a50c5d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Button primary"},"tag":"a","attributes":{"href":"#","class":"hero-section-frankfurt__btn btn--black btn--primary"},"styles":["5a50c74","5a30b39"]} -->
+<!-- wp:etch/text {"content":"Contact now"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Button outline"},"tag":"a","attributes":{"href":"#","class":"hero-section-frankfurt__btn-outline btn--black btn--outline btn--primary"},"styles":["5a50c76","5a30b39","5a30b3c"]} -->
+<!-- wp:etch/text {"content":"See more"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List"},"tag":"ul","attributes":{"class":"hero-section-frankfurt__list"},"styles":["5a50cba"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image wrapper"},"tag":"li","attributes":{"class":"hero-section-frankfurt__img-wrapper"},"styles":["5a50cdf"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"hero-section-frankfurt__img"},"styles":["5a50d19"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2024/06/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Inner list"},"tag":"ul","attributes":{"class":"hero-section-frankfurt__inner-list"},"styles":["5a50d37"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Item"},"tag":"li","attributes":{"class":"hero-section-frankfurt__inner-list-item"},"styles":["5a50d3a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Counter container"},"tag":"article","attributes":{"class":"hero-section-frankfurt__counter-container"},"styles":["5a50d60"]} -->
+<!-- wp:etch/raw-html {"metadata":{"name":"HTML"},"content":"","unsafe":false} -->
+<!-- /wp:etch/raw-html -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h4","attributes":{"class":"hero-section-frankfurt__counter-heading"},"styles":["5a50d93"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Image wrapper"},"tag":"li","attributes":{"class":"hero-section-frankfurt__img-wrapper"},"styles":["5a50cdf"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"hero-section-frankfurt__img"},"styles":["5a50d19"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2024/06/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Inner list"},"tag":"ul","attributes":{"class":"hero-section-frankfurt__inner-list"},"styles":["5a50d37"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image wrapper"},"tag":"li","attributes":{"class":"hero-section-frankfurt__img-wrapper"},"styles":["5a50cdf"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"hero-section-frankfurt__img"},"styles":["5a50d19"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://acss.brixies.co/wp-content/uploads/2024/06/Img-placeholder-16-9.png","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Item"},"tag":"li","attributes":{"class":"hero-section-frankfurt__inner-list-item"},"styles":["5a50d3a"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Counter container"},"tag":"article","attributes":{"class":"hero-section-frankfurt__counter-container hero-section-frankfurt__counter-container--negative"},"styles":["5a50d60","5a50dae"]} -->
+<!-- wp:etch/raw-html {"metadata":{"name":"HTML"},"content":"","unsafe":false} -->
+<!-- /wp:etch/raw-html -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h4","attributes":{"class":"hero-section-frankfurt__counter-heading"},"styles":["5a50d93"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/raw-html {"content":"<style>/* \u002d\u002d The root styles must go in the element of the structure with the name \"Hero\"(Section). \u002d\u002d*/\n\n.hero-section-frankfurt{\n  /* First image styles */\n  .hero-section-frankfurt__img-wrapper{\n    &:first-of-type{\n      \n      /* Tablet Styles */\n      @media (max-width: 991px) {\n        grid-column: span 2;\n      }\n\n      /* Mobile styles */\n      @media (max-width: 478px) {\n        grid-column: auto;\n      }\n    }\n  }\n}</style>","unsafe":false,"metadata":{"name":"CSS Styles (CSS)"}} -->
+<!-- /wp:etch/raw-html -->

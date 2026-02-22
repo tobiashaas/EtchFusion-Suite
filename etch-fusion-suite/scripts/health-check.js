@@ -1,30 +1,19 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
-const { existsSync, writeFileSync } = require('fs');
+const { writeFileSync } = require('fs');
 const { join } = require('path');
 
-const WP_ENV_CMD = process.platform === 'win32' ? 'wp-env.cmd' : 'wp-env';
 const REQUIRED_MEMORY_MB = 512;
 const WARNING_MEMORY_MB = 256;
 const VENDOR_AUTOLOAD_PATH = 'wp-content/plugins/etch-fusion-suite/vendor/autoload.php';
-
-function getWpEnvPath() {
-  if (process.platform !== 'win32') return WP_ENV_CMD;
-  const local = join(__dirname, '..', 'node_modules', '.bin', 'wp-env.cmd');
-  return existsSync(local) ? local : WP_ENV_CMD;
-}
-
 function spawnWpEnv(args) {
-  const wpEnv = getWpEnvPath();
-  if (process.platform === 'win32') {
-    const cmdLine = [wpEnv, ...args]
-      .map((arg) => (/[^\w./:-]/.test(String(arg)) ? `"${String(arg).replace(/"/g, '""')}"` : String(arg)))
-      .join(' ');
-    return spawn(cmdLine, [], { stdio: 'pipe', shell: true });
-  }
-
-  return spawn(wpEnv, args, { stdio: 'pipe' });
+  const isWin = process.platform === 'win32';
+  return spawn(
+    isWin ? 'cmd' : 'npx',
+    isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+    { stdio: 'pipe', cwd: join(__dirname, '..') }
+  );
 }
 
 function runWpEnv(args) {

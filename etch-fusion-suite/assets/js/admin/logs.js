@@ -373,6 +373,7 @@ const clearLogs = async () => {
         const data = await post(ACTION_CLEAR_LOGS);
         showToast(data?.message || 'Logs cleared.', 'success');
         allSecurityLogs = [];
+        allMigrationRuns = [];
         renderAll();
     } catch (error) {
         console.error('Clear logs failed', error);

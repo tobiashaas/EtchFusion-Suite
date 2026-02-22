@@ -81,12 +81,20 @@ class EFS_Background_Spawn_Handler {
 	 * @param string|null $nonce Unused; kept for API. Background auth is via short-lived token.
 	 */
 	public function spawn_migration_background_request( string $migration_id, ?string $nonce ): void {
+		// #region agent log
+		$efs_log_spawn = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
+		// #endregion
 		// Use hex token only: wp_generate_password with special chars can produce %XX sequences
 		// that sanitize_text_field strips on the receiving end, causing token mismatch → 400.
 		$bg_token = bin2hex( random_bytes( 16 ) );
 		set_transient( 'efs_bg_' . $migration_id, $bg_token, 120 );
 
 		$url  = $this->get_spawn_url();
+		// #region agent log
+		if ( $efs_log_spawn ) {
+			file_put_contents( $efs_log_spawn, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'spawn url and token set', 'data' => array( 'url' => $url, 'migration_id' => $migration_id ), 'hypothesisId' => 'B' ) ) . "\n", FILE_APPEND | LOCK_EX );
+		}
+		// #endregion
 		$body = array(
 			'action'       => 'efs_run_migration_background',
 			'migration_id' => $migration_id,
@@ -96,29 +104,8 @@ class EFS_Background_Spawn_Handler {
 		$skip_ssl_verify = in_array( wp_get_environment_type(), array( 'local', 'development' ), true )
 			|| (bool) apply_filters( 'etch_fusion_suite_loopback_skip_ssl_verify', false );
 
-		$probe = wp_remote_head(
-			$url,
-			array(
-				'timeout'     => 1,
-				'blocking'    => true,
-				'redirection' => 0,
-				'sslverify'   => ! $skip_ssl_verify,
-			)
-		);
-
-		if ( is_wp_error( $probe ) ) {
-			$this->error_handler->log_warning(
-				'W013',
-				array(
-					'message' => 'Loopback probe failed (' . $probe->get_error_message() . '). Falling back to synchronous execution.',
-					'url'     => $url,
-					'action'  => 'spawn_migration_background_request',
-				)
-			);
-			$this->async_runner->run_migration_execution( $migration_id );
-			return;
-		}
-
+		// Fire non-blocking POST directly. Skip loopback probe: in single-worker setups the probe
+		// would block (same process cannot serve itself) and always timeout, forcing sync fallback.
 		$response = wp_remote_post(
 			$url,
 			array(
@@ -131,6 +118,11 @@ class EFS_Background_Spawn_Handler {
 		);
 
 		if ( is_wp_error( $response ) ) {
+			// #region agent log
+			if ( isset( $efs_log_spawn ) && $efs_log_spawn ) {
+				file_put_contents( $efs_log_spawn, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'wp_remote_post failed', 'data' => array( 'post_error' => $response->get_error_message() ), 'hypothesisId' => 'B', 'runId' => 'post-fix' ) ) . "\n", FILE_APPEND | LOCK_EX );
+			}
+			// #endregion
 			$this->error_handler->log_warning(
 				'W013',
 				array(
@@ -139,6 +131,12 @@ class EFS_Background_Spawn_Handler {
 				)
 			);
 			$this->async_runner->run_migration_execution( $migration_id );
+		} else {
+			// #region agent log
+			if ( isset( $efs_log_spawn ) && $efs_log_spawn ) {
+				file_put_contents( $efs_log_spawn, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'background POST fired (no probe)', 'data' => array( 'url' => $url ), 'hypothesisId' => 'B', 'runId' => 'post-fix' ) ) . "\n", FILE_APPEND | LOCK_EX );
+			}
+			// #endregion
 		}
 	}
 }

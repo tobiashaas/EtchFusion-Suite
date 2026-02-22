@@ -144,7 +144,7 @@ class EFS_Migration_Orchestrator {
 				'progress'    => $progress,
 				'steps'       => $state['steps'],
 				'is_stale'    => $is_stale,
-				'resumable'   => true,
+				'resumable'   => ! $is_stale,
 			);
 		}
 

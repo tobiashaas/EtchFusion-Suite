@@ -1,0 +1,54 @@
+<!-- wp:etch/element {"metadata":{"name":"Content Section Whiskey"},"tag":"section","attributes":{"data-etch-element":"section","class":"content-section-whiskey bg--ultra-light"},"styles":["etch-section-style","5a4f752","da54fce"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Intro Alpha"},"tag":"div","attributes":{"data-etch-element":"container","class":"intro-alpha intro"},"styles":["etch-container-style","5a39564"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"intro-alpha__heading"},"styles":["5a395a0"]} -->
+<!-- wp:etch/text {"content":"Introduce the personal letter"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading intro-alpha__accent-heading"},"styles":["5a338ac","5a3956c"]} -->
+<!-- wp:etch/text {"content":"Accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"intro-alpha__lede lede"},"styles":["5a395a4"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Letter"},"tag":"article","attributes":{"class":"content-section-whiskey__letter"},"styles":["5a4f786"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"content-section-whiskey__content smart-spacing"},"styles":["5a4f789"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"Sometimes it’s nice to put in text just to get an idea of how text will fill in a space on your website."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"Traditionally our industry has used Lorem Ipsum, which is placeholder text written in Latin. Unfortunately, not everyone is familiar with Lorem Ipsum and that can lead to confusion. I can’t tell you how many times clients have asked me why their website is in another language!"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"There are other placeholder text alternatives like Hipster Ipsum, Zombie Ipsum, Bacon Ipsum, and many more. While often hilarious, these placeholder passages can also lead to much of the same confusion."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"If you’re curious, this is Website Ipsum. It was specifically developed for the use on development websites. Other than being less confusing than other Ipsum’s, Website Ipsum is also formatted in patterns more similar to how real copy is formatted on the web today."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Author"},"tag":"div","attributes":{"class":"content-section-whiskey__author"},"styles":["5a4f7a8"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Author Signature"},"tag":"figure","attributes":{"class":"content-section-whiskey__author-signature"},"styles":["5a4f833"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Jane-Doe.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Author Avatar Wrapper"},"tag":"div","attributes":{"class":"content-section-whiskey__author-avatar-wrapper"},"styles":["5a4f7ab"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Author Avatar"},"tag":"figure","attributes":{"class":"content-section-whiskey__author-avatar"},"styles":["5a4f7c7"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"931"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Author Identity"},"tag":"div","attributes":{"class":"content-section-whiskey__author-identity"},"styles":["5a4f7e4"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Author Name"},"tag":"p","attributes":{"class":"content-section-whiskey__author-name"},"styles":["5a4f7ff"]} -->
+<!-- wp:etch/text {"content":"Author Name"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Author Title"},"tag":"p","attributes":{"class":"content-section-whiskey__author-title"},"styles":["5a4f818"]} -->
+<!-- wp:etch/text {"content":"Founder"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

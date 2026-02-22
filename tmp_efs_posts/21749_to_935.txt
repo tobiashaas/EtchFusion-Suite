@@ -1,0 +1,86 @@
+<!-- wp:etch/element {"metadata":{"name":"Timeline Section Delta"},"tag":"section","attributes":{"data-etch-element":"section","class":"timeline-section-delta"},"styles":["etch-section-style","5a4a90d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Timeline Delta"},"tag":"div","attributes":{"data-etch-element":"container","class":"timeline-delta"},"styles":["etch-container-style","5a4a937"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content Wrapper (BG)"},"tag":"div","attributes":{"class":"timeline-delta__content-wrapper"},"styles":["5a4aa52"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"timeline-delta__content"},"styles":["5a4a9b8"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"timeline-delta__content-heading"},"styles":["5a4a9bb"]} -->
+<!-- wp:etch/text {"content":"This is just a placeholder headline."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"div","attributes":{"class":"timeline-delta__content-lede smart-spacing"},"styles":["5a4a9bd"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"Sometimes it’s nice to put in text just to get an idea of how text will fill in a space on your website."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"Traditionally our industry has used Lorem Ipsum, which is placeholder text written in Latin. Unfortunately, not everyone is familiar with Lorem Ipsum and that can lead to confusion. I can’t tell you how many times clients have asked me why their website is in another language!"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Social Icons Alpha"},"tag":"ul","attributes":{"data-color":"dark","class":"social-alpha"},"styles":["5a395df"]} -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"social-alpha__list-item"},"styles":["5a48594"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon Wrapper"},"tag":"a","attributes":{"class":"social-alpha__icon-wrapper"},"styles":["5a395fc"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a39600"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label (Hidden Accessible)"},"tag":"span","attributes":{"class":"hidden-accessible"},"styles":["1654411"]} -->
+<!-- wp:etch/text {"content":"Follow us on Facebook"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"social-alpha__list-item"},"styles":["5a48594"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon Wrapper"},"tag":"a","attributes":{"class":"social-alpha__icon-wrapper"},"styles":["5a395fc"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a39600"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label (Hidden Accessible)"},"tag":"span","attributes":{"class":"hidden-accessible"},"styles":["1654411"]} -->
+<!-- wp:etch/text {"content":"Follow us on Instagram"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"social-alpha__list-item"},"styles":["5a48594"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon Wrapper"},"tag":"a","attributes":{"class":"social-alpha__icon-wrapper"},"styles":["5a395fc"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a39600"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label (Hidden Accessible)"},"tag":"span","attributes":{"class":"hidden-accessible"},"styles":["1654411"]} -->
+<!-- wp:etch/text {"content":"Follow us on YouTube"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"social-alpha__list-item"},"styles":["5a48594"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Icon Wrapper"},"tag":"a","attributes":{"class":"social-alpha__icon-wrapper"},"styles":["5a395fc"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a39600"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Label (Hidden Accessible)"},"tag":"span","attributes":{"class":"hidden-accessible"},"styles":["1654411"]} -->
+<!-- wp:etch/text {"content":"Follow us on X"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Wrapper (BG)"},"tag":"div","attributes":{"class":"timeline-delta__list-wrapper"},"styles":["5a4aa7e"]} -->
+<!-- wp:etch/element {"metadata":{"name":"List"},"tag":"ul","attributes":{"class":"timeline-delta__list"},"styles":["5a4a982"]} -->
+<!-- wp:etch/loop {"loopId":"list-item_3cce9f4b","itemId":"item"} -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"timeline-delta__list-item"},"styles":["5a4a9ef"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"timeline-delta__list-item-heading"},"styles":["5a4aa26"]} -->
+<!-- wp:etch/text {"content":"{item.title}"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"div","attributes":{"class":"timeline-delta__list-item-lede smart-spacing"},"styles":["5a4aa28"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":[],"styles":[]} -->
+<!-- wp:etch/text {"content":"{item.content.stripTags()}"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Media"},"tag":"figure","attributes":{"class":"timeline-delta__list-item-media"},"styles":["5a4aa0c"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"{item.image.id}"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Date Wrapper"},"tag":"div","attributes":{"class":"timeline-delta__date-wrapper"},"styles":["5a4aac1"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Date"},"tag":"time","attributes":{"datetime":"{item.date.dateFormat('Y-m-d')}","pubdate":"","class":"timeline-lima__date"},"styles":["5a3e7d2"]} -->
+<!-- wp:etch/text {"content":"{item.date.dateFormat('F j, Y')}"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/loop -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

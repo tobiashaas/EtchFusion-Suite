@@ -1,0 +1,79 @@
+<!-- wp:etch/element {"metadata":{"name":"Feature Section Mike"},"tag":"section","attributes":{"data-etch-element":"section","class":"feature-section-mike"},"styles":["etch-section-style","5a36335"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Grid Mike"},"tag":"div","attributes":{"data-etch-element":"container","class":"feature-grid-mike"},"styles":["etch-container-style","5a3daf0"]} -->
+<!-- wp:etch/element {"metadata":{"name":"List Container"},"tag":"div","attributes":{"class":"feature-grid-mike__list-container"},"styles":["5a403dc"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content Wrapper"},"tag":"div","attributes":{"class":"feature-grid-mike__content-wrapper"},"styles":["5a40407"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Header"},"tag":"div","attributes":{"class":"feature-grid-mike__header"},"styles":["5a40456"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-grid-mike__heading"},"styles":["5a40459"]} -->
+<!-- wp:etch/text {"content":"I am a heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"feature-grid-mike__lede"},"styles":["5a4045b"]} -->
+<!-- wp:etch/text {"content":"Here goes your text ... Select any part of your text to access the formatting toolbar."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Alpha"},"tag":"ul","attributes":{"class":"list-alpha"},"styles":["5a36355"]} -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"list-alpha__li"},"styles":["5a36372"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a36375"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"span","attributes":{"class":"list-alpha__text"},"styles":["5a36377"]} -->
+<!-- wp:etch/text {"content":"This is a list item."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"list-alpha__li"},"styles":["5a36372"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a36375"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"span","attributes":{"class":"list-alpha__text"},"styles":["5a36377"]} -->
+<!-- wp:etch/text {"content":"This is a list item."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"list-alpha__li"},"styles":["5a36372"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a36375"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"span","attributes":{"class":"list-alpha__text"},"styles":["5a36377"]} -->
+<!-- wp:etch/text {"content":"This is a list item."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"list-alpha__li"},"styles":["5a36372"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a36375"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"span","attributes":{"class":"list-alpha__text"},"styles":["5a36377"]} -->
+<!-- wp:etch/text {"content":"This is a list item."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"List Item"},"tag":"li","attributes":{"class":"list-alpha__li"},"styles":["5a36372"]} -->
+<!-- wp:etch/svg {"tag":"svg","attributes":[],"styles":["5a36375"]} -->
+<!-- /wp:etch/svg -->
+<!-- wp:etch/element {"metadata":{"name":"Text"},"tag":"span","attributes":{"class":"list-alpha__text"},"styles":["5a36377"]} -->
+<!-- wp:etch/text {"content":"This is a list item."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"a","attributes":{"href":"#","class":"btn--primary btn--primary"},"styles":["5a30b3e"]} -->
+<!-- wp:etch/text {"content":"Call to action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Cards Wrapper"},"tag":"ul","attributes":{"class":"feature-grid-mike__cards-wrapper"},"styles":["5a40438"]} -->
+<!-- wp:etch/loop {"loopId":"feature-card-echo_d3dce9a2","itemId":"item"} -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Echo"},"tag":"li","attributes":{"class":"feature-card-echo"},"styles":["5a363ef"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"feature-card-echo__image"},"styles":["5a36450"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"mediaId":"{item.image.id}"}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Overlay"},"tag":"div","attributes":{"class":"feature-card-echo__overlay"},"styles":["5a36426"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-echo__heading"},"styles":["5a364d4","906ae2f"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading Link"},"tag":"a","attributes":{"href":"#"},"styles":[]} -->
+<!-- wp:etch/text {"content":"{item.title}"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Paragraph"},"tag":"p","attributes":{"class":"feature-card-echo__text"},"styles":["5a36485"]} -->
+<!-- wp:etch/text {"content":"{item.content.stripTags().truncateWords(10)}"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/loop -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accessibility Code"},"tag":"div","attributes":[],"styles":[],"script":{"code":"Ly8gVG8gZW5hYmxlIGNvZGUgZXhlY3V0aW9uIGdvIHRvIEJyaWNrcyA+IFNldHRpbmdzID4gQnVpbGRlciBBY2Nlc3MuIAovLyBZb3UgbXVzdCBhbHNvIG1ha2Ugc3VyZSAiZXhlY3V0ZSBjb2RlIGJsb2NrIiBpcyB0b2dnbGVkIG9uIHRoaXMgQnJpY2tzIGNvZGUgZWxlbWVudC4KCgpjb25zdCBjYXJkID0gJy5mci1mZWF0dXJlLWNhcmQtZWNobycgCmNvbnN0IGZlYXR1cmVDYXJkcyA9IGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoY2FyZCk7Cgpmb3IgKHZhciBpID0gMDsgaSA8IGZlYXR1cmVDYXJkcy5sZW5ndGg7IGkrKykgewogIGNvbnN0IGMgPSBmZWF0dXJlQ2FyZHNbaV0KICBjb25zdCB0ZXh0U2VsZWN0b3IgPSBgJHtjYXJkfV9fdGV4dGAKICBjb25zdCBjYXJkVGV4dCA9IGMucXVlcnlTZWxlY3Rvcih0ZXh0U2VsZWN0b3IpCiAgY29uc3QgaGVhZGluZyA9IGMucXVlcnlTZWxlY3RvcihgJHtjYXJkfV9faGVhZGluZyA+IGFgKQogIGNvbnN0IHRleHRIZWlnaHQgPSBjYXJkVGV4dC5vZmZzZXRIZWlnaHQ7CgogIGNhcmRUZXh0LnN0eWxlLmhlaWdodCA9ICcxcHgnOwoKICBjLmFkZEV2ZW50TGlzdGVuZXIoJ21vdXNlb3ZlcicsIGZ1bmN0aW9uKCkgewogICAgICB0aGlzLnF1ZXJ5U2VsZWN0b3IodGV4dFNlbGVjdG9yKS5zdHlsZS5oZWlnaHQgPSB0ZXh0SGVpZ2h0ICsgJ3B4JzsKICAgICAgdGhpcy5xdWVyeVNlbGVjdG9yKHRleHRTZWxlY3Rvcikuc3R5bGUub3BhY2l0eSA9ICcxJzsKICB9KTsKCiAgYy5hZGRFdmVudExpc3RlbmVyKCdtb3VzZW91dCcsIGZ1bmN0aW9uKCkgewogICAgdGhpcy5xdWVyeVNlbGVjdG9yKHRleHRTZWxlY3Rvcikuc3R5bGUuaGVpZ2h0ID0gJzFweCc7CiAgICB0aGlzLnF1ZXJ5U2VsZWN0b3IodGV4dFNlbGVjdG9yKS5zdHlsZS5vcGFjaXR5ID0gJzAnOwogIH0pOwoKICBoZWFkaW5nLmFkZEV2ZW50TGlzdGVuZXIoJ2ZvY3VzJywgZnVuY3Rpb24oKSB7CiAgICBjLnF1ZXJ5U2VsZWN0b3IodGV4dFNlbGVjdG9yKS5zdHlsZS5oZWlnaHQgPSB0ZXh0SGVpZ2h0ICsgJ3B4JzsKICAgIGMucXVlcnlTZWxlY3Rvcih0ZXh0U2VsZWN0b3IpLnN0eWxlLm9wYWNpdHkgPSAnMSc7CiAgfSk7CgogIGhlYWRpbmcuYWRkRXZlbnRMaXN0ZW5lcignYmx1cicsIGZ1bmN0aW9uKCkgewogICAgYy5xdWVyeVNlbGVjdG9yKHRleHRTZWxlY3Rvcikuc3R5bGUuaGVpZ2h0ID0gJzFweCc7CiAgICBjLnF1ZXJ5U2VsZWN0b3IodGV4dFNlbGVjdG9yKS5zdHlsZS5vcGFjaXR5ID0gJzAnOwogIH0pOwogIAp9"}} -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->

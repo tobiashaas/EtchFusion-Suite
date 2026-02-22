@@ -324,11 +324,24 @@ class EFS_Migration_Starter {
 			$existing_id     = isset( $progress_data['migrationId'] ) ? (string) $progress_data['migrationId'] : '';
 			$existing_status = isset( $progress_data['status'] ) ? (string) $progress_data['status'] : 'idle';
 			$is_stale        = ! empty( $progress_data['is_stale'] ) || 'stale' === $existing_status;
-			if ( '' !== $existing_id && in_array( $existing_status, array( 'running', 'receiving' ), true ) && ! $is_stale ) {
-				return new \WP_Error( 'migration_in_progress', __( 'A migration is already in progress.', 'etch-fusion-suite' ) );
+			if ( '' !== $existing_id && in_array( $existing_status, array( 'running', 'receiving' ), true ) ) {
+				if ( ! $is_stale ) {
+					return new \WP_Error( 'migration_in_progress', __( 'A migration is already in progress.', 'etch-fusion-suite' ) );
+				}
+				// Stale run: clear state so a new migration can start.
+				$this->migration_repository->delete_progress();
+				$this->migration_repository->delete_steps();
+				$this->migration_repository->delete_token_data();
+				$this->progress_manager->store_active_migration( array() );
 			}
 
 			$context = $this->prepare_migration_context( $migration_key, $target_url );
+			// #region agent log
+			$efs_log_starter = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
+			if ( $efs_log_starter ) {
+				file_put_contents( $efs_log_starter, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'prepare_migration_context result (async)', 'data' => array( 'is_wp_error' => is_wp_error( $context ), 'code' => is_wp_error( $context ) ? $context->get_error_code() : null, 'message' => is_wp_error( $context ) ? $context->get_error_message() : null ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
+			}
+			// #endregion
 			if ( is_wp_error( $context ) ) {
 				return $context;
 			}
@@ -354,6 +367,11 @@ class EFS_Migration_Starter {
 
 			$this->spawn_handler->spawn_migration_background_request( $migration_id, $nonce );
 
+			// #region agent log
+			if ( isset( $efs_log_starter ) && $efs_log_starter ) {
+				file_put_contents( $efs_log_starter, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'start_migration_async spawn called', 'data' => array( 'migration_id' => $migration_id ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
+			}
+			// #endregion
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),
 				'steps'       => $this->progress_manager->get_steps_state(),

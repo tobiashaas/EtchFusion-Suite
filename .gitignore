@@ -12,6 +12,9 @@
 .codex/
 traycerAI.md
 
+# Debug artefacts (never commit ad-hoc log files)
+debug-*.log
+
 # Local editor state
 .history/
 *.swp

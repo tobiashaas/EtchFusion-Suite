@@ -245,20 +245,6 @@ class EFS_Migration_Manager {
 	}
 
 	/**
-	 * Get migration status
-	 */
-	public function get_migration_status() {
-		return $this->migration_service->get_migration_status();
-	}
-
-	/**
-	 * Resume migration
-	 */
-	public function resume_migration( $migration_key, $target_url = null, $batch_size = null ) {
-		return $this->migration_service->resume_migration( $migration_key, $target_url, $batch_size );
-	}
-
-	/**
 	 * Validate target site requirements only
 	 * This runs on the TARGET site (Etch), not the source site (Bricks)
 	 */

@@ -23,7 +23,6 @@ async function runCommand(command, args, cwd = process.cwd()) {
     const child = spawn(command, args, {
       cwd,
       stdio: 'pipe',
-      shell: true
     });
 
     let stdout = '';
@@ -50,10 +49,12 @@ async function runCommand(command, args, cwd = process.cwd()) {
 /** Run wp-env and return { code, stdout, stderr } (no throw). */
 async function runWpEnv(args) {
   return new Promise((resolve) => {
-    const child = spawn('npx', ['wp-env', ...args], {
-      stdio: 'pipe',
-      shell: true
-    });
+    const isWin = process.platform === 'win32';
+    const child = spawn(
+      isWin ? 'cmd' : 'npx',
+      isWin ? ['/c', 'npx', 'wp-env', ...args] : ['wp-env', ...args],
+      { stdio: 'pipe', cwd: path.resolve(__dirname, '..') }
+    );
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (data) => {
@@ -191,7 +192,7 @@ async function checkBricksLicense() {
  */
 async function ensureDefaultTheme() {
   try {
-    await runCommand('npx', ['wp-env', 'run', 'cli', 'wp', 'theme', 'install', 'twentytwentyfour']);
+    await runCommand(process.platform === 'win32' ? 'cmd' : 'npx', process.platform === 'win32' ? ['/c', 'npx', 'wp-env', 'run', 'cli', 'wp', 'theme', 'install', 'twentytwentyfour'] : ['wp-env', 'run', 'cli', 'wp', 'theme', 'install', 'twentytwentyfour']);
     log('Bricks: twentytwentyfour installed as fallback (not activated)');
   } catch (err) {
     log(`Bricks: fallback theme install skipped or failed (${err.message})`);
@@ -219,7 +220,7 @@ async function ensureDefaultTheme() {
   }
 
   try {
-    await runCommand('npx', ['wp-env', 'run', 'tests-cli', 'wp', 'theme', 'install', 'twentytwentyfour', '--activate']);
+    await runCommand(process.platform === 'win32' ? 'cmd' : 'npx', process.platform === 'win32' ? ['/c', 'npx', 'wp-env', 'run', 'tests-cli', 'wp', 'theme', 'install', 'twentytwentyfour', '--activate'] : ['wp-env', 'run', 'tests-cli', 'wp', 'theme', 'install', 'twentytwentyfour', '--activate']);
     log('Etch: twentytwentyfour installed and activated');
   } catch (err) {
     log(`Etch: default theme install/activate skipped or failed (${err.message})`);
@@ -244,7 +245,7 @@ async function installBricks() {
 
     let themes = [];
     try {
-      const { stdout: themeList } = await runCommand('npx', ['wp-env', 'run', 'cli', 'wp', 'theme', 'list', '--status=active', '--format=json']);
+      const { stdout: themeList } = await runCommand(process.platform === 'win32' ? 'cmd' : 'npx', process.platform === 'win32' ? ['/c', 'npx', 'wp-env', 'run', 'cli', 'wp', 'theme', 'list', '--status=active', '--format=json'] : ['wp-env', 'run', 'cli', 'wp', 'theme', 'list', '--status=active', '--format=json']);
       themes = JSON.parse(themeList || '[]');
     } catch {
       themes = [];
@@ -310,7 +311,7 @@ async function main() {
     await cleanupBricksFromTests();
 
     log('Installing Composer dependencies in cli (Bricks)...');
-    await runCommand('npx', ['wp-env', 'run', 'cli', '--env-cwd=wp-content/plugins/etch-fusion-suite', 'composer', 'install', '--no-dev', '--optimize-autoloader']);
+    await runCommand(process.platform === 'win32' ? 'cmd' : 'npx', process.platform === 'win32' ? ['/c', 'npx', 'wp-env', 'run', 'cli', '--env-cwd=wp-content/plugins/etch-fusion-suite', 'composer', 'install', '--no-dev', '--optimize-autoloader'] : ['wp-env', 'run', 'cli', '--env-cwd=wp-content/plugins/etch-fusion-suite', 'composer', 'install', '--no-dev', '--optimize-autoloader']);
     const verify = await runWpEnv(['run', 'cli', 'test', '-f', 'wp-content/plugins/etch-fusion-suite/vendor/autoload.php']);
     if (verify.code !== 0) {
       error('Missing vendor/autoload.php in cli. Run `npm run composer:install` then retry.');

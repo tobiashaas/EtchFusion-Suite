@@ -1,0 +1,84 @@
+<!-- wp:etch/element {"metadata":{"name":"Feature Section Sierra"},"tag":"section","attributes":{"data-etch-element":"section","class":"feature-section-sierra"},"styles":["etch-section-style","5a3fbd8"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Intro Alpha"},"tag":"div","attributes":{"data-etch-element":"container","class":"intro-alpha"},"styles":["etch-container-style","5a39564"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h2","attributes":{"class":"intro-alpha__heading"},"styles":["5a395a0"]} -->
+<!-- wp:etch/text {"content":"Your heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading intro-alpha__accent-heading"},"styles":["5a338ac","5a3956c"]} -->
+<!-- wp:etch/text {"content":"Accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"intro-alpha__lede lede"},"styles":["5a395a4"]} -->
+<!-- wp:etch/text {"content":"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Grid Sierra"},"tag":"ul","attributes":{"data-etch-element":"container","class":"feature-grid-sierra"},"styles":["etch-container-style","5a3fbf7"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Sierra"},"tag":"li","attributes":{"class":"feature-card-sierra"},"styles":["5a3fc22"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"feature-card-sierra__content-wrapper"},"styles":["5a3fc3d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-sierra__heading"},"styles":["5a3fc40"]} -->
+<!-- wp:etch/text {"content":"This is just a placeholder headline, we will replace it once your website copy is finalized."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading feature-card-sierra__accent-heading"},"styles":["5a338ac","5a40541"]} -->
+<!-- wp:etch/text {"content":"accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"feature-card-sierra__lede"},"styles":["5a3fc42"]} -->
+<!-- wp:etch/text {"content":"This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"a","attributes":{"href":"#","class":"btn--primary feature-card-sierra__cta btn--primary"},"styles":["5a30b3e","5a40529"]} -->
+<!-- wp:etch/text {"content":"Call to action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Media"},"tag":"div","attributes":{"class":"feature-card-sierra__media-wrapper"},"styles":["5a3fc5b"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"feature-card-sierra__image"},"styles":["5a3fc7b"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Horizontal-Big.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Sierra"},"tag":"li","attributes":{"class":"feature-card-sierra"},"styles":["5a3fc22"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"feature-card-sierra__content-wrapper"},"styles":["5a3fc3d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-sierra__heading"},"styles":["5a3fc40"]} -->
+<!-- wp:etch/text {"content":"This is just a placeholder headline, we will replace it once your website copy is finalized."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading feature-card-sierra__accent-heading"},"styles":["5a338ac","5a40541"]} -->
+<!-- wp:etch/text {"content":"accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"feature-card-sierra__lede"},"styles":["5a3fc42"]} -->
+<!-- wp:etch/text {"content":"This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"a","attributes":{"href":"#","class":"btn--primary feature-card-sierra__cta btn--primary"},"styles":["5a30b3e","5a40529"]} -->
+<!-- wp:etch/text {"content":"Call to action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Media"},"tag":"div","attributes":{"class":"feature-card-sierra__media-wrapper"},"styles":["5a3fc5b"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"feature-card-sierra__image"},"styles":["5a3fc7b"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Horizontal-Big.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Feature Card Sierra"},"tag":"li","attributes":{"class":"feature-card-sierra"},"styles":["5a3fc22"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Content"},"tag":"div","attributes":{"class":"feature-card-sierra__content-wrapper"},"styles":["5a3fc3d"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Heading"},"tag":"h3","attributes":{"class":"feature-card-sierra__heading"},"styles":["5a3fc40"]} -->
+<!-- wp:etch/text {"content":"This is just a placeholder headline, we will replace it once your website copy is finalized."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Accent Heading"},"tag":"p","attributes":{"class":"accent-heading feature-card-sierra__accent-heading"},"styles":["5a338ac","5a40541"]} -->
+<!-- wp:etch/text {"content":"accent heading"} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Lede"},"tag":"p","attributes":{"class":"feature-card-sierra__lede"},"styles":["5a3fc42"]} -->
+<!-- wp:etch/text {"content":"This is just placeholder text. Don’t be alarmed, this is just here to fill up space since your finalized copy isn’t ready yet. Once we have your content finalized, we’ll replace this placeholder text with your real content."} /-->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Button"},"tag":"a","attributes":{"href":"#","class":"btn--primary feature-card-sierra__cta btn--primary"},"styles":["5a30b3e","5a40529"]} -->
+<!-- wp:etch/text {"content":"Call to action"} /-->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- wp:etch/element {"metadata":{"name":"Media"},"tag":"div","attributes":{"class":"feature-card-sierra__media-wrapper"},"styles":["5a3fc5b"]} -->
+<!-- wp:etch/element {"metadata":{"name":"Image"},"tag":"figure","attributes":{"class":"feature-card-sierra__image"},"styles":["5a3fc7b"]} -->
+<!-- wp:etch/dynamic-image {"metadata":{"name":"Image"},"tag":"img","attributes":{"src":"https://bricks-frames.tobiashaas.dev/wp-content/uploads/Horizontal-Big.svg","alt":""}} -->
+
+<!-- /wp:etch/dynamic-image -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
+<!-- /wp:etch/element -->
