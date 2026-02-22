@@ -37,7 +37,7 @@ const formatContextValue = (value) => {
     if (typeof value === 'object') {
         try {
             return JSON.stringify(value);
-        } catch (error) {
+        } catch {
             return String(value);
         }
     }
@@ -362,9 +362,9 @@ const fetchLogs = async () => {
         allMigrationRuns = data?.migration_runs || [];
         renderAll();
         highlightMigrationFromHash();
-    } catch (error) {
-        console.error('Fetch logs failed', error);
-        showToast(error.message, 'error');
+    } catch (err) {
+        console.error('Fetch logs failed', err);
+        showToast(err.message, 'error');
     }
 };
 
@@ -376,9 +376,9 @@ const clearLogs = async () => {
         allMigrationRuns = [];
         stopAutoRefreshLogs();
         renderAll();
-    } catch (error) {
-        console.error('Clear logs failed', error);
-        showToast(error.message, 'error');
+    } catch (err) {
+        console.error('Clear logs failed', err);
+        showToast(err.message, 'error');
     }
 };
 

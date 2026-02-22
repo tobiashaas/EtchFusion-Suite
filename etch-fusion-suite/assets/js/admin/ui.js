@@ -34,7 +34,7 @@ const fallbackCopy = (value) => {
     let success = false;
     try {
         success = document.execCommand('copy');
-    } catch (error) {
+    } catch {
         success = false;
     }
 

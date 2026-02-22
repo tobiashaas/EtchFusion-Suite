@@ -61,7 +61,7 @@ const parseMigrationUrl = (rawUrl) => {
 	let parsed;
 	try {
 		parsed = new URL(rawUrl.trim());
-	} catch (error) {
+	} catch {
 		throw new Error('Migration key format is invalid.');
 	}
 
@@ -300,7 +300,7 @@ const createWizard = (root) => {
 			const result = await post(ACTION_RUN_PREFLIGHT, { target_url: targetUrl, mode });
 			state.preflight = result;
 			renderPreflightUI(result);
-		} catch (err) {
+		} catch {
 			if (refs.preflightLoading) { refs.preflightLoading.hidden = true; }
 			if (refs.preflightResults) {
 				refs.preflightResults.hidden = false;
@@ -685,7 +685,7 @@ const createWizard = (root) => {
 			} else {
 				state.targetPostTypes = [{ slug: 'post', label: 'Posts' }, { slug: 'page', label: 'Pages' }];
 			}
-		} catch (err) {
+		} catch {
 			state.targetPostTypes = [{ slug: 'post', label: 'Posts' }, { slug: 'page', label: 'Pages' }];
 		}
 	};
@@ -809,7 +809,7 @@ const createWizard = (root) => {
 					refs.cssPreview.innerHTML = `<p><strong>CSS Classes:</strong> ${total.toLocaleString()} <span class="efs-wizard-hint">(all classes)</span></p>`;
 				}
 				refs.cssPreview.hidden = false;
-			} catch (e) {
+			} catch {
 				refs.cssPreview.hidden = true;
 			}
 		}
@@ -1299,11 +1299,11 @@ const createWizard = (root) => {
 				const parsed = parseMigrationUrl(url);
 				token = parsed.token;
 				targetUrl = parsed.origin;
-			} catch (parseError) {
+			} catch {
 				// No embedded token — treat the input as the target site base URL.
 				try {
 					targetUrl = new URL(url.includes('://') ? url : `https://${url}`).origin;
-				} catch (urlError) {
+				} catch {
 					throw new Error('Invalid URL. Enter the target site URL (e.g. https://mysite.com) or paste a migration URL.');
 				}
 			}
@@ -1337,7 +1337,7 @@ const createWizard = (root) => {
 				try {
 					const parsedInput = new URL(url.includes('://') ? url : `https://${url}`);
 					pairingCode = parsedInput.searchParams.get('_efs_pair') || '';
-				} catch (_parseErr) {
+				} catch {
 					// ignore — pairingCode stays empty
 				}
 				if (!pairingCode) {
@@ -1352,7 +1352,7 @@ const createWizard = (root) => {
 				let tokenRes;
 				try {
 					tokenRes = await fetch(generateUrl, { credentials: 'omit' });
-				} catch (fetchError) {
+				} catch {
 					throw new Error(`Could not reach target site at ${targetUrl}. Check the URL and ensure the plugin is active on the target.`);
 				}
 
@@ -1397,7 +1397,7 @@ const createWizard = (root) => {
 				const parsed = parseMigrationUrl(state.migrationUrl);
 				state.migrationKey = state.migrationKey || parsed.token;
 				state.targetUrl = state.targetUrl || parsed.origin;
-			} catch (error) {
+			} catch {
 				// Leave validation errors to the migration start endpoint for now.
 			}
 		}
@@ -1615,7 +1615,7 @@ const createWizard = (root) => {
 					updateNavigationState();
 					showToast('Key pasted.', 'success');
 				}
-			} catch (err) {
+			} catch {
 				showToast('Could not read clipboard. Paste manually.', 'error');
 			}
 		});
@@ -1904,7 +1904,7 @@ const createWizard = (root) => {
 			if (state.migrationUrl && state.migrationKey && state.targetUrl) {
 				try {
 					runtime.validatedMigrationUrl = parseMigrationUrl(state.migrationUrl).normalizedUrl;
-				} catch (error) {
+				} catch {
 					runtime.validatedMigrationUrl = state.migrationUrl;
 				}
 			}
@@ -1966,7 +1966,7 @@ const createWizard = (root) => {
 						await runBatchLoop(state.migrationId);
 						return true;
 					}
-				} catch (e) {
+				} catch {
 					// No valid checkpoint — fall through to return false.
 				}
 				return false;
@@ -2007,7 +2007,7 @@ const createWizard = (root) => {
 				startPolling(state.migrationId);
 			}
 			return true;
-		} catch (error) {
+		} catch {
 			return false;
 		}
 	};

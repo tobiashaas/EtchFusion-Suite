@@ -20,7 +20,7 @@ const extractHost = (value) => {
     try {
         const parsed = new URL(value);
         return parsed.host || value;
-    } catch (error) {
+    } catch {
         return value;
     }
 };
@@ -157,7 +157,7 @@ export const initReceivingStatus = () => {
             }
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? new Set(parsed.filter(Boolean)) : new Set();
-        } catch (error) {
+        } catch {
             return new Set();
         }
     };
@@ -165,7 +165,7 @@ export const initReceivingStatus = () => {
     const writeDismissedKeys = (keys) => {
         try {
             window.sessionStorage.setItem(STORAGE_KEY_DISMISSED, JSON.stringify(Array.from(keys)));
-        } catch (error) {
+        } catch {
             // Ignore storage failures; UI should still work in-memory.
         }
     };

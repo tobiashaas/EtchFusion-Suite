@@ -1,8 +1,7 @@
 /**
  * Format elapsed seconds as mm:ss. Returns '00:00' for null/negative/invalid.
- *
- * @param {number|null|undefined} seconds
- * @return {string}
+ * @param {number|null|undefined} seconds - Elapsed seconds to format.
+ * @returns {string} Formatted string mm:ss or '00:00'.
  */
 export const formatElapsed = (seconds) => {
     if (seconds == null || typeof seconds !== 'number' || seconds < 0 || Number.isNaN(seconds)) {
@@ -15,9 +14,8 @@ export const formatElapsed = (seconds) => {
 
 /**
  * Format ETA seconds for display. Returns null when ETA is not available so callers can hide the ETA.
- *
- * @param {number|null|undefined} seconds
- * @return {string|null}
+ * @param {number|null|undefined} seconds - ETA seconds to format.
+ * @returns {string|null} Human-readable ETA string or null.
  */
 export const formatEta = (seconds) => {
     if (seconds == null || seconds === 0 || typeof seconds !== 'number' || Number.isNaN(seconds) || seconds < 0) {
