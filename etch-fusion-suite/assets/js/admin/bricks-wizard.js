@@ -311,7 +311,11 @@ const createWizard = (root) => {
 	};
 
 	const invalidateAndRecheck = async () => {
-		await post(ACTION_INVALIDATE_PREFLIGHT, {});
+		try {
+			await post(ACTION_INVALIDATE_PREFLIGHT, {});
+		} catch (err) {
+			console.warn('[EFS] Preflight cache invalidation failed', err);
+		}
 		await runPreflightCheck(state.targetUrl || '', state.mode || 'browser');
 	};
 
@@ -1663,8 +1667,14 @@ const createWizard = (root) => {
 		refs.progressCancelButton?.addEventListener('click', handleCancel);
 		refs.preflightRecheck?.addEventListener('click', async () => {
 			if (refs.preflightRecheck) { refs.preflightRecheck.disabled = true; }
-			await invalidateAndRecheck();
-			if (refs.preflightRecheck) { refs.preflightRecheck.disabled = false; }
+			try {
+				await invalidateAndRecheck();
+			} catch (err) {
+				console.warn('[EFS] Preflight recheck failed', err);
+				showToast(err?.message || 'Preflight recheck failed. Please try again.', 'error');
+			} finally {
+				if (refs.preflightRecheck) { refs.preflightRecheck.disabled = false; }
+			}
 		});
 		refs.preflightConfirm?.addEventListener('change', (e) => {
 			state.preflightConfirmed = e.target.checked;
