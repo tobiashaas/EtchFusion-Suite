@@ -5,7 +5,6 @@
  * Thin facade that delegates to focused service classes:
  * - EFS_Migration_Orchestrator  — start / run / finalize the full migration flow
  * - EFS_Batch_Processor         — batched media + posts processing
- * - EFS_Legacy_Batch_Fallback   — inline batch loop for callers without phase handlers
  *
  * @package Bricks2Etch\Services
  */
@@ -26,28 +25,22 @@ class EFS_Migration_Service {
 	/** @var EFS_Batch_Processor */
 	private $batch_processor;
 
-	/** @var EFS_Legacy_Batch_Fallback */
-	private $legacy_batch_fallback;
-
 	/** @var Migration_Repository_Interface */
 	private $migration_repository;
 
 	/**
 	 * @param EFS_Migration_Orchestrator     $orchestrator
 	 * @param EFS_Batch_Processor            $batch_processor
-	 * @param EFS_Legacy_Batch_Fallback      $legacy_batch_fallback
 	 * @param Migration_Repository_Interface $migration_repository
 	 */
 	public function __construct(
 		EFS_Migration_Orchestrator $orchestrator,
 		EFS_Batch_Processor $batch_processor,
-		EFS_Legacy_Batch_Fallback $legacy_batch_fallback,
 		Migration_Repository_Interface $migration_repository
 	) {
-		$this->orchestrator          = $orchestrator;
-		$this->batch_processor       = $batch_processor;
-		$this->legacy_batch_fallback = $legacy_batch_fallback;
-		$this->migration_repository  = $migration_repository;
+		$this->orchestrator         = $orchestrator;
+		$this->batch_processor      = $batch_processor;
+		$this->migration_repository = $migration_repository;
 	}
 
 	// -------------------------------------------------------------------------
@@ -163,8 +156,6 @@ class EFS_Migration_Service {
 	/**
 	 * Process a single batch for the JS-driven batch loop.
 	 *
-	 * Delegates to EFS_Batch_Processor (DI path) or EFS_Legacy_Batch_Fallback.
-	 *
 	 * @param string $migration_id Migration ID.
 	 * @param array  $batch        Batch options. Accepts key 'batch_size' (int).
 	 * @return array|\WP_Error
@@ -175,17 +166,12 @@ class EFS_Migration_Service {
 		$migration_key            = is_array( $active ) && isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
 		$active_migration_options = is_array( $active ) && isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
 
-		if ( '' !== $target_url || '' !== $migration_key ) {
-			return $this->batch_processor->process_batch(
-				(string) $migration_id,
-				$batch,
-				$target_url,
-				$migration_key,
-				$active_migration_options
-			);
-		}
-
-		// Legacy path: no active migration record (e.g. migration_manager.php direct path).
-		return $this->legacy_batch_fallback->process_batch( (string) $migration_id, $batch );
+		return $this->batch_processor->process_batch(
+			(string) $migration_id,
+			$batch,
+			$target_url,
+			$migration_key,
+			$active_migration_options
+		);
 	}
 }

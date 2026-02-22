@@ -53,8 +53,6 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 */
 	protected function register_hooks() {
 		add_action( 'wp_ajax_efs_start_migration', array( $this, 'start_migration' ) );
-		add_action( 'wp_ajax_nopriv_efs_run_migration_background', array( $this, 'run_migration_background' ) );
-		add_action( 'wp_ajax_efs_run_migration_background', array( $this, 'run_migration_background' ) );
 		add_action( 'wp_ajax_efs_get_migration_progress', array( $this, 'get_progress' ) );
 		add_action( 'wp_ajax_efs_migrate_batch', array( $this, 'process_batch' ) );
 		add_action( 'wp_ajax_efs_resume_migration', array( $this, 'resume_migration' ) );
@@ -67,16 +65,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * Start migration.
 	 */
 	public function start_migration() {
-		// #region agent log
-		$efs_log = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
-		if ( $efs_log ) {
-			file_put_contents( $efs_log, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'start_migration entry', 'data' => array(), 'hypothesisId' => 'E' ) ) . "\n", FILE_APPEND | LOCK_EX );
-		}
-		// #endregion
 		if ( ! $this->verify_request( 'manage_options' ) ) {
-			// #region agent log
-			if ( $efs_log ) { file_put_contents( $efs_log, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'verify_request failed', 'data' => array(), 'hypothesisId' => 'E' ) ) . "\n", FILE_APPEND | LOCK_EX ); }
-			// #endregion
 			return;
 		}
 
@@ -85,9 +74,6 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		if ( ! $this->require_migration_controller( 'Start migration aborted: migration controller unavailable.' ) ) {
-			// #region agent log
-			if ( isset( $efs_log ) && $efs_log ) { file_put_contents( $efs_log, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'require_migration_controller failed', 'data' => array(), 'hypothesisId' => 'E' ) ) . "\n", FILE_APPEND | LOCK_EX ); }
-			// #endregion
 			return;
 		}
 
@@ -102,152 +88,9 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			'nonce'               => $this->get_post( 'nonce', '', 'raw' ),
 		);
 
-		$result = $this->migration_controller->start_migration( $payload );
-
-		// #region agent log
-		$efs_log_start = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
-		if ( $efs_log_start ) {
-			file_put_contents( $efs_log_start, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'start_migration result', 'data' => array( 'is_wp_error' => is_wp_error( $result ), 'code' => is_wp_error( $result ) ? $result->get_error_code() : null, 'message' => is_wp_error( $result ) ? $result->get_error_message() : null, 'migrationId' => is_array( $result ) ? ( $result['migrationId'] ?? null ) : null ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
-		}
-		// #endregion
+		$result     = $this->migration_controller->start_migration( $payload );
 		$extra_data = is_wp_error( $result ) ? array() : array( 'migration_id' => $result['migrationId'] ?? null );
 		$this->send_controller_response( $result, 'migration_start_failed', 'Migration started successfully.', $extra_data );
-	}
-
-	/**
-	 * Run migration in background (invoked by spawn; no user context).
-	 */
-	public function run_migration_background() {
-		$migration_id = isset( $_POST['migration_id'] ) ? sanitize_text_field( wp_unslash( $_POST['migration_id'] ) ) : '';
-		$bg_token     = isset( $_POST['bg_token'] ) ? sanitize_text_field( wp_unslash( $_POST['bg_token'] ) ) : '';
-
-		// #region agent log
-		$efs_log_bg = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
-		if ( $efs_log_bg ) {
-			$stored_token = $migration_id ? get_transient( 'efs_bg_' . $migration_id ) : false;
-			file_put_contents( $efs_log_bg, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'run_migration_background entry', 'data' => array( 'migration_id' => $migration_id, 'has_bg_token' => '' !== $bg_token, 'transient_exists' => false !== $stored_token, 'token_match' => ( false !== $stored_token && $stored_token === $bg_token ) ), 'hypothesisId' => 'C' ) ) . "\n", FILE_APPEND | LOCK_EX );
-		}
-		// #endregion
-		if ( ! $this->migration_controller instanceof EFS_Migration_Controller ) {
-			wp_die( '0', 503 );
-		}
-
-		$migration_repository = null;
-		$error_handler        = null;
-		if ( function_exists( 'etch_fusion_suite_container' ) ) {
-			$container = etch_fusion_suite_container();
-			if ( $container->has( 'migration_repository' ) ) {
-				$migration_repository = $container->get( 'migration_repository' );
-			}
-			if ( $container->has( 'error_handler' ) ) {
-				$error_handler = $container->get( 'error_handler' );
-			}
-		}
-
-		register_shutdown_function(
-			function () use ( $migration_id, $migration_repository, $error_handler ) {
-				$error = error_get_last();
-				if ( ! is_array( $error ) || ! in_array( $error['type'] ?? null, array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
-					return;
-				}
-
-				if ( $migration_repository ) {
-					$progress                         = $migration_repository->get_progress();
-					$current_percentage               = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
-					$progress['migrationId']          = $migration_id;
-					$progress['status']               = 'error';
-					$progress['percentage']           = $current_percentage;
-					$progress['message']              = sprintf( 'Fatal error during migration: %s', $error['message'] ?? '' );
-					$progress['last_updated']         = current_time( 'mysql' );
-					$progress['current_step']         = 'error';
-					$progress['completed_at']         = current_time( 'mysql' );
-					$progress['is_stale']             = false;
-					$progress['current_phase_status'] = 'failed';
-					$migration_repository->save_progress( $progress );
-					$migration_repository->save_active_migration( array() );
-				}
-
-				if ( $error_handler ) {
-					$error_handler->log_error(
-						'E500',
-						array(
-							'message' => $error['message'] ?? '',
-							'file'    => $error['file'] ?? '',
-							'line'    => $error['line'] ?? 0,
-							'action'  => 'Fatal error during background migration',
-						)
-					);
-				}
-			}
-		);
-
-		$result = $this->migration_controller->run_migration_execution( $migration_id, $bg_token );
-		// #region agent log
-		if ( isset( $efs_log_bg ) && $efs_log_bg ) {
-			if ( is_wp_error( $result ) ) {
-				file_put_contents( $efs_log_bg, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'run_migration_execution WP_Error', 'data' => array( 'code' => $result->get_error_code(), 'message' => $result->get_error_message() ), 'hypothesisId' => 'D' ) ) . "\n", FILE_APPEND | LOCK_EX );
-			} else {
-				$progress = isset( $result['progress'] ) && is_array( $result['progress'] ) ? $result['progress'] : array();
-				file_put_contents( $efs_log_bg, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'run_migration_execution success', 'data' => array( 'completed' => isset( $result['completed'] ) && $result['completed'], 'posts_ready' => isset( $result['posts_ready'] ) && $result['posts_ready'], 'step' => isset( $progress['current_step'] ) ? $progress['current_step'] : null, 'status' => isset( $progress['status'] ) ? $progress['status'] : null ) ) ) . "\n", FILE_APPEND | LOCK_EX );
-			}
-		}
-		// #endregion
-		if ( is_wp_error( $result ) ) {
-			$this->save_background_error( $migration_repository, $migration_id, $result->get_error_message() );
-			wp_die( '0', 400 );
-		}
-
-		// Use result from run_migration_execution: when batching is pending, return completed false and progress/posts_ready.
-		$completed = isset( $result['completed'] ) && $result['completed'];
-		$payload   = array(
-			'completed'   => $completed,
-			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
-			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
-			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : $migration_id,
-		);
-		if ( isset( $result['posts_ready'] ) ) {
-			$payload['posts_ready'] = (bool) $result['posts_ready'];
-			$payload['total']       = isset( $result['total'] ) ? $result['total'] : 0;
-		}
-
-		// #region agent log
-		if ( isset( $efs_log_bg ) && $efs_log_bg ) {
-			file_put_contents( $efs_log_bg, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'background sending json_success', 'data' => array( 'completed' => $completed ) ) ) . "\n", FILE_APPEND | LOCK_EX );
-		}
-		// #endregion
-		wp_send_json_success( $payload );
-	}
-
-	/**
-	 * Persist an error-state into the progress record from the background handler.
-	 *
-	 * Called when the background process cannot start or the execution returns WP_Error.
-	 * Without this, the client would have to wait for the 600-second stale TTL before
-	 * seeing any feedback.
-	 *
-	 * @param mixed  $migration_repository Repository instance or null.
-	 * @param string $migration_id         Active migration identifier.
-	 * @param string $message              Human-readable error description.
-	 * @return void
-	 */
-	private function save_background_error( $migration_repository, $migration_id, $message ) {
-		if ( ! $migration_repository || '' === $migration_id ) {
-			return;
-		}
-		$progress = $migration_repository->get_progress();
-		if ( ! is_array( $progress ) ) {
-			$progress = array();
-		}
-		$progress['migrationId']          = $migration_id;
-		$progress['status']               = 'error';
-		$progress['current_step']         = 'error';
-		$progress['current_phase_status'] = 'failed';
-		$progress['message']              = $message;
-		$progress['last_updated']         = current_time( 'mysql' );
-		$progress['completed_at']         = current_time( 'mysql' );
-		$progress['is_stale']             = false;
-		$migration_repository->save_progress( $progress );
-		$migration_repository->save_active_migration( array() );
 	}
 
 	/**

@@ -425,16 +425,6 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
-			'background_spawn_handler',
-			function ( $c ) {
-				return new \Bricks2Etch\Services\EFS_Background_Spawn_Handler(
-					$c->get( 'error_handler' ),
-					$c->get( 'async_migration_runner' )
-				);
-			}
-		);
-
-		$container->singleton(
 			'migration_starter',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Starter(
@@ -446,7 +436,6 @@ class EFS_Service_Provider {
 					$c->get( 'media_service' ),
 					$c->get( 'content_service' ),
 					$c->get( 'api_client' ),
-					$c->get( 'background_spawn_handler' ),
 					$c->get( 'error_handler' ),
 					$c->get( 'plugin_detector' ),
 					$c->get( 'migration_repository' )
@@ -484,22 +473,6 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
-			'legacy_batch_fallback',
-			function ( $c ) {
-				return new \Bricks2Etch\Services\EFS_Legacy_Batch_Fallback(
-					$c->get( 'media_service' ),
-					$c->get( 'content_service' ),
-					$c->get( 'api_client' ),
-					$c->get( 'error_handler' ),
-					$c->get( 'progress_manager' ),
-					$c->get( 'migration_repository' ),
-					$c->get( 'migration_runs_repository' ),
-					$c->get( 'run_finalizer' )
-				);
-			}
-		);
-
-		$container->singleton(
 			'migration_orchestrator',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
@@ -522,7 +495,6 @@ class EFS_Service_Provider {
 				return new \Bricks2Etch\Services\EFS_Migration_Service(
 					$c->get( 'migration_orchestrator' ),
 					$c->get( 'batch_processor' ),
-					$c->get( 'legacy_batch_fallback' ),
 					$c->get( 'migration_repository' )
 				);
 			}
@@ -808,11 +780,9 @@ class EFS_Service_Provider {
 			'progress_manager',
 			'run_finalizer',
 			'async_migration_runner',
-			'background_spawn_handler',
 			'migration_starter',
 			'batch_phase_runner',
 			'batch_processor',
-			'legacy_batch_fallback',
 			'migration_orchestrator',
 			'migration_service',
 			'wizard_state_service',

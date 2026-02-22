@@ -322,16 +322,6 @@ class Etch_Fusion_Suite_Plugin {
 	}
 
 	/**
-	 * Add admin menu - REMOVED: This was causing duplicate menus
-	 * Admin menu is now handled by EFS_Admin_Interface class only
-	 */
-
-	/**
-	 * Admin page callback - REMOVED: This was causing duplicate dashboards
-	 * Dashboard rendering is now handled by EFS_Admin_Interface class only
-	 */
-
-	/**
 	 * Plugin activation
 	 */
 	public static function activate() {
@@ -387,25 +377,6 @@ class Etch_Fusion_Suite_Plugin {
 		flush_rewrite_rules();
 	}
 
-	/**
-	 * Plugin activation - DUPLICATE REMOVED
-	 * Using static version instead
-	 */
-
-	/**
-	 * Plugin deactivation - DUPLICATE REMOVED
-	 * Using static version instead
-	 */
-
-	/**
-	 * Create migration tables/options - REMOVED
-	 * No longer needed with static activation
-	 */
-
-	/**
-	 * Clean up transients - REMOVED
-	 * No longer needed with static deactivation
-	 */
 }
 
 /**
@@ -460,8 +431,6 @@ function etch_fusion_suite_debug_log( $message, $data = null, $context = 'ETCH_F
  * Filters:
  * - `etch_fusion_suite_feature_enabled`            (bool $enabled, string $feature_name, bool $default_value)
  * - `etch_fusion_suite_feature_enabled_{$feature}` (bool $enabled, string $feature_key, bool $default_value)
- * - Legacy: `efs_feature_enabled`                  (bool $enabled, string $feature_name, bool $default_value)
- * - Legacy: `efs_feature_enabled_{$feature}`       (bool $enabled, string $feature_key, bool $default_value)
  *
  * @param string $feature_name Feature identifier.
  * @param bool   $default_value Default state if not configured.
@@ -509,19 +478,6 @@ function efs_is_framer_enabled(): bool {
 	} catch ( \Exception $e ) {
 		// Fallback to false if anything goes wrong
 		return false;
-	}
-}
-
-if ( ! function_exists( 'efs_feature_enabled' ) ) {
-	/**
-	 * Legacy wrapper for backwards compatibility.
-	 *
-	 * @deprecated 0.11.27 Use etch_fusion_suite_feature_enabled().
-	 */
-	function efs_feature_enabled( string $feature_name, bool $default_value = false ): bool {
-		_deprecated_function( __FUNCTION__, '0.11.27', 'etch_fusion_suite_feature_enabled' );
-
-		return etch_fusion_suite_feature_enabled( $feature_name, $default_value );
 	}
 }
 

@@ -112,7 +112,6 @@ class EFS_Migration_Manager {
 			$error_handler,
 			$plugin_detector
 		);
-		$spawn_handler    = new \Bricks2Etch\Services\EFS_Background_Spawn_Handler( $error_handler, $async_runner );
 		$starter          = new \Bricks2Etch\Services\EFS_Migration_Starter(
 			$token_manager,
 			$progress_manager,
@@ -122,7 +121,6 @@ class EFS_Migration_Manager {
 			$media_service,
 			$content_service,
 			$api_client,
-			$spawn_handler,
 			$error_handler,
 			$plugin_detector,
 			$migration_repository
@@ -133,16 +131,6 @@ class EFS_Migration_Manager {
 			$progress_manager,
 			$migration_repository,
 			$api_client
-		);
-		$legacy_batch     = new \Bricks2Etch\Services\EFS_Legacy_Batch_Fallback(
-			$media_service,
-			$content_service,
-			$api_client,
-			$error_handler,
-			$progress_manager,
-			$migration_repository,
-			null,
-			$run_finalizer
 		);
 		$media_phase_handler = new EFS_Media_Phase_Handler( $media_service, $error_handler );
 		$posts_phase_handler = new EFS_Posts_Phase_Handler( $content_service, $error_handler );
@@ -171,7 +159,6 @@ class EFS_Migration_Manager {
 		$this->migration_service = new EFS_Migration_Service(
 			$orchestrator,
 			$batch_processor,
-			$legacy_batch,
 			$migration_repository
 		);
 	}
@@ -264,10 +251,4 @@ class EFS_Migration_Manager {
 		return $this->migration_service->migrate_single_post( $post, $migration_key, $target_url );
 	}
 
-	/**
-	 * Migrate Gutenberg/Classic post via WordPress REST API
-	 */
-	private function migrate_gutenberg_post( $post, $migration_key, $target_url = null ) {
-		return $this->migration_service->migrate_single_post( $post, $migration_key, $target_url );
-	}
 }

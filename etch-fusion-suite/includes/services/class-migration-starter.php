@@ -52,9 +52,6 @@ class EFS_Migration_Starter {
 	/** @var EFS_API_Client */
 	private $api_client;
 
-	/** @var EFS_Background_Spawn_Handler */
-	private $spawn_handler;
-
 	/** @var EFS_Error_Handler */
 	private $error_handler;
 
@@ -73,7 +70,6 @@ class EFS_Migration_Starter {
 	 * @param EFS_Media_Service              $media_service
 	 * @param EFS_Content_Service            $content_service
 	 * @param EFS_API_Client                 $api_client
-	 * @param EFS_Background_Spawn_Handler   $spawn_handler
 	 * @param EFS_Error_Handler              $error_handler
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param Migration_Repository_Interface $migration_repository
@@ -87,7 +83,6 @@ class EFS_Migration_Starter {
 		EFS_Media_Service $media_service,
 		EFS_Content_Service $content_service,
 		EFS_API_Client $api_client,
-		EFS_Background_Spawn_Handler $spawn_handler,
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
 		Migration_Repository_Interface $migration_repository
@@ -100,7 +95,6 @@ class EFS_Migration_Starter {
 		$this->media_service        = $media_service;
 		$this->content_service      = $content_service;
 		$this->api_client           = $api_client;
-		$this->spawn_handler        = $spawn_handler;
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
 		$this->migration_repository = $migration_repository;
@@ -137,7 +131,7 @@ class EFS_Migration_Starter {
 			$expires = $context['expires'];
 
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
-			$migration_id = $this->spawn_handler->generate_migration_id();
+			$migration_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'efs_migration_', true );
 			$this->progress_manager->init_progress( $migration_id, $options );
 			$this->progress_manager->store_active_migration(
 				array(
@@ -336,12 +330,6 @@ class EFS_Migration_Starter {
 			}
 
 			$context = $this->prepare_migration_context( $migration_key, $target_url );
-			// #region agent log
-			$efs_log_starter = defined( 'ETCH_FUSION_SUITE_DIR' ) ? ETCH_FUSION_SUITE_DIR . 'debug-916622.log' : null;
-			if ( $efs_log_starter ) {
-				file_put_contents( $efs_log_starter, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'prepare_migration_context result (async)', 'data' => array( 'is_wp_error' => is_wp_error( $context ), 'code' => is_wp_error( $context ) ? $context->get_error_code() : null, 'message' => is_wp_error( $context ) ? $context->get_error_message() : null ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
-			}
-			// #endregion
 			if ( is_wp_error( $context ) ) {
 				return $context;
 			}
@@ -351,7 +339,7 @@ class EFS_Migration_Starter {
 			$expires = $context['expires'];
 
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
-			$migration_id = $this->spawn_handler->generate_migration_id();
+			$migration_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'efs_migration_', true );
 			$this->progress_manager->init_progress( $migration_id, $options );
 			$this->progress_manager->store_active_migration(
 				array(
@@ -365,13 +353,6 @@ class EFS_Migration_Starter {
 				)
 			);
 
-			$this->spawn_handler->spawn_migration_background_request( $migration_id, $nonce );
-
-			// #region agent log
-			if ( isset( $efs_log_starter ) && $efs_log_starter ) {
-				file_put_contents( $efs_log_starter, json_encode( array( 'sessionId' => '916622', 'timestamp' => (int) ( microtime( true ) * 1000 ), 'location' => __FILE__ . ':' . __LINE__, 'message' => 'start_migration_async spawn called', 'data' => array( 'migration_id' => $migration_id ), 'hypothesisId' => 'A' ) ) . "\n", FILE_APPEND | LOCK_EX );
-			}
-			// #endregion
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),
 				'steps'       => $this->progress_manager->get_steps_state(),
