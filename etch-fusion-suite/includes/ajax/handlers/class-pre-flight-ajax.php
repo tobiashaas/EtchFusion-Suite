@@ -81,25 +81,18 @@ class EFS_Pre_Flight_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	}
 
 	/**
-	 * Handle invalidate cache request.
+	 * Handle invalidate preflight cache request.
 	 */
-	public function handle_invalidate_cache() {
+	public function handle_invalidate_cache(): void {
 		if ( ! $this->verify_request( 'manage_options' ) ) {
 			return;
 		}
-
-		if ( ! ( $this->preflight_checker instanceof EFS_Pre_Flight_Checker ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'Pre-flight checker service is unavailable.', 'etch-fusion-suite' ),
-				),
-				503
-			);
+		if ( ! $this->check_rate_limit( 'invalidate_preflight', 30, MINUTE_IN_SECONDS ) ) {
 			return;
 		}
-
-		$this->preflight_checker->invalidate_cache();
-
+		if ( $this->preflight_checker instanceof EFS_Pre_Flight_Checker ) {
+			$this->preflight_checker->invalidate_cache();
+		}
 		wp_send_json_success( array( 'invalidated' => true ) );
 	}
 }

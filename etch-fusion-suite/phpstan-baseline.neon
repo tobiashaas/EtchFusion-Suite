@@ -1,0 +1,397 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Function acf_get_fields not found\.$#'
+			identifier: function.notFound
+			count: 2
+			path: includes/acf_field_groups_migrator.php
+
+		-
+			message: '#^Function acf_import_field_group not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: includes/acf_field_groups_migrator.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_DIR not found\.$#'
+			identifier: constant.notFound
+			count: 4
+			path: includes/admin_interface.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_URL not found\.$#'
+			identifier: constant.notFound
+			count: 4
+			path: includes/admin_interface.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
+			identifier: constant.notFound
+			count: 4
+			path: includes/admin_interface.php
+
+		-
+			message: '#^Action callback returns string but should not return anything\.$#'
+			identifier: return.void
+			count: 1
+			path: includes/ajax/handlers/class-connection-ajax.php
+
+		-
+			message: '#^Cannot call method get\(\) on class\-string\|object\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: includes/ajax/handlers/class-connection-ajax.php
+
+		-
+			message: '#^Method Bricks2Etch\\Ajax\\Handlers\\EFS_Connection_Ajax_Handler\:\:test_export_connection\(\) should return string but empty return statement found\.$#'
+			identifier: return.empty
+			count: 2
+			path: includes/ajax/handlers/class-connection-ajax.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$api_key$#'
+			identifier: parameter.notFound
+			count: 1
+			path: includes/ajax/handlers/class-connection-ajax.php
+
+		-
+			message: '#^Parameter \$audit_logger of method Bricks2Etch\\Ajax\\Handlers\\EFS_CSS_Ajax_Handler\:\:__construct\(\) has invalid type Bricks2Etch\\Security\\B2E_Audit_Logger\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/ajax/handlers/class-css-ajax.php
+
+		-
+			message: '#^Parameter \$input_validator of method Bricks2Etch\\Ajax\\Handlers\\EFS_CSS_Ajax_Handler\:\:__construct\(\) has invalid type Bricks2Etch\\Security\\B2E_Input_Validator\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/ajax/handlers/class-css-ajax.php
+
+		-
+			message: '#^Parameter \$rate_limiter of method Bricks2Etch\\Ajax\\Handlers\\EFS_CSS_Ajax_Handler\:\:__construct\(\) has invalid type Bricks2Etch\\Security\\B2E_Rate_Limiter\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/ajax/handlers/class-css-ajax.php
+
+		-
+			message: '#^Call to static method store\(\) on an unknown class Bricks2Etch\\Ajax\\Handlers\\EFS_Vendor_ActionScheduler\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/ajax/handlers/class-migration-ajax.php
+
+		-
+			message: '#^Function efs_is_framer_enabled not found\.$#'
+			identifier: function.notFound
+			count: 5
+			path: includes/ajax/handlers/class-template-ajax.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/api_endpoints.php
+
+		-
+			message: '#^Function efs_is_framer_enabled not found\.$#'
+			identifier: function.notFound
+			count: 6
+			path: includes/api_endpoints.php
+
+		-
+			message: '#^Method Bricks2Etch\\Api\\EFS_API_Endpoints\:\:validate_request_data\(\) has invalid return type Bricks2Etch\\Api\\WP_Error\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/api_endpoints.php
+
+		-
+			message: '#^Method Bricks2Etch\\Api\\EFS_API_Endpoints\:\:validate_request_data\(\) should return array\|Bricks2Etch\\Api\\WP_Error but returns WP_Error\.$#'
+			identifier: return.type
+			count: 1
+			path: includes/api_endpoints.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:getName\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: includes/container/class-service-container.php
+
+		-
+			message: '#^Call to an undefined method ReflectionType\:\:isBuiltin\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: includes/container/class-service-container.php
+
+		-
+			message: '#^Function efs_is_framer_enabled not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: includes/controllers/class-dashboard-controller.php
+
+		-
+			message: '#^Function efs_is_framer_enabled not found\.$#'
+			identifier: function.notFound
+			count: 7
+			path: includes/controllers/class-template-controller.php
+
+		-
+			message: '#^Method Bricks2Etch\\Controllers\\EFS_Template_Controller\:\:get_extraction_progress\(\) should return array\<string, mixed\> but returns WP_Error\.$#'
+			identifier: return.type
+			count: 1
+			path: includes/controllers/class-template-controller.php
+
+		-
+			message: '#^Method Bricks2Etch\\Controllers\\EFS_Template_Controller\:\:get_saved_templates\(\) should return array but returns WP_Error\.$#'
+			identifier: return.type
+			count: 1
+			path: includes/controllers/class-template-controller.php
+
+		-
+			message: '#^Function etch_fusion_suite_container not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: includes/gutenberg_generator.php
+
+		-
+			message: '#^Class Bricks2Etch\\Services\\EFS_Async_Migration_Runner constructor invoked with 11 parameters, 12 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/migration_manager.php
+
+		-
+			message: '#^Class Bricks2Etch\\Services\\EFS_Batch_Phase_Runner constructor invoked with 5 parameters, 6 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/migration_manager.php
+
+		-
+			message: '#^Class Bricks2Etch\\Services\\EFS_Migration_Starter constructor invoked with 11 parameters, 13 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/migration_manager.php
+
+		-
+			message: '#^Call to static method decode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Call to static method encode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Call to static method urlsafeB64Decode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
+			identifier: class.notFound
+			count: 2
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\BeforeValidException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\ExpiredException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\SignatureInvalidException not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Instantiated class EtchFusionSuite\\Vendor\\Firebase\\JWT\\Key not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migration_token_manager.php
+
+		-
+			message: '#^Function etch_fusion_suite_container not found\.$#'
+			identifier: function.notFound
+			count: 2
+			path: includes/migrators/class-component-migrator.php
+
+		-
+			message: '#^Call to method register\(\) on an unknown class Bricks2Etch\\Migrators\\B2E_Migrator_Registry\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migrators/class-migrator-discovery.php
+
+		-
+			message: '#^Function etch_fusion_suite_container not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: includes/migrators/class-migrator-discovery.php
+
+		-
+			message: '#^Parameter \$registry of method Bricks2Etch\\Migrators\\EFS_Migrator_Discovery\:\:auto_discover_from_directory\(\) has invalid type Bricks2Etch\\Migrators\\B2E_Migrator_Registry\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migrators/class-migrator-discovery.php
+
+		-
+			message: '#^Property Bricks2Etch\\Migrators\\EFS_Migrator_Registry\:\:\$instance has unknown class Bricks2Etch\\Migrators\\B2E_Migrator_Registry as its type\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/migrators/class-migrator-registry.php
+
+		-
+			message: '#^Static property Bricks2Etch\\Migrators\\EFS_Migrator_Registry\:\:\$instance \(Bricks2Etch\\Migrators\\B2E_Migrator_Registry\|null\) does not accept Bricks2Etch\\Migrators\\EFS_Migrator_Registry\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: includes/migrators/class-migrator-registry.php
+
+		-
+			message: '#^Call to method log_warning\(\) on an unknown class EFS_Error_Handler\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/security/class-audit-logger.php
+
+		-
+			message: '#^Parameter \$error_handler of method Bricks2Etch\\Security\\EFS_Audit_Logger\:\:__construct\(\) has invalid type EFS_Error_Handler\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/security/class-audit-logger.php
+
+		-
+			message: '#^Property Bricks2Etch\\Security\\EFS_Audit_Logger\:\:\$error_handler has unknown class EFS_Error_Handler as its type\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/security/class-audit-logger.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$array$#'
+			identifier: parameter.notFound
+			count: 1
+			path: includes/security/class-input-validator.php
+
+		-
+			message: '#^Found usage of constant DOING_AJAX\. Use wp_doing_ajax\(\) instead\.$#'
+			identifier: phpstanWP.wpConstant.fetch
+			count: 1
+			path: includes/security/class-security-headers.php
+
+		-
+			message: '#^Found usage of constant DOING_CRON\. Use wp_doing_cron\(\) instead\.$#'
+			identifier: phpstanWP.wpConstant.fetch
+			count: 1
+			path: includes/security/class-security-headers.php
+
+		-
+			message: '#^Method Bricks2Etch\\Parsers\\EFS_CSS_Converter\:\:import_etch_styles\(\) invoked with 3 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/services/class-css-service.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$api_key$#'
+			identifier: parameter.notFound
+			count: 2
+			path: includes/services/class-css-service.php
+
+		-
+			message: '#^PHPDoc tag @return has invalid value \(array\|\\\\WP_Error API response or error\.\)\: Unexpected token "\\\\\\\\WP_Error", expected type at offset 278 on line 8$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: includes/services/class-css-service.php
+
+		-
+			message: '#^Method Bricks2Etch\\Templates\\EFS_Etch_Template_Generator\:\:generate_style_definitions\(\) should return array\<string, mixed\> but returns list\<array\<string, string\>\>\.$#'
+			identifier: return.type
+			count: 1
+			path: includes/templates/class-etch-template-generator.php
+
+		-
+			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/templates/class-framer-to-etch-converter.php
+
+		-
+			message: '#^Method Bricks2Etch\\Templates\\EFS_Framer_To_Etch_Converter\:\:get_owner_document\(\) has invalid return type Bricks2Etch\\Templates\\DOMDocument\.$#'
+			identifier: class.notFound
+			count: 1
+			path: includes/templates/class-framer-to-etch-converter.php
+
+		-
+			message: '#^Method Bricks2Etch\\Templates\\EFS_Framer_To_Etch_Converter\:\:get_owner_document\(\) should return Bricks2Etch\\Templates\\DOMDocument but returns DOMDocument\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: includes/templates/class-framer-to-etch-converter.php
+
+		-
+			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/templates/class-html-parser.php
+
+		-
+			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: includes/templates/class-html-sanitizer.php
+
+		-
+			message: '#^Call to an undefined method Bricks2Etch\\Templates\\EFS_Template_Analyzer\:\:build_hierarchy\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: includes/templates/class-template-analyzer.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_BASENAME not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/updater/class-github-updater.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_FILE not found\.$#'
+			identifier: constant.notFound
+			count: 1
+			path: includes/updater/class-github-updater.php
+
+		-
+			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: includes/updater/class-github-updater.php
+
+		-
+			message: '#^Variable \$transient in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: includes/updater/class-github-updater.php
+
+		-
+			message: '#^Variable \$nonce might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/views/bricks-setup.php
+
+		-
+			message: '#^Variable \$settings might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: includes/views/bricks-setup.php
+
+		-
+			message: '#^Variable \$is_bricks_site might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: includes/views/dashboard.php
+
+		-
+			message: '#^Variable \$is_etch_site might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: includes/views/dashboard.php
+
+		-
+			message: '#^Function efs_is_framer_enabled not found\.$#'
+			identifier: function.notFound
+			count: 1
+			path: includes/views/template-extractor.php

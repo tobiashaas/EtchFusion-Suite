@@ -1,0 +1,10 @@
+includes:
+    - phpstan-baseline.neon
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 3
+    paths:
+        - includes/
+    bootstrapFiles:
+        - vendor/autoload.php

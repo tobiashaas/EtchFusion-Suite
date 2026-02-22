@@ -23,12 +23,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class EFS_Progress_Manager {
 
-	/**
-	 * Running progress with no updates for this period is stale.
-	 * Allows a new migration to start after an abandoned/hung run.
-	 */
-	private const PROGRESS_STALE_TTL = 300;
-
 	/** @var Progress_Repository_Interface */
 	private $progress_repository;
 
@@ -45,6 +39,16 @@ class EFS_Progress_Manager {
 	) {
 		$this->progress_repository = $progress_repository;
 		$this->steps_manager       = $steps_manager;
+	}
+
+	/**
+	 * Get TTL in seconds after which progress is considered stale.
+	 *
+	 * @param string $mode 'browser' or 'headless'.
+	 * @return int
+	 */
+	private function get_stale_ttl( string $mode ): int {
+		return 'browser' === $mode ? 60 : 300;
 	}
 
 	/**
@@ -72,6 +76,8 @@ class EFS_Progress_Manager {
 			'items_total'              => 0,
 			'mode'                     => $validated_mode,
 			'action_scheduler_id'      => null,
+			'headless_job_count'       => 0,
+			'is_stale'                 => false,
 		);
 
 		$this->progress_repository->save_progress( $progress );
@@ -164,12 +170,12 @@ class EFS_Progress_Manager {
 			$progress['last_updated'] = isset( $progress['started_at'] ) ? $progress['started_at'] : current_time( 'mysql' );
 		}
 
-		$status = isset( $progress['status'] ) ? (string) $progress['status'] : 'idle';
+		$status = isset( $progress['status'] ) ? (string) $progress['status'] : '';
 		if ( in_array( $status, array( 'running', 'receiving' ), true ) ) {
-			$last_updated_ts      = strtotime( (string) $progress['last_updated'] );
-			$is_stale             = false !== $last_updated_ts && ( time() - $last_updated_ts ) >= self::PROGRESS_STALE_TTL;
-			$progress['is_stale'] = $is_stale;
-			if ( $is_stale ) {
+			$stale_ttl       = $this->get_stale_ttl( $progress['mode'] ?? 'browser' );
+			$last_updated_ts = strtotime( $progress['last_updated'] );
+			$progress['is_stale'] = ( $last_updated_ts && ( time() - $last_updated_ts ) >= $stale_ttl );
+			if ( $progress['is_stale'] ) {
 				$progress['status'] = 'stale';
 			}
 		} else {
@@ -211,7 +217,7 @@ class EFS_Progress_Manager {
 	}
 
 	/**
-	 * Refresh `last_updated` in stored progress to prevent stale detection.
+	 * Refresh `last_updated` in stored progress.
 	 * Only updates if migration is actively running.
 	 */
 	public function touch_progress_heartbeat(): void {
@@ -255,6 +261,33 @@ class EFS_Progress_Manager {
 	}
 
 	/**
+	 * Increment headless job re-enqueue count (for monitoring).
+	 *
+	 * @return int New count.
+	 */
+	public function increment_headless_job_count(): int {
+		$progress = $this->progress_repository->get_progress();
+		if ( ! is_array( $progress ) ) {
+			$progress = array();
+		}
+		$count = isset( $progress['headless_job_count'] ) ? max( 0, (int) $progress['headless_job_count'] ) : 0;
+		$progress['headless_job_count'] = $count + 1;
+		$this->progress_repository->save_progress( $progress );
+		return $progress['headless_job_count'];
+	}
+
+	/**
+	 * Reset is_stale flag in stored progress.
+	 */
+	public function reset_stale_flag(): void {
+		$progress = $this->progress_repository->get_progress();
+		if ( is_array( $progress ) ) {
+			$progress['is_stale'] = false;
+			$this->progress_repository->save_progress( $progress );
+		}
+	}
+
+	/**
 	 * Mark migration stats as completed (sets last_migration and status = 'completed').
 	 */
 	public function mark_stats_completed(): void {
@@ -264,16 +297,4 @@ class EFS_Progress_Manager {
 		$this->progress_repository->save_stats( $stats );
 	}
 
-	/**
-	 * Reset the stale flag so the batch loop can restart.
-	 */
-	public function reset_stale_flag(): void {
-		$progress = $this->progress_repository->get_progress();
-		if ( is_array( $progress ) && isset( $progress['is_stale'] ) ) {
-			$progress['is_stale']     = false;
-			$progress['status']       = 'running';
-			$progress['last_updated'] = current_time( 'mysql' );
-			$this->progress_repository->save_progress( $progress );
-		}
-	}
 }

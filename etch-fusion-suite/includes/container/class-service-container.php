@@ -3,9 +3,9 @@ namespace Bricks2Etch\Container;
 
 use Closure;
 use Exception;
-use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
+use EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface;
+use EtchFusionSuite\Vendor\Psr\Container\ContainerInterface;
+use EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface;
 use ReflectionClass;
 use ReflectionException;
 use function esc_html;

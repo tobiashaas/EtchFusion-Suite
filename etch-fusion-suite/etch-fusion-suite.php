@@ -34,16 +34,29 @@ define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
 define( 'EFS_ENABLE_FRAMER', false );
 
-// Load PSR Container via a separate file (always read from disk, not from OPcache).
-require_once ETCH_FUSION_SUITE_DIR . 'includes/load-psr-container.php';
-
-// Then load Composer autoloader for all other dependencies.
-if ( file_exists( ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php' ) ) {
-	require_once ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php';
+// Load Strauss-prefixed vendor first if present; otherwise vendor/autoload with PSR Container shims.
+$etch_fusion_suite_vendor_prefixed = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/autoload.php';
+$etch_fusion_suite_vendor_plain    = ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php';
+if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
+	require_once $etch_fusion_suite_vendor_prefixed;
+} else {
+	if ( file_exists( $etch_fusion_suite_vendor_plain ) ) {
+		require_once $etch_fusion_suite_vendor_plain;
+	}
+	// Shim PSR Container interfaces under Strauss namespace for plugin code that expects prefixed names.
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false ) && interface_exists( 'Psr\Container\ContainerInterface', false ) ) {
+		class_alias( 'Psr\Container\ContainerInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' );
+	}
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface', false ) && interface_exists( 'Psr\Container\ContainerExceptionInterface', false ) ) {
+		class_alias( 'Psr\Container\ContainerExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' );
+	}
+	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface', false ) && interface_exists( 'Psr\Container\NotFoundExceptionInterface', false ) ) {
+		class_alias( 'Psr\Container\NotFoundExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' );
+	}
 }
 
-// Plugin requires PSR Container. Check both interface and class for compatibility.
-$etch_fusion_suite_psr_container_ok = interface_exists( 'Psr\Container\ContainerInterface', false ) || class_exists( 'Psr\Container\ContainerInterface', false );
+// Plugin requires PSR Container. Check prefixed interface for Strauss compatibility.
+$etch_fusion_suite_psr_container_ok = interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false ) || class_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface', false );
 if ( ! $etch_fusion_suite_psr_container_ok ) {
 	add_action(
 		'admin_notices',
@@ -144,12 +157,12 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
-		// Initialize Action Scheduler before other plugins_loaded hooks.
+		// Initialize Action Scheduler before other plugins_loaded hooks (Strauss-prefixed when used).
 		add_action(
 			'plugins_loaded',
 			function () {
-				if ( class_exists( 'ActionScheduler' ) ) {
-					ActionScheduler::init();
+				if ( class_exists( 'EFS_Vendor_ActionScheduler' ) ) {
+					EFS_Vendor_ActionScheduler::init();
 				}
 			},
 			1
@@ -361,6 +374,8 @@ class Etch_Fusion_Suite_Plugin {
              WHERE option_name LIKE '_transient_efs_%' 
              OR option_name LIKE '_transient_timeout_efs_%'"
 		);
+
+		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'efs_batch_lock_%'" );
 
 		// Clear all EFS options
 		$efs_options = array(

@@ -643,7 +643,8 @@ class EFS_Service_Provider {
 					$c->get( 'migration_runs_repository' ),
 					$c->get( 'rate_limiter' ),
 					$c->get( 'input_validator' ),
-					$c->get( 'migration_logger' )
+					$c->get( 'migration_logger' ),
+					$c->get( 'preflight_checker' )
 				);
 			}
 		);

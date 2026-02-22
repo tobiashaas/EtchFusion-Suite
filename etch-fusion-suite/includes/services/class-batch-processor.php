@@ -27,6 +27,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class EFS_Batch_Processor {
 
+	const LOCK_EXPIRY_TTL = 300;
+
+	/** @var string|null */
+	private static $shutdown_lock_key = null;
+
 	/** @var Phase_Handler_Interface[] */
 	private $phase_handlers;
 
@@ -93,15 +98,24 @@ class EFS_Batch_Processor {
 	 * @return array|\WP_Error
 	 */
 	public function process_batch( string $migration_id, array $batch, string $target_url, string $migration_key, array $active_migration_options ) {
-		$lock_key      = 'efs_batch_lock_' . $migration_id;
-		$lock_acquired = false;
+		$lock_key   = 'efs_batch_lock_' . $migration_id;
+		$expiry_key = 'efs_batch_lock_expiry_' . $migration_id;
 
-		if ( get_transient( $lock_key ) ) {
-			return new \WP_Error( 'batch_locked', __( 'A batch is already being processed for this migration.', 'etch-fusion-suite' ) );
+		$got_lock = add_option( $lock_key, '1', '', 'no' );
+		if ( ! $got_lock ) {
+			$expiry_alive = get_transient( $expiry_key );
+			if ( false === $expiry_alive ) {
+				delete_option( $lock_key );
+				$got_lock = add_option( $lock_key, '1', '', 'no' );
+			}
+			if ( ! $got_lock ) {
+				return new \WP_Error( 'batch_locked', __( 'Another batch process is running for this migration.', 'etch-fusion-suite' ) );
+			}
 		}
 
-		set_transient( $lock_key, true, 30 );
-		$lock_acquired = true;
+		set_transient( $expiry_key, '1', self::LOCK_EXPIRY_TTL );
+		self::$shutdown_lock_key = $lock_key;
+		register_shutdown_function( array( self::class, 'release_lock_on_shutdown' ) );
 
 		try {
 			$checkpoint = $this->checkpoint_repository->get_checkpoint();
@@ -140,9 +154,19 @@ class EFS_Batch_Processor {
 				$active_migration_options
 			);
 		} finally {
-			if ( $lock_acquired ) {
-				delete_transient( $lock_key );
-			}
+			delete_option( $lock_key );
+			delete_transient( $expiry_key );
+			self::$shutdown_lock_key = null;
+		}
+	}
+
+	/**
+	 * Release batch lock on shutdown (e.g. fatal error).
+	 */
+	public static function release_lock_on_shutdown(): void {
+		if ( self::$shutdown_lock_key !== null ) {
+			delete_option( self::$shutdown_lock_key );
+			self::$shutdown_lock_key = null;
 		}
 	}
 
@@ -164,9 +188,6 @@ class EFS_Batch_Processor {
 		$remaining = 'media' === $phase
 			? count( isset( $checkpoint['remaining_media_ids'] ) ? (array) $checkpoint['remaining_media_ids'] : array() )
 			: count( isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array() );
-
-		// Reset stale flag so the batch loop can restart.
-		$this->progress_manager->reset_stale_flag();
 
 		return array(
 			'resumed'     => true,

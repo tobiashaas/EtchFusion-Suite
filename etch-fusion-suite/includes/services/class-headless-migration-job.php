@@ -2,8 +2,7 @@
 /**
  * Headless Migration Job Service
  *
- * Runs the migration entirely server-side via Action Scheduler,
- * allowing the browser to be closed during execution.
+ * Registers and runs headless migration via Action Scheduler; handles log cleanup.
  *
  * @package Bricks2Etch\Services
  */
@@ -19,9 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class EFS_Headless_Migration_Job
  *
- * Registers an Action Scheduler action and runs the complete migration
- * workflow inside that action, chunking across multiple AS jobs when the
- * time budget is approaching.
+ * Registers efs_run_headless_migration and efs_cleanup_migration_log; runs batch loop
+ * with time budget and re-enqueue; provides enqueue_job and handle_cleanup_log.
  */
 class EFS_Headless_Migration_Job {
 
@@ -67,84 +65,81 @@ class EFS_Headless_Migration_Job {
 	 * Register WordPress hooks.
 	 */
 	private function register_hooks(): void {
-		add_action( 'efs_run_headless_migration', array( $this, 'run_headless_job' ) );
+		add_action( 'efs_run_headless_migration', array( $this, 'run_headless_job' ), 10, 1 );
+		add_action( 'efs_cleanup_migration_log', array( $this, 'handle_cleanup_log' ), 10, 1 );
 	}
 
 	/**
-	 * Action Scheduler callback: run migration setup and/or batch loop.
+	 * Run headless migration job (Action Scheduler callback).
 	 *
-	 * @param string $migration_id Migration UUID.
+	 * @param string $migration_id Migration ID.
 	 */
 	public function run_headless_job( string $migration_id ): void {
-		// Allow long execution time and ignore client disconnects.
 		set_time_limit( 0 );
 		ignore_user_abort( true );
 
-		// Capture dependencies by value for the shutdown handler.
-		$progress_manager  = $this->progress_manager;
-		$migration_logger  = $this->migration_logger;
-		$captured_id       = $migration_id;
-
+		$migration_logger_shutdown = $this->migration_logger;
 		register_shutdown_function(
-			function () use ( $progress_manager, $migration_logger, $captured_id ) {
+			function () use ( $migration_id, $migration_logger_shutdown ) {
 				$error = error_get_last();
-				if ( null === $error || ! in_array( $error['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
-					return;
+				if ( $error && in_array( $error['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
+					$migration_logger_shutdown->log( $migration_id, 'error', 'Fatal shutdown: ' . $error['message'] );
 				}
-				$message = sprintf(
-					'Fatal error in headless migration: %s in %s on line %d',
-					$error['message'],
-					$error['file'],
-					$error['line']
-				);
-				$progress_data = $progress_manager->get_progress_data();
-				$current_pct   = isset( $progress_data['percentage'] ) ? (int) $progress_data['percentage'] : 0;
-				$progress_manager->update_progress( 'error', $current_pct, $message );
-				$migration_logger->log( $captured_id, 'error', $message );
 			}
 		);
 
-		// Idempotency guard: skip if already complete.
-		if ( $this->progress_manager->is_migration_complete() ) {
+		$progress = $this->progress_manager->get_progress_data();
+		$status   = isset( $progress['status'] ) ? (string) $progress['status'] : '';
+		if ( in_array( $status, array( 'completed', 'error' ), true ) ) {
 			return;
 		}
 
-		// Setup phase: run if no checkpoint exists yet.
 		$checkpoint = $this->migration_repository->get_checkpoint();
-		if ( empty( $checkpoint ) ) {
-			$setup_result = $this->runner->run_migration_execution( $migration_id );
-			if ( is_wp_error( $setup_result ) ) {
-				$this->migration_logger->log( $migration_id, 'error', 'Headless setup phase failed: ' . $setup_result->get_error_message() );
+		if ( empty( $checkpoint ) || (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
+			$runner_result = $this->runner->run_migration_execution( $migration_id );
+			if ( is_wp_error( $runner_result ) ) {
 				return;
 			}
 		}
 
-		// Compute time budget: 80 % of max_execution_time, defaulting to 300 s.
-		$time_limit  = (int) ini_get( 'max_execution_time' );
-		$start_time  = time();
-		$time_budget = $time_limit > 0 ? (int) ( $time_limit * 0.8 ) : 300;
+		$active = $this->progress_manager->get_active_migration();
+		$target_url  = isset( $active['target_url'] ) ? (string) $active['target_url'] : '';
+		$migration_key = isset( $active['migration_key'] ) ? (string) $active['migration_key'] : '';
+		$active_options = isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+		$batch_size = isset( $active['batch_size'] ) ? max( 1, (int) $active['batch_size'] ) : 50;
 
-		// Batch loop.
-		while ( true ) {
-			$result = $this->batch_processor->process_batch( $migration_id );
+		if ( '' === $target_url || '' === $migration_key ) {
+			$this->migration_logger->log( $migration_id, 'error', 'Headless job: missing target_url or migration_key in active migration.' );
+			return;
+		}
 
+		$max_time  = (int) ini_get( 'max_execution_time' );
+		$budget    = $max_time > 0 ? (int) floor( 0.8 * $max_time ) : 0;
+		$start_time = time();
+
+		for ( ; ; ) {
+			$result = $this->batch_processor->process_batch( $migration_id, array(), $target_url, $migration_key, $active_options );
 			if ( is_wp_error( $result ) ) {
-				$error_message = $result->get_error_message();
-				$this->migration_logger->log( $migration_id, 'error', 'Headless batch error: ' . $error_message );
-				$progress_data = $this->progress_manager->get_progress_data();
-				$current_pct   = isset( $progress_data['percentage'] ) ? (int) $progress_data['percentage'] : 0;
-				$this->progress_manager->update_progress( 'error', $current_pct, $error_message );
+				if ( 'no_checkpoint' === $result->get_error_code() ) {
+					$runner_result = $this->runner->run_migration_execution( $migration_id );
+					if ( is_wp_error( $runner_result ) ) {
+						return;
+					}
+					continue;
+				}
 				return;
 			}
 
-			if ( ! empty( $result['completed'] ) ) {
-				$this->migration_logger->log( $migration_id, 'info', 'Headless migration completed.' );
+			$progress = $this->progress_manager->get_progress_data();
+			$status   = isset( $progress['status'] ) ? (string) $progress['status'] : '';
+			if ( in_array( $status, array( 'completed', 'error' ), true ) ) {
+				if ( function_exists( 'as_schedule_single_action' ) ) {
+					as_schedule_single_action( time() + 7 * DAY_IN_SECONDS, 'efs_cleanup_migration_log', array( 'migration_id' => $migration_id ), 'efs-migration' );
+				}
 				return;
 			}
 
-			// Re-queue if time budget is approaching.
-			if ( ( time() - $start_time ) >= $time_budget ) {
-				$this->migration_logger->log( $migration_id, 'info', 'Time budget reached — re-queuing headless migration.' );
+			if ( $budget > 0 && ( time() - $start_time ) >= $budget ) {
 				$this->enqueue_job( $migration_id );
 				return;
 			}
@@ -152,20 +147,35 @@ class EFS_Headless_Migration_Job {
 	}
 
 	/**
-	 * Enqueue a new Action Scheduler job for the given migration.
+	 * Enqueue headless migration job (Action Scheduler).
 	 *
-	 * @param string $migration_id Migration UUID.
-	 * @return int Action ID.
+	 * @param string $migration_id Migration ID.
+	 * @return int Action ID or 0.
 	 */
 	public function enqueue_job( string $migration_id ): int {
 		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
+			$this->migration_logger->log( $migration_id, 'warning', 'Headless: as_enqueue_async_action not available.' );
 			return 0;
 		}
+		$count = $this->progress_manager->increment_headless_job_count();
+		if ( $count > 50 ) {
+			$this->migration_logger->log( $migration_id, 'warning', 'Headless job count exceeds 50; consider checking for stuck migrations.' );
+		}
+		return (int) as_enqueue_async_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+	}
 
-		return (int) as_enqueue_async_action(
-			'efs_run_headless_migration',
-			array( 'migration_id' => $migration_id ),
-			'efs-migration'
-		);
+	/**
+	 * Delete migration log (scheduled cleanup callback).
+	 *
+	 * @param string $migration_id Migration ID.
+	 */
+	public function handle_cleanup_log( string $migration_id ): void {
+		if ( '' === $migration_id ) {
+			return;
+		}
+		$this->migration_logger->delete_log( $migration_id );
+		if ( defined( 'WP_DEBUG_LOG' ) && true === WP_DEBUG_LOG ) {
+			$this->migration_logger->log( $migration_id, 'info', 'Migration log deleted.' );
+		}
 	}
 }

@@ -21,6 +21,9 @@ debug-*.log
 *.swo
 *~
 
+# Strauss prefixed vendor (generated)
+etch-fusion-suite/vendor-prefixed/
+
 # OS files
 .DS_Store
 Thumbs.db

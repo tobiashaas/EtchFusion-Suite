@@ -15,7 +15,11 @@
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "yoast/phpunit-polyfills": "^4.0",
         "phpunit/phpunit": "^9.6",
-        "mockery/mockery": "^1.6"
+        "mockery/mockery": "^1.6",
+        "phpstan/phpstan": "^1.12 || ^2.0",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "brianhenryie/strauss": "^0.19",
+        "roave/security-advisories": "dev-latest"
     },
     "autoload": {
         "psr-4": {
@@ -37,10 +41,24 @@
             "php": "8.1.0"
         },
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "brianhenryie/strauss": true
         },
         "audit": {
             "block-insecure": false
+        }
+    },
+    "extra": {
+        "strauss": {
+            "target_directory": "vendor-prefixed",
+            "namespace_prefix": "EtchFusionSuite\\Vendor\\",
+            "classmap_prefix": "EFS_Vendor_",
+            "packages": [
+                "firebase/php-jwt",
+                "woocommerce/action-scheduler",
+                "psr/container"
+            ],
+            "delete_vendor_files": false
         }
     },
     "audit": {
@@ -50,12 +68,15 @@
         }
     },
     "scripts": {
+        "post-install-cmd": ["vendor/bin/strauss"],
+        "post-update-cmd": ["vendor/bin/strauss"],
         "lint": "phpcs",
         "lint:fix": "phpcbf",
         "phpcs": "vendor/bin/phpcs --standard=phpcs.xml.dist",
         "phpcbf": "vendor/bin/phpcbf --standard=phpcs.xml.dist",
         "phpcs:report": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary",
         "phpcs:full": "vendor/bin/phpcs --standard=phpcs.xml.dist --report=full",
+        "phpstan": "vendor/bin/phpstan analyse",
         "verify-strict": "./scripts/verify-strict-comparison.sh",
         "verify-yoda": "./scripts/verify-yoda-conditions.sh",
         "verify-hooks": "./scripts/verify-hook-prefixing.sh",

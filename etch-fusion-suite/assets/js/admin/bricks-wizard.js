@@ -311,14 +311,8 @@ const createWizard = (root) => {
 	};
 
 	const invalidateAndRecheck = async () => {
-		if (refs.preflightRecheck) { refs.preflightRecheck.disabled = true; }
-		try {
-			await post(ACTION_INVALIDATE_PREFLIGHT, {});
-		} catch (_err) {
-			// ignore invalidation errors
-		}
+		await post(ACTION_INVALIDATE_PREFLIGHT, {});
 		await runPreflightCheck(state.targetUrl || '', state.mode || 'browser');
-		if (refs.preflightRecheck) { refs.preflightRecheck.disabled = false; }
 	};
 
 	const hasValidStep2Selection = () => {
@@ -1667,7 +1661,11 @@ const createWizard = (root) => {
 
 		refs.cancelButton?.addEventListener('click', handleCancel);
 		refs.progressCancelButton?.addEventListener('click', handleCancel);
-		refs.preflightRecheck?.addEventListener('click', () => invalidateAndRecheck());
+		refs.preflightRecheck?.addEventListener('click', async () => {
+			if (refs.preflightRecheck) { refs.preflightRecheck.disabled = true; }
+			await invalidateAndRecheck();
+			if (refs.preflightRecheck) { refs.preflightRecheck.disabled = false; }
+		});
 		refs.preflightConfirm?.addEventListener('change', (e) => {
 			state.preflightConfirmed = e.target.checked;
 			updateNavigationState();
@@ -1818,6 +1816,7 @@ const createWizard = (root) => {
 				}
 
 				updateNavigationState();
+				await invalidateAndRecheck();
 				await saveWizardState();
 			});
 		});

@@ -9,11 +9,11 @@
 namespace Bricks2Etch\Core;
 
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\SignatureInvalidException;
-use Firebase\JWT\BeforeValidException;
+use EtchFusionSuite\Vendor\Firebase\JWT\JWT;
+use EtchFusionSuite\Vendor\Firebase\JWT\Key;
+use EtchFusionSuite\Vendor\Firebase\JWT\ExpiredException;
+use EtchFusionSuite\Vendor\Firebase\JWT\SignatureInvalidException;
+use EtchFusionSuite\Vendor\Firebase\JWT\BeforeValidException;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {

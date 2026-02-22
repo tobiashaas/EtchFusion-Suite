@@ -4,6 +4,7 @@ namespace Bricks2Etch\Ajax\Handlers;
 use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
 use Bricks2Etch\Security\EFS_Audit_Logger;
 use Bricks2Etch\Services\EFS_Migration_Logger;
+use Bricks2Etch\Services\EFS_Pre_Flight_Checker;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -17,6 +18,13 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @var EFS_Audit_Logger
 	 */
 	protected $audit_logger;
+
+	/**
+	 * Pre-flight checker instance (optional).
+	 *
+	 * @var EFS_Pre_Flight_Checker|null
+	 */
+	protected $preflight_checker;
 
 	/**
 	 * Migration runs repository instance.
@@ -40,11 +48,13 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null                            $rate_limiter              Rate limiter instance (optional).
 	 * @param \Bricks2Etch\Security\EFS_Input_Validator|null                         $input_validator           Input validator instance (optional).
 	 * @param EFS_Migration_Logger|null                                               $migration_logger          Migration logger instance (optional).
+	 * @param EFS_Pre_Flight_Checker|null                                             $preflight_checker          Pre-flight checker (optional).
 	 */
-	public function __construct( ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null, ?EFS_Migration_Logger $migration_logger = null ) {
+	public function __construct( ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null, ?EFS_Migration_Logger $migration_logger = null, ?EFS_Pre_Flight_Checker $preflight_checker = null ) {
 		$this->migration_logger          = $migration_logger;
 		$this->audit_logger              = $audit_logger;
 		$this->migration_runs_repository = $migration_runs_repository;
+		$this->preflight_checker         = $preflight_checker;
 
 		if ( null === $this->migration_runs_repository && function_exists( 'etch_fusion_suite_container' ) ) {
 			try {
@@ -64,6 +74,7 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_clear_logs', array( $this, 'clear_logs' ) );
 		add_action( 'wp_ajax_efs_get_logs', array( $this, 'get_logs' ) );
 		add_action( 'wp_ajax_efs_get_migration_log', array( $this, 'handle_get_migration_log' ) );
+		add_action( 'wp_ajax_efs_invalidate_preflight_cache', array( $this, 'invalidate_preflight_cache' ) );
 	}
 
 	public function clear_logs() {
@@ -147,12 +158,23 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		wp_send_json_success(
-			array(
-				'content' => $content,
-				'log_url' => $this->migration_logger->get_log_url( $migration_id ),
-			)
-		);
+		wp_send_json_success( array( 'content' => $content ) );
+	}
+
+	/**
+	 * Invalidate pre-flight check cache.
+	 */
+	public function invalidate_preflight_cache(): void {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+		if ( ! $this->check_rate_limit( 'invalidate_preflight', 30, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+		if ( $this->preflight_checker instanceof EFS_Pre_Flight_Checker ) {
+			$this->preflight_checker->invalidate_cache();
+		}
+		wp_send_json_success( array( 'invalidated' => true ) );
 	}
 
 	public function get_logs() {
