@@ -2,6 +2,10 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
+## [0.12.6] — 2026-02-23
+
+- Release v0.12.6: Security (test_grid_span entfernt, sslverify auf local/dev beschränkt), Migration-Performance (HEAD/DNS-Cache, Resume Batch-Loop). Siehe `etch-fusion-suite/CHANGELOG.md`.
+
 ## [0.11.0] — 2026-02-16
 
 ### Added

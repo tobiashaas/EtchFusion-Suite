@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(No changes yet.)
+
+## [0.12.6] - 2026-02-23
+
 ### Security
 - **`test_grid_span.php` Debug-Skript entfernt (2026-02-21)**: Datei gab rohe WordPress-Option-Daten (alle Bricks Global Classes) und CSS-Converter-Ergebnisse ohne Authentifizierungs- oder ABSPATH-Guard aus. Datei gelöscht; `test_*.php` in `.gitignore` aufgenommen, damit lokale Debug-Skripte nie versehentlich committed werden.
 
