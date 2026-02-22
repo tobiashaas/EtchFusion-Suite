@@ -982,12 +982,13 @@ const createWizard = (root) => {
 
 	const runBatchLoop = async (migrationId) => {
 		runtime.batchFailCount = 0;
+		let currentBatchSize = BATCH_SIZE;
 
 		const processBatch = async () => {
 			try {
 				const payload = await post(ACTION_MIGRATE_BATCH, {
 					migration_id: migrationId,
-					batch_size: BATCH_SIZE,
+					batch_size: currentBatchSize,
 				});
 				runtime.batchFailCount = 0;
 
@@ -1002,6 +1003,11 @@ const createWizard = (root) => {
 				runtime.lastPollTime = performance.now();
 
 				renderProgress(payload);
+
+				if (payload?.memory_pressure) {
+					currentBatchSize = Math.max(1, Math.floor(currentBatchSize / 2));
+					showToast('⚡ Batch size adjusted due to memory pressure', 'info');
+				}
 
 				if (payload?.completed) {
 					perfMetrics.endMigration();

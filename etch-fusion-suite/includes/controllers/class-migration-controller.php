@@ -186,12 +186,13 @@ class EFS_Migration_Controller {
 			return $result;
 		}
 		return array(
-			'progress'     => isset( $result['progress'] ) ? $result['progress'] : array(),
-			'steps'        => isset( $result['steps'] ) ? $result['steps'] : array(),
-			'migrationId'  => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
-			'completed'    => ! empty( $result['completed'] ),
-			'remaining'    => isset( $result['remaining'] ) ? (int) $result['remaining'] : 0,
-			'current_item' => isset( $result['current_item'] ) ? $result['current_item'] : array(),
+			'progress'        => isset( $result['progress'] ) ? $result['progress'] : array(),
+			'steps'           => isset( $result['steps'] ) ? $result['steps'] : array(),
+			'migrationId'     => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
+			'completed'       => ! empty( $result['completed'] ),
+			'remaining'       => isset( $result['remaining'] ) ? (int) $result['remaining'] : 0,
+			'current_item'    => isset( $result['current_item'] ) ? $result['current_item'] : array(),
+			'memory_pressure' => ! empty( $result['memory_pressure'] ),
 		);
 	}
 

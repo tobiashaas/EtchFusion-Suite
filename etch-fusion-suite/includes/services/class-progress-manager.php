@@ -27,7 +27,7 @@ class EFS_Progress_Manager {
 	 * Running progress with no updates for this period is stale.
 	 * Allows a new migration to start after an abandoned/hung run.
 	 */
-	private const PROGRESS_STALE_TTL = 120;
+	private const PROGRESS_STALE_TTL = 300;
 
 	/** @var Progress_Repository_Interface */
 	private $progress_repository;

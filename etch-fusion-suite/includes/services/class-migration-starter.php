@@ -117,6 +117,8 @@ class EFS_Migration_Starter {
 	 * @return array|\WP_Error
 	 */
 	public function start_migration( $migration_key, $target_url = null, $batch_size = null, $options = array() ) {
+		set_time_limit( 0 );
+		ignore_user_abort( true );
 		try {
 			// Check for already-running migration.
 			$progress_data   = $this->progress_manager->get_progress_data();

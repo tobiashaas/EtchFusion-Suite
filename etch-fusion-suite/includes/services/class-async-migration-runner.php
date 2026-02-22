@@ -113,6 +113,24 @@ class EFS_Async_Migration_Runner {
 	 * @return array|\WP_Error
 	 */
 	public function run_migration_execution( $migration_id = '' ) {
+		set_time_limit( 0 );
+		ignore_user_abort( true );
+		$is_cron_context = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
+		$is_ajax_context = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
+		$migration_id_for_shutdown  = $migration_id;
+		$progress_manager_shutdown  = $this->progress_manager;
+		$migration_logger_shutdown  = $this->migration_logger;
+		register_shutdown_function(
+			function () use ( $migration_id_for_shutdown, $progress_manager_shutdown, $migration_logger_shutdown ) {
+				$error = error_get_last();
+				if ( $error && in_array( $error['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
+					$progress_manager_shutdown->update_progress( 'error', 0, 'Fatal error: ' . $error['message'] );
+					if ( $migration_logger_shutdown ) {
+						$migration_logger_shutdown->log( $migration_id_for_shutdown, 'error', 'Fatal shutdown: ' . $error['message'] );
+					}
+				}
+			}
+		);
 		$this->migration_logger->log( $migration_id, 'info', 'Migration execution started' );
 		$active = $this->migration_repository->get_active_migration();
 		if ( ! is_array( $active ) || empty( $active['migration_id'] ) || (string) $active['migration_id'] !== (string) $migration_id ) {

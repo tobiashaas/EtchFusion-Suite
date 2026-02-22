@@ -93,41 +93,57 @@ class EFS_Batch_Processor {
 	 * @return array|\WP_Error
 	 */
 	public function process_batch( string $migration_id, array $batch, string $target_url, string $migration_key, array $active_migration_options ) {
-		$checkpoint = $this->checkpoint_repository->get_checkpoint();
+		$lock_key      = 'efs_batch_lock_' . $migration_id;
+		$lock_acquired = false;
 
-		if ( empty( $checkpoint ) || (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
-			return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration.', 'etch-fusion-suite' ) );
+		if ( get_transient( $lock_key ) ) {
+			return new \WP_Error( 'batch_locked', __( 'A batch is already being processed for this migration.', 'etch-fusion-suite' ) );
 		}
 
-		$phase = isset( $checkpoint['phase'] ) ? (string) $checkpoint['phase'] : 'posts';
+		set_transient( $lock_key, true, 30 );
+		$lock_acquired = true;
 
-		// Find the registered phase handler for the current phase.
-		$active_handler = null;
-		foreach ( $this->phase_handlers as $handler ) {
-			if ( $handler->get_phase_key() === $phase ) {
-				$active_handler = $handler;
-				break;
+		try {
+			$checkpoint = $this->checkpoint_repository->get_checkpoint();
+
+			if ( empty( $checkpoint ) || (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
+				return new \WP_Error( 'no_checkpoint', __( 'No checkpoint found for this migration.', 'etch-fusion-suite' ) );
+			}
+
+			$phase = isset( $checkpoint['phase'] ) ? (string) $checkpoint['phase'] : 'posts';
+
+			// Find the registered phase handler for the current phase.
+			$active_handler = null;
+			foreach ( $this->phase_handlers as $handler ) {
+				if ( $handler->get_phase_key() === $phase ) {
+					$active_handler = $handler;
+					break;
+				}
+			}
+
+			if ( null === $active_handler ) {
+				return new \WP_Error(
+					'no_phase_handler',
+					/* translators: %s: phase key */
+					sprintf( __( 'No handler registered for phase: %s', 'etch-fusion-suite' ), $phase )
+				);
+			}
+
+			return $this->batch_phase_runner->run_phase(
+				$active_handler,
+				$phase,
+				$checkpoint,
+				$batch,
+				$migration_id,
+				$target_url,
+				$migration_key,
+				$active_migration_options
+			);
+		} finally {
+			if ( $lock_acquired ) {
+				delete_transient( $lock_key );
 			}
 		}
-
-		if ( null === $active_handler ) {
-			return new \WP_Error(
-				'no_phase_handler',
-				/* translators: %s: phase key */
-				sprintf( __( 'No handler registered for phase: %s', 'etch-fusion-suite' ), $phase )
-			);
-		}
-
-		return $this->batch_phase_runner->run_phase(
-			$active_handler,
-			$phase,
-			$checkpoint,
-			$batch,
-			$migration_id,
-			$target_url,
-			$migration_key,
-			$active_migration_options
-		);
 	}
 
 	/**

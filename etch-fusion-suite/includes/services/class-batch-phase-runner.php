@@ -92,6 +92,24 @@ class EFS_Batch_Phase_Runner {
 		string $migration_key,
 		array $active_migration_options
 	) {
+		$is_cron_context = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
+		$is_ajax_context = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
+		$migration_id_for_shutdown       = $migration_id;
+		$progress_manager_for_shutdown   = $this->progress_manager;
+		$migration_logger_for_shutdown   = $this->migration_logger;
+		register_shutdown_function(
+			function () use ( $migration_id_for_shutdown, $progress_manager_for_shutdown, $migration_logger_for_shutdown ) {
+				$error = error_get_last();
+				if ( $error && in_array( $error['type'], array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ), true ) ) {
+					$progress_manager_for_shutdown->update_progress( 'error', 0, 'Fatal error in batch: ' . $error['message'] );
+					if ( $migration_logger_for_shutdown ) {
+						$migration_logger_for_shutdown->log( $migration_id_for_shutdown, 'error', 'Fatal shutdown in batch: ' . $error['message'] );
+					}
+				}
+			}
+		);
+		$memory_pressure = false;
+
 		// --- Delegating path: all phase logic driven by the handler interface ---
 
 		// Derive checkpoint keys.
@@ -199,6 +217,12 @@ class EFS_Batch_Phase_Runner {
 			$checkpoint['current_item_id'] = $id;
 			$wp_post                       = get_post( $id );
 			$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+
+			$memory_limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
+			if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
+				$memory_pressure = true;
+				break;
+			}
 		}
 
 		// Save progress via handler (remaining IDs + processed count), then persist attempt/failed state.
@@ -240,15 +264,16 @@ class EFS_Batch_Phase_Runner {
 			$remaining_post_ids = (array) ( $checkpoint['remaining_post_ids'] ?? array() );
 			$this->progress_manager->update_progress( 'posts', 80, __( 'Ready to migrate posts...', 'etch-fusion-suite' ), 0, count( $remaining_post_ids ), false );
 			return array(
-				'completed'    => false,
-				'remaining'    => count( $remaining_post_ids ),
-				'migrationId'  => $migration_id,
-				'progress'     => $this->progress_manager->get_progress_data(),
-				'steps'        => $this->progress_manager->get_steps_state(),
-				'current_item' => array(
+				'completed'       => false,
+				'remaining'       => count( $remaining_post_ids ),
+				'migrationId'     => $migration_id,
+				'progress'        => $this->progress_manager->get_progress_data(),
+				'steps'           => $this->progress_manager->get_steps_state(),
+				'current_item'    => array(
 					'id'    => null,
 					'title' => '',
 				),
+				'memory_pressure' => $memory_pressure,
 			);
 		}
 
@@ -328,20 +353,22 @@ class EFS_Batch_Phase_Runner {
 				'failed_media_count'    => $failed_media_count,
 				'failed_media_ids'      => $failed_media_ids_final,
 				'failed_post_ids_final' => $failed_ids,
+				'memory_pressure'       => $memory_pressure,
 			);
 		}
 
 		// Normal (mid-phase) return.
 		return array(
-			'completed'    => false,
-			'remaining'    => count( $remaining ),
-			'migrationId'  => $migration_id,
-			'progress'     => $this->progress_manager->get_progress_data(),
-			'steps'        => $this->progress_manager->get_steps_state(),
-			'current_item' => array(
+			'completed'       => false,
+			'remaining'       => count( $remaining ),
+			'migrationId'     => $migration_id,
+			'progress'        => $this->progress_manager->get_progress_data(),
+			'steps'           => $this->progress_manager->get_steps_state(),
+			'current_item'    => array(
 				'id'    => $checkpoint['current_item_id'] ?? null,
 				'title' => $checkpoint['current_item_title'] ?? '',
 			),
+			'memory_pressure' => $memory_pressure,
 		);
 	}
 }
