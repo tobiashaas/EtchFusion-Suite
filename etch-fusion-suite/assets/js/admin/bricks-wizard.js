@@ -17,6 +17,9 @@ const ACTION_GET_PROGRESS = 'efs_get_migration_progress';
 const ACTION_CANCEL_MIGRATION = 'efs_cancel_migration';
 const ACTION_MIGRATE_BATCH = 'efs_migrate_batch';
 const ACTION_RESUME_MIGRATION = 'efs_resume_migration';
+const ACTION_GET_CSS_PREVIEW = 'efs_get_css_preview';
+const ACTION_RUN_PREFLIGHT = 'efs_run_preflight_check';
+const ACTION_INVALIDATE_PREFLIGHT = 'efs_invalidate_preflight_cache';
 
 const BATCH_SIZE = 10;
 
@@ -35,9 +38,12 @@ const defaultState = () => ({
 	selectedPostTypes: [],
 	postTypeMappings: {},
 	includeMedia: true,
+	restrictCssToUsed: true,
 	batchSize: 50,
 	migrationId: '',
 	progressMinimized: false,
+	preflight: null,
+	preflightConfirmed: false,
 });
 
 const humanize = (value) => String(value || '')
@@ -109,7 +115,9 @@ const createWizard = (root) => {
 		runFullAnalysis: root.querySelector('[data-efs-run-full-analysis]'),
 		rowsBody: root.querySelector('[data-efs-post-type-rows]'),
 		includeMedia: root.querySelector('[data-efs-include-media]'),
+		restrictCssToUsed: root.querySelector('[data-efs-restrict-css]'),
 		previewBreakdown: root.querySelector('[data-efs-preview-breakdown]'),
+		cssPreview: root.querySelector('[data-efs-css-preview]'),
 		previewWarnings: root.querySelector('[data-efs-preview-warnings]'),
 		warningList: root.querySelector('[data-efs-warning-list]'),
 		progressTakeover: root.querySelector('[data-efs-progress-takeover]'),
@@ -133,6 +141,13 @@ const createWizard = (root) => {
 		openLogsButton: root.querySelector('[data-efs-open-logs]'),
 		startNewButton: root.querySelector('[data-efs-start-new]'),
 		presets: Array.from(root.querySelectorAll('[data-efs-preset]')),
+		preflightContainer: root.querySelector('[data-efs-preflight]'),
+		preflightLoading: root.querySelector('[data-efs-preflight-loading]'),
+		preflightResults: root.querySelector('[data-efs-preflight-results]'),
+		preflightActions: root.querySelector('[data-efs-preflight-actions]'),
+		preflightOverride: root.querySelector('[data-efs-preflight-override]'),
+		preflightConfirm: root.querySelector('[data-efs-preflight-confirm]'),
+		preflightRecheck: root.querySelector('[data-efs-preflight-recheck]'),
 	};
 
 	const wizardNonce = root.getAttribute('data-efs-state-nonce') || window.efsData?.nonce || '';
@@ -177,6 +192,100 @@ const createWizard = (root) => {
 		}
 	};
 
+	const PREFLIGHT_HINTS = {
+		memory: 'PHP memory_limit is below 64 MB. Contact your hosting provider to increase it.',
+		target_reachable: 'The target site is not reachable. Check the URL and ensure the site is online.',
+		wp_cron: 'WP Cron is disabled (DISABLE_WP_CRON). Switch to Browser Mode or enable WP Cron.',
+		memory_warning: 'Memory is limited. Large migrations may fail. Consider increasing memory_limit.',
+		execution_time: 'max_execution_time is low. Batch size will be reduced automatically.',
+		disk_space: 'Target site has less than 500 MB free disk space.',
+	};
+
+	const renderPreflightUI = (result) => {
+		if (refs.preflightLoading) { refs.preflightLoading.hidden = true; }
+		if (refs.preflightResults) { refs.preflightResults.hidden = false; }
+		if (refs.preflightActions) { refs.preflightActions.hidden = false; }
+
+		if (!result || !Array.isArray(result.checks)) {
+			if (refs.preflightResults) {
+				refs.preflightResults.innerHTML = '<p>Environment check failed &ndash; please try again.</p>';
+			}
+			updateNavigationState();
+			return;
+		}
+
+		const rows = result.checks.map((check) => {
+			const hint = (check.status === 'error' || check.status === 'warning')
+				? (PREFLIGHT_HINTS[check.id] || '')
+				: '';
+			const hintHtml = hint
+				? `<span class="efs-preflight__hint">${hint}</span>`
+				: '';
+			return `<div class="efs-preflight__row">
+				<span class="efs-preflight__badge efs-preflight__badge--${check.status}">${check.status}</span>
+				<div class="efs-preflight__row-content">
+					<span>${check.message || check.id}</span>
+					${hintHtml}
+				</div>
+			</div>`;
+		}).join('');
+
+		const errorCount = result.checks.filter((c) => c.status === 'error').length;
+		const warnCount = result.checks.filter((c) => c.status === 'warning').length;
+
+		let barClass = '';
+		let barText = 'All checks passed.';
+		if (result.has_hard_block) {
+			barClass = 'efs-preflight__bar--error';
+			barText = `${errorCount} error${errorCount !== 1 ? 's' : ''} &ndash; migration blocked.`;
+		} else if (result.has_soft_block) {
+			barClass = 'efs-preflight__bar--warn';
+			barText = `${warnCount} warning${warnCount !== 1 ? 's' : ''} detected.`;
+		}
+
+		const barHtml = `<div class="efs-preflight__bar ${barClass}">${barText}</div>`;
+
+		if (refs.preflightResults) {
+			refs.preflightResults.innerHTML = rows + barHtml;
+		}
+
+		if (refs.preflightOverride) {
+			refs.preflightOverride.hidden = !(result.has_soft_block && !result.has_hard_block);
+		}
+
+		updateNavigationState();
+	};
+
+	const runPreflightCheck = async (targetUrl = '', mode = 'browser') => {
+		if (refs.preflightLoading) { refs.preflightLoading.hidden = false; }
+		if (refs.preflightResults) { refs.preflightResults.hidden = true; }
+		if (refs.preflightActions) { refs.preflightActions.hidden = true; }
+
+		try {
+			const result = await post(ACTION_RUN_PREFLIGHT, { target_url: targetUrl, mode });
+			state.preflight = result;
+			renderPreflightUI(result);
+		} catch (err) {
+			if (refs.preflightLoading) { refs.preflightLoading.hidden = true; }
+			if (refs.preflightResults) {
+				refs.preflightResults.hidden = false;
+				refs.preflightResults.innerHTML = '<p>Environment check failed &ndash; please try again.</p>';
+			}
+			updateNavigationState();
+		}
+	};
+
+	const invalidateAndRecheck = async () => {
+		if (refs.preflightRecheck) { refs.preflightRecheck.disabled = true; }
+		try {
+			await post(ACTION_INVALIDATE_PREFLIGHT, {});
+		} catch (_err) {
+			// ignore invalidation errors
+		}
+		await runPreflightCheck(state.targetUrl || '', state.mode || 'browser');
+		if (refs.preflightRecheck) { refs.preflightRecheck.disabled = false; }
+	};
+
 	const hasValidStep2Selection = () => {
 		if (!state.discoveryData || !getDiscoveryPostTypes(state.discoveryData).length) {
 			return false;
@@ -217,6 +326,14 @@ const createWizard = (root) => {
 			if (state.currentStep === 1) {
 				disabled = !state.migrationUrl || runtime.validatingConnect;
 				label = runtime.validatingConnect ? 'Validating...' : 'Next';
+				// Pre-flight hard block always disables Next
+				if (state.preflight?.has_hard_block) {
+					disabled = true;
+				}
+				// Pre-flight soft block requires confirmation checkbox
+				if (state.preflight?.has_soft_block && !state.preflight?.has_hard_block && !state.preflightConfirmed) {
+					disabled = true;
+				}
 			} else if (state.currentStep === 2) {
 				disabled = !hasValidStep2Selection();
 				label = 'Next';
@@ -272,6 +389,7 @@ const createWizard = (root) => {
 					selected_post_types: state.selectedPostTypes,
 					post_type_mappings: state.postTypeMappings,
 					include_media: state.includeMedia,
+					restrict_css_to_used: state.restrictCssToUsed,
 					batch_size: state.batchSize,
 				}),
 			});
@@ -574,7 +692,7 @@ const createWizard = (root) => {
 		}
 	};
 
-	const renderPreview = () => {
+	const renderPreview = async () => {
 		if (!refs.previewBreakdown) {
 			return;
 		}
@@ -584,6 +702,9 @@ const createWizard = (root) => {
 
 		if (!selected.length) {
 			refs.previewBreakdown.innerHTML = '<p>No post types selected.</p>';
+			if (refs.cssPreview) {
+				refs.cssPreview.hidden = true;
+			}
 			return;
 		}
 
@@ -639,6 +760,25 @@ const createWizard = (root) => {
 
 		refs.previewWarnings.hidden = false;
 		refs.warningList.innerHTML = warnings.map((warning) => `<li class="is-${warning.level}">${warning.text}</li>`).join('');
+
+		if (refs.cssPreview) {
+			try {
+				const cssData = await post(ACTION_GET_CSS_PREVIEW, {
+					selected_post_types: state.selectedPostTypes,
+					restrict_css_to_used: state.restrictCssToUsed ? '1' : '0',
+				});
+				const total = cssData?.css_classes_total ?? 0;
+				const toMigrate = cssData?.css_classes_to_migrate ?? 0;
+				if (state.restrictCssToUsed && toMigrate < total) {
+					refs.cssPreview.innerHTML = `<p><strong>CSS Classes:</strong> ${toMigrate.toLocaleString()} <span class="efs-wizard-hint">&#10003; filtered from ${total.toLocaleString()} total</span></p>`;
+				} else {
+					refs.cssPreview.innerHTML = `<p><strong>CSS Classes:</strong> ${total.toLocaleString()} <span class="efs-wizard-hint">(all classes)</span></p>`;
+				}
+				refs.cssPreview.hidden = false;
+			} catch (e) {
+				refs.cssPreview.hidden = true;
+			}
+		}
 	};
 
 	const renderProgress = (payload) => {
@@ -1043,7 +1183,7 @@ const createWizard = (root) => {
 		}
 
 		if (nextStep === 3) {
-			renderPreview();
+			await renderPreview();
 		}
 
 		if (nextStep < 4) {
@@ -1173,6 +1313,7 @@ const createWizard = (root) => {
 			state.migrationKey = token;
 			state.targetUrl = targetUrl;
 			runtime.validatedMigrationUrl = targetUrl;
+			runPreflightCheck(state.targetUrl, state.mode || 'browser').catch(() => {});
 			if (refs.keyInput) {
 				refs.keyInput.value = token;
 			}
@@ -1220,6 +1361,7 @@ const createWizard = (root) => {
 				selected_post_types: state.selectedPostTypes,
 				post_type_mappings: state.postTypeMappings,
 				include_media: state.includeMedia ? '1' : '0',
+				restrict_css_to_used: state.restrictCssToUsed ? '1' : '0',
 			});
 
 			state.migrationId = payload?.migrationId ?? payload?.migration_id ?? '';
@@ -1276,6 +1418,11 @@ const createWizard = (root) => {
 		if (refs.includeMedia) {
 			refs.includeMedia.checked = true;
 		}
+
+		if (refs.restrictCssToUsed) {
+			refs.restrictCssToUsed.checked = true;
+		}
+		state.restrictCssToUsed = true;
 
 		if (refs.progressTakeover) {
 			refs.progressTakeover.hidden = true;
@@ -1419,6 +1566,11 @@ const createWizard = (root) => {
 
 		refs.cancelButton?.addEventListener('click', handleCancel);
 		refs.progressCancelButton?.addEventListener('click', handleCancel);
+		refs.preflightRecheck?.addEventListener('click', () => invalidateAndRecheck());
+		refs.preflightConfirm?.addEventListener('change', (e) => {
+			state.preflightConfirmed = e.target.checked;
+			updateNavigationState();
+		});
 		refs.retryButton?.addEventListener('click', async () => {
 			refs.retryButton.hidden = true;
 			try {
@@ -1477,6 +1629,11 @@ const createWizard = (root) => {
 			await saveWizardState();
 		});
 
+		refs.restrictCssToUsed?.addEventListener('change', async () => {
+			state.restrictCssToUsed = Boolean(refs.restrictCssToUsed?.checked);
+			await saveWizardState();
+		});
+
 		refs.presets.forEach((button) => {
 			button.addEventListener('click', async () => {
 				await applyPreset(button.getAttribute('data-efs-preset') || 'none');
@@ -1522,6 +1679,12 @@ const createWizard = (root) => {
 				? saved.post_type_mappings
 				: state.postTypeMappings;
 			state.includeMedia = typeof saved.include_media === 'boolean' ? saved.include_media : state.includeMedia;
+			state.restrictCssToUsed = typeof saved.restrict_css_to_used === 'boolean'
+				? saved.restrict_css_to_used
+				: state.restrictCssToUsed;
+			if (refs.restrictCssToUsed) {
+				refs.restrictCssToUsed.checked = state.restrictCssToUsed;
+			}
 			state.batchSize = Number(saved.batch_size || state.batchSize);
 
 			if (refs.urlInput && state.migrationUrl) {
@@ -1631,6 +1794,9 @@ const createWizard = (root) => {
 	const init = async () => {
 		bindEvents();
 		await restoreState();
+
+		// Run pre-flight silently on wizard load (no target URL yet)
+		runPreflightCheck('', state.mode || 'browser').catch(() => {});
 
 		const resumed = await autoResumeMigration();
 		if (!resumed) {

@@ -61,6 +61,9 @@ class EFS_Async_Migration_Runner {
 	/** @var EFS_Plugin_Detector */
 	private $plugin_detector;
 
+	/** @var EFS_Migration_Logger */
+	private $migration_logger;
+
 	/**
 	 * @param EFS_Migrator_Executor          $migrator_executor
 	 * @param EFS_Progress_Manager           $progress_manager
@@ -73,6 +76,7 @@ class EFS_Async_Migration_Runner {
 	 * @param Migration_Repository_Interface $migration_repository
 	 * @param EFS_Error_Handler              $error_handler
 	 * @param EFS_Plugin_Detector            $plugin_detector
+	 * @param EFS_Migration_Logger           $migration_logger
 	 */
 	public function __construct(
 		EFS_Migrator_Executor $migrator_executor,
@@ -85,7 +89,8 @@ class EFS_Async_Migration_Runner {
 		EFS_API_Client $api_client,
 		Migration_Repository_Interface $migration_repository,
 		EFS_Error_Handler $error_handler,
-		EFS_Plugin_Detector $plugin_detector
+		EFS_Plugin_Detector $plugin_detector,
+		EFS_Migration_Logger $migration_logger
 	) {
 		$this->migrator_executor    = $migrator_executor;
 		$this->progress_manager     = $progress_manager;
@@ -98,6 +103,7 @@ class EFS_Async_Migration_Runner {
 		$this->migration_repository = $migration_repository;
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
+		$this->migration_logger     = $migration_logger;
 	}
 
 	/**
@@ -107,6 +113,7 @@ class EFS_Async_Migration_Runner {
 	 * @return array|\WP_Error
 	 */
 	public function run_migration_execution( $migration_id = '' ) {
+		$this->migration_logger->log( $migration_id, 'info', 'Migration execution started' );
 		$active = $this->migration_repository->get_active_migration();
 		if ( ! is_array( $active ) || empty( $active['migration_id'] ) || (string) $active['migration_id'] !== (string) $migration_id ) {
 			return new \WP_Error( 'migration_not_found', __( 'No active migration found for this ID.', 'etch-fusion-suite' ) );
@@ -181,12 +188,14 @@ class EFS_Async_Migration_Runner {
 				return $migrator_result;
 			}
 			$async_migrator_warnings = isset( $migrator_result['warnings'] ) ? $migrator_result['warnings'] : array();
+			$this->migration_logger->log( $migration_id, 'info', 'CPTs registered' );
 
 			$this->progress_manager->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
 			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
+			$this->migration_logger->log( $migration_id, 'info', 'CSS classes migrated: ' . ( $css_result['migrated'] ?? 0 ) );
 
 			$steps         = $this->progress_manager->get_steps_state();
 			$include_media = ! empty( $options['include_media'] ) && isset( $steps['media'] );
@@ -226,6 +235,7 @@ class EFS_Async_Migration_Runner {
 			}
 
 			$phase = ( $include_media && ! empty( $media_ids ) ) ? 'media' : 'posts';
+			$this->migration_logger->log( $migration_id, 'info', 'Post IDs collected: ' . $total_count );
 
 			$this->migration_repository->save_checkpoint(
 				array(
@@ -267,6 +277,7 @@ class EFS_Async_Migration_Runner {
 				basename( $exception->getFile() ),
 				$exception->getLine()
 			);
+			$this->migration_logger->log( $migration_id, 'error', $error_message, [ 'migration_id' => $migration_id ] );
 			$this->error_handler->log_error(
 				'E201',
 				array(

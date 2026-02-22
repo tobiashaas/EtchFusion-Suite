@@ -61,6 +61,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_wizard_clear_state', array( $this, 'clear_state' ) );
 		add_action( 'wp_ajax_efs_wizard_validate_url', array( $this, 'validate_url' ) );
 		add_action( 'wp_ajax_efs_get_target_post_types', array( $this, 'get_target_post_types' ) );
+		add_action( 'wp_ajax_efs_get_css_preview', array( $this, 'get_css_preview' ) );
 	}
 
 	/**
@@ -405,6 +406,53 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Return CSS class counts for the Step 3 preview.
+	 */
+	public function get_css_preview() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'wizard_css_preview', 30, MINUTE_IN_SECONDS ) ) {
+			return;
+		}
+
+		$selected_post_types  = $this->get_post( 'selected_post_types', array(), 'array' );
+		$restrict_css_to_used = filter_var( $this->get_post( 'restrict_css_to_used', '1', 'text' ), FILTER_VALIDATE_BOOLEAN );
+
+		$css_converter = null;
+		if ( function_exists( 'etch_fusion_suite_container' ) ) {
+			$container = etch_fusion_suite_container();
+			if ( $container->has( 'css_converter' ) ) {
+				$css_converter = $container->get( 'css_converter' );
+			}
+		}
+
+		if ( ! $css_converter || ! method_exists( $css_converter, 'get_css_class_counts' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'CSS converter service unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$result = $css_converter->get_css_class_counts(
+			array_map( 'sanitize_key', $selected_post_types ),
+			$restrict_css_to_used
+		);
+
+		wp_send_json_success(
+			array(
+				'css_classes_total'      => $result['total'],
+				'css_classes_to_migrate' => $result['to_migrate'],
+			)
+		);
 	}
 
 	/**

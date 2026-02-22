@@ -21,6 +21,7 @@ use Bricks2Etch\Ajax\Handlers\EFS_Cleanup_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Template_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Wizard_Ajax_Handler;
 use Bricks2Etch\Ajax\Handlers\EFS_Progress_Ajax_Handler;
+use Bricks2Etch\Ajax\Handlers\EFS_Pre_Flight_Ajax_Handler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,7 +48,8 @@ class EFS_Ajax_Handler {
 		EFS_Template_Ajax_Handler $template_handler,
 		EFS_Migration_Ajax_Handler $migration_handler,
 		?EFS_Wizard_Ajax_Handler $wizard_handler = null,
-		?EFS_Progress_Ajax_Handler $progress_handler = null
+		?EFS_Progress_Ajax_Handler $progress_handler = null,
+		?EFS_Pre_Flight_Ajax_Handler $preflight_handler = null
 	) {
 		$this->init_handlers(
 			$css_handler,
@@ -60,7 +62,8 @@ class EFS_Ajax_Handler {
 			$template_handler,
 			$migration_handler,
 			$wizard_handler,
-			$progress_handler
+			$progress_handler,
+			$preflight_handler
 		);
 	}
 
@@ -78,7 +81,8 @@ class EFS_Ajax_Handler {
 		EFS_Template_Ajax_Handler $template_handler,
 		EFS_Migration_Ajax_Handler $migration_handler,
 		?EFS_Wizard_Ajax_Handler $wizard_handler = null,
-		?EFS_Progress_Ajax_Handler $progress_handler = null
+		?EFS_Progress_Ajax_Handler $progress_handler = null,
+		?EFS_Pre_Flight_Ajax_Handler $preflight_handler = null
 	) {
 		$this->handlers['css']        = $css_handler;
 		$this->handlers['content']    = $content_handler;
@@ -94,6 +98,9 @@ class EFS_Ajax_Handler {
 		}
 		if ( $progress_handler ) {
 			$this->handlers['progress'] = $progress_handler;
+		}
+		if ( $preflight_handler ) {
+			$this->handlers['preflight'] = $preflight_handler;
 		}
 	}
 

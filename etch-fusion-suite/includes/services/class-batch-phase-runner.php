@@ -42,25 +42,31 @@ class EFS_Batch_Phase_Runner {
 	/** @var EFS_API_Client */
 	private $api_client;
 
+	/** @var EFS_Migration_Logger */
+	private $migration_logger;
+
 	/**
 	 * @param EFS_Error_Handler               $error_handler
 	 * @param EFS_Migration_Run_Finalizer     $run_finalizer
 	 * @param EFS_Progress_Manager            $progress_manager
 	 * @param Checkpoint_Repository_Interface $checkpoint_repository
 	 * @param EFS_API_Client                  $api_client
+	 * @param EFS_Migration_Logger            $migration_logger
 	 */
 	public function __construct(
 		EFS_Error_Handler $error_handler,
 		EFS_Migration_Run_Finalizer $run_finalizer,
 		EFS_Progress_Manager $progress_manager,
 		Checkpoint_Repository_Interface $checkpoint_repository,
-		EFS_API_Client $api_client
+		EFS_API_Client $api_client,
+		EFS_Migration_Logger $migration_logger
 	) {
 		$this->error_handler         = $error_handler;
 		$this->run_finalizer         = $run_finalizer;
 		$this->progress_manager      = $progress_manager;
 		$this->checkpoint_repository = $checkpoint_repository;
 		$this->api_client            = $api_client;
+		$this->migration_logger      = $migration_logger;
 	}
 
 	/**
@@ -123,6 +129,17 @@ class EFS_Batch_Phase_Runner {
 			$context['post_type_mappings'] = isset( $active_migration_options['post_type_mappings'] ) && is_array( $active_migration_options['post_type_mappings'] ) ? $active_migration_options['post_type_mappings'] : array();
 		}
 
+		$this->migration_logger->log(
+			$migration_id,
+			'info',
+			'Batch started',
+			[
+				'migration_id' => $migration_id,
+				'phase'        => $phase,
+				'batch_size'   => count( $current_batch ),
+			]
+		);
+
 		// Process each item in the batch.
 		foreach ( $current_batch as $id ) {
 			$id     = (int) $id;
@@ -137,6 +154,17 @@ class EFS_Batch_Phase_Runner {
 			}
 
 			if ( is_wp_error( $result ) ) {
+				$this->migration_logger->log(
+					$migration_id,
+					'warning',
+					'Item failed',
+					[
+						'migration_id' => $migration_id,
+						'id'           => $id,
+						'attempt'      => $attempts[ $id_key ],
+						'error'        => $result->get_error_message(),
+					]
+				);
 				if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
 					$remaining[] = $id;
 					if ( 'posts' === $phase ) {
@@ -197,6 +225,17 @@ class EFS_Batch_Phase_Runner {
 		$checkpoint[ $attempts_key ]   = $attempts;
 		$checkpoint[ $failed_ids_key ] = $failed_ids;
 		$this->checkpoint_repository->save_checkpoint( $checkpoint );
+
+		$this->migration_logger->log(
+			$migration_id,
+			'info',
+			'Batch complete',
+			[
+				'migration_id' => $migration_id,
+				'processed'    => $processed_count,
+				'remaining'    => count( $remaining ),
+			]
+		);
 
 		// Calculate percentage within this phase's range.
 		$range      = $active_handler->get_percentage_range();

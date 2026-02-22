@@ -19,6 +19,23 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 		<div class="efs-wizard-progress-chip-container" data-efs-progress-chip-container></div>
 	</header>
 
+	<div class="efs-preflight" data-efs-preflight aria-live="polite">
+		<div class="efs-preflight__loading" data-efs-preflight-loading hidden>
+			<span class="efs-wizard-loading__spinner" aria-hidden="true"></span>
+			<span><?php esc_html_e( 'Running environment checks…', 'etch-fusion-suite' ); ?></span>
+		</div>
+		<div class="efs-preflight__results" data-efs-preflight-results hidden></div>
+		<div class="efs-preflight__actions" data-efs-preflight-actions hidden>
+			<label class="efs-preflight__override" data-efs-preflight-override hidden>
+				<input type="checkbox" data-efs-preflight-confirm />
+				<span><?php esc_html_e( 'I understand the risks and want to proceed anyway', 'etch-fusion-suite' ); ?></span>
+			</label>
+			<button type="button" class="button button-secondary efs-preflight__recheck" data-efs-preflight-recheck>
+				<?php esc_html_e( '↺ Re-check', 'etch-fusion-suite' ); ?>
+			</button>
+		</div>
+	</div>
+
 	<nav class="efs-wizard-steps" aria-label="<?php esc_attr_e( 'Migration steps', 'etch-fusion-suite' ); ?>">
 		<button type="button" class="efs-wizard-step is-active" data-efs-step-nav="1" aria-current="step">
 			<span class="efs-wizard-step__number">1</span>
@@ -112,6 +129,13 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<input type="checkbox" data-efs-include-media checked />
 				<span><?php esc_html_e( 'Include media migration', 'etch-fusion-suite' ); ?></span>
 			</label>
+			<label class="efs-media-toggle">
+				<input type="checkbox" data-efs-restrict-css checked />
+				<span><?php esc_html_e( 'Only migrate used CSS classes (recommended)', 'etch-fusion-suite' ); ?></span>
+			</label>
+			<p class="efs-wizard-hint">
+				<?php esc_html_e( 'Scans selected posts + Bricks Templates (Header, Footer, Global Sections) to find referenced classes only. Uncheck to migrate ALL Bricks Global Classes.', 'etch-fusion-suite' ); ?>
+			</p>
 			<p class="efs-wizard-message" data-efs-select-message hidden></p>
 		</section>
 
@@ -119,6 +143,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<h3><?php esc_html_e( 'Preview Migration', 'etch-fusion-suite' ); ?></h3>
 			<p><?php esc_html_e( 'Review your migration breakdown and warnings before starting.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-wizard-preview" data-efs-preview-breakdown></div>
+			<div class="efs-wizard-css-preview" data-efs-css-preview hidden></div>
 			<section class="efs-wizard-warnings" data-efs-preview-warnings hidden>
 				<h4><?php esc_html_e( 'Conversion Warnings', 'etch-fusion-suite' ); ?></h4>
 				<ul data-efs-warning-list></ul>

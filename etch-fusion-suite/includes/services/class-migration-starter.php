@@ -61,6 +61,9 @@ class EFS_Migration_Starter {
 	/** @var Migration_Repository_Interface */
 	private $migration_repository;
 
+	/** @var EFS_Migration_Logger */
+	private $migration_logger;
+
 	/**
 	 * @param EFS_Migration_Token_Manager    $token_manager       Non-nullable; caller must ensure token manager is configured.
 	 * @param EFS_Progress_Manager           $progress_manager
@@ -73,6 +76,7 @@ class EFS_Migration_Starter {
 	 * @param EFS_Error_Handler              $error_handler
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param Migration_Repository_Interface $migration_repository
+	 * @param EFS_Migration_Logger           $migration_logger
 	 */
 	public function __construct(
 		EFS_Migration_Token_Manager $token_manager,
@@ -85,7 +89,8 @@ class EFS_Migration_Starter {
 		EFS_API_Client $api_client,
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
-		Migration_Repository_Interface $migration_repository
+		Migration_Repository_Interface $migration_repository,
+		EFS_Migration_Logger $migration_logger
 	) {
 		$this->token_manager        = $token_manager;
 		$this->progress_manager     = $progress_manager;
@@ -98,6 +103,7 @@ class EFS_Migration_Starter {
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
 		$this->migration_repository = $migration_repository;
+		$this->migration_logger     = $migration_logger;
 	}
 
 	/**
@@ -144,6 +150,7 @@ class EFS_Migration_Starter {
 					'options'       => $options,
 				)
 			);
+			$this->migration_logger->log( $migration_id, 'info', 'Migration started', [ 'mode' => 'browser', 'options' => $options ] );
 
 			$this->progress_manager->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
 			$validation_result = $this->plugin_detector->validate_migration_requirements();
@@ -352,6 +359,7 @@ class EFS_Migration_Starter {
 					'options'       => $options,
 				)
 			);
+			$this->migration_logger->log( $migration_id, 'info', 'Migration started', [ 'mode' => 'async', 'options' => $options ] );
 
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),

@@ -56,13 +56,17 @@ class EFS_Migration_Controller {
 		}
 
 		$options = array(
-			'selected_post_types' => array(),
-			'post_type_mappings'  => array(),
-			'include_media'       => true,
+			'selected_post_types'  => array(),
+			'post_type_mappings'   => array(),
+			'include_media'        => true,
+			'restrict_css_to_used' => true,
 		);
 		if ( isset( $data['include_media'] ) ) {
 			$options['include_media'] = filter_var( $data['include_media'], FILTER_VALIDATE_BOOLEAN );
 		}
+		$options['restrict_css_to_used'] = isset( $data['restrict_css_to_used'] )
+			? filter_var( $data['restrict_css_to_used'], FILTER_VALIDATE_BOOLEAN )
+			: true;
 		if ( ! empty( $data['selected_post_types'] ) && is_array( $data['selected_post_types'] ) ) {
 			$options['selected_post_types'] = array_map( 'sanitize_key', $data['selected_post_types'] );
 		}

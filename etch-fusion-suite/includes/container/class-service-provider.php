@@ -318,6 +318,13 @@ class EFS_Service_Provider {
 
 		// Business Services
 		$container->singleton(
+			'migration_logger',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Migration_Logger();
+			}
+		);
+
+		$container->singleton(
 			'css_service',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_CSS_Service(
@@ -419,7 +426,8 @@ class EFS_Service_Provider {
 					$c->get( 'api_client' ),
 					$c->get( 'migration_repository' ),
 					$c->get( 'error_handler' ),
-					$c->get( 'plugin_detector' )
+					$c->get( 'plugin_detector' ),
+					$c->get( 'migration_logger' )
 				);
 			}
 		);
@@ -438,7 +446,8 @@ class EFS_Service_Provider {
 					$c->get( 'api_client' ),
 					$c->get( 'error_handler' ),
 					$c->get( 'plugin_detector' ),
-					$c->get( 'migration_repository' )
+					$c->get( 'migration_repository' ),
+					$c->get( 'migration_logger' )
 				);
 			}
 		);
@@ -451,7 +460,8 @@ class EFS_Service_Provider {
 					$c->get( 'run_finalizer' ),
 					$c->get( 'progress_manager' ),
 					$c->get( 'checkpoint_repository' ),
-					$c->get( 'api_client' )
+					$c->get( 'api_client' ),
+					$c->get( 'migration_logger' )
 				);
 			}
 		);
@@ -618,7 +628,8 @@ class EFS_Service_Provider {
 					$c->get( 'audit_logger' ),
 					$c->get( 'migration_runs_repository' ),
 					$c->get( 'rate_limiter' ),
-					$c->get( 'input_validator' )
+					$c->get( 'input_validator' ),
+					$c->get( 'migration_logger' )
 				);
 			}
 		);
@@ -673,6 +684,25 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'preflight_checker',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Pre_Flight_Checker();
+			}
+		);
+
+		$container->singleton(
+			'preflight_ajax',
+			function ( $c ) {
+				return new \Bricks2Etch\Ajax\Handlers\EFS_Pre_Flight_Ajax_Handler(
+					$c->get( 'preflight_checker' ),
+					$c->get( 'rate_limiter' ),
+					$c->get( 'input_validator' ),
+					$c->get( 'audit_logger' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'progress_ajax',
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\Handlers\EFS_Progress_Ajax_Handler(
@@ -708,7 +738,8 @@ class EFS_Service_Provider {
 					$c->get( 'template_ajax' ),
 					$c->get( 'migration_ajax' ),
 					$c->get( 'wizard_ajax' ),
-					$c->get( 'progress_ajax' )
+					$c->get( 'progress_ajax' ),
+					$c->get( 'preflight_ajax' )
 				);
 			}
 		);
@@ -770,6 +801,7 @@ class EFS_Service_Provider {
 			'framer_to_etch_converter',
 			'etch_template_generator',
 			'template_extractor_service',
+			'migration_logger',
 			'css_service',
 			'media_service',
 			'content_service',
@@ -799,6 +831,8 @@ class EFS_Service_Provider {
 			'cleanup_ajax',
 			'template_ajax',
 			'wizard_ajax',
+			'preflight_checker',
+			'preflight_ajax',
 			'progress_ajax',
 			'debug_ajax',
 			'ajax_handler',

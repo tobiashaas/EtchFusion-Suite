@@ -360,9 +360,11 @@ class EFS_CSS_Converter {
 
 		$selected_post_types = $this->get_selected_post_types_from_active_migration();
 		$referenced_class_ids = $this->collect_referenced_global_class_ids( $selected_post_types );
+		$migration_data       = get_option( 'efs_active_migration', array() );
+		$restrict_css_to_used = isset( $migration_data['options']['restrict_css_to_used'] ) ? (bool) $migration_data['options']['restrict_css_to_used'] : true;
 		$restrict_to_referenced_classes = (bool) apply_filters(
 			'etch_fusion_suite_css_restrict_to_referenced_classes',
-			true,
+			$restrict_css_to_used,
 			$selected_post_types,
 			$referenced_class_ids
 		);
@@ -1087,6 +1089,46 @@ class EFS_CSS_Converter {
 	}
 
 	/**
+	 * Get CSS class counts for migration preview.
+	 *
+	 * @param array<int,string> $selected_post_types Selected post types from wizard.
+	 * @param bool              $restrict_to_used    Whether to count only referenced classes.
+	 * @return array{total: int, to_migrate: int}
+	 */
+	public function get_css_class_counts( array $selected_post_types, bool $restrict_to_used ): array {
+		$bricks_classes = get_option( 'bricks_global_classes', array() );
+		if ( is_string( $bricks_classes ) ) {
+			$decoded = json_decode( $bricks_classes, true );
+			if ( is_array( $decoded ) ) {
+				$bricks_classes = $decoded;
+			} else {
+				$maybe          = maybe_unserialize( $bricks_classes );
+				$bricks_classes = is_array( $maybe ) ? $maybe : array();
+			}
+		} elseif ( ! is_array( $bricks_classes ) ) {
+			$bricks_classes = array();
+		}
+
+		$total = count( $bricks_classes );
+		if ( $restrict_to_used ) {
+			$referenced = $this->collect_referenced_global_class_ids( $selected_post_types );
+			$to_migrate = 0;
+			foreach ( $bricks_classes as $class ) {
+				if ( $this->is_referenced_global_class( $class, $referenced ) ) {
+					$to_migrate++;
+				}
+			}
+		} else {
+			$to_migrate = $total;
+		}
+
+		return array(
+			'total'      => $total,
+			'to_migrate' => $to_migrate,
+		);
+	}
+
+	/**
 	 * Collect referenced Bricks global class identifiers from selected Bricks content.
 	 *
 	 * @param array<int,string> $selected_post_types Selected post types from wizard.
@@ -1096,6 +1138,9 @@ class EFS_CSS_Converter {
 		$this->has_scanned_bricks_content = false;
 
 		$post_types = ! empty( $selected_post_types ) ? $selected_post_types : array( 'post', 'page', 'bricks_template' );
+		if ( post_type_exists( 'bricks_template' ) && ! in_array( 'bricks_template', $post_types, true ) ) {
+			$post_types[] = 'bricks_template';
+		}
 		$post_types = array_values(
 			array_filter(
 				array_map( 'sanitize_key', $post_types ),

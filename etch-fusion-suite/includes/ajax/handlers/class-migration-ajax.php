@@ -79,13 +79,14 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$raw_target = $this->get_post( 'target_url', '', 'url' );
 		$payload    = array(
-			'migration_key'       => $this->get_post( 'migration_key', '', 'raw' ),
-			'target_url'          => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
-			'batch_size'          => $this->get_post( 'batch_size', 50, 'int' ),
-			'selected_post_types' => $this->get_post( 'selected_post_types', array(), 'array' ),
-			'post_type_mappings'  => $this->get_post( 'post_type_mappings', array(), 'array' ),
-			'include_media'       => $this->get_post( 'include_media', '1', 'text' ),
-			'nonce'               => $this->get_post( 'nonce', '', 'raw' ),
+			'migration_key'        => $this->get_post( 'migration_key', '', 'raw' ),
+			'target_url'           => $raw_target ? $this->convert_to_internal_url( $raw_target ) : '',
+			'batch_size'           => $this->get_post( 'batch_size', 50, 'int' ),
+			'selected_post_types'  => $this->get_post( 'selected_post_types', array(), 'array' ),
+			'post_type_mappings'   => $this->get_post( 'post_type_mappings', array(), 'array' ),
+			'include_media'        => $this->get_post( 'include_media', '1', 'text' ),
+			'restrict_css_to_used' => $this->get_post( 'restrict_css_to_used', '1', 'text' ),
+			'nonce'                => $this->get_post( 'nonce', '', 'raw' ),
 		);
 
 		$result     = $this->migration_controller->start_migration( $payload );
