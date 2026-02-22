@@ -44,7 +44,7 @@ function log(message) {
 }
 
 function showSpinner() {
-  const spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const spinner = ['-', '\\', '|', '/'];
   let i = 0;
   return setInterval(() => {
     process.stdout.write(`\r${spinner[i]} `);
@@ -99,18 +99,18 @@ function runCommandQuiet(command, args, options = {}) {
 }
 
 async function checkComposerInContainer() {
-  console.log('▶ Checking for Composer in wp-env container...');
+  console.log('> Checking for Composer in wp-env container...');
   const result = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'composer', '--version']);
   return result.code === 0;
 }
 
 async function checkPrerequisites() {
-  log('▶ Checking prerequisites...');
+  log('> Checking prerequisites...');
   
   // Check Docker
   try {
     await runCommandQuiet('docker', ['ps']);
-    log('✓ Docker is running');
+    log('[OK] Docker is running');
   } catch (error) {
     throw new Error('Docker is not running. Please start Docker Desktop and try again.');
   }
@@ -121,7 +121,7 @@ async function checkPrerequisites() {
   if (majorVersion < 18) {
     throw new Error(`Node.js ${nodeVersion} detected. Node.js >= 18 is required.`);
   }
-  log(`✓ Node.js ${nodeVersion}`);
+  log(`[OK] Node.js ${nodeVersion}`);
   
   // Load wp-env config to get custom ports
   const config = loadWpEnvConfig();
@@ -139,7 +139,7 @@ async function checkPortAvailability(port) {
     
     server.listen(port, () => {
       server.once('close', () => {
-        log(`✓ Port ${port} is available`);
+        log(`[OK] Port ${port} is available`);
         resolve();
       });
       server.close();
@@ -201,17 +201,17 @@ async function main() {
   const skipComposer = args.includes('--skip-composer');
   const skipActivation = args.includes('--skip-activation');
   
-  log('▶ Starting WordPress environments via wp-env...');
+  log('> Starting WordPress environments via wp-env...');
   
   await checkPrerequisites();
 
-  log('â–¶ Checking commercial plugins setup...');
+  log('> Checking commercial plugins setup...');
   const pluginsSetup = await checkCommercialPlugins();
   if (!pluginsSetup) {
-    log('âš  Running commercial plugins setup...');
+    log('[!] Running commercial plugins setup...');
     await runCommand('node', [join('scripts', 'setup-commercial-plugins.js')]);
   } else {
-    log('âœ“ Commercial plugins setup detected');
+    log('[OK] Commercial plugins setup detected');
   }
 
   const spinner = showSpinner();
@@ -223,25 +223,25 @@ async function main() {
     process.stdout.write('\r');
   }
   
-  log('▶ Verifying WordPress instances...');
+  log('> Verifying WordPress instances...');
   
   // Load wp-env config to get custom ports
   const config = loadWpEnvConfig();
   
-  log(`⏳ Waiting for Bricks instance (port ${config.port})...`);
+  log(`... Waiting for Bricks instance (port ${config.port})...`);
   await waitForWordPress({ port: config.port, timeout: 120 });
   
-  log(`⏳ Waiting for Etch instance (port ${config.testsPort})...`);
+  log(`... Waiting for Etch instance (port ${config.testsPort})...`);
   await waitForWordPress({ port: config.testsPort, timeout: 120 });
 
   if (!skipComposer) {
-    log('▶ Installing Composer dependencies...');
+    log('> Installing Composer dependencies...');
     const hasComposer = await checkComposerInContainer();
 
     if (hasComposer) {
       const envs = ['cli', 'tests-cli'];
       for (const env of envs) {
-        log(`✓ Composer found in container, installing dependencies in ${env}...`);
+        log(`[OK] Composer found in container, installing dependencies in ${env}...`);
         await runCommandWithRetry(WP_ENV_CMD, [
           'run',
           env,
@@ -264,13 +264,13 @@ async function main() {
         }
       }
     } else {
-      log('⚠ Composer not found in container, attempting host installation...');
+      log('[!] Composer not found in container, attempting host installation...');
       const { join } = require('path');
       const pluginDir = join(__dirname, '..');
 
       try {
         await runCommandWithRetry('composer', ['install', '--no-dev', '--optimize-autoloader'], { cwd: pluginDir });
-        log('✓ Composer dependencies installed from host (may not propagate to containers)');
+        log('[OK] Composer dependencies installed from host (may not propagate to containers)');
       } catch (error) {
         throw new Error(
           'Composer is not available in the wp-env container or on the host.\n' +
@@ -280,14 +280,14 @@ async function main() {
       }
     }
   } else {
-    log('⏭ Skipping Composer installation');
+    log('[skip] Skipping Composer installation');
   }
   
   if (!skipActivation) {
-    log('▶ Activating required plugins and themes...');
+    log('> Activating required plugins and themes...');
     await runCommand('node', [join('scripts', 'activate-plugins.js')]);
   } else {
-    log('⏭ Skipping plugin activation');
+    log('[skip] Skipping plugin activation');
   }
   
   // Display summary
@@ -303,7 +303,7 @@ async function runCommandWithRetry(command, args, options = {}, retries = 1) {
       if (i === retries) {
         throw error;
       }
-      log(`⚠ Command failed, retrying in 5 seconds... (${i + 1}/${retries})`);
+      log(`[!] Command failed, retrying in 5 seconds... (${i + 1}/${retries})`);
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
@@ -320,23 +320,23 @@ async function displaySummary() {
     const bricksVersion = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'core', 'version']);
     const etchVersion = await runCommandQuiet(WP_ENV_CMD, ['run', 'tests-cli', 'wp', 'core', 'version']);
     
-    log(`✅ Bricks (WordPress ${bricksVersion.stdout.trim()}): http://localhost:${config.port}/wp-admin (admin/password)`);
-    log(`✅ Etch (WordPress ${etchVersion.stdout.trim()}): http://localhost:${config.testsPort}/wp-admin (admin/password)`);
+    log(`[OK] Bricks (WordPress ${bricksVersion.stdout.trim()}): http://localhost:${config.port}/wp-admin (admin/password)`);
+    log(`[OK] Etch (WordPress ${etchVersion.stdout.trim()}): http://localhost:${config.testsPort}/wp-admin (admin/password)`);
     
     // Check plugin status
     const bricksPlugins = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'plugin', 'list', '--status=active', '--format=count']);
     const etchPlugins = await runCommandQuiet(WP_ENV_CMD, ['run', 'tests-cli', 'wp', 'plugin', 'list', '--status=active', '--format=count']);
     
-    log(`📦 Active plugins - Bricks: ${bricksPlugins.stdout.trim()}, Etch: ${etchPlugins.stdout.trim()}`);
+    log(`Active plugins - Bricks: ${bricksPlugins.stdout.trim()}, Etch: ${etchPlugins.stdout.trim()}`);
     
     // Check database connection
     const bricksDb = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'wp', 'db', 'check']);
     const etchDb = await runCommandQuiet(WP_ENV_CMD, ['run', 'tests-cli', 'wp', 'db', 'check']);
     
     if (bricksDb.code === 0 && etchDb.code === 0) {
-      log('🗄 Database connections: OK');
+      log('Database connections: OK');
     } else {
-      log('⚠ Database connection issues detected');
+      log('[!] Database connection issues detected');
     }
 
     // Vendor deps status per env
@@ -346,16 +346,16 @@ async function displaySummary() {
     log(`Vendor deps: tests-cli - ${vendorTestsCli.code === 0 ? 'PASS' : 'FAIL (run composer:install)'}`);
 
   } catch (error) {
-    log(`⚠ Could not gather complete environment info: ${error.message}`);
+    log(`[!] Could not gather complete environment info: ${error.message}`);
   }
   
-  log('✅ Use npm run wp / npm run wp:etch for WP-CLI access');
-  log('✅ Use npm run health to check environment health');
+  log('[OK] Use npm run wp / npm run wp:etch for WP-CLI access');
+  log('[OK] Use npm run health to check environment health');
 }
 
 main().catch((error) => {
-  log('\n✗ Setup failed:', error.message);
-  log('\n🔧 Troubleshooting:');
+  log('\n[FAIL] Setup failed:', error.message);
+  log('\nTroubleshooting:');
   log('   • Ensure Docker is running: docker ps');
   log('   • Check port availability: npm run ports:check');
   log('   • Verify wp-env installation: wp-env --version');
