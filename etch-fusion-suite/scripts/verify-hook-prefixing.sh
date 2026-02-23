@@ -957,52 +957,34 @@ main() {
     exit 2
   fi
 
-  local total_hooks
-  total_hooks=$(php <<'PHP' "${hook_summary_path}"
+  local summary_nums
+  summary_nums=$(php <<'PHP' "${hook_summary_path}"
 <?php
-$summary = json_decode(file_get_contents($argv[1]), true);
+$f = isset($argv[1]) ? $argv[1] : '';
+if ($f === '' || !is_readable($f)) {
+    exit(1);
+}
+$summary = json_decode(file_get_contents($f), true);
 if (!is_array($summary)) {
     exit(1);
 }
-echo (int) ($summary['totals']['hooks'] ?? 0);
+$t = $summary['totals'] ?? [];
+$v = $summary['violations'] ?? [];
+echo (int)($t['hooks'] ?? 0) . ' ' . (int)($t['global_functions'] ?? 0) . ' '
+  . (int)($v['hooks'] ?? 0) . ' ' . (int)($v['functions'] ?? 0);
 PHP
-) || total_hooks=0
+  ) || summary_nums='0 0 0 0'
+
+  # Ensure we have exactly four integers (avoid JSON or stray output breaking arithmetic).
+  if [[ ! "${summary_nums}" =~ ^[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+[[:space:]]*$ ]]; then
+    summary_nums='0 0 0 0'
+  fi
+
+  local total_hooks total_functions hook_violations function_violations
+  read -r total_hooks total_functions hook_violations function_violations <<< "${summary_nums}"
   total_hooks=$(( total_hooks + 0 ))
-
-  local total_functions
-  total_functions=$(php <<'PHP' "${hook_summary_path}"
-<?php
-$summary = json_decode(file_get_contents($argv[1]), true);
-if (!is_array($summary)) {
-    exit(1);
-}
-echo (int) ($summary['totals']['global_functions'] ?? 0);
-PHP
-) || total_functions=0
   total_functions=$(( total_functions + 0 ))
-
-  local hook_violations
-  hook_violations=$(php <<'PHP' "${hook_summary_path}"
-<?php
-$summary = json_decode(file_get_contents($argv[1]), true);
-if (!is_array($summary)) {
-    exit(1);
-}
-echo (int) ($summary['violations']['hooks'] ?? 0);
-PHP
-) || hook_violations=0
   hook_violations=$(( hook_violations + 0 ))
-
-  local function_violations
-  function_violations=$(php <<'PHP' "${hook_summary_path}"
-<?php
-$summary = json_decode(file_get_contents($argv[1]), true);
-if (!is_array($summary)) {
-    exit(1);
-}
-echo (int) ($summary['violations']['functions'] ?? 0);
-PHP
-) || function_violations=0
   function_violations=$(( function_violations + 0 ))
 
   local exit_code=0
