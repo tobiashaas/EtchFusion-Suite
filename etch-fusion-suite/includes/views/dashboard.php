@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 ?>
-<div class="wrap efs-typography efs-admin-wrap">
+<div class="efs-typography efs-admin-wrap">
 	<h1 class="efs-page-title"><?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?></h1>
 
 	<?php if ( ! $is_bricks_site && ! $is_etch_site ) : ?>

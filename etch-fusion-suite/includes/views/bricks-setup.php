@@ -30,7 +30,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<input type="checkbox" data-efs-preflight-confirm />
 				<span><?php esc_html_e( 'I understand the risks and want to proceed anyway', 'etch-fusion-suite' ); ?></span>
 			</label>
-			<button type="button" class="button button-secondary efs-preflight__recheck" data-efs-preflight-recheck>
+			<button type="button" class="btn--primary efs-preflight__recheck" data-efs-preflight-recheck>
 				<?php esc_html_e( '↺ Re-check', 'etch-fusion-suite' ); ?>
 			</button>
 		</div>
@@ -68,7 +68,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 					placeholder="<?php esc_attr_e( 'https://your-etch-site.com/?_efs_pair=...', 'etch-fusion-suite' ); ?>"
 				><?php echo esc_textarea( $etch_fusion_suite_url ); ?></textarea>
 				<div class="efs-actions efs-actions--inline efs-wizard-connect-key__actions">
-					<button type="button" class="button" data-efs-paste-migration-url aria-label="<?php esc_attr_e( 'Paste connection URL from clipboard', 'etch-fusion-suite' ); ?>">
+					<button type="button" class="btn--primary" data-efs-paste-migration-url aria-label="<?php esc_attr_e( 'Paste connection URL from clipboard', 'etch-fusion-suite' ); ?>">
 						<?php esc_html_e( 'Paste URL', 'etch-fusion-suite' ); ?>
 					</button>
 				</div>
@@ -182,16 +182,13 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 
 	<footer class="efs-wizard-footer">
 		<div class="efs-actions efs-actions--inline">
-			<button type="button" class="button" data-efs-wizard-back><?php esc_html_e( 'Back', 'etch-fusion-suite' ); ?></button>
-			<button type="button" class="efs-btn--primary" data-efs-wizard-next><?php esc_html_e( 'Next', 'etch-fusion-suite' ); ?></button>
-			<button type="button" class="button" data-efs-wizard-cancel><?php esc_html_e( 'Cancel', 'etch-fusion-suite' ); ?></button>
+			<button type="button" class="btn--primary btn--outline" data-efs-wizard-back><?php esc_html_e( 'Back', 'etch-fusion-suite' ); ?></button>
+			<button type="button" class="btn--primary" data-efs-wizard-next><?php esc_html_e( 'Next', 'etch-fusion-suite' ); ?></button>
+			<button type="button" class="btn--danger" style="margin-inline-start: auto;" data-efs-wizard-cancel><?php esc_html_e( 'Cancel', 'etch-fusion-suite' ); ?></button>
 		</div>
 	</footer>
 
 	<div class="efs-wizard-progress" data-efs-progress-takeover hidden>
-		<button type="button" class="button efs-wizard-progress__minimize" data-efs-minimize-progress>
-			<?php esc_html_e( 'Minimize', 'etch-fusion-suite' ); ?>
-		</button>
 		<div class="efs-wizard-progress__panel">
 			<h3><?php esc_html_e( 'Migration in Progress', 'etch-fusion-suite' ); ?></h3>
 			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -205,6 +202,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<div class="efs-actions efs-actions--inline">
 				<button type="button" class="button" data-efs-retry-migration hidden><?php esc_html_e( 'Retry Migration', 'etch-fusion-suite' ); ?></button>
 				<button type="button" class="button" data-efs-progress-cancel><?php esc_html_e( 'Cancel', 'etch-fusion-suite' ); ?></button>
+				<button type="button" class="button btn--base efs-wizard-progress__minimize" data-efs-minimize-progress><?php esc_html_e( 'Minimize', 'etch-fusion-suite' ); ?></button>
 			</div>
 		</div>
 		<div class="efs-wizard-result" data-efs-wizard-result hidden>
@@ -212,7 +210,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<h3 class="efs-wizard-result__title" data-efs-result-title><?php esc_html_e( 'Migration complete', 'etch-fusion-suite' ); ?></h3>
 			<p data-efs-result-subtitle><?php esc_html_e( 'The migration has finished.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-actions efs-actions--inline">
-				<button type="button" class="efs-btn--primary" data-efs-start-new><?php esc_html_e( 'Finish', 'etch-fusion-suite' ); ?></button>
+				<button type="button" class="btn--primary" data-efs-start-new><?php esc_html_e( 'Finish', 'etch-fusion-suite' ); ?></button>
 				<button type="button" class="button" data-efs-open-logs><?php esc_html_e( 'View logs', 'etch-fusion-suite' ); ?></button>
 			</div>
 		</div>
@@ -224,12 +222,18 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<div class="efs-progress-fill" data-efs-headless-progress-fill style="width:0%"></div>
 			</div>
 			<p class="efs-wizard-progress__percent" data-efs-headless-progress-percent>0%</p>
+			<p class="efs-headless-screen__status" data-efs-headless-status aria-live="polite"></p>
+			<p class="efs-headless-screen__items" data-efs-headless-items></p>
+			<p class="efs-headless-screen__elapsed" data-efs-headless-elapsed hidden></p>
 			<div class="efs-actions efs-actions--inline">
-				<button type="button" class="button" data-efs-view-logs>
+				<button type="button" class="btn--primary" data-efs-view-logs>
 					<?php esc_html_e( 'View Logs', 'etch-fusion-suite' ); ?>
 				</button>
-				<button type="button" class="button" data-efs-cancel-headless>
+				<button type="button" class="btn--base" data-efs-cancel-headless>
 					<?php esc_html_e( 'Cancel Migration', 'etch-fusion-suite' ); ?>
+				</button>
+				<button type="button" class="btn--base" data-efs-minimize-progress>
+					<?php esc_html_e( 'Minimize', 'etch-fusion-suite' ); ?>
 				</button>
 			</div>
 		</div>

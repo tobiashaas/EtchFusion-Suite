@@ -133,7 +133,7 @@ const createWizard = (root) => {
 		progressSteps: root.querySelector('[data-efs-wizard-step-status]'),
 		retryButton: root.querySelector('[data-efs-retry-migration]'),
 		progressCancelButton: root.querySelector('[data-efs-progress-cancel]'),
-		minimizeButton: root.querySelector('[data-efs-minimize-progress]'),
+		minimizeButtons: Array.from(root.querySelectorAll('[data-efs-minimize-progress]')),
 		expandButton: root.querySelector('[data-efs-expand-progress]'),
 		bannerText: root.querySelector('[data-efs-banner-text]'),
 		result: root.querySelector('[data-efs-wizard-result]'),
@@ -155,6 +155,9 @@ const createWizard = (root) => {
 		headlessScreen: root.querySelector('[data-efs-headless-screen]'),
 		headlessProgressFill: root.querySelector('[data-efs-headless-progress-fill]'),
 		headlessProgressPercent: root.querySelector('[data-efs-headless-progress-percent]'),
+		headlessStatus: root.querySelector('[data-efs-headless-status]'),
+		headlessItems: root.querySelector('[data-efs-headless-items]'),
+		headlessElapsed: root.querySelector('[data-efs-headless-elapsed]'),
 		cancelHeadlessButton: root.querySelector('[data-efs-cancel-headless]'),
 	};
 
@@ -907,6 +910,55 @@ const createWizard = (root) => {
 			if (refs.headlessProgressPercent) {
 				refs.headlessProgressPercent.textContent = `${Math.round(percentage)}%`;
 			}
+			if (refs.headlessStatus) {
+				refs.headlessStatus.textContent = String(status);
+				refs.headlessStatus.hidden = !status;
+			}
+			if (refs.headlessItems) {
+				const currentItemTitle = payload?.current_item?.title || progress?.current_item_title || '';
+				if (itemsTotal > 0) {
+					let itemsText = `${itemsProcessed}/${itemsTotal}`;
+					if (currentItemTitle) {
+						itemsText += ` — ${currentItemTitle}`;
+					}
+					refs.headlessItems.textContent = itemsText;
+					refs.headlessItems.hidden = false;
+				} else if (itemsProcessed > 0) {
+					refs.headlessItems.textContent = String(itemsProcessed);
+					refs.headlessItems.hidden = false;
+				} else if (currentItemTitle) {
+					refs.headlessItems.textContent = currentItemTitle;
+					refs.headlessItems.hidden = false;
+				} else {
+					refs.headlessItems.textContent = '';
+					refs.headlessItems.hidden = true;
+				}
+			}
+			if (refs.headlessElapsed) {
+				const startedAtRaw = progress?.started_at;
+				const startedAt = typeof startedAtRaw === 'string' && startedAtRaw.trim() !== ''
+					? startedAtRaw.trim().replace(' ', 'T') + 'Z'
+					: '';
+				const startedMs = startedAt ? new Date(startedAt).getTime() : NaN;
+				const elapsedSec = Number.isFinite(startedMs) && startedMs > 0
+					? Math.max(0, Math.floor((Date.now() - startedMs) / 1000))
+					: null;
+				const etaSec = progress?.estimated_time_remaining != null
+					? Number(progress.estimated_time_remaining)
+					: null;
+				const etaStr = formatEta(etaSec);
+				if (elapsedSec != null) {
+					let text = `Elapsed: ${formatElapsed(elapsedSec)}`;
+					if (etaStr) {
+						text += `  •  ${etaStr}`;
+					}
+					refs.headlessElapsed.textContent = text;
+					refs.headlessElapsed.hidden = false;
+				} else {
+					refs.headlessElapsed.textContent = '';
+					refs.headlessElapsed.hidden = true;
+				}
+			}
 		}
 	};
 
@@ -930,9 +982,7 @@ const createWizard = (root) => {
 		if (refs.progressBanner) {
 			refs.progressBanner.hidden = true;
 		}
-		if (refs.minimizeButton) {
-			refs.minimizeButton.hidden = true;
-		}
+		refs.minimizeButtons?.forEach((btn) => { btn.hidden = true; });
 
 		const isSuccess = type === 'success';
 		if (refs.resultTitle) {
@@ -969,12 +1019,11 @@ const createWizard = (root) => {
 			refs.progressTakeover.hidden = !runtime.migrationRunning;
 			refs.progressTakeover.classList.remove('is-showing-result');
 		}
+		// In headless mode show only headless screen; otherwise show progress panel.
 		if (refs.progressPanel) {
-			refs.progressPanel.hidden = false;
+			refs.progressPanel.hidden = state.mode === 'headless' && refs.headlessScreen && !refs.headlessScreen.hidden;
 		}
-		if (refs.minimizeButton) {
-			refs.minimizeButton.hidden = false;
-		}
+		refs.minimizeButtons?.forEach((btn) => { btn.hidden = false; });
 		hideResult();
 		if (refs.progressBanner) {
 			refs.progressBanner.hidden = true;
@@ -1449,6 +1498,10 @@ const createWizard = (root) => {
 
 			// Headless mode: show headless screen instead of browser progress panel.
 			if (payload?.queued === true && state.mode === 'headless') {
+				if (refs.progressPanel) {
+					refs.progressPanel.hidden = true;
+				}
+				hideResult();
 				if (refs.headlessScreen) {
 					refs.headlessScreen.hidden = false;
 				}
@@ -1695,7 +1748,7 @@ const createWizard = (root) => {
 			}
 		});
 
-		refs.minimizeButton?.addEventListener('click', dismissProgress);
+		refs.minimizeButtons?.forEach((btn) => btn.addEventListener('click', dismissProgress));
 		refs.expandButton?.addEventListener('click', reopenProgress);
 
 		refs.runFullAnalysis?.addEventListener('click', () => {
@@ -1989,6 +2042,10 @@ const createWizard = (root) => {
 				if (payload?.progress?.action_scheduler_id) {
 					state.actionSchedulerId = payload.progress.action_scheduler_id;
 				}
+				if (refs.progressPanel) {
+					refs.progressPanel.hidden = true;
+				}
+				hideResult();
 				if (refs.headlessScreen) {
 					refs.headlessScreen.hidden = false;
 				}

@@ -63,7 +63,7 @@ class EFS_Admin_Notice_Manager {
 
 		if ( 'error' === $status ) {
 			printf(
-				'<div class="notice notice-error is-dismissible"><p>&#9888; %s &ndash; <a href="%s">%s</a></p></div>',
+				'<div class="notice notice-error is-dismissible efs-migration-notice"><p>&#9888; %s &ndash; <a href="%s">%s</a></p></div>',
 				esc_html__( 'Migration stopped', 'etch-fusion-suite' ),
 				esc_url( $url ),
 				esc_html__( 'View Details', 'etch-fusion-suite' )
@@ -74,7 +74,7 @@ class EFS_Admin_Notice_Manager {
 		if ( in_array( $status, array( 'running', 'queued' ), true ) ) {
 			$pct = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
 			printf(
-				'<div class="notice notice-info"><p>&#9881; %s</p></div>',
+				'<div class="notice notice-info efs-migration-notice"><p>&#9881; %s</p></div>',
 				wp_kses(
 					sprintf(
 						/* translators: 1: percentage, 2: link to details */

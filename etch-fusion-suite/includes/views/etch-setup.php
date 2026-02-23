@@ -88,60 +88,33 @@ $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. U
 
 	<div class="efs-etch-receiving-takeover" data-efs-receiving-display hidden>
 		<div class="efs-etch-receiving-takeover__inner">
-			<header class="efs-etch-receiving-takeover__header">
-				<div>
-					<p class="efs-etch-receiving-takeover__eyebrow"><?php esc_html_e( 'Etch Receive Mode', 'etch-fusion-suite' ); ?></p>
-					<h3 data-efs-receiving-title><?php esc_html_e( 'Receiving Migration', 'etch-fusion-suite' ); ?></h3>
-					<p data-efs-receiving-subtitle><?php esc_html_e( 'Incoming data from the source site is being processed.', 'etch-fusion-suite' ); ?></p>
-				</div>
-				<button type="button" class="button button-secondary" data-efs-receiving-minimize>
-					<?php esc_html_e( 'Minimize', 'etch-fusion-suite' ); ?>
-				</button>
-			</header>
-
-			<dl class="efs-etch-receiving-takeover__meta">
-				<div>
-					<dt><?php esc_html_e( 'Source Site', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-source><?php esc_html_e( 'Waiting for source...', 'etch-fusion-suite' ); ?></dd>
-				</div>
-				<div>
-					<dt><?php esc_html_e( 'Phase', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-phase>
-						<span class="status-badge is-active">
-							<span class="status-dot"></span>
-							<?php esc_html_e( 'Initializing', 'etch-fusion-suite' ); ?>
-						</span>
-					</dd>
-				</div>
-				<div>
-					<dt><?php esc_html_e( 'Items Received', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-items>0</dd>
-				</div>
-				<div>
-					<dt><?php esc_html_e( 'Last Activity', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-last-activity><?php esc_html_e( 'Not yet available', 'etch-fusion-suite' ); ?></dd>
-				</div>
-				<div>
-					<dt><?php esc_html_e( 'Elapsed', 'etch-fusion-suite' ); ?></dt>
-					<dd data-efs-receiving-elapsed hidden>—</dd>
-				</div>
-			</dl>
-
+			<h3 data-efs-receiving-title><?php esc_html_e( 'Receiving Migration', 'etch-fusion-suite' ); ?></h3>
+			<span class="efs-badge" aria-hidden="true">&#9881; <?php esc_html_e( 'Etch Receive Mode', 'etch-fusion-suite' ); ?></span>
+			<p class="efs-etch-receiving-takeover__subtitle" data-efs-receiving-subtitle><?php esc_html_e( 'Incoming data from the source site is being processed.', 'etch-fusion-suite' ); ?></p>
+			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+				<div class="efs-progress-fill" data-efs-receiving-progress-fill style="width:0%"></div>
+			</div>
+			<p class="efs-etch-receiving-takeover__percent" data-efs-receiving-percent hidden>0%</p>
 			<p class="efs-etch-receiving-takeover__status" data-efs-receiving-status>
 				<?php esc_html_e( 'Listening for incoming migration packets.', 'etch-fusion-suite' ); ?>
 			</p>
-
-			<div class="efs-etch-receiving-takeover__actions">
+			<p class="efs-etch-receiving-takeover__source" data-efs-receiving-source aria-live="polite"></p>
+			<p class="efs-etch-receiving-takeover__items" data-efs-receiving-items></p>
+			<p class="efs-etch-receiving-takeover__elapsed" data-efs-receiving-elapsed hidden></p>
+			<div class="efs-actions efs-actions--inline efs-etch-receiving-takeover__actions">
 				<a
-					class="button button-primary"
+					class="btn--primary"
 					href="<?php echo esc_url( admin_url( 'edit.php' ) ); ?>"
 					data-efs-view-received-content
 					hidden
 				>
 					<?php esc_html_e( 'View Received Content', 'etch-fusion-suite' ); ?>
 				</a>
-				<button type="button" class="button" data-efs-receiving-dismiss hidden>
+				<button type="button" class="btn--base" data-efs-receiving-dismiss hidden>
 					<?php esc_html_e( 'Dismiss', 'etch-fusion-suite' ); ?>
+				</button>
+				<button type="button" class="btn--base" data-efs-receiving-minimize>
+					<?php esc_html_e( 'Minimize', 'etch-fusion-suite' ); ?>
 				</button>
 			</div>
 		</div>

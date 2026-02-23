@@ -131,11 +131,11 @@ export const initReceivingStatus = () => {
         title: root.querySelector('[data-efs-receiving-title]'),
         subtitle: root.querySelector('[data-efs-receiving-subtitle]'),
         source: root.querySelector('[data-efs-receiving-source]'),
-        phase: root.querySelector('[data-efs-receiving-phase]'),
         items: root.querySelector('[data-efs-receiving-items]'),
-        lastActivity: root.querySelector('[data-efs-receiving-last-activity]'),
         elapsed: root.querySelector('[data-efs-receiving-elapsed]'),
         status: root.querySelector('[data-efs-receiving-status]'),
+        progressFill: root.querySelector('[data-efs-receiving-progress-fill]'),
+        percent: root.querySelector('[data-efs-receiving-percent]'),
         bannerText: root.querySelector('[data-efs-receiving-banner-text]'),
         minimize: root.querySelector('[data-efs-receiving-minimize]'),
         expand: root.querySelector('[data-efs-receiving-expand]'),
@@ -197,30 +197,20 @@ export const initReceivingStatus = () => {
             elements.subtitle.textContent = model.subtitle;
         }
         if (elements.source) {
-            elements.source.textContent = model.source;
-        }
-        if (elements.phase) {
-            const phaseBadge = elements.phase.querySelector('.status-badge');
-            if (phaseBadge) {
-                phaseBadge.classList.toggle('is-active', model.status === 'receiving' || model.status === 'completed');
-                phaseBadge.classList.toggle('is-warning', model.status === 'stale');
-                phaseBadge.classList.toggle('is-error', model.status === 'idle');
-
-                const textNode = Array.from(phaseBadge.childNodes).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
-                if (textNode) {
-                    textNode.textContent = ` ${model.phase}`;
-                } else {
-                    phaseBadge.append(document.createTextNode(` ${model.phase}`));
-                }
-            } else {
-                elements.phase.textContent = model.phase;
-            }
+            elements.source.textContent = model.source && model.source !== SOURCE_FALLBACK ? `Source: ${model.source}` : '';
+            elements.source.hidden = !elements.source.textContent;
         }
         if (elements.items) {
-            elements.items.textContent = `${model.items}`;
+            const total = model.itemsTotal > 0 ? `/${model.itemsTotal}` : '';
+            elements.items.textContent = model.items > 0 || total ? `Items: ${model.items}${total}` : '';
+            elements.items.hidden = !elements.items.textContent;
         }
-        if (elements.lastActivity) {
-            elements.lastActivity.textContent = model.lastActivity;
+        if (elements.progressFill && elements.percent) {
+            const total = model.itemsTotal > 0 ? model.itemsTotal : 0;
+            const pct = total > 0 ? Math.min(100, Math.round((model.items / total) * 100)) : 0;
+            elements.progressFill.style.width = `${pct}%`;
+            elements.percent.textContent = `${pct}%`;
+            elements.percent.hidden = total === 0;
         }
         if (elements.elapsed) {
             const startedAt = model.startedAt;
@@ -236,6 +226,7 @@ export const initReceivingStatus = () => {
                 elements.elapsed.textContent = text;
                 elements.elapsed.hidden = false;
             } else {
+                elements.elapsed.textContent = '';
                 elements.elapsed.hidden = true;
             }
         }
