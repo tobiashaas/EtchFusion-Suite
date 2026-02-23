@@ -21,7 +21,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# All runtime PHP paths; exclude vendor/ and optionally tests/ to avoid noise.
+# All runtime PHP paths; exclude vendor/, tests/, and scripts/ (one-off CLI/dev helpers).
 # error_handler.php exclusions for log-related patterns are applied separately below.
 SCAN_PATHS=(
   "${PROJECT_ROOT}"
@@ -67,7 +67,7 @@ run_grep_check() {
   info "Scanning for forbidden debug file-write patterns"
   local all_matches=""
   local match
-  local exclude_dirs=( --exclude-dir=vendor --exclude-dir=tests )
+  local exclude_dirs=( --exclude-dir=vendor --exclude-dir=tests --exclude-dir=scripts )
 
   for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
     match=$(grep -rn --include="*.php" "${exclude_dirs[@]}" -E "${pattern}" "${SCAN_PATHS[@]}" 2>/dev/null || true)
