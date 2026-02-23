@@ -714,7 +714,7 @@ class EFS_API_Endpoints {
 				'code'       => strtoupper( substr( $code, 0, 4 ) ) . '-' . strtoupper( substr( $code, 4 ) ),
 				'raw_code'   => $code,
 				'expires_in' => 15 * MINUTE_IN_SECONDS,
-				'expires_at' => gmdate( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS ),
+				'expires_at' => wp_date( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS, new \DateTimeZone( 'UTC' ) ),
 			),
 			200
 		);

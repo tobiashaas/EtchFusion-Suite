@@ -936,6 +936,7 @@ main() {
 
   run_phpcs
   local phpcs_status=${PHPCS_STATUS}
+  phpcs_status=$(( phpcs_status + 0 ))
 
   if (( phpcs_status >= 2 )); then
     error "PHPCS encountered an error (exit code ${phpcs_status})"
@@ -963,9 +964,10 @@ $summary = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($summary)) {
     exit(1);
 }
-echo $summary['totals']['hooks'] ?? 0;
+echo (int) ($summary['totals']['hooks'] ?? 0);
 PHP
 ) || total_hooks=0
+  total_hooks=$(( total_hooks + 0 ))
 
   local total_functions
   total_functions=$(php <<'PHP' "${hook_summary_path}"
@@ -974,9 +976,10 @@ $summary = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($summary)) {
     exit(1);
 }
-echo $summary['totals']['global_functions'] ?? 0;
+echo (int) ($summary['totals']['global_functions'] ?? 0);
 PHP
 ) || total_functions=0
+  total_functions=$(( total_functions + 0 ))
 
   local hook_violations
   hook_violations=$(php <<'PHP' "${hook_summary_path}"
@@ -985,9 +988,10 @@ $summary = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($summary)) {
     exit(1);
 }
-echo $summary['violations']['hooks'] ?? 0;
+echo (int) ($summary['violations']['hooks'] ?? 0);
 PHP
 ) || hook_violations=0
+  hook_violations=$(( hook_violations + 0 ))
 
   local function_violations
   function_violations=$(php <<'PHP' "${hook_summary_path}"
@@ -996,9 +1000,10 @@ $summary = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($summary)) {
     exit(1);
 }
-echo $summary['violations']['functions'] ?? 0;
+echo (int) ($summary['violations']['functions'] ?? 0);
 PHP
 ) || function_violations=0
+  function_violations=$(( function_violations + 0 ))
 
   local exit_code=0
 
