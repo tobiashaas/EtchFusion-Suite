@@ -44,9 +44,22 @@ function generateMigrationKey(targetUrl, sourceUrl) {
 }
 
 function triggerMigration(migrationKey, targetUrl) {
-  console.log('> Triggering migration via WP-CLI...');
-  const cmd = `if (!function_exists('bricks_is_builder')) { function bricks_is_builder() { return true; } } $result=etch_fusion_suite_container()->get('migration_controller')->start_migration(array('migration_key'=>'${migrationKey}','target_url'=>'${targetUrl}','batch_size'=>50)); if (is_wp_error($result)) { fwrite(STDERR, $result->get_error_message()); exit(1); } echo wp_json_encode($result);`;
+  console.log('> Triggering migration via WP-CLI (headless mode)...');
+  // Limit to post/page only; bricks_template requires a dedicated converter
+  // and is handled separately via the template extractor service.
+  const cmd = `if (!function_exists('bricks_is_builder')) { function bricks_is_builder() { return true; } } $result=etch_fusion_suite_container()->get('migration_controller')->start_migration(array('migration_key'=>'${migrationKey}','target_url'=>'${targetUrl}','batch_size'=>50,'mode'=>'headless','selected_post_types'=>array('post','page'),'post_type_mappings'=>array('post'=>'post','page'=>'page'))); if (is_wp_error($result)) { fwrite(STDERR, $result->get_error_message()); exit(1); } echo wp_json_encode($result);`;
+  const rawOutput = runWpCli(['cli'], ['eval', cmd]);
+  const match = rawOutput.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+}
+
+function driveHeadlessMigration(migrationId) {
+  console.log(`> Driving headless migration ${migrationId} synchronously via WP-CLI...`);
+  // Directly invoke run_headless_job — bypasses Action Scheduler and runs the
+  // full batch loop synchronously, which is safe in a CLI context.
+  const cmd = `set_time_limit(0); etch_fusion_suite_container()->get('headless_migration_job')->run_headless_job('${migrationId}');`;
   runWpCli(['cli'], ['eval', cmd]);
+  console.log('> Headless migration driver completed');
 }
 
 function getProgress() {
@@ -119,8 +132,22 @@ async function main() {
   const targetUrl = 'http://localhost:8889';
   const sourceUrl = 'http://localhost:8888';
   const migrationKey = generateMigrationKey(targetUrl, sourceUrl);
-  triggerMigration(migrationKey, targetUrl);
-  const progress = await waitForCompletion();
+  const migrationId = triggerMigration(migrationKey, targetUrl);
+
+  let progress;
+  if (migrationId) {
+    console.log(`> Started migration ID: ${migrationId}`);
+    driveHeadlessMigration(migrationId);
+    progress = getProgress();
+    if (!progress || progress.status !== 'completed') {
+      const status = progress ? progress.status : 'unknown';
+      throw new Error(`Migration did not complete. Final status: ${status}`);
+    }
+    console.log('OK Migration completed successfully');
+  } else {
+    console.log('> No migrationId returned, falling back to polling...');
+    progress = await waitForCompletion();
+  }
 
   const stats = collectStats();
   const report = {
