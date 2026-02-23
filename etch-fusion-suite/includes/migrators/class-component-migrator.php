@@ -333,7 +333,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		}
 
 		if ( ! $dry_run ) {
-			update_option( 'b2e_component_map', $this->component_map );
+			update_option( 'efs_component_map', $this->component_map );
 		}
 
 		return true;
@@ -700,7 +700,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 */
 	public function save_component_mapping( $bricks_id, $etch_post_id ) {
 		$this->component_map[ $bricks_id ] = (int) $etch_post_id;
-		update_option( 'b2e_component_map', $this->component_map );
+		update_option( 'efs_component_map', $this->component_map );
 	}
 
 	/**
@@ -709,7 +709,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 * @return array<string, int>
 	 */
 	public function get_component_mapping() {
-		return get_option( 'b2e_component_map', array() );
+		return get_option( 'efs_component_map', get_option( 'b2e_component_map', array() ) );
 	}
 
 	/**
@@ -719,7 +719,7 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 	 * @return int|null Etch post ID or null if not found.
 	 */
 	public static function get_etch_component_id( $bricks_id ) {
-		$map = get_option( 'b2e_component_map', array() );
+		$map = get_option( 'efs_component_map', get_option( 'b2e_component_map', array() ) );
 		return isset( $map[ $bricks_id ] ) ? (int) $map[ $bricks_id ] : null;
 	}
 }

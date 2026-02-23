@@ -7,7 +7,7 @@
  */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-// Bricks ID => Etch ID mapping (from _b2e_original_post_id meta on etch site)
+// Bricks ID => Etch ID mapping (from _efs_original_post_id meta (or legacy _b2e_original_post_id) on etch site)
 $mapping = array(
 	25199 => 953,
 	25197 => 925,

@@ -72,7 +72,7 @@ class EFS_Framer_To_Etch_Converter {
 			}
 		} catch ( \Throwable $exception ) {
 			$this->error_handler->log_error(
-				'B2E_FRAMER_CONVERTER',
+				'EFS_FRAMER_CONVERTER',
 				array(
 					'message' => $exception->getMessage(),
 					'tag'     => $this->get_element_tag_name( $element ),

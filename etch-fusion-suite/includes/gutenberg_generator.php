@@ -849,9 +849,10 @@ class EFS_Gutenberg_Generator {
 		}
 
 		// Append inline JavaScript from code blocks (if any)
-		$inline_js = get_option( 'b2e_inline_js_' . $post->ID, '' );
+		$inline_js = get_option( 'efs_inline_js_' . $post->ID, get_option( 'b2e_inline_js_' . $post->ID, '' ) );
 		if ( ! empty( $inline_js ) ) {
 			$gutenberg_html .= "\n\n<!-- wp:html -->\n<script>\n" . trim( $inline_js ) . "\n</script>\n<!-- /wp:html -->";
+			delete_option( 'efs_inline_js_' . $post->ID );
 			delete_option( 'b2e_inline_js_' . $post->ID );
 		}
 
@@ -887,8 +888,8 @@ class EFS_Gutenberg_Generator {
 			return false;
 		}
 
-		// Send blocks to Etch via HTTP (using new b2e/v1 endpoint with API key)
-		$endpoint_url = rtrim( $target_url, '/' ) . '/wp-json/b2e/v1/import/post';
+		// Send blocks to Etch via HTTP (using efs/v1 REST API endpoint)
+		$endpoint_url = rtrim( $target_url, '/' ) . '/wp-json/efs/v1/import/post';
 
 		// Convert bricks_template to page
 		$target_post_type = $post->post_type;

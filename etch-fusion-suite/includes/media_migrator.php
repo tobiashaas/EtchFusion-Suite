@@ -513,16 +513,16 @@ class EFS_Media_Migrator {
 	 * Store media ID mapping for later reference
 	 */
 	private function store_media_mapping( $source_media_id, $target_media_id ) {
-		$mappings                     = get_option( 'b2e_media_mappings', array() );
+		$mappings                     = get_option( 'efs_media_mappings', get_option( 'b2e_media_mappings', array() ) );
 		$mappings[ $source_media_id ] = $target_media_id;
-		update_option( 'b2e_media_mappings', $mappings );
+		update_option( 'efs_media_mappings', $mappings );
 	}
 
 	/**
 	 * Get media ID mapping
 	 */
 	public function get_media_mapping( $source_media_id ) {
-		$mappings = get_option( 'b2e_media_mappings', array() );
+		$mappings = get_option( 'efs_media_mappings', get_option( 'b2e_media_mappings', array() ) );
 		return isset( $mappings[ $source_media_id ] ) ? $mappings[ $source_media_id ] : null;
 	}
 

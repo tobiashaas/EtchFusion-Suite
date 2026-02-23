@@ -16,12 +16,12 @@ use WP_UnitTestCase;
 class ComponentContentIntegrationTest extends WP_UnitTestCase {
 
 	protected function tearDown(): void {
-		delete_option( 'b2e_component_map' );
+		delete_option( 'efs_component_map' );
 		parent::tearDown();
 	}
 
 	public function test_component_reference_replaced_in_content(): void {
-		update_option( 'b2e_component_map', array( 'bricks-comp-123' => 456 ) );
+		update_option( 'efs_component_map', array( 'bricks-comp-123' => 456 ) );
 
 		$converter = new EFS_Element_Component( array() );
 		$element   = array(
@@ -43,7 +43,7 @@ class ComponentContentIntegrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_component_converter_returns_empty_when_no_mapping(): void {
-		delete_option( 'b2e_component_map' );
+		delete_option( 'efs_component_map' );
 		$converter = new EFS_Element_Component( array() );
 		$element   = array( 'cid' => 'unknown-comp' );
 		$html = $converter->convert( $element, array() );

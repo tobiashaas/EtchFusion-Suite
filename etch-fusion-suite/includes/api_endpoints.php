@@ -1475,7 +1475,7 @@ class EFS_API_Endpoints {
 		$existing        = null;
 		$resolution_path = 'new';
 
-		// Tier 1: meta lookup by _b2e_original_post_id (authoritative).
+		// Tier 1: meta lookup by _efs_original_post_id (authoritative). Also checks legacy _b2e_original_post_id.
 		if ( $source_post_id > 0 ) {
 			$meta_matches = get_posts(
 				array(
@@ -1484,6 +1484,12 @@ class EFS_API_Endpoints {
 					'posts_per_page' => 1,
 					'fields'         => 'ids',
 					'meta_query'     => array(
+						'relation' => 'OR',
+						array(
+							'key'   => '_efs_original_post_id',
+							'value' => $source_post_id,
+							'type'  => 'NUMERIC',
+						),
 						array(
 							'key'   => '_b2e_original_post_id',
 							'value' => $source_post_id,
@@ -1498,9 +1504,9 @@ class EFS_API_Endpoints {
 			}
 		}
 
-		// Tier 2: option mapping lookup via b2e_post_mappings.
+		// Tier 2: option mapping lookup via efs_post_mappings (falls back to legacy b2e_post_mappings).
 		if ( null === $existing && $source_post_id > 0 ) {
-			$mappings = get_option( 'b2e_post_mappings', array() );
+			$mappings = get_option( 'efs_post_mappings', get_option( 'b2e_post_mappings', array() ) );
 			$mappings = is_array( $mappings ) ? $mappings : array();
 			if ( isset( $mappings[ $source_post_id ] ) ) {
 				$mapped_post = get_post( $mappings[ $source_post_id ] );
@@ -1567,12 +1573,12 @@ class EFS_API_Endpoints {
 		}
 
 		if ( $source_post_id > 0 ) {
-			$mappings                    = get_option( 'b2e_post_mappings', array() );
+			$mappings                    = get_option( 'efs_post_mappings', get_option( 'b2e_post_mappings', array() ) );
 			$mappings                    = is_array( $mappings ) ? $mappings : array();
 			$mappings[ $source_post_id ] = (int) $post_id;
-			update_option( 'b2e_post_mappings', $mappings );
+			update_option( 'efs_post_mappings', $mappings );
 
-			update_post_meta( $post_id, '_b2e_original_post_id', $source_post_id );
+			update_post_meta( $post_id, '_efs_original_post_id', $source_post_id );
 		}
 
 		if ( in_array( $resolution_path, array( 'meta', 'option', 'slug' ), true ) ) {
@@ -1586,8 +1592,8 @@ class EFS_API_Endpoints {
 			);
 		}
 
-		update_post_meta( $post_id, '_b2e_migrated_from_bricks', 1 );
-		update_post_meta( $post_id, '_b2e_migration_date', current_time( 'mysql' ) );
+		update_post_meta( $post_id, '_efs_migrated_from_bricks', 1 );
+		update_post_meta( $post_id, '_efs_migration_date', current_time( 'mysql' ) );
 
 		return new \WP_REST_Response(
 			array(
@@ -1679,7 +1685,7 @@ class EFS_API_Endpoints {
 		$target_post_id = isset( $payload['target_post_id'] ) ? absint( $payload['target_post_id'] ) : 0;
 
 		if ( $target_post_id <= 0 && $source_post_id > 0 ) {
-			$mappings = get_option( 'b2e_post_mappings', array() );
+			$mappings = get_option( 'efs_post_mappings', get_option( 'b2e_post_mappings', array() ) );
 			if ( is_array( $mappings ) && isset( $mappings[ $source_post_id ] ) ) {
 				$target_post_id = absint( $mappings[ $source_post_id ] );
 			}

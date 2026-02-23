@@ -336,12 +336,24 @@ class EFS_Migration_Starter {
 			$is_stale        = ! empty( $progress_data['is_stale'] ) || 'stale' === $existing_status;
 			if ( '' !== $existing_id && in_array( $existing_status, array( 'running', 'receiving' ), true ) ) {
 				if ( ! $is_stale ) {
-					return new \WP_Error( 'migration_in_progress', __( 'A migration is already in progress.', 'etch-fusion-suite' ) );
+					return new \WP_Error(
+						'migration_in_progress',
+						__( 'A migration is already in progress.', 'etch-fusion-suite' ),
+						array(
+							'existing_migration_id' => $existing_id,
+							'status'                => $existing_status,
+						)
+					);
 				}
 				// Stale run: clear state so a new migration can start.
 				$this->migration_repository->delete_progress();
 				$this->migration_repository->delete_steps();
 				$this->migration_repository->delete_token_data();
+				$this->progress_manager->store_active_migration( array() );
+			} elseif ( $is_stale ) {
+				// Status may have already been transformed to 'stale' by get_progress_data() — clear it.
+				$this->migration_repository->delete_progress();
+				$this->migration_repository->delete_steps();
 				$this->progress_manager->store_active_migration( array() );
 			}
 

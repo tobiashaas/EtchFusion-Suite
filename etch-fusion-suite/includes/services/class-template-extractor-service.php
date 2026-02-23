@@ -153,7 +153,7 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 
 		$validation = $this->template_generator->validate_generated_template( $template['blocks'] );
 		if ( ! $validation['valid'] ) {
-			return new WP_Error( 'b2e_template_extractor_invalid_template', __( 'Generated template failed validation.', 'etch-fusion-suite' ), $validation['errors'] );
+			return new WP_Error( 'efs_template_extractor_invalid_template', __( 'Generated template failed validation.', 'etch-fusion-suite' ), $validation['errors'] );
 		}
 
 		$this->stats = array(
@@ -192,12 +192,12 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			return new WP_Error( 'b2e_template_extractor_fetch_failed', __( 'Failed to fetch HTML from remote source.', 'etch-fusion-suite' ), array( 'status_code' => $code ) );
+			return new WP_Error( 'efs_template_extractor_fetch_failed', __( 'Failed to fetch HTML from remote source.', 'etch-fusion-suite' ), array( 'status_code' => $code ) );
 		}
 
 		$body = wp_remote_retrieve_body( $response );
 		if ( empty( $body ) ) {
-			return new WP_Error( 'b2e_template_extractor_empty_html', __( 'Received empty HTML response.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_extractor_empty_html', __( 'Received empty HTML response.', 'etch-fusion-suite' ) );
 		}
 
 		return $body;
@@ -235,14 +235,14 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 	public function validate_source( $source, $type ) {
 		if ( 'url' === $type ) {
 			if ( ! filter_var( $source, FILTER_VALIDATE_URL ) ) {
-				return new WP_Error( 'b2e_template_extractor_invalid_url', __( 'Please provide a valid Framer URL.', 'etch-fusion-suite' ) );
+				return new WP_Error( 'efs_template_extractor_invalid_url', __( 'Please provide a valid Framer URL.', 'etch-fusion-suite' ) );
 			}
 		} elseif ( 'html' === $type ) {
 			if ( empty( trim( $source ) ) ) {
-				return new WP_Error( 'b2e_template_extractor_empty_html', __( 'Please provide Framer HTML to import.', 'etch-fusion-suite' ) );
+				return new WP_Error( 'efs_template_extractor_empty_html', __( 'Please provide Framer HTML to import.', 'etch-fusion-suite' ) );
 			}
 		} else {
-			return new WP_Error( 'b2e_template_extractor_invalid_source_type', __( 'Unsupported source type provided.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_extractor_invalid_source_type', __( 'Unsupported source type provided.', 'etch-fusion-suite' ) );
 		}
 
 		return true;
@@ -276,12 +276,12 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 		);
 
 		if ( is_wp_error( $post_id ) || 0 === (int) $post_id ) {
-			return new WP_Error( 'b2e_template_save_failed', __( 'Unable to save template as draft.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_save_failed', __( 'Unable to save template as draft.', 'etch-fusion-suite' ) );
 		}
 
-		update_post_meta( $post_id, '_b2e_template_styles', $template['styles'] ?? array() );
-		update_post_meta( $post_id, '_b2e_template_metadata', $template['metadata'] ?? array() );
-		update_post_meta( $post_id, '_b2e_template_stats', $template['stats'] ?? array() );
+		update_post_meta( $post_id, '_efs_template_styles', $template['styles'] ?? array() );
+		update_post_meta( $post_id, '_efs_template_metadata', $template['metadata'] ?? array() );
+		update_post_meta( $post_id, '_efs_template_stats', $template['stats'] ?? array() );
 
 		return $post_id;
 	}
@@ -318,7 +318,7 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 				'id'         => $post->ID,
 				'title'      => get_the_title( $post ),
 				'created_at' => $post->post_date,
-				'metadata'   => get_post_meta( $post->ID, '_b2e_template_metadata', true ),
+				'metadata'   => get_post_meta( $post->ID, '_efs_template_metadata', true ),
 				'preview'    => maybe_unserialize( $post->post_content ),
 			);
 		}

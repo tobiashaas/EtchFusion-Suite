@@ -277,7 +277,7 @@ class EFS_Element_Image extends EFS_Base_Element {
 			return 0;
 		}
 
-		$mappings = get_option( 'b2e_media_mappings', array() );
+		$mappings = get_option( 'efs_media_mappings', get_option( 'b2e_media_mappings', array() ) );
 		if ( ! is_array( $mappings ) || ! isset( $mappings[ $source_image_id ] ) ) {
 			return 0;
 		}

@@ -6,6 +6,16 @@
 
 ### ✅ Completed Tasks
 
+- [✅] **Plugin-Review: 7 Bugfixes + Legacy-Präfix-Migration** - **Completed:** 2026-02-23
+  - **Root cause Migration-Blocker gefunden und behoben**: Debug-Log zeigte dauerhaft `"code":"migration_in_progress"`. Ein vorheriger Run ließ `status: 'running'` in der DB. Behoben durch: (1) Stale-Detection-Fix für ungültige Timestamps, (2) Headless-TTL von 300s auf 120s reduziert, (3) explizite State-Bereinigung in `start_migration_async()` für stale-States, (4) HTTP 409 mit `existing_migration_id` im AJAX-Fehler.
+  - **Cache-Key-Typo behoben**: `save_imported_data()` nutzte `b2e_cache_imported_` statt `efs_cache_imported_` → Cache wurde nie invalidiert.
+  - **WP_Error-Handling in Connection-AJAX**: `is_wp_error()`-Check vor Array-Zugriff ergänzt, fehlendes `return` nach `wp_send_json_success()` hinzugefügt.
+  - **Falsche Fehlermeldungen im Wizard-AJAX**: URL-Validierungsfehler gaben fälschlicherweise "Migration key"-Meldungen aus.
+  - **Toter Code in `send_css_styles()`** entfernt.
+  - **Legacy-Präfix `b2e_` → `efs_`** in 20+ Dateien migriert (Option-Namen, Post-Meta-Keys, WP_Error-Codes, Debug-Tags, Typ-Hints, Container-Referenz, REST-URL). Alle Reads haben Fallbacks auf alte `b2e_*`-Keys.
+  - **29 Temp-/Log-Dateien gelöscht** und `.gitignore` um die entsprechenden Patterns erweitert.
+  - PHPCS (128 Dateien) nach allen Änderungen fehlerfrei.
+
 - [✅] **Fix Backup Metadata Version Retrieval** - **Completed:** 2025-11-04 21:22
   - Fixed `scripts/backup-db.js` version helper mis-mapping environments
   - Added `normalizeEnvironmentToTarget()` function for consistent environment mapping
@@ -212,6 +222,6 @@
 
 ---
 
-**Last Updated:** 2025-10-29 15:30  
-**Next Review:** 2025-11-05 15:30  
+**Last Updated:** 2026-02-23 00:00
+**Next Review:** 2026-03-02 00:00
 **Maintainer:** Etch Fusion Suite Development Team

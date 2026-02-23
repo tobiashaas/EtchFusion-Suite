@@ -93,7 +93,7 @@ class EFS_Template_Controller {
 		}
 
 		if ( empty( $template_payload['blocks'] ) || ! is_array( $template_payload['blocks'] ) ) {
-			return new WP_Error( 'b2e_template_import_invalid', __( 'Template payload is missing blocks data.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_import_invalid', __( 'Template payload is missing blocks data.', 'etch-fusion-suite' ) );
 		}
 
 		$resolved_name = $name ? sanitize_text_field( $name ) : ( $template_payload['metadata']['title'] ?? '' );
@@ -156,7 +156,7 @@ class EFS_Template_Controller {
 		$deleted = wp_delete_post( (int) $template_id, true );
 
 		if ( ! $deleted ) {
-			return new WP_Error( 'b2e_template_delete_failed', __( 'Failed to delete the template.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_delete_failed', __( 'Failed to delete the template.', 'etch-fusion-suite' ) );
 		}
 
 		return true;
@@ -180,16 +180,16 @@ class EFS_Template_Controller {
 		$post = get_post( (int) $template_id );
 
 		if ( ! $post || 'etch_template' !== $post->post_type ) {
-			return new WP_Error( 'b2e_template_not_found', __( 'Template not found.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_not_found', __( 'Template not found.', 'etch-fusion-suite' ) );
 		}
 
 		return array(
 			'id'       => $post->ID,
 			'title'    => get_the_title( $post ),
 			'content'  => maybe_unserialize( $post->post_content ),
-			'styles'   => get_post_meta( $post->ID, '_b2e_template_styles', true ),
-			'metadata' => get_post_meta( $post->ID, '_b2e_template_metadata', true ),
-			'stats'    => get_post_meta( $post->ID, '_b2e_template_stats', true ),
+			'styles'   => get_post_meta( $post->ID, '_efs_template_styles', true ) ? get_post_meta( $post->ID, '_efs_template_styles', true ) : get_post_meta( $post->ID, '_b2e_template_styles', true ),
+			'metadata' => get_post_meta( $post->ID, '_efs_template_metadata', true ) ? get_post_meta( $post->ID, '_efs_template_metadata', true ) : get_post_meta( $post->ID, '_b2e_template_metadata', true ),
+			'stats'    => get_post_meta( $post->ID, '_efs_template_stats', true ) ? get_post_meta( $post->ID, '_efs_template_stats', true ) : get_post_meta( $post->ID, '_b2e_template_stats', true ),
 		);
 	}
 }

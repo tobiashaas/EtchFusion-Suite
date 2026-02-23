@@ -16,7 +16,7 @@ class ComponentIntegrationTest extends WP_UnitTestCase {
 
 	protected function tearDown(): void {
 		delete_option( 'bricks_components' );
-		delete_option( 'b2e_component_map' );
+		delete_option( 'efs_component_map' );
 		parent::tearDown();
 	}
 

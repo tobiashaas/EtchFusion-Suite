@@ -33,3 +33,14 @@ test_*.php
 
 # Debug log artifacts
 debug-*.log
+
+# Migration / health-check artifacts (temp files from local testing)
+tmp-*.json
+tmp-*.txt
+tmp-*.html
+tmp-*.php
+migration-report-*.json
+page-*.json
+env-info-output.txt
+test-output.log
+.phpunit.result.cache

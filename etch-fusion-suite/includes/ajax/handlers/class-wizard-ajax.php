@@ -256,7 +256,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		if ( '' === $url ) {
 			wp_send_json_error(
 				array(
-					'message' => __( 'Migration key is required.', 'etch-fusion-suite' ),
+					'message' => __( 'Target URL is required.', 'etch-fusion-suite' ),
 					'code'    => 'missing_url',
 				),
 				400
@@ -268,7 +268,7 @@ class EFS_Wizard_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		if ( ! is_array( $parsed ) || empty( $parsed['host'] ) ) {
 			wp_send_json_error(
 				array(
-					'message' => __( 'Migration key is invalid.', 'etch-fusion-suite' ),
+					'message' => __( 'Target URL is invalid.', 'etch-fusion-suite' ),
 					'code'    => 'invalid_url',
 				),
 				400

@@ -386,7 +386,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_imported_data( string $type, array $data ): bool {
 		$option_key = $this->get_imported_data_option_key( $type );
-		$cache_key  = 'b2e_cache_imported_' . $type;
+		$cache_key  = 'efs_cache_imported_' . $type;
 
 		$this->invalidate_cache( $cache_key );
 		return update_option( $option_key, $data );

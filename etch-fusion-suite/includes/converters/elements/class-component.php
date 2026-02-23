@@ -4,7 +4,7 @@
  *
  * Converts Bricks component instances (template element with cid) to Etch
  * etch/component blocks. Resolves Bricks component ID to Etch post ID via
- * component mapping (b2e_component_map).
+ * component mapping (efs_component_map).
  *
  * @package Bricks2Etch\Converters\Elements
  * @since 0.5.0

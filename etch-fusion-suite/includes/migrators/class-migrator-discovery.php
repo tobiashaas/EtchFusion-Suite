@@ -63,7 +63,7 @@ class EFS_Migrator_Discovery {
 		 * Allow third-party plugins to register migrators.
 		 *
 		 * New hook prefix: etch_fusion_suite_*.
-		 * Backwards compatibility hooks (b2e_*, efs_*) retained temporarily.
+		 * Backwards compatibility hooks (b2e_*, efs_*) retained for legacy integrations.
 		 */
 		do_action( 'etch_fusion_suite_register_migrators', $registry );
 		do_action( 'efs_register_migrators', $registry ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- legacy compatibility.
@@ -105,7 +105,7 @@ class EFS_Migrator_Discovery {
 					'count' => $registry->count(),
 					'types' => $registry->get_types(),
 				),
-				'B2E_MIGRATOR'
+				'EFS_MIGRATOR'
 			);
 		}
 	}
@@ -113,7 +113,7 @@ class EFS_Migrator_Discovery {
 	/**
 	 * Auto-discover migrators from directory (optional helper).
 	 */
-	public static function auto_discover_from_directory( $directory, B2E_Migrator_Registry $registry ) {
+	public static function auto_discover_from_directory( $directory, EFS_Migrator_Registry $registry ) {
 		if ( ! is_dir( $directory ) || ! is_readable( $directory ) ) {
 			return;
 		}
@@ -126,7 +126,7 @@ class EFS_Migrator_Discovery {
 			require_once $file->getPathname();
 		}
 
-		$container     = function_exists( 'b2e_container' ) ? b2e_container() : null;
+		$container     = function_exists( 'etch_fusion_suite_container' ) ? etch_fusion_suite_container() : null;
 		$error_handler = ( $container && $container->has( 'error_handler' ) ) ? $container->get( 'error_handler' ) : null;
 		$api_client    = ( $container && $container->has( 'api_client' ) ) ? $container->get( 'api_client' ) : null;
 

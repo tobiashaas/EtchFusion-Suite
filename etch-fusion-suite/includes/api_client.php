@@ -310,15 +310,7 @@ class EFS_API_Client {
 	 * Send CSS styles to target site
 	 */
 	public function send_css_styles( $url, $jwt_token, $etch_styles ) {
-		$styles_count = is_array( $etch_styles ) ? count( $etch_styles ) : 0;
-
-		$result = $this->send_request( $url, $jwt_token, '/import/css-classes', 'POST', $etch_styles );
-
-		if ( is_wp_error( $result ) ) {
-		} else {
-		}
-
-		return $result;
+		return $this->send_request( $url, $jwt_token, '/import/css-classes', 'POST', $etch_styles );
 	}
 
 

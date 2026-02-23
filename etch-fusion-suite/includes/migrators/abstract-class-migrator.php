@@ -97,7 +97,7 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 	 * Logs an info/debug message.
 	 */
 	protected function log_info( $message, $context = array() ) {
-		$this->error_handler->debug_log( $message, $context, 'B2E_MIGRATOR' );
+		$this->error_handler->debug_log( $message, $context, 'EFS_MIGRATOR' );
 	}
 
 	/**

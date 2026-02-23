@@ -91,7 +91,20 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			'mode'                 => $this->get_post( 'mode', 'browser', 'text' ),
 		);
 
-		$result     = $this->migration_controller->start_migration( $payload );
+		$result = $this->migration_controller->start_migration( $payload );
+		if ( is_wp_error( $result ) && 'migration_in_progress' === $result->get_error_code() ) {
+			$error_data  = $result->get_error_data();
+			$error_extra = array(
+				'message' => $result->get_error_message(),
+				'code'    => 'migration_in_progress',
+			);
+			if ( is_array( $error_data ) && isset( $error_data['existing_migration_id'] ) ) {
+				$error_extra['existing_migration_id'] = sanitize_text_field( $error_data['existing_migration_id'] );
+				$error_extra['existing_status']       = sanitize_key( $error_data['status'] ?? '' );
+			}
+			wp_send_json_error( $error_extra, 409 );
+			return;
+		}
 		$extra_data = is_wp_error( $result ) ? array() : array( 'migration_id' => $result['migrationId'] ?? null );
 		$this->send_controller_response( $result, 'migration_start_failed', 'Migration started successfully.', $extra_data );
 	}

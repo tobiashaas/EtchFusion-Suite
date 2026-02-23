@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(No changes yet.)
+## [0.12.7] - 2026-02-23
+
+### Fixed
+- **Cache-Key-Typo im Migration-Repository (2026-02-23)**: `save_imported_data()` verwendete den falschen Cache-Präfix `b2e_cache_imported_` statt `efs_cache_imported_`. Dadurch wurde der Transient-Cache nach dem Speichern nie invalidiert und veraltete Daten wurden für CPTs/ACF-Feldgruppen/Metabox-Konfigurationen zurückgegeben.
+- **WP_Error-Handling in `test_export_connection` / `test_import_connection` (2026-02-23)**: Wenn `validate_migration_key_on_target()` einen `WP_Error` zurückgab, wurde er stillschweigend ignoriert (kein `is_wp_error()`-Check vor Array-Zugriff), und es wurde eine generische "Connection failed."-Meldung ausgegeben. Der echte Fehlergrund (z.B. Netzwerkfehler, ungültiger Key) wurde verloren. Jetzt wird `WP_Error` korrekt behandelt und die echte Fehlermeldung zurückgegeben. Außerdem fehlendes `return` nach `wp_send_json_success()` ergänzt.
+- **Falsche Fehlermeldungen im Wizard-AJAX (2026-02-23)**: Bei fehlendem oder ungültigem URL in `validate_url()` wurden fälschlicherweise "Migration key is required." / "Migration key is invalid." ausgegeben statt der korrekten URL-bezogenen Meldungen.
+- **Toter Code in `send_css_styles()` (2026-02-23)**: Leere `if/else`-Blöcke in `api_client.php` wurden entfernt.
+- **Stale-Detection-Bug im Progress Manager (2026-02-23)**: Wenn `strtotime()` für `last_updated` `false` zurückgab (ungültiger/leerer Timestamp), wurde die Migration nie als "stale" erkannt, was zu dauerhaft feststeckenden Migrations-States führte. Nun wird ein ungültiger Timestamp direkt als stale behandelt.
+- **Headless-Mode Stale-TTL von 300s auf 120s reduziert (2026-02-23)**: Headless-Migrationen wurden erst nach 5 Minuten als stale erkannt, was neue Migrations-Starts für zu lange blockierte.
+- **Feststeckende stale Migrations-States werden jetzt in `start_migration_async()` bereinigt (2026-02-23)**: Wenn `get_progress_data()` einen Status bereits zu 'stale' transformiert hatte, wurde das alte State nicht explizit geleert. Jetzt wird auch in diesem Fall `delete_progress()` / `delete_steps()` aufgerufen, bevor eine neue Migration startet.
+- **`migration_in_progress`-Fehler enthält jetzt die ID der hängenden Migration (2026-02-23)**: Die AJAX-Response für `migration_in_progress` gibt jetzt `existing_migration_id` und `existing_status` zurück (HTTP 409), damit das Frontend eine gezielte Abbruchmöglichkeit anbieten kann.
+
+### Changed
+- **Legacy-Präfix `b2e_` vollständig zu `efs_` migriert (2026-02-23)**:
+  - Option-Namen: `b2e_post_mappings` → `efs_post_mappings`, `b2e_media_mappings` → `efs_media_mappings`, `b2e_component_map` → `efs_component_map`, `b2e_registered_cpts` → `efs_registered_cpts`, `b2e_inline_js_*` → `efs_inline_js_*`
+  - Post-Meta-Keys: `_b2e_original_post_id` → `_efs_original_post_id`, `_b2e_migrated_from_bricks` → `_efs_migrated_from_bricks`, `_b2e_migration_date` → `_efs_migration_date`, `_b2e_template_*` → `_efs_template_*`
+  - WP_Error-Codes: alle `b2e_*` → `efs_*`
+  - Debug-Tags: `B2E_MIGRATOR` → `EFS_MIGRATOR`, `B2E_HTML_PARSER` → `EFS_HTML_PARSER`, etc.
+  - `B2E_Migrator_Registry` Type-Hint → `EFS_Migrator_Registry`
+  - `b2e_container()` Funktionsreferenz → `etch_fusion_suite_container()`
+  - REST-API-Endpoint-URL in `gutenberg_generator.php`: `b2e/v1` → `efs/v1`
+  - Alle Reads haben Fallbacks auf alte `b2e_*`-Keys für Rückwärtskompatibilität mit bestehenden Installationen
+  - Legacy-Compat-Hooks `b2e_register_migrators` und `b2e_migrators_discovered` bleiben für Drittanbieter-Integration erhalten
+  - Autoloader-Regex behält `b2e`-Präfix-Support für bestehende Klassen
+
+### Removed
+- **Alte Migrations-Logs und Temp-Dateien gelöscht (2026-02-23)**: `debug-*.log`, `tmp-*`, `migration-report-*.json`, `page-*.json`, `health-report-*.json`, `env-info-output.txt`, `test-output.log`, fehlerhafte Datei `revoke_current_migration_key())`
+- **`.gitignore` erweitert (2026-02-23)**: Patterns für `tmp-*`, `migration-report-*.json`, `page-*.json`, `env-info-output.txt`, `test-output.log`, `.phpunit.result.cache` hinzugefügt
+
+---
 
 ## [0.12.6] - 2026-02-23
 

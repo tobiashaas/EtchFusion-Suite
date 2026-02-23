@@ -47,7 +47,7 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 	public function sanitize( DOMDocument $dom ) {
 		$root_element = $this->get_document_element( $dom );
 		if ( ! $root_element instanceof DOMElement ) {
-			$this->error_handler->log_error( 'B2E_SANITIZER_DOM_MISSING', array(), 'error' );
+			$this->error_handler->log_error( 'EFS_SANITIZER_DOM_MISSING', array(), 'error' );
 			return $dom;
 		}
 

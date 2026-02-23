@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class EFS_Migrator_Registry {
 	/**
-	 * @var B2E_Migrator_Registry|null
+	 * @var EFS_Migrator_Registry|null
 	 */
 	private static $instance;
 

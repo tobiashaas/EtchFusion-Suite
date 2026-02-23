@@ -543,6 +543,25 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$result = $client->validate_migration_key_on_target( $this->convert_to_internal_url( $target_url ), $migration_key );
 
+		if ( is_wp_error( $result ) ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Export connection test failed: ' . $result->get_error_message(),
+				array(
+					'target_url' => $target_url,
+					'code'       => $result->get_error_code(),
+				)
+			);
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'connection_failed',
+				),
+				$this->determine_error_status( $result )
+			);
+			return;
+		}
+
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
 			// Log successful connection test
 			$this->log_security_event(
@@ -558,6 +577,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 					'plugins' => $result['plugins'] ?? array(),
 				)
 			);
+			return;
 		}
 
 		$error_messages = array();
@@ -567,7 +587,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			}
 		}
 		$errors     = $error_messages ? implode( ', ', $error_messages ) : __( 'Connection failed.', 'etch-fusion-suite' );
-		$error_code = $result['code'] ?? 'connection_failed';
+		$error_code = isset( $result['code'] ) ? (string) $result['code'] : 'connection_failed';
 		$status     = isset( $result['status'] ) ? (int) $result['status'] : 400;
 		$this->log_security_event(
 			'ajax_action',
@@ -649,6 +669,25 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 
 		$result = $client->validate_migration_key_on_target( $this->convert_to_internal_url( $source_url ), $migration_key );
 
+		if ( is_wp_error( $result ) ) {
+			$this->log_security_event(
+				'ajax_action',
+				'Import connection test failed: ' . $result->get_error_message(),
+				array(
+					'source_url' => $source_url,
+					'code'       => $result->get_error_code(),
+				)
+			);
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+					'code'    => $result->get_error_code() ? sanitize_key( $result->get_error_code() ) : 'connection_failed',
+				),
+				$this->determine_error_status( $result )
+			);
+			return;
+		}
+
 		if ( isset( $result['valid'] ) && $result['valid'] ) {
 			// Log successful connection test
 			$this->log_security_event(
@@ -664,6 +703,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 					'plugins' => $result['plugins'] ?? array(),
 				)
 			);
+			return;
 		}
 
 		$error_messages = array();
@@ -673,7 +713,7 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			}
 		}
 		$errors     = $error_messages ? implode( ', ', $error_messages ) : __( 'Connection failed.', 'etch-fusion-suite' );
-		$error_code = $result['code'] ?? 'connection_failed';
+		$error_code = isset( $result['code'] ) ? (string) $result['code'] : 'connection_failed';
 		$status     = isset( $result['status'] ) ? (int) $result['status'] : 400;
 		$this->log_security_event(
 			'ajax_action',

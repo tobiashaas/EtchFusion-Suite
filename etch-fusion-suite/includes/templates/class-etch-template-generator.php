@@ -49,7 +49,7 @@ class EFS_Etch_Template_Generator {
 	 */
 	public function generate( DOMDocument $sanitized_dom, array $analysis, array $css_variables = array() ) {
 		if ( empty( $analysis['sections'] ) ) {
-			return new WP_Error( 'b2e_template_generator_no_sections', __( 'No sections were detected in the sanitized DOM.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_template_generator_no_sections', __( 'No sections were detected in the sanitized DOM.', 'etch-fusion-suite' ) );
 		}
 
 		$blocks   = $this->generate_blocks_from_sections( $analysis['sections'], $sanitized_dom );
@@ -65,7 +65,7 @@ class EFS_Etch_Template_Generator {
 
 		$validation = $this->validate_generated_template( $blocks );
 		if ( ! $validation['valid'] ) {
-			return new WP_Error( 'b2e_template_generator_invalid_output', __( 'Generated template failed validation.', 'etch-fusion-suite' ), $validation['errors'] );
+			return new WP_Error( 'efs_template_generator_invalid_output', __( 'Generated template failed validation.', 'etch-fusion-suite' ), $validation['errors'] );
 		}
 
 		return array(

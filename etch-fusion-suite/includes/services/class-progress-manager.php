@@ -48,7 +48,7 @@ class EFS_Progress_Manager {
 	 * @return int
 	 */
 	private function get_stale_ttl( string $mode ): int {
-		return 'browser' === $mode ? 60 : 300;
+		return 'browser' === $mode ? 60 : 120;
 	}
 
 	/**
@@ -172,9 +172,10 @@ class EFS_Progress_Manager {
 
 		$status = isset( $progress['status'] ) ? (string) $progress['status'] : '';
 		if ( in_array( $status, array( 'running', 'receiving' ), true ) ) {
-			$stale_ttl            = $this->get_stale_ttl( $progress['mode'] ?? 'browser' );
-			$last_updated_ts      = strtotime( $progress['last_updated'] );
-			$progress['is_stale'] = ( $last_updated_ts && ( time() - $last_updated_ts ) >= $stale_ttl );
+			$stale_ttl       = $this->get_stale_ttl( $progress['mode'] ?? 'browser' );
+			$last_updated_ts = strtotime( $progress['last_updated'] );
+			// If the timestamp is invalid (false) treat as stale to prevent permanently stuck state.
+			$progress['is_stale'] = ( false === $last_updated_ts ) || ( ( time() - $last_updated_ts ) >= $stale_ttl );
 			if ( $progress['is_stale'] ) {
 				$progress['status'] = 'stale';
 			}

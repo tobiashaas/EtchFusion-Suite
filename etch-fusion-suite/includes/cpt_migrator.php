@@ -283,16 +283,16 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 	 * Save custom post type registration for persistence
 	 */
 	private function save_cpt_registration( $post_type_name, $cpt_data ) {
-		$registered_cpts                    = get_option( 'b2e_registered_cpts', array() );
+		$registered_cpts                    = get_option( 'efs_registered_cpts', get_option( 'b2e_registered_cpts', array() ) );
 		$registered_cpts[ $post_type_name ] = $cpt_data;
-		update_option( 'b2e_registered_cpts', $registered_cpts );
+		update_option( 'efs_registered_cpts', $registered_cpts );
 	}
 
 	/**
 	 * Register custom post types from saved registrations
 	 */
 	public function init_registered_cpts() {
-		$registered_cpts = get_option( 'b2e_registered_cpts', array() );
+		$registered_cpts = get_option( 'efs_registered_cpts', get_option( 'b2e_registered_cpts', array() ) );
 
 		foreach ( $registered_cpts as $post_type_name => $cpt_data ) {
 			if ( ! post_type_exists( $post_type_name ) ) {

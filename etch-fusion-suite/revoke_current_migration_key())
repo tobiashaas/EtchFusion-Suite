@@ -1,8 +1,0 @@
-
-> etch-fusion-suite@1.0.0 wp:etch
-> npm run wp:tests -- eval var_export(etch_fusion_suite_container()-;
-
-
-> etch-fusion-suite@1.0.0 wp:tests
-> wp-env run tests-cli wp eval var_export(etch_fusion_suite_container()-;
-

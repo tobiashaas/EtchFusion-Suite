@@ -39,7 +39,7 @@ class EFS_HTML_Parser {
 	 */
 	public function parse_html( $html ) {
 		if ( empty( $html ) ) {
-			return new WP_Error( 'b2e_html_parser_empty_html', __( 'No HTML provided for parsing.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_html_parser_empty_html', __( 'No HTML provided for parsing.', 'etch-fusion-suite' ) );
 		}
 
 		$dom = new DOMDocument();
@@ -55,7 +55,7 @@ class EFS_HTML_Parser {
 		if ( ! $loaded ) {
 			$this->log_libxml_errors( $errors );
 
-			return new WP_Error( 'b2e_html_parser_load_failed', __( 'Failed to parse HTML content.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_html_parser_load_failed', __( 'Failed to parse HTML content.', 'etch-fusion-suite' ) );
 		}
 
 		return $dom;
@@ -69,7 +69,7 @@ class EFS_HTML_Parser {
 	 */
 	public function parse_from_url( $url ) {
 		if ( empty( $url ) || ! filter_var( $url, FILTER_VALIDATE_URL ) ) {
-			return new WP_Error( 'b2e_html_parser_invalid_url', __( 'An invalid URL was provided.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_html_parser_invalid_url', __( 'An invalid URL was provided.', 'etch-fusion-suite' ) );
 		}
 
 		$response = wp_remote_get(
@@ -90,7 +90,7 @@ class EFS_HTML_Parser {
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== (int) $code ) {
 			return new WP_Error(
-				'b2e_html_parser_http_error',
+				'efs_html_parser_http_error',
 				__( 'Failed to fetch HTML from the remote source.', 'etch-fusion-suite' ),
 				array( 'status_code' => $code )
 			);
@@ -98,7 +98,7 @@ class EFS_HTML_Parser {
 
 		$body = wp_remote_retrieve_body( $response );
 		if ( empty( $body ) ) {
-			return new WP_Error( 'b2e_html_parser_empty_body', __( 'Empty response body received from remote source.', 'etch-fusion-suite' ) );
+			return new WP_Error( 'efs_html_parser_empty_body', __( 'Empty response body received from remote source.', 'etch-fusion-suite' ) );
 		}
 
 		return $this->parse_html( $body );
@@ -180,7 +180,7 @@ class EFS_HTML_Parser {
 
 		foreach ( $errors as $error ) {
 			$this->error_handler->log_error(
-				'B2E_HTML_PARSER',
+				'EFS_HTML_PARSER',
 				array(
 					'level'   => $error->level,
 					'code'    => $error->code,
