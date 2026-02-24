@@ -30,9 +30,10 @@ class EFS_Media_Phase_Handler implements Phase_Handler_Interface {
 
 	/**
 	 * Number of media items to process per batch call.
-	 * Kept small to limit base64 memory usage per request.
+	 * Items are processed sequentially so memory from one transfer is freed before the next;
+	 * 10 items per request balances throughput against per-request timeout risk.
 	 */
-	private const BATCH_SIZE = 3;
+	private const BATCH_SIZE = 10;
 
 	/**
 	 * Maximum number of attempts before marking a media item as permanently failed.

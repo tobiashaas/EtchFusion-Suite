@@ -124,6 +124,11 @@ class EFS_Posts_Phase_Handler implements Phase_Handler_Interface {
 		$prepared = array();
 		$results  = array();
 
+		// Prime WordPress post and meta caches for all IDs at once.
+		// Converts N individual get_post / get_post_meta calls into 2 bulk queries,
+		// eliminating the N+1 pattern that dominates batch processing time.
+		_prime_post_caches( array_map( 'intval', $ids ) );
+
 		foreach ( $ids as $id ) {
 			$id   = (int) $id;
 			$item = $this->content_service->prepare_post_for_batch( $id, $context['post_type_mappings'] );

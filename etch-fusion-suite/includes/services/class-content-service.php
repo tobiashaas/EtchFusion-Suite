@@ -258,30 +258,32 @@ class EFS_Content_Service {
 	 * @return array|\WP_Error Payload with keys 'post', 'etch_content', 'etch_loops'; or WP_Error.
 	 */
 	public function prepare_post_for_batch( int $post_id, array $post_type_mappings ) {
+		// Fetch post upfront — benefits from _prime_post_caches() called by the
+		// batch handler, and makes the object available for both content generation
+		// (template-type detection) and payload assembly below.
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			/* translators: %d is the numeric post ID. */
+			return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
+		}
+
 		$bricks_content = $this->content_parser->parse_bricks_content( $post_id );
 
 		if ( ! $bricks_content || ! isset( $bricks_content['elements'] ) ) {
-			$post = get_post( $post_id );
-			if ( ! $post ) {
-				/* translators: %d is the numeric post ID. */
-				return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
-			}
 			$etch_content = ! empty( $post->post_content )
 				? $post->post_content
 				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 		} else {
-			$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks( $bricks_content['elements'] );
+			// Use generate_gutenberg_content (not generate_gutenberg_blocks directly) so
+			// that template-type context (header/footer semantic tags) is applied in the
+			// batch path the same way it is in the single-post path.
+			$etch_content = $this->gutenberg_generator->generate_gutenberg_content( $post, $bricks_content['elements'] );
 			if ( empty( $etch_content ) ) {
 				$etch_content = '<!-- wp:paragraph --><p>Content migrated from Bricks (conversion pending)</p><!-- /wp:paragraph -->';
 				$this->error_handler->log_info(
 					'Bricks content found but conversion produced empty output — placeholder inserted',
 					array( 'post_id' => $post_id )
 				);
-			}
-			$post = get_post( $post_id );
-			if ( ! $post ) {
-				/* translators: %d is the numeric post ID. */
-				return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
 			}
 		}
 
