@@ -494,14 +494,19 @@ class EFS_Content_Parser {
 		// Filter out posts that explicitly use Gutenberg/Classic editor
 		// (have _bricks_editor_mode but it's NOT 'bricks')
 		$filtered_posts = array();
-		foreach ( $posts as $post ) {
-			$editor_mode = get_post_meta( $post->ID, '_bricks_editor_mode', true );
+		if ( ! empty( $posts ) ) {
+			$post_ids = wp_list_pluck( $posts, 'ID' );
+			update_postmeta_cache( $post_ids );
 
-			// Include if:
-			// 1. No editor mode set (like bricks_template) OR
-			// 2. Editor mode is 'bricks'
-			if ( empty( $editor_mode ) || 'bricks' === $editor_mode ) {
-				$filtered_posts[] = $post;
+			foreach ( $posts as $post ) {
+				$editor_mode = get_post_meta( $post->ID, '_bricks_editor_mode', true );
+
+				// Include if:
+				// 1. No editor mode set (like bricks_template) OR
+				// 2. Editor mode is 'bricks'
+				if ( empty( $editor_mode ) || 'bricks' === $editor_mode ) {
+					$filtered_posts[] = $post;
+				}
 			}
 		}
 

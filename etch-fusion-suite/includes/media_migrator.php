@@ -106,9 +106,7 @@ class EFS_Media_Migrator {
 				}
 			}
 
-			// Small delay between batches
-			usleep( 200000 ); // 0.2 seconds
-		}
+			}
 
 		$this->error_handler->log_info( 'Media Migration: Complete - Total: ' . $total_media . ', Migrated: ' . $migrated_media . ', Skipped: ' . $skipped_media . ', Failed: ' . ( $total_media - $migrated_media - $skipped_media ) );
 

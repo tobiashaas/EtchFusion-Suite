@@ -1605,6 +1605,198 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Batch-import multiple posts in a single HTTP request.
+	 *
+	 * Performs auth, CORS, and source-origin verification once for the whole batch,
+	 * loads efs_post_mappings once, processes each post, and saves mappings once.
+	 * Returns per-post results so the caller can track individual failures.
+	 *
+	 * @param \WP_REST_Request $request
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function import_posts( $request ) {
+		$rate = self::check_rate_limit( 'import_posts', 30, 60 );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$cors = self::check_cors_origin();
+		if ( is_wp_error( $cors ) ) {
+			return $cors;
+		}
+
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
+
+		$payload = $request->get_json_params();
+		$payload = is_array( $payload ) ? $payload : array();
+		$items   = isset( $payload['posts'] ) && is_array( $payload['posts'] ) ? $payload['posts'] : array();
+
+		if ( empty( $items ) ) {
+			return new \WP_Error( 'invalid_batch_payload', __( 'No posts in batch payload.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
+		}
+
+		self::touch_receiving_state( $token, 'posts', count( $items ), $request );
+
+		// Merge and sync all Etch loop presets ONCE for the entire batch.
+		$all_loops = array();
+		foreach ( $items as $item ) {
+			if ( ! empty( $item['etch_loops'] ) && is_array( $item['etch_loops'] ) ) {
+				$all_loops = array_merge( $all_loops, $item['etch_loops'] );
+			}
+		}
+		if ( ! empty( $all_loops ) ) {
+			self::sync_etch_loops_from_payload( $all_loops );
+		}
+
+		// Load post mappings ONCE for the whole batch.
+		$mappings = get_option( 'efs_post_mappings', get_option( 'b2e_post_mappings', array() ) );
+		$mappings = is_array( $mappings ) ? $mappings : array();
+
+		$results = array();
+
+		foreach ( $items as $item ) {
+			$post_raw = isset( $item['post'] ) && is_array( $item['post'] ) ? $item['post'] : array();
+			if ( empty( $post_raw ) ) {
+				$results[] = array( 'source_id' => 0, 'status' => 'failed', 'error' => 'Missing post data in batch item.' );
+				continue;
+			}
+
+			$etch_content    = isset( $item['etch_content'] ) ? (string) $item['etch_content'] : '';
+			$source_post_id  = isset( $post_raw['ID'] ) ? absint( $post_raw['ID'] ) : 0;
+			$post_type       = isset( $post_raw['post_type'] ) ? sanitize_key( $post_raw['post_type'] ) : 'post';
+			if ( ! post_type_exists( $post_type ) ) {
+				$post_type = 'post';
+			}
+			$post_title  = isset( $post_raw['post_title'] ) ? sanitize_text_field( $post_raw['post_title'] ) : '';
+			$post_slug   = isset( $post_raw['post_name'] ) ? sanitize_title( $post_raw['post_name'] ) : sanitize_title( $post_title );
+			$post_date   = isset( $post_raw['post_date'] ) ? sanitize_text_field( $post_raw['post_date'] ) : current_time( 'mysql' );
+			$post_status = isset( $post_raw['post_status'] ) ? sanitize_key( $post_raw['post_status'] ) : 'draft';
+			if ( ! in_array( $post_status, array( 'publish', 'draft', 'pending', 'private', 'future' ), true ) ) {
+				$post_status = 'draft';
+			}
+
+			if ( '' === trim( $etch_content ) ) {
+				$etch_content = '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->';
+			}
+			$is_block_content = false !== strpos( $etch_content, '<!-- wp:' );
+			$post_content     = $is_block_content ? $etch_content : wp_kses_post( $etch_content );
+
+			$existing        = null;
+			$resolution_path = 'new';
+
+			// Tier 1: meta lookup by _efs_original_post_id.
+			if ( $source_post_id > 0 ) {
+				$meta_matches = get_posts(
+					array(
+						'post_type'      => 'any',
+						'post_status'    => 'any',
+						'posts_per_page' => 1,
+						'fields'         => 'ids',
+						'meta_query'     => array(
+							'relation' => 'OR',
+							array(
+								'key'   => '_efs_original_post_id',
+								'value' => $source_post_id,
+								'type'  => 'NUMERIC',
+							),
+							array(
+								'key'   => '_b2e_original_post_id',
+								'value' => $source_post_id,
+								'type'  => 'NUMERIC',
+							),
+						),
+					)
+				);
+				if ( ! empty( $meta_matches ) ) {
+					$existing        = get_post( $meta_matches[0] );
+					$resolution_path = 'meta';
+				}
+			}
+
+			// Tier 2: in-memory mapping (no extra get_option per post).
+			if ( null === $existing && $source_post_id > 0 && isset( $mappings[ $source_post_id ] ) ) {
+				$mapped_post = get_post( $mappings[ $source_post_id ] );
+				if ( $mapped_post instanceof \WP_Post ) {
+					$existing        = $mapped_post;
+					$resolution_path = 'option';
+				}
+			}
+
+			// Tier 3: slug fallback.
+			if ( null === $existing ) {
+				$existing = $post_slug ? get_page_by_path( $post_slug, OBJECT, $post_type ) : null;
+				if ( $existing instanceof \WP_Post ) {
+					$resolution_path = 'slug';
+				}
+			}
+
+			$postarr = array(
+				'post_title'   => $post_title,
+				'post_name'    => $post_slug,
+				'post_type'    => $post_type,
+				'post_status'  => $post_status,
+				'post_date'    => $post_date,
+				'post_content' => $post_content,
+			);
+
+			if ( $existing instanceof \WP_Post ) {
+				$postarr['ID'] = $existing->ID;
+				if ( in_array( $resolution_path, array( 'meta', 'option' ), true ) && $existing->post_type !== $post_type ) {
+					if ( post_type_exists( $post_type ) ) {
+						$postarr['post_type'] = $post_type;
+					} else {
+						unset( $postarr['post_type'] );
+					}
+				}
+			}
+
+			if ( $is_block_content ) {
+				kses_remove_filters();
+			}
+			$post_id = wp_insert_post( $postarr, true );
+			if ( $is_block_content ) {
+				kses_init_filters();
+			}
+
+			if ( is_wp_error( $post_id ) ) {
+				$results[] = array( 'source_id' => $source_post_id, 'status' => 'failed', 'error' => $post_id->get_error_message() );
+				continue;
+			}
+
+			// Update in-memory mapping (no update_option per post).
+			if ( $source_post_id > 0 ) {
+				$mappings[ $source_post_id ] = (int) $post_id;
+				update_post_meta( $post_id, '_efs_original_post_id', $source_post_id );
+			}
+
+			update_post_meta( $post_id, '_efs_migrated_from_bricks', 1 );
+			update_post_meta( $post_id, '_efs_migration_date', current_time( 'mysql' ) );
+
+			$results[] = array( 'source_id' => $source_post_id, 'post_id' => (int) $post_id, 'status' => 'ok' );
+		}
+
+		// Save mappings ONCE for the whole batch.
+		update_option( 'efs_post_mappings', $mappings );
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'count'   => count( $results ),
+				'results' => $results,
+			),
+			200
+		);
+	}
+
+	/**
 	 * Merge incoming Etch loop presets into local etch_loops option.
 	 *
 	 * @param array<string, array<string, mixed>> $incoming_loops Loop presets payload.
@@ -1981,6 +2173,16 @@ class EFS_API_Endpoints {
 			'/import/post',
 			array(
 				'callback'            => array( __CLASS__, 'import_post' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/posts',
+			array(
+				'callback'            => array( __CLASS__, 'import_posts' ),
 				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)

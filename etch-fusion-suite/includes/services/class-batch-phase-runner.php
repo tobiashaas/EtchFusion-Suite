@@ -109,6 +109,7 @@ class EFS_Batch_Phase_Runner {
 			}
 		);
 		$memory_pressure = false;
+		$memory_limit    = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
 
 		// --- Delegating path: all phase logic driven by the handler interface ---
 
@@ -149,97 +150,138 @@ class EFS_Batch_Phase_Runner {
 		}
 
 		// Process each item in the batch.
-		foreach ( $current_batch as $loop_idx => $id ) {
-			$id     = (int) $id;
-			$id_key = (string) $id;
+		if ( 'posts' === $phase && method_exists( $active_handler, 'process_items_batch' ) ) {
+			// Batch path: convert all posts locally, then send in one HTTP request.
+			$batch_item_results = $active_handler->process_items_batch( $current_batch, $context );
 
-			$attempts[ $id_key ] = isset( $attempts[ $id_key ] ) ? (int) $attempts[ $id_key ] + 1 : 1;
-			$result              = $active_handler->process_item( $id, $context );
+			foreach ( $current_batch as $loop_idx => $id ) {
+				$id     = (int) $id;
+				$id_key = (string) $id;
 
-			// Treat a boolean false return as a generic item-processing failure.
-			if ( false === $result ) {
-				$result = new \WP_Error( 'process_item_false', __( 'Item processing returned false.', 'etch-fusion-suite' ) );
-			}
+				$attempts[ $id_key ] = isset( $attempts[ $id_key ] ) ? (int) $attempts[ $id_key ] + 1 : 1;
+				$result              = isset( $batch_item_results[ $id ] ) ? $batch_item_results[ $id ] : new \WP_Error( 'batch_item_missing', sprintf( 'No batch result for post %d.', $id ) );
 
-			if ( is_wp_error( $result ) ) {
-				if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
-					$this->migration_logger->log(
-						$migration_id,
-						'warning',
-						'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
-						array(
-							'post_id' => $id,
-							'attempt' => $attempts[ $id_key ],
-						)
-					);
-					$remaining[] = $id;
-					if ( 'posts' === $phase ) {
-						$this->error_handler->log_warning(
-							'W010',
-							array(
-								'post_id'       => $id,
-								'attempt'       => $attempts[ $id_key ],
-								'error_message' => $result->get_error_message(),
-								'action'        => 'Batch post conversion retry scheduled',
-							)
-						);
-					}
-				} else {
-					$this->migration_logger->log(
-						$migration_id,
-						'warning',
-						'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
-						array(
-							'post_id' => $id,
-							'attempt' => $attempts[ $id_key ],
-						)
-					);
-					$failed_ids[] = $id;
-					if ( 'media' === $phase ) {
-						$this->error_handler->log_warning(
-							'W012',
-							array(
-								'media_id'      => $id,
-								'attempts_made' => $attempts[ $id_key ],
-								'error_message' => $result->get_error_message(),
-								'action'        => 'Media migration failed after retries',
-							)
-						);
-					} else {
-						$this->error_handler->log_warning(
-							'W011',
-							array(
-								'post_id'       => $id,
-								'attempts_made' => $attempts[ $id_key ],
-								'error_message' => $result->get_error_message(),
-								'action'        => 'Batch post conversion failed after max retries',
-							)
-						);
-						$this->error_handler->log_error(
-							'E107',
-							array(
-								'post_id'       => $id,
-								'attempts_made' => $attempts[ $id_key ],
-								'error_message' => $result->get_error_message(),
-								'action'        => 'Failed to send post to target site after all retry attempts',
-							)
-						);
-					}
+				if ( false === $result ) {
+					$result = new \WP_Error( 'process_item_false', __( 'Item processing returned false.', 'etch-fusion-suite' ) );
 				}
-				continue;
+
+				if ( is_wp_error( $result ) ) {
+					if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
+						$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ) );
+						$remaining[] = $id;
+						$this->error_handler->log_warning( 'W010', array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Batch post conversion retry scheduled' ) );
+					} else {
+						$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ) );
+						$failed_ids[] = $id;
+						$this->error_handler->log_warning( 'W011', array( 'post_id' => $id, 'attempts_made' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Batch post conversion failed after max retries' ) );
+						$this->error_handler->log_error( 'E107', array( 'post_id' => $id, 'attempts_made' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Failed to send post to target site after all retry attempts' ) );
+					}
+					continue;
+				}
+
+				++$processed_count;
+				$checkpoint['current_item_id']    = $id;
+				$wp_post                          = get_post( $id );
+				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
 			}
 
-			++$processed_count;
-			$checkpoint['current_item_id']    = $id;
-			$wp_post                          = get_post( $id );
-			$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
-
-			$memory_limit = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
+			// Memory check once after the batch is processed (HTTP call already completed).
 			if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
 				$memory_pressure = true;
-				$unprocessed     = array_slice( $current_batch, $loop_idx + 1 );
-				$remaining       = array_merge( $unprocessed, $remaining );
-				break;
+			}
+		} else {
+			// Individual path: one HTTP request per item (used for media phase).
+			foreach ( $current_batch as $loop_idx => $id ) {
+				$id     = (int) $id;
+				$id_key = (string) $id;
+
+				$attempts[ $id_key ] = isset( $attempts[ $id_key ] ) ? (int) $attempts[ $id_key ] + 1 : 1;
+				$result              = $active_handler->process_item( $id, $context );
+
+				// Treat a boolean false return as a generic item-processing failure.
+				if ( false === $result ) {
+					$result = new \WP_Error( 'process_item_false', __( 'Item processing returned false.', 'etch-fusion-suite' ) );
+				}
+
+				if ( is_wp_error( $result ) ) {
+					if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
+						$this->migration_logger->log(
+							$migration_id,
+							'warning',
+							'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+							array(
+								'post_id' => $id,
+								'attempt' => $attempts[ $id_key ],
+							)
+						);
+						$remaining[] = $id;
+						if ( 'posts' === $phase ) {
+							$this->error_handler->log_warning(
+								'W010',
+								array(
+									'post_id'       => $id,
+									'attempt'       => $attempts[ $id_key ],
+									'error_message' => $result->get_error_message(),
+									'action'        => 'Batch post conversion retry scheduled',
+								)
+							);
+						}
+					} else {
+						$this->migration_logger->log(
+							$migration_id,
+							'warning',
+							'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+							array(
+								'post_id' => $id,
+								'attempt' => $attempts[ $id_key ],
+							)
+						);
+						$failed_ids[] = $id;
+						if ( 'media' === $phase ) {
+							$this->error_handler->log_warning(
+								'W012',
+								array(
+									'media_id'      => $id,
+									'attempts_made' => $attempts[ $id_key ],
+									'error_message' => $result->get_error_message(),
+									'action'        => 'Media migration failed after retries',
+								)
+							);
+						} else {
+							$this->error_handler->log_warning(
+								'W011',
+								array(
+									'post_id'       => $id,
+									'attempts_made' => $attempts[ $id_key ],
+									'error_message' => $result->get_error_message(),
+									'action'        => 'Batch post conversion failed after max retries',
+								)
+							);
+							$this->error_handler->log_error(
+								'E107',
+								array(
+									'post_id'       => $id,
+									'attempts_made' => $attempts[ $id_key ],
+									'error_message' => $result->get_error_message(),
+									'action'        => 'Failed to send post to target site after all retry attempts',
+								)
+							);
+						}
+					}
+					continue;
+				}
+
+				++$processed_count;
+				$checkpoint['current_item_id']    = $id;
+				$wp_post                          = get_post( $id );
+				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+
+				if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
+					$memory_pressure = true;
+					$unprocessed     = array_slice( $current_batch, $loop_idx + 1 );
+					$remaining       = array_merge( $unprocessed, $remaining );
+					break;
+				}
 			}
 		}
 

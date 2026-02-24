@@ -33,12 +33,12 @@ $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. U
 			<p class="efs-etch-dashboard__block-desc">
 				<?php esc_html_e( 'Generate a one-time connection URL and paste it into the Bricks migration wizard. The URL expires after 15 minutes and can only be used once — the migration key is generated automatically in the background.', 'etch-fusion-suite' ); ?>
 			</p>
-			<button type="button" class="button button-primary" data-efs-generate-pairing-code>
+			<button type="button" class="btn--primary" data-efs-generate-pairing-code>
 				<?php esc_html_e( 'Generate Connection URL', 'etch-fusion-suite' ); ?>
 			</button>
 			<div data-efs-pairing-code-result hidden>
 				<code class="efs-pairing-code" data-efs-pairing-code-display></code>
-				<button type="button" class="button" data-efs-copy-pairing-code>
+				<button type="button" class="btn--primary" data-efs-copy-pairing-code>
 					<?php esc_html_e( 'Copy URL', 'etch-fusion-suite' ); ?>
 				</button>
 				<span data-efs-pairing-code-expiry></span>
@@ -87,20 +87,20 @@ $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. U
 	</div>
 
 	<div class="efs-etch-receiving-takeover" data-efs-receiving-display hidden>
-		<div class="efs-etch-receiving-takeover__inner">
+		<div class="efs-etch-receiving-takeover__inner efs-migration-progress-card">
 			<h3 data-efs-receiving-title><?php esc_html_e( 'Receiving Migration', 'etch-fusion-suite' ); ?></h3>
 			<span class="efs-badge" aria-hidden="true">&#9881; <?php esc_html_e( 'Etch Receive Mode', 'etch-fusion-suite' ); ?></span>
-			<p class="efs-etch-receiving-takeover__subtitle" data-efs-receiving-subtitle><?php esc_html_e( 'Incoming data from the source site is being processed.', 'etch-fusion-suite' ); ?></p>
+			<p class="efs-migration-progress-card__desc" data-efs-receiving-subtitle><?php esc_html_e( 'Incoming data from the source site is being processed.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 				<div class="efs-progress-fill" data-efs-receiving-progress-fill style="width:0%"></div>
 			</div>
-			<p class="efs-etch-receiving-takeover__percent" data-efs-receiving-percent hidden>0%</p>
-			<p class="efs-etch-receiving-takeover__status" data-efs-receiving-status>
+			<p class="efs-migration-progress-card__percent" data-efs-receiving-percent hidden>0%</p>
+			<p class="efs-migration-progress-card__status" data-efs-receiving-status>
 				<?php esc_html_e( 'Listening for incoming migration packets.', 'etch-fusion-suite' ); ?>
 			</p>
-			<p class="efs-etch-receiving-takeover__source" data-efs-receiving-source aria-live="polite"></p>
-			<p class="efs-etch-receiving-takeover__items" data-efs-receiving-items></p>
-			<p class="efs-etch-receiving-takeover__elapsed" data-efs-receiving-elapsed hidden></p>
+			<p class="efs-migration-progress-card__source" data-efs-receiving-source aria-live="polite" hidden></p>
+			<p class="efs-migration-progress-card__items" data-efs-receiving-items></p>
+			<p class="efs-migration-progress-card__elapsed" data-efs-receiving-elapsed hidden></p>
 			<div class="efs-actions efs-actions--inline efs-etch-receiving-takeover__actions">
 				<a
 					class="btn--primary"

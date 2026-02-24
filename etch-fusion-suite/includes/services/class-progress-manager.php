@@ -74,6 +74,7 @@ class EFS_Progress_Manager {
 			'completed_at'         => null,
 			'items_processed'      => 0,
 			'items_total'          => 0,
+			'items_skipped'        => 0,
 			'mode'                 => $validated_mode,
 			'action_scheduler_id'  => null,
 			'headless_job_count'   => 0,
@@ -92,9 +93,10 @@ class EFS_Progress_Manager {
 	 * @param string   $message
 	 * @param int|null $items_processed
 	 * @param int|null $items_total
+	 * @param int|null $items_skipped       Number of items skipped (e.g. already migrated). Resets to 0 when passed explicitly.
 	 * @param bool     $mark_step_completed If false, set step as active only; do not mark it completed. Default true.
 	 */
-	public function update_progress( string $step, int $percentage, string $message, ?int $items_processed = null, ?int $items_total = null, bool $mark_step_completed = true ): void {
+	public function update_progress( string $step, int $percentage, string $message, ?int $items_processed = null, ?int $items_total = null, ?int $items_skipped = null, bool $mark_step_completed = true ): void {
 		$progress                 = $this->progress_repository->get_progress();
 		$previous_percentage      = isset( $progress['percentage'] ) ? (float) $progress['percentage'] : 0.0;
 		$normalized_percentage    = max( $previous_percentage, min( 100, (float) $percentage ) );
@@ -113,6 +115,9 @@ class EFS_Progress_Manager {
 		}
 		if ( null !== $items_total ) {
 			$progress['items_total'] = max( 0, (int) $items_total );
+		}
+		if ( null !== $items_skipped ) {
+			$progress['items_skipped'] = max( 0, (int) $items_skipped );
 		}
 
 		if ( 'completed' === $step ) {

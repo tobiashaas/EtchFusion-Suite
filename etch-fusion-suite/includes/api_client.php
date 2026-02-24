@@ -117,7 +117,7 @@ class EFS_API_Client {
 
 		$args = array(
 			'method'  => $method,
-			'timeout' => 30,
+			'timeout' => (int) apply_filters( 'efs_api_request_timeout', 60 ),
 			'headers' => array(
 				'Content-Type' => 'application/json',
 			),
@@ -285,6 +285,22 @@ class EFS_API_Client {
 		}
 
 		return $this->send_request( $url, $jwt_token, '/import/post', 'POST', $post_data );
+	}
+
+	/**
+	 * Send a batch of posts to the target site in a single HTTP request.
+	 *
+	 * @param string $url       Target site URL.
+	 * @param string $jwt_token Migration token.
+	 * @param array  $posts     Prepared post payloads, each with 'post', 'etch_content', 'etch_loops'.
+	 * @return array|\WP_Error  Array of per-post result objects on success, or WP_Error on transport failure.
+	 */
+	public function send_posts_batch( string $url, string $jwt_token, array $posts ) {
+		$response = $this->send_request( $url, $jwt_token, '/import/posts', 'POST', array( 'posts' => $posts ) );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+		return isset( $response['results'] ) && is_array( $response['results'] ) ? $response['results'] : array();
 	}
 
 	/**

@@ -124,6 +124,20 @@ class EFS_CSS_Service {
 	}
 
 	/**
+	 * Get CSS class counts for progress tracking.
+	 *
+	 * @param array $selected_post_types Post types selected for migration.
+	 * @param bool  $restrict_to_used   Whether to count only referenced classes.
+	 * @return array{total: int, to_migrate: int}
+	 */
+	public function get_css_class_counts( array $selected_post_types = array(), bool $restrict_to_used = false ): array {
+		if ( method_exists( $this->css_converter, 'get_css_class_counts' ) ) {
+			return $this->css_converter->get_css_class_counts( $selected_post_types, $restrict_to_used );
+		}
+		return array( 'total' => 0, 'to_migrate' => 0 );
+	}
+
+	/**
 	 * @return array
 	 */
 	public function get_bricks_global_classes() {

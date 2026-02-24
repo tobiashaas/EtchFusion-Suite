@@ -147,16 +147,53 @@ export const setLoading = (element, isLoading) => {
     element.disabled = Boolean(isLoading);
 };
 
-export const updateProgress = ({ percentage = 0, status = '', steps = [] }) => {
+export const updateProgress = ({ percentage = 0, status = '', steps = [], items_processed = 0, items_total = 0, items_skipped = 0 }) => {
     const progressRoot = document.querySelector('[data-efs-progress]');
     const progressFill = progressRoot?.querySelector('.efs-progress-fill');
     const currentStep = document.querySelector('[data-efs-current-step]');
     const stepsList = document.querySelector('[data-efs-steps]');
+    const itemsCount = document.querySelector('[data-efs-items-count]');
 
-    progressRoot?.setAttribute('aria-valuenow', String(percentage));
-    if (progressFill) {
-        progressFill.style.width = `${percentage}%`;
+    let displayPercentage;
+    if (items_total > 0) {
+        displayPercentage = Math.min(100, Math.round((items_processed / items_total) * 100));
+    } else if (percentage >= 100) {
+        displayPercentage = 100;
+    } else {
+        displayPercentage = null;
     }
+
+    if (displayPercentage !== null) {
+        progressRoot?.setAttribute('aria-valuenow', String(displayPercentage));
+    } else {
+        progressRoot?.removeAttribute('aria-valuenow');
+    }
+
+    if (progressFill) {
+        if (displayPercentage !== null) {
+            progressFill.style.width = `${displayPercentage}%`;
+            progressFill.classList.remove('is-indeterminate');
+        } else {
+            progressFill.style.width = '';
+            progressFill.classList.add('is-indeterminate');
+        }
+    }
+
+    if (itemsCount) {
+        if (items_total > 0) {
+            if (items_skipped > 0) {
+                const migrated = Math.max(0, items_processed - items_skipped);
+                itemsCount.textContent = `${migrated} migriert · ${items_skipped} übersprungen`;
+            } else {
+                itemsCount.textContent = `${items_processed} / ${items_total}`;
+            }
+            itemsCount.hidden = false;
+        } else {
+            itemsCount.textContent = '';
+            itemsCount.hidden = true;
+        }
+    }
+
     if (currentStep) {
         currentStep.textContent = status || '';
     }
@@ -187,6 +224,9 @@ const syncInitialProgress = () => {
         percentage: progress.percentage || 0,
         status: progress.current_step || progress.status || '',
         steps: progress.steps || [],
+        items_processed: progress.items_processed || 0,
+        items_total: progress.items_total || 0,
+        items_skipped: progress.items_skipped || 0,
     });
 };
 

@@ -247,6 +247,75 @@ class EFS_Content_Service {
 	}
 
 	/**
+	 * Convert a single post for batch sending without dispatching an HTTP request.
+	 *
+	 * Runs the full Bricks-to-Gutenberg conversion and returns the ready-to-send
+	 * payload. The caller is responsible for collecting payloads and sending them
+	 * in bulk via EFS_API_Client::send_posts_batch().
+	 *
+	 * @param int   $post_id           Source post ID.
+	 * @param array $post_type_mappings Source post type => target post type.
+	 * @return array|\WP_Error Payload with keys 'post', 'etch_content', 'etch_loops'; or WP_Error.
+	 */
+	public function prepare_post_for_batch( int $post_id, array $post_type_mappings ) {
+		$bricks_content = $this->content_parser->parse_bricks_content( $post_id );
+
+		if ( ! $bricks_content || ! isset( $bricks_content['elements'] ) ) {
+			$post = get_post( $post_id );
+			if ( ! $post ) {
+				/* translators: %d is the numeric post ID. */
+				return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
+			}
+			$etch_content = ! empty( $post->post_content )
+				? $post->post_content
+				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
+		} else {
+			$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks( $bricks_content['elements'] );
+			if ( empty( $etch_content ) ) {
+				$etch_content = '<!-- wp:paragraph --><p>Content migrated from Bricks (conversion pending)</p><!-- /wp:paragraph -->';
+				$this->error_handler->log_info(
+					'Bricks content found but conversion produced empty output — placeholder inserted',
+					array( 'post_id' => $post_id )
+				);
+			}
+			$post = get_post( $post_id );
+			if ( ! $post ) {
+				/* translators: %d is the numeric post ID. */
+				return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
+			}
+		}
+
+		if ( ! isset( $post_type_mappings[ $post->post_type ] ) || '' === $post_type_mappings[ $post->post_type ] ) {
+			$this->error_handler->log_error(
+				'E108',
+				array(
+					'post_id'   => $post_id,
+					'post_type' => $post->post_type,
+					'action'    => 'Missing post type mapping - migration cannot proceed',
+				)
+			);
+			/* translators: %s is the post type slug. */
+			return new \WP_Error( 'missing_post_type_mapping', sprintf( __( 'No mapping found for post type: %s', 'etch-fusion-suite' ), $post->post_type ) );
+		}
+
+		$target_post_type = $post_type_mappings[ $post->post_type ];
+		$loop_presets     = $this->extract_loop_presets_from_content( (string) $etch_content );
+
+		return array(
+			'post'         => array(
+				'ID'          => $post->ID,
+				'post_title'  => $post->post_title,
+				'post_name'   => $post->post_name,
+				'post_type'   => $target_post_type,
+				'post_date'   => $post->post_date,
+				'post_status' => $post->post_status,
+			),
+			'etch_content' => $etch_content,
+			'etch_loops'   => $loop_presets,
+		);
+	}
+
+	/**
 	 * Extract loop presets referenced by etch/loop blocks in content.
 	 *
 	 * @param string $content Block content.

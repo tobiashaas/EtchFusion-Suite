@@ -60,8 +60,11 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
         
         updateProgress({
             percentage: progress.percentage || 0,
-            status: progress.status || progress.current_step || '',
+            status: progress.message || progress.status || progress.current_step || '',
             steps,
+            items_processed: progress.items_processed || 0,
+            items_total: progress.items_total || 0,
+            items_skipped: progress.items_skipped || 0,
         });
 
         if (data?.completed) {
@@ -118,8 +121,11 @@ export const startMigration = async (payload) => {
     showToast(data?.message || 'Migration started.', 'success');
     updateProgress({
         percentage: data?.progress?.percentage || 0,
-        status: data?.progress?.status || '',
+        status: data?.progress?.message || data?.progress?.status || '',
         steps: data?.steps || [],
+        items_processed: data?.progress?.items_processed || 0,
+        items_total: data?.progress?.items_total || 0,
+        items_skipped: data?.progress?.items_skipped || 0,
     });
     startProgressPolling({ migrationId: getActiveMigrationId() });
     return data;
@@ -139,8 +145,11 @@ export const processBatch = async (payload) => {
     const progress = data?.progress || {};
     updateProgress({
         percentage: progress.percentage || 0,
-        status: progress.status || progress.current_step || '',
+        status: progress.message || progress.status || progress.current_step || '',
         steps: data?.steps || progress.steps || [],
+        items_processed: progress.items_processed || 0,
+        items_total: progress.items_total || 0,
+        items_skipped: progress.items_skipped || 0,
     });
     if (data?.completed) {
         showToast('Migration completed successfully.', 'success');

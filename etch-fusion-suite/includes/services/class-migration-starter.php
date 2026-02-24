@@ -231,18 +231,29 @@ class EFS_Migration_Starter {
 			$media_result = array( 'skipped' => true );
 			if ( isset( $steps['media'] ) ) {
 				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-				$this->progress_manager->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ) );
+				$media_ids    = $this->media_service->get_media_ids( $selected_post_types );
+				$media_total  = count( $media_ids );
+				$this->progress_manager->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ), 0, $media_total, null, false );
 				$media_result = $this->media_service->migrate_media( $target, $migration_key, $selected_post_types );
 				if ( is_wp_error( $media_result ) ) {
 					return $media_result;
 				}
+				$media_summary  = isset( $media_result['summary'] ) ? (array) $media_result['summary'] : array();
+				$media_migrated = isset( $media_summary['migrated_media'] ) ? (int) $media_summary['migrated_media'] : 0;
+				$media_skipped  = isset( $media_summary['skipped_media'] ) ? (int) $media_summary['skipped_media'] : 0;
+				$media_total    = isset( $media_summary['total_media'] ) ? (int) $media_summary['total_media'] : $media_total;
+				$this->progress_manager->update_progress( 'media', 65, __( 'Media files migrated.', 'etch-fusion-suite' ), $media_migrated + $media_skipped, $media_total, $media_skipped );
 			}
 
-			$this->progress_manager->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ) );
+			$css_counts = $this->css_service->get_css_class_counts( $selected_post_types, false );
+			$css_total  = isset( $css_counts['to_migrate'] ) ? (int) $css_counts['to_migrate'] : 0;
+			$this->progress_manager->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ), 0, $css_total, 0, false );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
 			if ( is_wp_error( $css_result ) || ( is_array( $css_result ) && isset( $css_result['success'] ) && ! $css_result['success'] ) ) {
 				return is_wp_error( $css_result ) ? $css_result : new \WP_Error( 'css_migration_failed', $css_result['message'] );
 			}
+			$css_migrated = isset( $css_result['migrated'] ) ? (int) $css_result['migrated'] : 0;
+			$this->progress_manager->update_progress( 'css', 75, __( 'CSS classes converted.', 'etch-fusion-suite' ), $css_migrated, max( $css_total, $css_migrated ), 0 );
 
 			$this->progress_manager->update_progress( 'posts', 80, __( 'Migrating posts and content...', 'etch-fusion-suite' ) );
 			$post_type_mappings  = isset( $options['post_type_mappings'] ) && is_array( $options['post_type_mappings'] ) ? $options['post_type_mappings'] : array();
