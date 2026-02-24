@@ -93,6 +93,30 @@ compute_checksum() {
   fi
 }
 
+strip_php_comments() {
+  local dir="$1"
+  # Uses PHP's token_get_all() to strip all comments (T_COMMENT, T_DOC_COMMENT)
+  # from every .php file in the build directory. Newlines inside comments are
+  # preserved so line numbers in stack traces remain accurate.
+  while IFS= read -r -d '' file; do
+    php -r "
+      \$src = file_get_contents(\$argv[1]);
+      \$tokens = token_get_all(\$src);
+      \$out = '';
+      foreach (\$tokens as \$tok) {
+        if (is_array(\$tok) && (\$tok[0] === T_COMMENT || \$tok[0] === T_DOC_COMMENT)) {
+          \$out .= str_repeat(\"\n\", substr_count(\$tok[1], \"\n\"));
+        } elseif (is_array(\$tok)) {
+          \$out .= \$tok[1];
+        } else {
+          \$out .= \$tok;
+        }
+      }
+      file_put_contents(\$argv[1], \$out);
+    " "${file}"
+  done < <(find "${dir}" -name '*.php' -not -path '*/vendor/*' -print0)
+}
+
 main() {
   ensure_command rsync "Install rsync to continue."
   ensure_command zip "Install zip (e.g., apt-get install zip)."
@@ -133,6 +157,9 @@ main() {
   local build_plugin_dir="${BUILD_DIR}/${PLUGIN_SLUG}"
   log "Copying plugin files with rsync (respecting .distignore)."
   rsync -av --delete --exclude-from="${DISTIGNORE_FILE}" "${PLUGIN_DIR}/" "${build_plugin_dir}/"
+
+  log "Stripping PHP comments from distribution build."
+  strip_php_comments "${build_plugin_dir}"
 
   pushd "${build_plugin_dir}" >/dev/null
 

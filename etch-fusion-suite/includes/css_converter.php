@@ -412,11 +412,36 @@ class EFS_CSS_Converter {
 			)
 		);
 
+		// -----------------------------------------------------------------------
+		// ID SYSTEM OVERVIEW — two completely separate systems, never mix them:
+		//
+		// 1. ELEMENT IDs  (HTML id attributes on individual DOM nodes)
+		//    Bricks: brxe-abc1234  →  Etch: etch-abc1234
+		//    Renamed 1-to-1 by map_bricks_element_id_to_etch_selector_id().
+		//    Used as CSS selectors: #brxe-abc1234 { … } → #etch-abc1234 { … }
+		//    Every element instance has its own unique id.
+		//
+		// 2. STYLE MANAGER IDs  (internal keys in Etch's reusable-class registry)
+		//    Bricks global classes carry a random internal ID (e.g. "abc1234") plus
+		//    a human-readable name (e.g. "my-card"). Etch assigns a fresh 7-char hex
+		//    ID via substr(uniqid(), -7) to every migrated class. The class name and
+		//    selector (.my-card) are preserved; only the internal tracking ID changes.
+		//    $style_map connects the two:
+		//      Bricks class ID  →  { id: Etch Style Manager ID, selector: '.my-card' }
+		//    These IDs never carry a "brxe-" or "etch-" prefix.
+		//
+		// 3. ETCH FRAMEWORK STYLES  (etch-section-style, etch-container-style, …)
+		//    Built-in Etch CSS rules for its own element types. Added to $etch_styles
+		//    under "etch-*" keys so Etch's Style Manager registers them as read-only.
+		//    They are NEVER added to $style_map because they have no Bricks counterpart
+		//    and must not appear as class names on converted elements.
+		// -----------------------------------------------------------------------
+
 		$etch_styles     = array();
-		$style_map       = array(); // Maps Bricks ID => Etch Style ID
+		$style_map       = array(); // Maps Bricks class ID → { id: Etch Style Manager ID (7-char hex), selector }
 		$acss_stub_index = array(); // Tracks ACSS classes added as empty stubs.
 
-		// Add Etch element styles (readonly)
+		// Add Etch framework element styles (type-3, readonly — not added to style_map).
 		$etch_styles = array_merge( $etch_styles, $this->get_etch_element_styles() );
 
 		// Add CSS variables (custom type) - DISABLED
@@ -565,7 +590,8 @@ class EFS_CSS_Converter {
 
 			$converted_class = $this->convert_bricks_class_to_etch( $class );
 			if ( $converted_class ) {
-				// Generate unique ID like Etch does (uniqid is fine!)
+				// Fresh 7-char Style Manager ID (type-2) — completely unrelated to the
+				// element's HTML id attribute (type-1, brxe-/etch- prefixed).
 				$style_id = substr( uniqid(), -7 );
 
 				// Add style WITH ID as key (Etch won't overwrite existing IDs!)
@@ -582,8 +608,9 @@ class EFS_CSS_Converter {
 					);
 				}
 
-				// Map Bricks ID to Etch Style ID + Selector
-				// Store both ID and selector so we can use them on Bricks side
+				// Record the Bricks class ID → Etch Style Manager ID mapping so that
+				// element converters (EFS_Base_Element::get_style_ids) can resolve the
+				// correct Etch ID when they encounter a _cssGlobalClasses reference.
 				if ( ! empty( $class['id'] ) ) {
 					$style_map[ $class['id'] ] = array(
 						'id'       => $style_id,
@@ -1490,10 +1517,19 @@ class EFS_CSS_Converter {
 	}
 
 	/**
-	 * Map Bricks element IDs to migrated Etch IDs for selector use.
+	 * Convert a Bricks element's HTML id to its Etch equivalent (type-1 ID rename).
+	 *
+	 * This handles ELEMENT IDs only — the unique HTML id attribute placed on every
+	 * DOM node by Bricks (brxe-abc1234) and the equivalent used by Etch (etch-abc1234).
+	 * This has nothing to do with Style Manager IDs (type-2, 7-char hex strings).
+	 *
+	 * Rules:
+	 *   brxe-abc1234  →  etch-abc1234   (strip brxe- prefix, add etch-)
+	 *   etch-abc1234  →  etch-abc1234   (already converted, pass through)
+	 *   abc1234       →  etch-abc1234   (bare ID, add etch- prefix)
 	 *
 	 * @param array<string,mixed> $element Bricks element.
-	 * @return string
+	 * @return string Etch element id (without leading #), or empty string if none.
 	 */
 	private function map_bricks_element_id_to_etch_selector_id( array $element ) {
 		$raw_id = isset( $element['id'] ) ? trim( (string) $element['id'] ) : '';
@@ -3225,7 +3261,15 @@ class EFS_CSS_Converter {
 	}
 
 	/**
-	 * Get Etch element styles (readonly)
+	 * Built-in Etch framework styles (type-3 — not in style_map, not user classes).
+	 *
+	 * These define the default layout behaviour for Etch's own element types (sections,
+	 * containers, iframes, …). They are keyed by "etch-*" strings in $etch_styles so
+	 * Etch's Style Manager registers them as read-only entries.
+	 *
+	 * They are NEVER added to $style_map and will never appear as class names on
+	 * converted elements. Do not confuse these "etch-*" keys with element IDs (type-1)
+	 * or Style Manager IDs (type-2).
 	 */
 	private function get_etch_element_styles() {
 		return array(

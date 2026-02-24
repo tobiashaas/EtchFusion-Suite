@@ -58,17 +58,35 @@ abstract class EFS_Base_Element {
 	abstract public function convert( $element, $children = array(), $context = array() );
 
 	/**
-	 * Get style IDs for element
+	 * Resolve Etch Style Manager IDs for this element's global classes.
 	 *
-	 * @param array $element Bricks element
-	 * @return array Style IDs
+	 * IMPORTANT — two completely separate ID systems exist in this codebase:
+	 *
+	 * 1. ELEMENT IDs (HTML id attributes on DOM nodes):
+	 *    Bricks: brxe-abc1234  →  Etch: etch-abc1234
+	 *    These are per-element HTML ids used as CSS selectors (#etch-abc1234 { ... }).
+	 *    Renamed 1-to-1 in EFS_CSS_Converter::map_bricks_element_id_to_etch_selector_id().
+	 *
+	 * 2. STYLE MANAGER IDs (internal keys in Etch's reusable-class registry):
+	 *    Bricks global classes have a random internal ID (e.g. "abc1234") and a
+	 *    human-readable name (e.g. "my-card"). After migration the class name/selector
+	 *    (.my-card) is preserved, but Etch assigns a fresh 7-char hex ID via
+	 *    substr(uniqid(), -7). These IDs never carry a "brxe-" or "etch-" prefix.
+	 *    $style_map connects the two:  Bricks class ID → { id: Etch Style ID, selector: '.my-card' }
+	 *
+	 * This method resolves type-2 IDs: it reads the Bricks _cssGlobalClasses references
+	 * from the element and returns the corresponding Etch Style Manager IDs via style_map.
+	 *
+	 * @param array $element Bricks element.
+	 * @return array Etch Style Manager IDs (7-char hex strings).
 	 */
 	protected function get_style_ids( $element ) {
 		$style_ids                     = array();
 		$this->current_element         = is_array( $element ) ? $element : array();
 		$this->pending_acss_inline_css = $this->build_acss_inline_css( $element );
 
-		// Get Global Classes from settings
+		// _cssGlobalClasses holds Bricks-side class IDs; look each one up in style_map
+		// to get the corresponding Etch Style Manager ID (7-char hex).
 		if ( isset( $element['settings']['_cssGlobalClasses'] ) && is_array( $element['settings']['_cssGlobalClasses'] ) ) {
 			foreach ( $element['settings']['_cssGlobalClasses'] as $class_id ) {
 				if ( isset( $this->style_map[ $class_id ]['id'] ) ) {
@@ -81,23 +99,20 @@ abstract class EFS_Base_Element {
 	}
 
 	/**
-	 * Get CSS classes from style IDs
+	 * Resolve CSS class names from Etch Style Manager IDs.
 	 *
-	 * @param array $style_ids Style IDs
-	 * @return string CSS classes (space-separated)
+	 * Receives the Etch Style Manager IDs produced by get_style_ids() (7-char hex strings,
+	 * never "brxe-" or "etch-" prefixed) and looks up the human-readable selector (e.g.
+	 * ".my-card") from style_map. The leading dot is stripped so the value is usable
+	 * directly as an HTML class attribute value.
+	 *
+	 * @param array $style_ids Etch Style Manager IDs (7-char hex strings).
+	 * @return string Space-separated CSS class names.
 	 */
 	protected function get_css_classes( $style_ids ) {
 		$classes = array();
 
 		foreach ( $style_ids as $style_id ) {
-			// Skip Etch-internal styles (e.g. etch-video-style, etch-section-style, etch-iframe-style).
-			// These style IDs are reserved for built-in Etch framework styles whose selectors must
-			// not be emitted as CSS class names on elements.  User-generated style IDs are always
-			// 7-character uniqid hex strings and never start with the 'etch-' prefix.
-			if ( 0 === strpos( $style_id, 'etch-' ) ) {
-				continue;
-			}
-
 			// Find selector in style map
 			foreach ( $this->style_map as $bricks_id => $etch_data ) {
 				if ( $etch_data['id'] === $style_id && isset( $etch_data['selector'] ) ) {
