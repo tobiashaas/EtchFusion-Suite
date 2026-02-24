@@ -2,6 +2,13 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+- **Class Migration — ACSS Double-Skip:** Removed the ACSS-availability drop check from `get_css_classes()` in `class-base-element.php`. When a class existed in `style_map` but `efs_acss_inline_style_map` was empty (ACSS not installed or CSS not generated), the class was silently dropped from `get_css_classes()` *and* subsequently skipped by `get_resolved_global_class_names()` (which skips style_map entries to prevent duplicates). This double-skip caused all ACSS global classes to disappear from migrated HTML. The fix: always output the class name if it is in `style_map`, regardless of ACSS inline-style availability.
+- Added PHPUnit tests `test_css_class_in_style_map_appears_in_output` and `test_acss_class_in_style_map_appears_even_without_inline_style_map` to `BaseElementModifierClassTest.php`.
+
 ## [0.12.6] — 2026-02-23
 
 - Release v0.12.6: Security (test_grid_span entfernt, sslverify auf local/dev beschränkt), Migration-Performance (HEAD/DNS-Cache, Resume Batch-Loop). Siehe `etch-fusion-suite/CHANGELOG.md`.

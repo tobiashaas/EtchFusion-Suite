@@ -90,8 +90,11 @@ abstract class EFS_Base_Element {
 		$classes = array();
 
 		foreach ( $style_ids as $style_id ) {
-			// Skip Etch-internal styles
-			if ( strpos( $style_id, 'etch-' ) === 0 ) {
+			// Skip Etch-internal styles (e.g. etch-video-style, etch-section-style, etch-iframe-style).
+			// These style IDs are reserved for built-in Etch framework styles whose selectors must
+			// not be emitted as CSS class names on elements.  User-generated style IDs are always
+			// 7-character uniqid hex strings and never start with the 'etch-' prefix.
+			if ( 0 === strpos( $style_id, 'etch-' ) ) {
 				continue;
 			}
 
@@ -101,9 +104,6 @@ abstract class EFS_Base_Element {
 					// Remove leading dot from selector
 					$class = ltrim( $etch_data['selector'], '.' );
 					if ( $this->is_utility_like_selector( $class ) ) {
-						break;
-					}
-					if ( $this->is_acss_selector_name( $class ) && ! $this->is_available_acss_selector_name( $class ) ) {
 						break;
 					}
 					$classes[] = $class;
