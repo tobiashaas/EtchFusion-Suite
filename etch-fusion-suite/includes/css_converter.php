@@ -1193,12 +1193,22 @@ class EFS_CSS_Converter {
 						'key'     => '_bricks_page_content',
 						'compare' => 'EXISTS',
 					),
+					array(
+						'key'     => '_bricks_settings',
+						'compare' => 'EXISTS',
+					),
+					array(
+						'key'     => '_bricks_page_settings',
+						'compare' => 'EXISTS',
+					),
 				),
 			)
 		);
 
 		$referenced = array();
 		foreach ( $posts as $post ) {
+			$found_in_post = false;
+
 			$elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
 			if ( empty( $elements ) ) {
 				$elements = get_post_meta( $post->ID, '_bricks_page_content', true );
@@ -1206,46 +1216,123 @@ class EFS_CSS_Converter {
 			if ( is_string( $elements ) ) {
 				$elements = maybe_unserialize( $elements );
 			}
-			if ( ! is_array( $elements ) ) {
-				continue;
-			}
-			$this->has_scanned_bricks_content = true;
-
-			foreach ( $elements as $element ) {
-				if ( ! is_array( $element ) ) {
-					continue;
-				}
-				$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-				if ( empty( $settings['_cssGlobalClasses'] ) || ! is_array( $settings['_cssGlobalClasses'] ) ) {
-					continue;
-				}
-				foreach ( $settings['_cssGlobalClasses'] as $class_id ) {
-					if ( ! is_scalar( $class_id ) ) {
+			if ( is_array( $elements ) ) {
+				foreach ( $elements as $element ) {
+					if ( ! is_array( $element ) ) {
 						continue;
 					}
-					$key = trim( (string) $class_id );
-					if ( '' !== $key ) {
-						$referenced[ $key ] = true;
+					$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
+					if ( $this->collect_referenced_classes_from_settings_value( $settings, $referenced ) ) {
+						$found_in_post = true;
 					}
 				}
+			}
 
-				// Bricks also stores direct class names in _cssClasses (space-separated).
-				// Include these so class-restricted migration does not drop referenced globals.
-				if ( ! empty( $settings['_cssClasses'] ) && is_string( $settings['_cssClasses'] ) ) {
-					$tokens = preg_split( '/\s+/', trim( $settings['_cssClasses'] ) );
-					if ( is_array( $tokens ) ) {
-						foreach ( $tokens as $token ) {
-							$name = trim( (string) $token );
-							if ( '' !== $name ) {
-								$referenced[ $name ] = true;
-							}
-						}
-					}
-				}
+			// Template-level wrapper classes can live outside the element tree.
+			$wrapper_settings = get_post_meta( $post->ID, '_bricks_settings', true );
+			if ( $this->collect_referenced_classes_from_settings_value( $wrapper_settings, $referenced ) ) {
+				$found_in_post = true;
+			}
+
+			$page_settings = get_post_meta( $post->ID, '_bricks_page_settings', true );
+			if ( $this->collect_referenced_classes_from_settings_value( $page_settings, $referenced ) ) {
+				$found_in_post = true;
+			}
+
+			if ( $found_in_post ) {
+				$this->has_scanned_bricks_content = true;
 			}
 		}
 
 		return $referenced;
+	}
+
+	/**
+	 * Collect referenced class identifiers recursively from a Bricks settings payload.
+	 *
+	 * @param mixed             $settings   Any Bricks settings payload.
+	 * @param array<string,bool> $referenced Referenced class identifiers map (by reference).
+	 * @return bool True when at least one class token was extracted.
+	 */
+	private function collect_referenced_classes_from_settings_value( $settings, array &$referenced ) {
+		if ( is_string( $settings ) ) {
+			$decoded = maybe_unserialize( $settings );
+			if ( is_array( $decoded ) ) {
+				$settings = $decoded;
+			} else {
+				$json = json_decode( $settings, true );
+				if ( is_array( $json ) ) {
+					$settings = $json;
+				}
+			}
+		}
+
+		if ( ! is_array( $settings ) ) {
+			return false;
+		}
+
+		$found = false;
+
+		if ( isset( $settings['_cssGlobalClasses'] ) ) {
+			$global_classes = $settings['_cssGlobalClasses'];
+			if ( is_scalar( $global_classes ) ) {
+				$global_classes = array( $global_classes );
+			}
+			if ( is_array( $global_classes ) ) {
+				foreach ( $global_classes as $class_id ) {
+					if ( ! is_scalar( $class_id ) ) {
+						continue;
+					}
+					$key = trim( (string) $class_id );
+					if ( '' === $key ) {
+						continue;
+					}
+					$referenced[ $key ] = true;
+					$found              = true;
+				}
+			}
+		}
+
+		if ( isset( $settings['_cssClasses'] ) ) {
+			$raw_classes = $settings['_cssClasses'];
+			$tokens      = array();
+			if ( is_scalar( $raw_classes ) ) {
+				$tokens = preg_split( '/\s+/', trim( (string) $raw_classes ) );
+			} elseif ( is_array( $raw_classes ) ) {
+				foreach ( $raw_classes as $class_name ) {
+					if ( ! is_scalar( $class_name ) ) {
+						continue;
+					}
+					$parts = preg_split( '/\s+/', trim( (string) $class_name ) );
+					if ( is_array( $parts ) ) {
+						$tokens = array_merge( $tokens, $parts );
+					}
+				}
+			}
+			if ( is_array( $tokens ) ) {
+				foreach ( $tokens as $token ) {
+					$name = trim( (string) $token );
+					if ( '' === $name ) {
+						continue;
+					}
+					$referenced[ $name ] = true;
+					$found               = true;
+				}
+			}
+		}
+
+		foreach ( $settings as $key => $value ) {
+			if ( '_cssGlobalClasses' === $key || '_cssClasses' === $key ) {
+				continue;
+			}
+			if ( is_array( $value ) || is_string( $value ) ) {
+				if ( $this->collect_referenced_classes_from_settings_value( $value, $referenced ) ) {
+					$found = true;
+				}
+			}
+		}
+
+		return $found;
 	}
 
 	/**

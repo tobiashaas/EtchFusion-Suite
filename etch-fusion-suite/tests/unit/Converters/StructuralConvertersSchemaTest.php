@@ -93,6 +93,27 @@ class StructuralConvertersSchemaTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'wp-block-group', $result );
 	}
 
+	public function test_section_converter_promotes_template_root_to_header_from_context(): void {
+		$converter = new EFS_Element_Section( $this->style_map );
+		$element   = array(
+			'name'     => 'section',
+			'label'    => 'Header Wrapper',
+			'settings' => array(),
+		);
+
+		$result = $converter->convert(
+			$element,
+			array(),
+			array(
+				'is_template_root'  => true,
+				'template_root_tag' => 'header',
+			)
+		);
+		$attrs  = $this->extract_etch_element_attrs( $result );
+
+		$this->assertSame( 'header', $attrs['tag'] );
+	}
+
 	public function test_div_converter_does_not_emit_deprecated_flex_div_marker(): void {
 		$converter = new EFS_Element_Div( $this->style_map );
 		$element   = array(
@@ -177,6 +198,44 @@ class StructuralConvertersSchemaTest extends WP_UnitTestCase {
 			$this->assertArrayHasKey( 'styles', $attrs );
 			$this->assertIsArray( $attrs['styles'] );
 		}
+	}
+
+	public function test_generator_promotes_first_root_structural_element_to_template_header_tag(): void {
+		$error_handler  = new EFS_Error_Handler();
+		$dynamic_data   = new EFS_Dynamic_Data_Converter( $error_handler );
+		$content_parser = new EFS_Content_Parser( $error_handler );
+		$generator      = new EFS_Gutenberg_Generator( $error_handler, $dynamic_data, $content_parser );
+
+		$elements = array(
+			array(
+				'id'       => 'root-container',
+				'name'     => 'container',
+				'parent'   => 0,
+				'label'    => 'Header Root',
+				'children' => array( 'child-div' ),
+				'settings' => array(),
+			),
+			array(
+				'id'       => 'child-div',
+				'name'     => 'div',
+				'parent'   => 'root-container',
+				'label'    => 'Inner',
+				'children' => array(),
+				'settings' => array(),
+			),
+		);
+
+		$result   = $generator->generate_gutenberg_blocks(
+			$elements,
+			array(
+				'template_root_tag' => 'header',
+			)
+		);
+		$all_attrs = $this->extract_all_etch_element_attrs( $result );
+
+		$this->assertCount( 2, $all_attrs );
+		$this->assertSame( 'header', $all_attrs[0]['tag'] );
+		$this->assertSame( 'div', $all_attrs[1]['tag'] );
 	}
 
 	/**

@@ -38,8 +38,9 @@ class EFS_Element_Container extends EFS_Base_Element {
 		// Get CSS classes
 		$css_classes = $this->get_css_classes( $style_ids );
 
-		// Get custom tag (e.g., ul, ol)
-		$tag = $this->get_tag( $element, 'div' );
+		// Get custom tag (e.g., ul, ol). Header/footer templates can promote the root wrapper.
+		$fallback_tag = $this->get_root_semantic_tag_from_context( $context, 'div' );
+		$tag          = $this->get_tag( $element, $fallback_tag );
 
 		// Get label
 		$label = $this->get_label( $element );

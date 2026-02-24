@@ -48,6 +48,20 @@ class EFS_Gutenberg_Generator {
 	private $display_fallback_helper = null;
 
 	/**
+	 * Semantic root tag for current template conversion (`header`/`footer`).
+	 *
+	 * @var string
+	 */
+	private $current_template_root_tag = '';
+
+	/**
+	 * Root element IDs eligible for semantic template tag promotion.
+	 *
+	 * @var array<string,bool>
+	 */
+	private $current_template_root_ids = array();
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( EFS_Error_Handler $error_handler, EFS_Dynamic_Data_Converter $dynamic_data_converter, EFS_Content_Parser $content_parser ) {
@@ -67,9 +81,23 @@ class EFS_Gutenberg_Generator {
 			return '';
 		}
 
+		$template_root_tag = '';
+		if ( isset( $post->ID ) ) {
+			$template_type = get_post_meta( (int) $post->ID, '_bricks_template_type', true );
+			$template_type = is_string( $template_type ) ? strtolower( trim( $template_type ) ) : '';
+			if ( 'header' === $template_type || 'footer' === $template_type ) {
+				$template_root_tag = $template_type;
+			}
+		}
+
 		// Keep legacy API stable, but route serialization through the modern
 		// element-factory path to avoid generating deprecated nested etchData.
-		return $this->generate_gutenberg_blocks( $bricks_elements );
+		return $this->generate_gutenberg_blocks(
+			$bricks_elements,
+			array(
+				'template_root_tag' => $template_root_tag,
+			)
+		);
 	}
 
 	/**
@@ -761,12 +789,14 @@ class EFS_Gutenberg_Generator {
 	/**
 	 * Generate Gutenberg blocks from Bricks elements (REAL CONVERSION!)
 	 */
-	public function generate_gutenberg_blocks( $bricks_elements ) {
+	public function generate_gutenberg_blocks( $bricks_elements, $context = array() ) {
 		if ( empty( $bricks_elements ) || ! is_array( $bricks_elements ) ) {
 			return '';
 		}
 
 		$this->error_handler->log_info( 'Gutenberg Generator: Generating blocks with modular converters' );
+		$this->current_template_root_tag = '';
+		$this->current_template_root_ids = array();
 
 		// Initialize element factory with style map (NEW - v0.5.0)
 		$style_map                     = get_option( 'efs_style_map', array() );
@@ -788,6 +818,25 @@ class EFS_Gutenberg_Generator {
 			$parent_id = $element['parent'] ?? 0;
 			if ( 0 === $parent_id || '0' === $parent_id || ! isset( $element_map[ $parent_id ] ) ) {
 				$top_level_elements[] = $element;
+			}
+		}
+
+		$template_root_tag = is_array( $context ) && isset( $context['template_root_tag'] ) && is_string( $context['template_root_tag'] )
+			? strtolower( trim( $context['template_root_tag'] ) )
+			: '';
+		if ( 'header' === $template_root_tag || 'footer' === $template_root_tag ) {
+			foreach ( $top_level_elements as $root_element ) {
+				$root_name = isset( $root_element['name'] ) ? (string) $root_element['name'] : '';
+				if ( ! in_array( $root_name, array( 'section', 'container', 'div', 'block' ), true ) ) {
+					continue;
+				}
+				$root_id = isset( $root_element['id'] ) ? trim( (string) $root_element['id'] ) : '';
+				if ( '' === $root_id ) {
+					continue;
+				}
+				$this->current_template_root_tag             = $template_root_tag;
+				$this->current_template_root_ids[ $root_id ] = true;
+				break;
 			}
 		}
 
@@ -1010,11 +1059,23 @@ class EFS_Gutenberg_Generator {
 			}
 
 			// Pass context for template (component) elements so slotChildren can be resolved to innerBlocks.
-			$context = array();
+			$context    = array();
+			$element_id = isset( $element['id'] ) ? trim( (string) $element['id'] ) : '';
+			if (
+				'' !== $element_id
+				&& '' !== $this->current_template_root_tag
+				&& isset( $this->current_template_root_ids[ $element_id ] )
+			) {
+				$context['is_template_root']  = true;
+				$context['template_root_tag'] = $this->current_template_root_tag;
+			}
 			if ( ( $element['name'] ?? '' ) === 'template' && ! empty( $element_map ) ) {
-				$context = array(
-					'element_map'      => $element_map,
-					'convert_callback' => array( $this, 'generate_block_html' ),
+				$context = array_merge(
+					$context,
+					array(
+						'element_map'      => $element_map,
+						'convert_callback' => array( $this, 'generate_block_html' ),
+					)
 				);
 			}
 

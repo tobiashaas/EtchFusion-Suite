@@ -264,6 +264,27 @@ abstract class EFS_Base_Element {
 	}
 
 	/**
+	 * Resolve semantic root tag from conversion context (header/footer templates).
+	 *
+	 * @param array  $context     Conversion context.
+	 * @param string $fallback_tag Fallback HTML tag when context does not apply.
+	 * @return string
+	 */
+	protected function get_root_semantic_tag_from_context( $context, $fallback_tag = 'div' ) {
+		$fallback_tag = is_string( $fallback_tag ) && '' !== $fallback_tag ? $fallback_tag : 'div';
+		if ( ! is_array( $context ) || empty( $context['is_template_root'] ) ) {
+			return $fallback_tag;
+		}
+
+		$tag = isset( $context['template_root_tag'] ) && is_string( $context['template_root_tag'] ) ? strtolower( trim( $context['template_root_tag'] ) ) : '';
+		if ( 'header' !== $tag && 'footer' !== $tag ) {
+			return $fallback_tag;
+		}
+
+		return $tag;
+	}
+
+	/**
 	 * Build Gutenberg block attributes
 	 *
 	 * @param string $label Element label

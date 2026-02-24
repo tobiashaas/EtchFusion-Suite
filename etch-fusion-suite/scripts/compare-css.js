@@ -1,331 +1,433 @@
 #!/usr/bin/env node
 /**
- * CSS Quality Check: Bricks → Etch
+ * CSS Quality Check: Bricks -> Etch
  *
- * Runs the EFS CSS converter on the Bricks site to get the *expected* CSS
- * for every global class, then compares it against the actual etch_styles on
- * the Etch site.
- *
- * Quality categories (based on expected vs. actual CSS byte length):
- *
- *   PERFECT  — ratio 0.8–2.5  (nesting/logical-properties add ~1.5–2× verbosity)
- *   PARTIAL  — ratio 0.3–0.8 or 2.5–5
- *   POOR     — ratio < 0.3 or > 5
- *   LOST     — expected > 0, actual = 0  ← converter bug or transfer loss
- *   GHOST    — expected = 0, actual > 0  ← unexpected CSS in Etch
- *   UTILITY  — expected = 0, actual = 0  ← empty utility class (fine)
- *
- * Separate buckets for ACSS vs. custom classes.
- * Responsive detection uses the colon-key syntax Bricks actually uses
- * (e.g. "color:tablet_portrait"), NOT nested objects.
+ * - Reads global classes from Bricks.
+ * - Reads class styles from Etch.
+ * - Compares "all classes" in one run.
+ * - Uses declaration-based matching for custom CSS (nested-aware).
+ * - Treats ACSS classes as external stylesheet classes.
  *
  * Usage:
  *   node scripts/compare-css.js
  *
- * Output: console summary + css-quality-<timestamp>.json
+ * Output:
+ *   console summary + css-quality-<timestamp>.json
  */
 
 'use strict';
 
 const { spawnSync } = require('child_process');
-const fs            = require('fs');
-const path          = require('path');
+const fs = require('fs');
+const path = require('path');
 
-const CWD        = path.resolve(__dirname, '..');
+const CWD = path.resolve(__dirname, '..');
 const SPAWN_OPTS = { encoding: 'utf8', cwd: CWD, maxBuffer: 64 * 1024 * 1024 };
-
-// ─── WP-CLI helpers ───────────────────────────────────────────────────────────
 
 function runWpEnv(args) {
   const result = process.platform === 'win32'
     ? spawnSync('cmd', ['/c', 'npx', 'wp-env', ...args], SPAWN_OPTS)
     : spawnSync('npx', ['wp-env', ...args], SPAWN_OPTS);
   if (result.error) throw result.error;
-  if (result.status !== 0)
+  if (result.status !== 0) {
     throw new Error(result.stderr || result.stdout || `wp-env failed: ${args.join(' ')}`);
+  }
   return result.stdout;
 }
 
 function runPhpJson(env, phpCode) {
   const raw = runWpEnv(['run', env, 'wp', 'eval', phpCode]);
-  for (const line of raw.split('\n')) {
-    const t = line.trim();
-    if (t.startsWith('[') || t.startsWith('{')) return JSON.parse(t);
-  }
-  throw new Error(`No JSON in WP-CLI output (env=${env}):\n${raw.slice(0, 500)}`);
-}
-
-// ─── Data extraction ──────────────────────────────────────────────────────────
-
-/**
- * Run the EFS CSS converter on the Bricks site and return compact per-class
- * data: expected CSS (from settings), ACSS flag, responsive flag.
- *
- * Note: this uses convert_bricks_class_to_etch() which converts the structured
- * settings object.  Custom CSS from bricks_global_custom_css is handled
- * separately by the full migration and is NOT included here — those classes
- * will appear as expected_len=0 even if they have custom CSS.
- */
-function getBricksExpected() {
-  console.log('> Running EFS converter on Bricks classes (may take ~30 s)...');
-
-  const php = `set_time_limit(0); $raw=get_option('bricks_global_classes',array()); if(is_string($raw)){$d=json_decode($raw,true);$raw=is_array($d)?$d:(maybe_unserialize($raw)?:array());} $conv=etch_fusion_suite_container()->get('css_converter'); $excPfx=array('brxe-','bricks-','brx-','wp-','wp-block-','has-','is-','woocommerce-','wc-','product-','cart-','checkout-'); $excExact=array('bg--ultra-light','bg--ultra-dark','fr-lede','fr-intro','fr-note','fr-notes','text--l'); $out=array(); foreach($raw as $c){ $orig=!empty($c['name'])?$c['name']:(!empty($c['id'])?$c['id']:''); if(empty($orig))continue; $isAccs=(strpos($orig,'acss_import_')===0); $norm=preg_replace('/^acss_import_/','',$orig); $norm=preg_replace('/^fr-/','',$norm); $excl=false; foreach($excPfx as $p){if(strpos($norm,$p)===0){if($p==='is-'&&strpos($norm,'is-bg')===0)continue; $excl=true;break;}} if($excl||in_array($norm,$excExact))continue; $s=isset($c['settings'])&&is_array($c['settings'])?$c['settings']:array(); $hasS=!empty($s); $hasR=false; foreach($s as $k=>$v){if(strpos((string)$k,':')!==false){$hasR=true;break;}} $etch=$conv->convert_bricks_class_to_etch($c); $css=trim($etch['css']??''); $out[]=array('name'=>$norm,'is_acss'=>$isAccs,'has_settings'=>$hasS,'has_responsive'=>$hasR,'expected_len'=>strlen($css),'selector'=>'.'.$norm); } echo json_encode($out);`;
-
-  return runPhpJson('cli', php);
-}
-
-/**
- * Get etch_styles from Etch site — compact form with CSS classification done in PHP.
- */
-function getEtchStyles() {
-  console.log('> Fetching Etch styles...');
-
-  const php = `$raw=get_option('etch_styles',array()); $st=is_string($raw)?maybe_unserialize($raw):$raw; if(!is_array($st))$st=array(); $out=array(); foreach($st as $s){ if(($s['type']??'')!=='class')continue; $css=trim($s['css']??''); $hm=(strpos($css,'@media')!==false); $hn=(strpos($css,'&')!==false); $b=trim(preg_replace('/&[^{]*\\{[^{}]*\\}/s','',preg_replace('/@media[^{]*\\{(?:[^{}]|\\{[^{}]*\\})*\\}/s','',$css))); $out[]=array('selector'=>$s['selector']??'','empty'=>(strlen($css)===0),'len'=>strlen($css),'has_media'=>$hm,'has_nesting'=>$hn,'has_base'=>(strlen($b)>0),'readonly'=>!empty($s['readonly'])); } echo json_encode($out);`;
-
-  return runPhpJson('tests-cli', php);
-}
-
-// ─── Quality scoring ──────────────────────────────────────────────────────────
-
-/**
- * @param {number} expectedLen
- * @param {{empty:boolean, len:number}} merged  — merged Etch entry
- * @returns {'PERFECT'|'PARTIAL'|'POOR'|'LOST'|'GHOST'|'UTILITY'}
- */
-function quality(expectedLen, merged) {
-  const actualLen = merged.len;
-  if (expectedLen === 0 && actualLen === 0) return 'UTILITY';
-  if (expectedLen === 0 && actualLen > 0)   return 'GHOST';
-  if (expectedLen > 0  && actualLen === 0)  return 'LOST';
-  const ratio = actualLen / expectedLen;
-  if (ratio >= 0.8 && ratio <= 2.5) return 'PERFECT';
-  if (ratio >= 0.3 && ratio <= 5.0) return 'PARTIAL';
-  return 'POOR';
-}
-
-function cssType(s) {
-  if (s.empty)                         return 'empty';
-  if (s.has_base && s.has_media)       return 'base+responsive';
-  if (s.has_base && s.has_nesting)     return 'base+nesting';
-  if (s.has_base)                      return 'base-only';
-  if (s.has_media)                     return 'responsive-only';
-  if (s.has_nesting)                   return 'nesting-only';
-  return 'empty';
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-function main() {
-  const bricks    = getBricksExpected();
-  const etchRaw   = getEtchStyles();
-
-  console.log(`> Bricks eligible classes: ${bricks.length}`);
-  console.log(`> Etch class entries:      ${etchRaw.length}`);
-
-  // ── Index Etch by selector ────────────────────────────────────────────────
-  const etchIdx = new Map();
-  for (const s of etchRaw) {
-    if (!s.selector) continue;
-    if (!etchIdx.has(s.selector)) etchIdx.set(s.selector, []);
-    etchIdx.get(s.selector).push(s);
+  const input = String(raw || '').trim();
+  const starts = [input.indexOf('{'), input.indexOf('[')].filter((i) => i >= 0);
+  if (starts.length === 0) {
+    throw new Error(`No JSON in WP-CLI output (env=${env}): ${input.slice(0, 800)}`);
   }
 
-  // ── Duplicate detection ───────────────────────────────────────────────────
-  const duplicates = [];
-  for (const [sel, entries] of etchIdx) {
-    if (entries.length > 1) duplicates.push({ selector: sel, count: entries.length });
-  }
-  duplicates.sort((a, b) => b.count - a.count);
+  const start = Math.min(...starts);
+  let inString = false;
+  let escaped = false;
+  const stack = [];
 
-  // ── Counters ──────────────────────────────────────────────────────────────
-  const counts = {
-    total: 0, acss: 0, custom: 0,
-    acssWithSettings: 0, customWithSettings: 0,
-    acssWithResponsive: 0, customWithResponsive: 0,
-  };
-  // Quality counters: { ACSS: {...}, Custom: {...} }
-  const qCounts = {
-    ACSS:   { PERFECT: 0, PARTIAL: 0, POOR: 0, LOST: 0, GHOST: 0, UTILITY: 0, MISSING: 0 },
-    Custom: { PERFECT: 0, PARTIAL: 0, POOR: 0, LOST: 0, GHOST: 0, UTILITY: 0, MISSING: 0 },
-  };
-  const cssTypeCounts = {};
-
-  const lostClasses    = [];  // LOST — expected CSS but nothing in Etch
-  const poorClasses    = [];  // POOR quality
-  const missingClasses = [];  // not in Etch at all
-  const ghostClasses   = [];  // unexpected CSS in Etch
-
-  const bricksSelectors = new Set(bricks.map(c => c.selector));
-  const details = [];  // per-class detail rows (for report)
-
-  for (const cls of bricks) {
-    counts.total++;
-    const bucket = cls.is_acss ? 'ACSS' : 'Custom';
-    if (cls.is_acss) {
-      counts.acss++;
-      if (cls.has_settings)   counts.acssWithSettings++;
-      if (cls.has_responsive) counts.acssWithResponsive++;
-    } else {
-      counts.custom++;
-      if (cls.has_settings)   counts.customWithSettings++;
-      if (cls.has_responsive) counts.customWithResponsive++;
-    }
-
-    const entries = etchIdx.get(cls.selector);
-    if (!entries) {
-      qCounts[bucket].MISSING++;
-      if (!cls.is_acss && cls.expected_len > 0) {
-        missingClasses.push({ name: cls.name, expected_len: cls.expected_len });
+  for (let i = start; i < input.length; i += 1) {
+    const ch = input[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
       }
-      details.push({ name: cls.name, is_acss: cls.is_acss, has_settings: cls.has_settings,
-        expected_len: cls.expected_len, actual_len: 0, quality: 'MISSING', css_type: 'n/a' });
       continue;
     }
 
-    // Merge entries for this selector
-    const merged = {
-      empty:       entries.every(e => e.empty),
-      len:         entries.reduce((n, e) => n + e.len, 0),
-      has_base:    entries.some(e => e.has_base),
-      has_media:   entries.some(e => e.has_media),
-      has_nesting: entries.some(e => e.has_nesting),
-    };
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
 
-    const q    = quality(cls.expected_len, merged);
-    const type = cssType(merged);
-    qCounts[bucket][q]++;
-    cssTypeCounts[type] = (cssTypeCounts[type] || 0) + 1;
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+      continue;
+    }
 
-    if (q === 'LOST')  lostClasses.push({ name: cls.name, is_acss: cls.is_acss, expected_len: cls.expected_len, has_settings: cls.has_settings });
-    if (q === 'POOR')  poorClasses.push({ name: cls.name, is_acss: cls.is_acss, expected_len: cls.expected_len, actual_len: merged.len, ratio: (merged.len / cls.expected_len).toFixed(2) });
-    if (q === 'GHOST') ghostClasses.push({ name: cls.name, actual_len: merged.len });
-
-    details.push({ name: cls.name, is_acss: cls.is_acss, has_settings: cls.has_settings,
-      has_responsive: cls.has_responsive, expected_len: cls.expected_len,
-      actual_len: merged.len, quality: q, css_type: type,
-      ratio: cls.expected_len > 0 ? (merged.len / cls.expected_len).toFixed(2) : null,
-      etch_entries: entries.length });
+    if (ch === '}' || ch === ']') {
+      const expected = ch === '}' ? '{' : '[';
+      if (stack.length === 0 || stack[stack.length - 1] !== expected) {
+        continue;
+      }
+      stack.pop();
+      if (stack.length === 0) {
+        const snippet = input.slice(start, i + 1);
+        return JSON.parse(snippet);
+      }
+    }
   }
 
-  // Etch orphans (selector not in Bricks)
+  throw new Error(`No parseable JSON in WP-CLI output (env=${env}): ${input.slice(0, 800)}`);
+}
+
+function normalizeSelectorName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/^\./, '')
+    .replace(/^acss_import_/, '')
+    .replace(/^fr-/, '');
+}
+
+function getBricksExpected() {
+  console.log('> Reading Bricks global classes...');
+
+  const php = `
+set_time_limit(0);
+$raw = get_option('bricks_global_classes', array());
+if (is_string($raw)) {
+  $decoded = json_decode($raw, true);
+  if (is_array($decoded)) {
+    $raw = $decoded;
+  } else {
+    $maybe = maybe_unserialize($raw);
+    $raw = is_array($maybe) ? $maybe : array();
+  }
+}
+$conv = etch_fusion_suite_container()->get('css_converter');
+$out = array();
+foreach ((array) $raw as $class_data) {
+  if (!is_array($class_data)) continue;
+
+  $orig = !empty($class_data['name']) ? (string) $class_data['name'] : (!empty($class_data['id']) ? (string) $class_data['id'] : '');
+  if ('' === trim($orig)) continue;
+
+  $category = isset($class_data['category']) ? strtolower(trim((string) $class_data['category'])) : '';
+  $is_acss = (0 === strpos($orig, 'acss_import_')) || (false !== strpos($category, 'acss')) || (false !== strpos($category, 'automatic'));
+
+  $normalized = preg_replace('/^acss_import_/', '', $orig);
+  $normalized = preg_replace('/^fr-/', '', $normalized);
+  $normalized = ltrim((string) $normalized, '.');
+  if ('' === trim($normalized)) continue;
+
+  $settings = isset($class_data['settings']) && is_array($class_data['settings']) ? $class_data['settings'] : array();
+  $has_responsive = false;
+  foreach ($settings as $key => $value) {
+    if (false !== strpos((string) $key, ':')) {
+      $has_responsive = true;
+      break;
+    }
+  }
+
+  $etch = $conv->convert_bricks_class_to_etch($class_data);
+  $expected_css = trim((string) ($etch['css'] ?? ''));
+
+  $out[] = array(
+    'name' => $normalized,
+    'selector' => '.' . $normalized,
+    'category' => $category,
+    'is_acss' => $is_acss,
+    'has_settings' => !empty($settings),
+    'has_responsive' => $has_responsive,
+    'expected_css' => $expected_css,
+    'expected_len' => strlen($expected_css),
+  );
+}
+echo json_encode($out);
+`;
+
+  return runPhpJson('cli', php.replace(/\s*\n\s*/g, ' '));
+}
+
+function getEtchStyles() {
+  console.log('> Reading Etch class styles...');
+
+  const php = `
+$raw = get_option('etch_styles', array());
+$styles = is_string($raw) ? maybe_unserialize($raw) : $raw;
+if (!is_array($styles)) $styles = array();
+$out = array();
+foreach ($styles as $s) {
+  if (!is_array($s)) continue;
+  if (($s['type'] ?? '') !== 'class') continue;
+  $selector = isset($s['selector']) ? (string) $s['selector'] : '';
+  if ('' === trim($selector)) continue;
+  $css = trim((string) ($s['css'] ?? ''));
+  $out[] = array(
+    'selector' => $selector,
+    'css' => $css,
+    'len' => strlen($css),
+    'readonly' => !empty($s['readonly']),
+  );
+}
+echo json_encode($out);
+`;
+
+  return runPhpJson('tests-cli', php.replace(/\s*\n\s*/g, ' '));
+}
+
+function extractDeclarations(css) {
+  const out = new Set();
+  const raw = String(css || '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\s+/g, ' ');
+
+  const re = /([a-zA-Z_-][a-zA-Z0-9_-]*)\s*:\s*([^;{}]+);/g;
+  let match;
+  while ((match = re.exec(raw)) !== null) {
+    const prop = String(match[1] || '').trim().toLowerCase();
+    const value = String(match[2] || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    if (!prop || !value) continue;
+    out.add(`${prop}:${value}`);
+  }
+
+  return out;
+}
+
+function compareDeclarationSets(expectedSet, actualSet) {
+  const expectedTotal = expectedSet.size;
+  const actualTotal = actualSet.size;
+
+  if (expectedTotal === 0 && actualTotal === 0) {
+    return { status: 'EMPTY', expectedTotal, actualTotal, matched: 0, coverage: null };
+  }
+  if (expectedTotal === 0 && actualTotal > 0) {
+    return { status: 'GHOST', expectedTotal, actualTotal, matched: 0, coverage: null };
+  }
+  if (expectedTotal > 0 && actualTotal === 0) {
+    return { status: 'LOST', expectedTotal, actualTotal, matched: 0, coverage: 0 };
+  }
+
+  let matched = 0;
+  for (const key of expectedSet) {
+    if (actualSet.has(key)) matched += 1;
+  }
+
+  const coverage = expectedTotal > 0 ? matched / expectedTotal : null;
+  if (coverage >= 0.9) return { status: 'FULL', expectedTotal, actualTotal, matched, coverage };
+  if (coverage >= 0.5) return { status: 'PARTIAL', expectedTotal, actualTotal, matched, coverage };
+  return { status: 'LOW', expectedTotal, actualTotal, matched, coverage };
+}
+
+function main() {
+  const bricksRaw = getBricksExpected();
+  const etchRaw = getEtchStyles();
+
+  const bricks = bricksRaw.map((c) => ({
+    ...c,
+    selector: `.${normalizeSelectorName(c.selector || c.name)}`,
+  }));
+
+  const etchIdx = new Map();
+  for (const entry of etchRaw) {
+    const selector = `.${normalizeSelectorName(entry.selector)}`;
+    if (!selector || selector === '.') continue;
+    if (!etchIdx.has(selector)) etchIdx.set(selector, []);
+    etchIdx.get(selector).push(entry);
+  }
+
+  const duplicates = [];
+  for (const [selector, entries] of etchIdx.entries()) {
+    if (entries.length > 1) duplicates.push({ selector, count: entries.length });
+  }
+  duplicates.sort((a, b) => b.count - a.count);
+
+  const qCustom = { FULL: 0, PARTIAL: 0, LOW: 0, LOST: 0, GHOST: 0, EMPTY: 0, MISSING: 0 };
+  const qAcss = { EXTERNAL_EMPTY: 0, EXTERNAL_PRESENT: 0, MISSING: 0 };
+
+  const counts = {
+    total: 0,
+    custom: 0,
+    acss: 0,
+    custom_with_settings: 0,
+    custom_with_responsive: 0,
+    acss_with_settings: 0,
+    acss_with_responsive: 0,
+  };
+
+  const missingCustomWithCss = [];
+  const lowCustom = [];
+  const lostCustom = [];
+  const details = [];
+
+  const bricksSelectors = new Set();
+  for (const cls of bricks) {
+    counts.total += 1;
+    bricksSelectors.add(cls.selector);
+
+    if (cls.is_acss) {
+      counts.acss += 1;
+      if (cls.has_settings) counts.acss_with_settings += 1;
+      if (cls.has_responsive) counts.acss_with_responsive += 1;
+    } else {
+      counts.custom += 1;
+      if (cls.has_settings) counts.custom_with_settings += 1;
+      if (cls.has_responsive) counts.custom_with_responsive += 1;
+    }
+
+    const entries = etchIdx.get(cls.selector) || [];
+    const mergedCss = entries.map((e) => String(e.css || '')).join('\n');
+    const expectedSet = extractDeclarations(cls.expected_css || '');
+    const actualSet = extractDeclarations(mergedCss);
+
+    if (cls.is_acss) {
+      let acssStatus = 'EXTERNAL_EMPTY';
+      if (entries.length === 0) acssStatus = 'MISSING';
+      else if (actualSet.size > 0) acssStatus = 'EXTERNAL_PRESENT';
+      qAcss[acssStatus] += 1;
+
+      details.push({
+        name: cls.name,
+        selector: cls.selector,
+        type: 'ACSS',
+        category: cls.category || '',
+        status: acssStatus,
+        expected_decls: expectedSet.size,
+        actual_decls: actualSet.size,
+        etch_entries: entries.length,
+      });
+      continue;
+    }
+
+    if (entries.length === 0) {
+      qCustom.MISSING += 1;
+      if (expectedSet.size > 0) {
+        missingCustomWithCss.push({ name: cls.name, selector: cls.selector, expected_decls: expectedSet.size });
+      }
+      details.push({
+        name: cls.name,
+        selector: cls.selector,
+        type: 'Custom',
+        status: 'MISSING',
+        expected_decls: expectedSet.size,
+        actual_decls: 0,
+        matched_decls: 0,
+        coverage: null,
+        etch_entries: 0,
+      });
+      continue;
+    }
+
+    const cmp = compareDeclarationSets(expectedSet, actualSet);
+    qCustom[cmp.status] += 1;
+
+    if (cmp.status === 'LOST') {
+      lostCustom.push({ name: cls.name, selector: cls.selector, expected_decls: cmp.expectedTotal });
+    }
+    if (cmp.status === 'LOW') {
+      lowCustom.push({
+        name: cls.name,
+        selector: cls.selector,
+        expected_decls: cmp.expectedTotal,
+        actual_decls: cmp.actualTotal,
+        matched_decls: cmp.matched,
+        coverage: cmp.coverage,
+      });
+    }
+
+    details.push({
+      name: cls.name,
+      selector: cls.selector,
+      type: 'Custom',
+      status: cmp.status,
+      expected_decls: cmp.expectedTotal,
+      actual_decls: cmp.actualTotal,
+      matched_decls: cmp.matched,
+      coverage: cmp.coverage,
+      etch_entries: entries.length,
+      has_settings: cls.has_settings,
+      has_responsive: cls.has_responsive,
+    });
+  }
+
   const onlyInEtch = [];
-  for (const [sel] of etchIdx) {
-    if (!bricksSelectors.has(sel)) onlyInEtch.push(sel);
+  for (const selector of etchIdx.keys()) {
+    if (!bricksSelectors.has(selector)) onlyInEtch.push(selector);
   }
 
-  // ── Summary stats ─────────────────────────────────────────────────────────
-  const totalDupeExtra = duplicates.reduce((n, d) => n + (d.count - 1), 0);
+  const customComparable = Object.values(qCustom).reduce((a, b) => a + b, 0);
+  const customGood = (qCustom.FULL || 0) + (qCustom.PARTIAL || 0);
+  const customGoodRate = customComparable > 0 ? ((customGood / customComparable) * 100).toFixed(1) : 'n/a';
 
-  function qualityRate(bucket, cats) {
-    const total = Object.values(qCounts[bucket]).reduce((a, b) => a + b, 0);
-    if (!total) return 'n/a';
-    const good  = cats.reduce((n, c) => n + (qCounts[bucket][c] || 0), 0);
-    return ((good / total) * 100).toFixed(1) + '%';
+  console.log('\n=== CSS Quality Check (All Classes) ===');
+  console.log(`Bricks classes total: ${counts.total}`);
+  console.log(`- Custom: ${counts.custom}`);
+  console.log(`- ACSS:   ${counts.acss}`);
+  console.log(`Etch class entries: ${etchRaw.length}`);
+  console.log(`Etch unique selectors: ${etchIdx.size}`);
+  console.log(`Duplicate selector groups: ${duplicates.length}`);
+
+  console.log('\nCustom class quality (declaration-based, nested-aware):');
+  for (const key of ['FULL', 'PARTIAL', 'LOW', 'LOST', 'GHOST', 'EMPTY', 'MISSING']) {
+    console.log(`- ${key}: ${qCustom[key] || 0}`);
+  }
+  console.log(`Custom good rate (FULL+PARTIAL): ${customGoodRate}%`);
+
+  console.log('\nACSS class tracking (external stylesheet expected):');
+  for (const key of ['EXTERNAL_EMPTY', 'EXTERNAL_PRESENT', 'MISSING']) {
+    console.log(`- ${key}: ${qAcss[key] || 0}`);
   }
 
-  // ── Console output ─────────────────────────────────────────────────────────
-  console.log('\n╔══════════════════════════════════════════════════════════╗');
-  console.log('║      CSS Quality Check — Bricks → Etch                 ║');
-  console.log('╚══════════════════════════════════════════════════════════╝\n');
-
-  console.log('── Bricks source classes ────────────────────────────────────');
-  console.log(`  Total eligible:            ${counts.total}`);
-  console.log(`  ACSS (acss_import_*):      ${counts.acss}  (settings: ${counts.acssWithSettings}, responsive: ${counts.acssWithResponsive})`);
-  console.log(`  Custom:                    ${counts.custom}  (settings: ${counts.customWithSettings}, responsive: ${counts.customWithResponsive})`);
-
-  console.log('\n── Etch target styles ───────────────────────────────────────');
-  console.log(`  Total entries (type=class): ${etchRaw.length}`);
-  console.log(`  Unique selectors:           ${etchIdx.size}`);
-  console.log(`  Duplicate extra entries:    ${totalDupeExtra}  ← ${duplicates.length} selectors affected`);
-  if (duplicates.length > 0) {
-    duplicates.slice(0, 5).forEach(d => console.log(`    ×${d.count}  ${d.selector}`));
-    if (duplicates.length > 5) console.log(`    … and ${duplicates.length - 5} more`);
+  if (missingCustomWithCss.length > 0) {
+    console.log(`\nMissing custom classes with expected declarations: ${missingCustomWithCss.length}`);
+    for (const row of missingCustomWithCss.slice(0, 12)) {
+      console.log(`- ${row.name} (${row.expected_decls} decls)`);
+    }
   }
 
-  console.log('\n── Migration quality (Custom classes) ───────────────────────');
-  const cq = qCounts.Custom;
-  const cTotal = Object.values(cq).reduce((a, b) => a + b, 0);
-  [['PERFECT', '✓ CSS matches expected'],
-   ['PARTIAL', '~ CSS partial / different length'],
-   ['POOR',    '✗ CSS very different'],
-   ['LOST',    '✗ Expected CSS, got nothing'],
-   ['GHOST',   '? Unexpected CSS in Etch'],
-   ['UTILITY', '· Empty utility (expected)'],
-   ['MISSING', '✗ Class absent from Etch'],
-  ].forEach(([k, label]) => {
-    const n   = cq[k] || 0;
-    const pct = cTotal ? ((n / cTotal) * 100).toFixed(1).padStart(5) : '  n/a';
-    console.log(`  ${k.padEnd(8)} ${String(n).padStart(5)}  ${pct}%  ${label}`);
-  });
-  console.log(`  Good rate (PERFECT+PARTIAL): ${qualityRate('Custom', ['PERFECT', 'PARTIAL', 'GHOST', 'UTILITY'])}`);
-
-  console.log('\n── Migration quality (ACSS classes) ─────────────────────────');
-  const aq = qCounts.ACSS;
-  const aTotal = Object.values(aq).reduce((a, b) => a + b, 0);
-  [['PERFECT', '✓'], ['PARTIAL', '~'], ['POOR', '✗'], ['LOST', '✗'],
-   ['GHOST', '?'], ['UTILITY', '·'], ['MISSING', '✗'],
-  ].forEach(([k, icon]) => {
-    const n   = aq[k] || 0;
-    const pct = aTotal ? ((n / aTotal) * 100).toFixed(1).padStart(5) : '  n/a';
-    console.log(`  ${k.padEnd(8)} ${String(n).padStart(5)}  ${pct}%`);
-  });
-
-  console.log('\n── CSS type breakdown (matched entries) ─────────────────────');
-  const typeOrder = ['base-only', 'base+responsive', 'base+nesting', 'responsive-only', 'nesting-only', 'empty'];
-  for (const t of typeOrder) {
-    const n = cssTypeCounts[t] || 0;
-    console.log(`  ${t.padEnd(22)} ${n}`);
+  if (lowCustom.length > 0) {
+    console.log(`\nLOW custom matches: ${lowCustom.length}`);
+    for (const row of lowCustom.slice(0, 12)) {
+      const cov = row.coverage === null ? 'n/a' : `${(row.coverage * 100).toFixed(1)}%`;
+      console.log(`- ${row.name} (coverage ${cov}, expected ${row.expected_decls}, actual ${row.actual_decls})`);
+    }
   }
 
-  if (lostClasses.filter(c => !c.is_acss).length > 0) {
-    const custom = lostClasses.filter(c => !c.is_acss);
-    console.log(`\n── LOST — Custom classes: expected CSS → empty in Etch (${custom.length}) ──`);
-    custom.forEach(c => console.log(`  ${c.name}  (expected ${c.expected_len}B)`));
-  }
-
-  if (poorClasses.filter(c => !c.is_acss).length > 0) {
-    const custom = poorClasses.filter(c => !c.is_acss);
-    console.log(`\n── POOR quality — Custom (${custom.length}) ───────────────────────`);
-    custom.slice(0, 15).forEach(c => console.log(`  ${c.name}  ratio=${c.ratio}  (exp:${c.expected_len}B  act:${c.actual_len}B)`));
-    if (custom.length > 15) console.log(`  … and ${custom.length - 15} more (see report)`);
-  }
-
-  if (missingClasses.length > 0) {
-    console.log(`\n── MISSING Custom classes with expected CSS (${missingClasses.length}) ────────`);
-    missingClasses.slice(0, 10).forEach(c => console.log(`  ${c.name}  (${c.expected_len}B)`));
-    if (missingClasses.length > 10) console.log(`  … and ${missingClasses.length - 10} more`);
-  }
-
-  // ── JSON report ───────────────────────────────────────────────────────────
   const report = {
     timestamp: new Date().toISOString(),
     summary: {
-      bricks_eligible: counts.total,
-      bricks_acss: counts.acss,
+      bricks_total: counts.total,
       bricks_custom: counts.custom,
-      bricks_custom_with_settings: counts.customWithSettings,
-      bricks_custom_with_responsive: counts.customWithResponsive,
+      bricks_acss: counts.acss,
+      bricks_custom_with_settings: counts.custom_with_settings,
+      bricks_custom_with_responsive: counts.custom_with_responsive,
+      bricks_acss_with_settings: counts.acss_with_settings,
+      bricks_acss_with_responsive: counts.acss_with_responsive,
       etch_entries_total: etchRaw.length,
       etch_unique_selectors: etchIdx.size,
-      etch_duplicate_extra: totalDupeExtra,
+      etch_duplicate_selector_groups: duplicates.length,
       only_in_etch: onlyInEtch.length,
+      custom_good_rate_percent: customGoodRate,
     },
-    quality_custom: qCounts.Custom,
-    quality_acss:   qCounts.ACSS,
-    css_type_breakdown: cssTypeCounts,
+    quality_custom: qCustom,
+    quality_acss: qAcss,
     duplicate_selectors: duplicates,
-    lost_custom_classes: lostClasses.filter(c => !c.is_acss),
-    poor_custom_classes: poorClasses.filter(c => !c.is_acss),
-    missing_custom_with_css: missingClasses,
-    ghost_classes: ghostClasses,
-    only_in_etch_sample: onlyInEtch.slice(0, 50),
-    // Full detail rows for deep analysis
+    missing_custom_with_expected_declarations: missingCustomWithCss,
+    low_custom_matches: lowCustom,
+    lost_custom_matches: lostCustom,
+    only_in_etch_sample: onlyInEtch.slice(0, 100),
     details,
   };
 
   const reportPath = path.join(CWD, `css-quality-${Date.now()}.json`);
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  console.log(`\nFull report: ${path.basename(reportPath)}`);
+  console.log(`\nReport: ${path.basename(reportPath)}`);
 }
 
 main();
