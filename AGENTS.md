@@ -63,8 +63,23 @@ All commands run from `etch-fusion-suite/`:
 - `npm run lint` — ESLint for JS
 - `npm run typecheck` — TypeScript check
 
+### Commercial plugins
+
+The full `npm run dev` requires commercial plugin ZIPs in `etch-fusion-suite/local-plugins/`. The setup script (`node scripts/setup-commercial-plugins.js`) auto-detects versioned ZIPs and creates `-latest.zip` copies:
+
+| Plugin | Required | Naming pattern |
+|---|---|---|
+| Bricks Builder | Yes | `bricks-*.zip` (not `bricks-child`) |
+| Etch Plugin | Yes | `etch-<version>.zip` (not `etch-theme`) |
+| Etch Theme | Yes | `etch-theme-*.zip` |
+| Frames | No | `frames-*.zip` |
+| Automatic.css | No | `automatic*.zip` |
+
+License keys go in `etch-fusion-suite/.env` (copy from `.env.example`).
+
 ### Key gotchas
 
 - The Composer `--no-dev` flag is used inside Docker containers; for local dev testing with PHPUnit/PHPCS, always use `composer install` (with dev dependencies) in `etch-fusion-suite/`.
 - The `postinstall` npm script runs `patch-package` which patches `@wordpress/env`. Always use `npm install` (not `npm ci`) if the lockfile hasn't changed but patches need reapplying.
 - Root-level PHPUnit (`phpunit.xml.dist`) uses PHPUnit 10.5 with a different bootstrap than plugin-level PHPUnit 9.6.
+- `npm run health` has a pre-existing SyntaxError (`await` outside `async` function in `health-check.js`). Use direct `wp-env run cli wp ...` commands to verify environment health instead.
