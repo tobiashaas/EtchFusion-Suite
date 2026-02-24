@@ -236,10 +236,10 @@ class EFS_Element_Text extends EFS_Base_Element {
 			return $this->generate_etch_element_block( $attrs );
 		}
 
-		// etch/text is plain-text only — use etch/raw-html when content contains markup.
-		$inner = strip_tags( $content ) !== $content
-			? $this->generate_etch_raw_html_block( $content )
-			: $this->generate_etch_text_block( $content );
+		// etch/text supports inline HTML (bold, italic, li, etc.) — always use it for
+		// block-level content. etch/raw-html is reserved for top-level HTML fragments
+		// that are not part of the structured block tree.
+		$inner = $this->generate_etch_text_block( $content );
 
 		return $this->generate_etch_element_block( $attrs, $inner );
 	}
