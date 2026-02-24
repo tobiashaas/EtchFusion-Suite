@@ -1205,10 +1205,14 @@ class EFS_CSS_Converter {
 			)
 		);
 
+		// Any post returned by the query holds at least one of the Bricks meta keys,
+		// so we have actively scanned Bricks content — regardless of whether classes are found.
+		if ( ! empty( $posts ) ) {
+			$this->has_scanned_bricks_content = true;
+		}
+
 		$referenced = array();
 		foreach ( $posts as $post ) {
-			$found_in_post = false;
-
 			$elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
 			if ( empty( $elements ) ) {
 				$elements = get_post_meta( $post->ID, '_bricks_page_content', true );
@@ -1222,26 +1226,16 @@ class EFS_CSS_Converter {
 						continue;
 					}
 					$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
-					if ( $this->collect_referenced_classes_from_settings_value( $settings, $referenced ) ) {
-						$found_in_post = true;
-					}
+					$this->collect_referenced_classes_from_settings_value( $settings, $referenced );
 				}
 			}
 
 			// Template-level wrapper classes can live outside the element tree.
 			$wrapper_settings = get_post_meta( $post->ID, '_bricks_settings', true );
-			if ( $this->collect_referenced_classes_from_settings_value( $wrapper_settings, $referenced ) ) {
-				$found_in_post = true;
-			}
+			$this->collect_referenced_classes_from_settings_value( $wrapper_settings, $referenced );
 
 			$page_settings = get_post_meta( $post->ID, '_bricks_page_settings', true );
-			if ( $this->collect_referenced_classes_from_settings_value( $page_settings, $referenced ) ) {
-				$found_in_post = true;
-			}
-
-			if ( $found_in_post ) {
-				$this->has_scanned_bricks_content = true;
-			}
+			$this->collect_referenced_classes_from_settings_value( $page_settings, $referenced );
 		}
 
 		return $referenced;
@@ -1250,11 +1244,17 @@ class EFS_CSS_Converter {
 	/**
 	 * Collect referenced class identifiers recursively from a Bricks settings payload.
 	 *
-	 * @param mixed             $settings   Any Bricks settings payload.
+	 * @param mixed              $settings   Any Bricks settings payload.
 	 * @param array<string,bool> $referenced Referenced class identifiers map (by reference).
+	 * @param int                $depth      Current recursion depth (internal, do not pass).
 	 * @return bool True when at least one class token was extracted.
 	 */
-	private function collect_referenced_classes_from_settings_value( $settings, array &$referenced ) {
+	private function collect_referenced_classes_from_settings_value( $settings, array &$referenced, $depth = 0 ) {
+		// Guard against pathologically deep or circular structures.
+		if ( $depth > 8 ) {
+			return false;
+		}
+
 		if ( is_string( $settings ) ) {
 			$decoded = maybe_unserialize( $settings );
 			if ( is_array( $decoded ) ) {
@@ -1326,7 +1326,7 @@ class EFS_CSS_Converter {
 				continue;
 			}
 			if ( is_array( $value ) || is_string( $value ) ) {
-				if ( $this->collect_referenced_classes_from_settings_value( $value, $referenced ) ) {
+				if ( $this->collect_referenced_classes_from_settings_value( $value, $referenced, $depth + 1 ) ) {
 					$found = true;
 				}
 			}
