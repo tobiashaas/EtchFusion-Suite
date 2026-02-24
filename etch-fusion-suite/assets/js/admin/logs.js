@@ -448,4 +448,8 @@ export const initLogs = () => {
         pendingHashMigrationId = hash.slice('#migration-'.length);
         highlightMigrationFromHash();
     }
+
+    // Always fetch fresh logs on page load so migration runs are populated even
+    // when no migration is currently active (efsData.migration_runs is not set).
+    fetchLogs();
 };

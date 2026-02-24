@@ -145,6 +145,18 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
+		// Validate migration_id format: only alphanumerics, hyphens, and underscores; max 64 chars.
+		if ( ! preg_match( '/^[a-zA-Z0-9_-]{1,64}$/', $migration_id ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Invalid migration_id format',
+					'code'    => 'invalid_param',
+				),
+				400
+			);
+			return;
+		}
+
 		if ( null === $this->migration_logger ) {
 			wp_send_json_error(
 				array(

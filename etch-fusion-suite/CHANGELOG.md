@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **SQL Injection: `$wpdb->prepare()` für alle LIKE-Queries in `deactivate()` (2026-02-24)**: Die drei rohen `$wpdb->query()`-Aufrufe in der Deaktivierungsroutine wurden durch `$wpdb->prepare()` mit `$wpdb->esc_like()` abgesichert (`etch-fusion-suite.php`).
+- **Path Traversal: Pfadvalidierung in `EFS_Migration_Logger::get_log_path()` (2026-02-24)**: Defense-in-depth-Check mit `wp_normalize_path()` und `strpos()`-Vergleich stellt sicher, dass der aufgelöste Pfad innerhalb des Log-Verzeichnisses bleibt. Außerdem wird die `migration_id` im AJAX-Handler nun vor Verwendung auf das Format `[a-zA-Z0-9_-]{1,64}` validiert (`class-migration-logger.php`, `class-logs-ajax.php`).
+- **CSRF: Nonce-Verifizierung im Debug-AJAX-Handler (2026-02-24)**: `efs_query_db` fehlte eine Nonce-Prüfung; `wp_verify_nonce()` gegen `efs_nonce` wurde ergänzt (`class-debug-ajax.php`).
+- **CORS: Leerer Origin-Header wird nicht mehr zu CORS-Headern führen (2026-02-24)**: `add_cors_headers()` gibt jetzt früh zurück, wenn kein `Origin`-Header vorhanden ist, sodass keine CORS-Header für same-origin- oder Server-zu-Server-Anfragen gesetzt werden (`class-cors-manager.php`).
+- **Information Disclosure: JWT-Payload-Felder aus Connection-Test-Response entfernt (2026-02-24)**: `issued_at` (`iat`) und `jwt_target` werden nicht mehr in der AJAX-Response von `efs_test_connection` zurückgegeben (`class-connection-ajax.php`).
+
+### Fixed
+- **Logs werden jetzt beim Seitenaufruf immer geladen (2026-02-24)**: `initLogs()` ruft nun einmalig `fetchLogs()` auf, damit Migration-Runs im Dashboard direkt sichtbar sind — auch wenn keine Migration aktiv ist. Vorher wurden Logs nur während aktiver Migrationen via Auto-Refresh aktualisiert (`assets/js/admin/logs.js`).
+
+### Performance
+- **Media-Batch-Size von 10 auf 30 erhöht (2026-02-24)**: `EFS_Media_Phase_Handler::BATCH_SIZE` wurde verdreifacht. Reduziert die Anzahl der HTTP-Round-Trips für Media-Migration erheblich (`includes/services/class-media-phase-handler.php`).
+
+### Changed
+- **Test-Migrator zählt jetzt alle Post-Types (2026-02-24)**: `collectStats()` berücksichtigt nun `post`, `page` und `bricks_template`/Target-Post-Type statt nur `post`. Zusätzlich werden Media-Items gezählt und Delta-Warnungen ausgegeben (`scripts/test-migration.js`). `resolveTemplateTargetPostType()` cached sein Ergebnis um doppelte WP-CLI-Aufrufe zu vermeiden.
+
 ## [0.12.7] - 2026-02-23
 
 ### Fixed

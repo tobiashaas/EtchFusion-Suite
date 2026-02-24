@@ -45,7 +45,19 @@ class EFS_Debug_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Dev-only endpoint gated by WP_DEBUG and manage_options.
+		// Verify nonce even for dev-only endpoints to prevent CSRF.
+		$raw_nonce = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $raw_nonce, 'efs_nonce' ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Security check failed.', 'etch-fusion-suite' ),
+					'code'    => 'invalid_nonce',
+				),
+				403
+			);
+			return;
+		}
+
 		$sql = isset( $_POST['sql'] ) ? sanitize_text_field( wp_unslash( $_POST['sql'] ) ) : '';
 		$sql = is_string( $sql ) ? trim( $sql ) : '';
 

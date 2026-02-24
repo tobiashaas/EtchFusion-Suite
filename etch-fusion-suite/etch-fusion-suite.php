@@ -382,12 +382,19 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Clear transients
 		$wpdb->query(
-			"DELETE FROM {$wpdb->options} 
-             WHERE option_name LIKE '_transient_efs_%' 
-             OR option_name LIKE '_transient_timeout_efs_%'"
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+				$wpdb->esc_like( '_transient_efs_' ) . '%',
+				$wpdb->esc_like( '_transient_timeout_efs_' ) . '%'
+			)
 		);
 
-		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'efs_batch_lock_%'" );
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+				$wpdb->esc_like( 'efs_batch_lock_' ) . '%'
+			)
+		);
 
 		// Clear all EFS options
 		$efs_options = array(
@@ -411,7 +418,10 @@ class Etch_Fusion_Suite_Plugin {
 
 		// Clear user meta
 		$wpdb->query(
-			"DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE '%efs%'"
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s",
+				'%' . $wpdb->esc_like( 'efs' ) . '%'
+			)
 		);
 
 		// Clear WordPress object cache

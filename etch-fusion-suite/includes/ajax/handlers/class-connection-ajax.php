@@ -423,11 +423,8 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		wp_send_json_success(
 			array(
 				'valid'      => true,
-				'payload'    => $this->mask_sensitive_values( $result['payload'] ?? array() ),
 				'target_url' => $result['target_domain'] ?? $result['target_url'] ?? $internal_target_url,
 				'expiration' => $result['expires'] ?? null,
-				'issued_at'  => $result['payload']['iat'] ?? null,
-				'jwt_target' => $result['payload']['target_url'] ?? null,
 			)
 		);
 	}

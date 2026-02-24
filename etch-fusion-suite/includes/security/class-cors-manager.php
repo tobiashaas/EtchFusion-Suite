@@ -77,8 +77,9 @@ class EFS_CORS_Manager {
 	 */
 	public function is_origin_allowed( $origin ) {
 		if ( empty( $origin ) ) {
-			// Requests originating from the server or same-origin browsers omit the Origin header.
-			// Treat these as allowed to prevent false CORS denials for server-to-server calls.
+			// No Origin header: same-origin or server-to-server request.
+			// CORS validation is not applicable; add_cors_headers() handles this case
+			// separately and returns early before setting any headers.
 			return true;
 		}
 
@@ -111,6 +112,12 @@ class EFS_CORS_Manager {
 
 		if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
 			$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+		}
+
+		// Same-origin and server-to-server requests omit the Origin header.
+		// CORS headers are a browser mechanism and not needed in those cases.
+		if ( empty( $origin ) ) {
+			return;
 		}
 
 		// Check if origin is allowed

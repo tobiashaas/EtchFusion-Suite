@@ -72,11 +72,28 @@ class EFS_Migration_Logger {
 	/**
 	 * Get the full path to the log file for a migration.
 	 *
+	 * Validates that the resulting path stays inside the log directory as
+	 * defense-in-depth against path traversal, even though sanitize_migration_id()
+	 * already strips all non-alphanumeric characters.
+	 *
 	 * @param string $migration_id
 	 * @return string
 	 */
 	public function get_log_path( string $migration_id ): string {
-		return $this->get_log_dir() . '/migration-' . $this->sanitize_migration_id( $migration_id ) . '.log';
+		$log_dir   = $this->get_log_dir();
+		$sanitized = $this->sanitize_migration_id( $migration_id );
+		$log_path  = $log_dir . '/migration-' . $sanitized . '.log';
+
+		// Normalize both paths using WordPress helper (handles mixed separators on Windows).
+		$norm_dir  = trailingslashit( wp_normalize_path( $log_dir ) );
+		$norm_path = wp_normalize_path( $log_path );
+
+		if ( 0 !== strpos( $norm_path, $norm_dir ) ) {
+			// Path traversal detected – return a safe fallback that never matches a real file.
+			return $log_dir . '/invalid.log';
+		}
+
+		return $log_path;
 	}
 
 	/**
@@ -86,7 +103,8 @@ class EFS_Migration_Logger {
 	 * @return string
 	 */
 	public function get_log_url( string $migration_id ): string {
-		return wp_upload_dir()['baseurl'] . '/efs-migration-logs/migration-' . $this->sanitize_migration_id( $migration_id ) . '.log';
+		$sanitized = $this->sanitize_migration_id( $migration_id );
+		return wp_upload_dir()['baseurl'] . '/efs-migration-logs/migration-' . $sanitized . '.log';
 	}
 
 	/**
