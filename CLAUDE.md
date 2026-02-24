@@ -106,6 +106,26 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 Release workflow builds ZIP with checksums on `v*.*.*` tags.
 
+## Documentation & Comments
+
+**Comments are required** — they are stripped automatically from the distribution ZIP by `build-release.sh` (via `strip_php_comments()`), so they only exist in source/GitHub and never reach end users.
+
+### When to comment
+- Every non-trivial function or method gets a docblock (`/** ... */`) explaining what it does, its parameters, and return value
+- Any logic that is not immediately obvious gets an inline `//` comment explaining *why*, not just *what*
+- Architectural decisions, gotchas, and cross-system relationships (e.g. the two separate ID systems in converters) must be explained at the point where confusion could arise
+- When a guard/check exists for a specific reason, that reason must be stated in the comment
+
+### When comments must be updated
+- **Renaming** a function, parameter, or variable → update all docblocks referencing it
+- **Changing behaviour** of a function → update its docblock and any callers that have explaining comments
+- **Removing** a guard or branch → remove its comment too (no orphaned comments)
+- **Adding** a new system, pattern, or non-obvious interaction → document it before or alongside the code
+
+### Comment language
+- All comments and docblocks must be written in **English**
+- Technical identifiers (function names, class names, etc.) stay as-is
+
 ## Project Conventions
 
 - Update `CHANGELOG.md` with timestamps when making changes
