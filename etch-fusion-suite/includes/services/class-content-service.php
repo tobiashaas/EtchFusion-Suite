@@ -274,10 +274,20 @@ class EFS_Content_Service {
 				? $post->post_content
 				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 		} else {
-			// Use generate_gutenberg_content (not generate_gutenberg_blocks directly) so
-			// that template-type context (header/footer semantic tags) is applied in the
-			// batch path the same way it is in the single-post path.
-			$etch_content = $this->gutenberg_generator->generate_gutenberg_content( $post, $bricks_content['elements'] );
+			// Resolve template_root_tag from Bricks post meta so that header/footer
+			// templates get the correct semantic root element (same logic as in
+			// EFS_Gutenberg_Generator::convert_bricks_to_gutenberg_html).
+			$template_root_tag = '';
+			$template_type     = get_post_meta( (int) $post->ID, '_bricks_template_type', true );
+			$template_type     = is_string( $template_type ) ? strtolower( trim( $template_type ) ) : '';
+			if ( 'header' === $template_type || 'footer' === $template_type ) {
+				$template_root_tag = $template_type;
+			}
+
+			$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks(
+				$bricks_content['elements'],
+				array( 'template_root_tag' => $template_root_tag )
+			);
 			if ( empty( $etch_content ) ) {
 				$etch_content = '<!-- wp:paragraph --><p>Content migrated from Bricks (conversion pending)</p><!-- /wp:paragraph -->';
 				$this->error_handler->log_info(
