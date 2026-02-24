@@ -19,44 +19,52 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 		<div class="efs-wizard-progress-chip-container" data-efs-progress-chip-container></div>
 	</header>
 
-	<div class="efs-preflight" data-efs-preflight aria-live="polite">
-		<div class="efs-preflight__loading" data-efs-preflight-loading hidden>
-			<span class="efs-wizard-loading__spinner" aria-hidden="true"></span>
-			<span><?php esc_html_e( 'Running environment checks…', 'etch-fusion-suite' ); ?></span>
-		</div>
-		<div class="efs-preflight__results" data-efs-preflight-results hidden></div>
-		<div class="efs-preflight__actions" data-efs-preflight-actions hidden>
-			<label class="efs-preflight__override" data-efs-preflight-override hidden>
-				<input type="checkbox" data-efs-preflight-confirm />
-				<span><?php esc_html_e( 'I understand the risks and want to proceed anyway', 'etch-fusion-suite' ); ?></span>
-			</label>
-			<button type="button" class="btn--primary efs-preflight__recheck" data-efs-preflight-recheck>
-				<?php esc_html_e( '↺ Re-check', 'etch-fusion-suite' ); ?>
-			</button>
-		</div>
-	</div>
-
 	<nav class="efs-wizard-steps" aria-label="<?php esc_attr_e( 'Migration steps', 'etch-fusion-suite' ); ?>">
 		<button type="button" class="efs-wizard-step is-active" data-efs-step-nav="1" aria-current="step">
 			<span class="efs-wizard-step__number">1</span>
-			<span class="efs-wizard-step__label"><?php esc_html_e( 'Connect', 'etch-fusion-suite' ); ?></span>
+			<span class="efs-wizard-step__label"><?php esc_html_e( 'Check', 'etch-fusion-suite' ); ?></span>
 		</button>
 		<button type="button" class="efs-wizard-step" data-efs-step-nav="2">
 			<span class="efs-wizard-step__number">2</span>
-			<span class="efs-wizard-step__label"><?php esc_html_e( 'Select & Map', 'etch-fusion-suite' ); ?></span>
+			<span class="efs-wizard-step__label"><?php esc_html_e( 'Connect', 'etch-fusion-suite' ); ?></span>
 		</button>
 		<button type="button" class="efs-wizard-step" data-efs-step-nav="3">
 			<span class="efs-wizard-step__number">3</span>
-			<span class="efs-wizard-step__label"><?php esc_html_e( 'Preview', 'etch-fusion-suite' ); ?></span>
+			<span class="efs-wizard-step__label"><?php esc_html_e( 'Select & Map', 'etch-fusion-suite' ); ?></span>
 		</button>
 		<button type="button" class="efs-wizard-step" data-efs-step-nav="4">
 			<span class="efs-wizard-step__number">4</span>
+			<span class="efs-wizard-step__label"><?php esc_html_e( 'Preview', 'etch-fusion-suite' ); ?></span>
+		</button>
+		<button type="button" class="efs-wizard-step" data-efs-step-nav="5">
+			<span class="efs-wizard-step__number">5</span>
 			<span class="efs-wizard-step__label"><?php esc_html_e( 'Migrate', 'etch-fusion-suite' ); ?></span>
 		</button>
 	</nav>
 
 	<div class="efs-wizard-panels">
 		<section class="is-active" data-efs-step-panel="1">
+			<h3><?php esc_html_e( 'Environment Check', 'etch-fusion-suite' ); ?></h3>
+			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'System and target site checks run before migration. Resolve any errors before continuing.', 'etch-fusion-suite' ); ?></p>
+			<div class="efs-preflight" data-efs-preflight aria-live="polite">
+				<div class="efs-preflight__loading" data-efs-preflight-loading hidden>
+					<span class="efs-wizard-loading__spinner" aria-hidden="true"></span>
+					<span><?php esc_html_e( 'Running environment checks…', 'etch-fusion-suite' ); ?></span>
+				</div>
+				<div class="efs-preflight__results" data-efs-preflight-results hidden></div>
+				<div class="efs-preflight__actions" data-efs-preflight-actions hidden>
+					<label class="efs-preflight__override" data-efs-preflight-override hidden>
+						<input type="checkbox" data-efs-preflight-confirm />
+						<span><?php esc_html_e( 'I understand the risks and want to proceed anyway', 'etch-fusion-suite' ); ?></span>
+					</label>
+					<button type="button" class="btn--primary efs-preflight__recheck" data-efs-preflight-recheck>
+						<?php esc_html_e( '↺ Re-check', 'etch-fusion-suite' ); ?>
+					</button>
+				</div>
+			</div>
+		</section>
+
+		<section class="efs-wizard-panel" data-efs-step-panel="2" hidden>
 			<h3><?php esc_html_e( 'Connect to Etch Site', 'etch-fusion-suite' ); ?></h3>
 			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'Paste the connection URL from your Etch target site. You can generate it there via "Generate Connection URL" — the migration key will be created automatically in the background.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-wizard-connect-key">
@@ -77,7 +85,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p class="efs-wizard-message" data-efs-connect-message hidden></p>
 		</section>
 
-		<section class="efs-wizard-panel" data-efs-step-panel="2" hidden>
+		<section class="efs-wizard-panel" data-efs-step-panel="3" hidden>
 			<h3><?php esc_html_e( 'Select & Map Content', 'etch-fusion-suite' ); ?></h3>
 			<p><?php esc_html_e( 'Discovery runs automatically when this step opens. Choose post types and map each one to a target post type.', 'etch-fusion-suite' ); ?></p>
 
@@ -163,7 +171,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			<p class="efs-wizard-message" data-efs-select-message hidden></p>
 		</section>
 
-		<section data-efs-step-panel="3" hidden>
+		<section class="efs-wizard-panel" data-efs-step-panel="4" hidden>
 			<h3><?php esc_html_e( 'Preview Migration', 'etch-fusion-suite' ); ?></h3>
 			<p><?php esc_html_e( 'Review your migration breakdown and warnings before starting.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-wizard-preview" data-efs-preview-breakdown></div>
@@ -174,7 +182,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			</section>
 		</section>
 
-		<section class="efs-wizard-panel" data-efs-step-panel="4" hidden>
+		<section class="efs-wizard-panel" data-efs-step-panel="5" hidden>
 			<h3><?php esc_html_e( 'Migration', 'etch-fusion-suite' ); ?></h3>
 			<p><?php esc_html_e( 'Migration is running. Keep this screen open or use minimize to monitor in compact mode.', 'etch-fusion-suite' ); ?></p>
 		</section>
@@ -214,17 +222,18 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<button type="button" class="button" data-efs-open-logs><?php esc_html_e( 'View logs', 'etch-fusion-suite' ); ?></button>
 			</div>
 		</div>
-		<div class="efs-headless-screen" data-efs-headless-screen hidden>
+		<div class="efs-headless-screen efs-migration-progress-card" data-efs-headless-screen hidden>
 			<h3><?php esc_html_e( 'Headless Migration Running', 'etch-fusion-suite' ); ?></h3>
 			<span class="efs-badge">&#9881; <?php esc_html_e( 'Server-Side via Action Scheduler', 'etch-fusion-suite' ); ?></span>
-			<p><?php esc_html_e( 'The migration is running in the background. You can safely close this browser tab.', 'etch-fusion-suite' ); ?></p>
+			<p class="efs-migration-progress-card__desc"><?php esc_html_e( 'The migration is running in the background. You can safely close this browser tab.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 				<div class="efs-progress-fill" data-efs-headless-progress-fill style="width:0%"></div>
 			</div>
-			<p class="efs-wizard-progress__percent" data-efs-headless-progress-percent>0%</p>
-			<p class="efs-headless-screen__status" data-efs-headless-status aria-live="polite"></p>
-			<p class="efs-headless-screen__items" data-efs-headless-items></p>
-			<p class="efs-headless-screen__elapsed" data-efs-headless-elapsed hidden></p>
+			<p class="efs-migration-progress-card__percent" data-efs-headless-progress-percent>0%</p>
+			<p class="efs-migration-progress-card__status" data-efs-headless-status aria-live="polite"></p>
+			<p class="efs-migration-progress-card__source" data-efs-headless-source aria-live="polite" hidden></p>
+			<p class="efs-migration-progress-card__items" data-efs-headless-items></p>
+			<p class="efs-migration-progress-card__elapsed" data-efs-headless-elapsed hidden></p>
 			<div class="efs-actions efs-actions--inline">
 				<button type="button" class="btn--primary" data-efs-view-logs>
 					<?php esc_html_e( 'View Logs', 'etch-fusion-suite' ); ?>

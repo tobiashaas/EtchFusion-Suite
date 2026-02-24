@@ -156,6 +156,7 @@ const createWizard = (root) => {
 		headlessProgressFill: root.querySelector('[data-efs-headless-progress-fill]'),
 		headlessProgressPercent: root.querySelector('[data-efs-headless-progress-percent]'),
 		headlessStatus: root.querySelector('[data-efs-headless-status]'),
+		headlessSource: root.querySelector('[data-efs-headless-source]'),
 		headlessItems: root.querySelector('[data-efs-headless-items]'),
 		headlessElapsed: root.querySelector('[data-efs-headless-elapsed]'),
 		cancelHeadlessButton: root.querySelector('[data-efs-cancel-headless]'),
@@ -352,7 +353,7 @@ const createWizard = (root) => {
 
 	const updateNavigationState = () => {
 		if (refs.backButton) {
-			refs.backButton.disabled = state.currentStep <= 1 || state.currentStep >= 4;
+			refs.backButton.disabled = state.currentStep <= 1 || state.currentStep >= 5;
 		}
 
 		if (refs.nextButton) {
@@ -360,20 +361,24 @@ const createWizard = (root) => {
 			let label = 'Next';
 
 			if (state.currentStep === 1) {
-				disabled = !state.migrationUrl || runtime.validatingConnect;
-				label = runtime.validatingConnect ? 'Validating...' : 'Next';
-				// Pre-flight hard block always disables Next
-				if (state.preflight?.has_hard_block) {
-					disabled = true;
-				}
-				// Pre-flight soft block requires confirmation checkbox
+				disabled = !!(state.preflight?.has_hard_block);
 				if (state.preflight?.has_soft_block && !state.preflight?.has_hard_block && !state.preflightConfirmed) {
 					disabled = true;
 				}
+				label = 'Next';
 			} else if (state.currentStep === 2) {
+				disabled = !state.migrationUrl || runtime.validatingConnect;
+				label = runtime.validatingConnect ? 'Validating...' : 'Next';
+				if (state.preflight?.has_hard_block) {
+					disabled = true;
+				}
+				if (state.preflight?.has_soft_block && !state.preflight?.has_hard_block && !state.preflightConfirmed) {
+					disabled = true;
+				}
+			} else if (state.currentStep === 3) {
 				disabled = !hasValidStep2Selection();
 				label = 'Next';
-			} else if (state.currentStep === 3) {
+			} else if (state.currentStep === 4) {
 				disabled = runtime.migrationRunning;
 				label = runtime.migrationRunning ? 'Starting migration…' : 'Confirm & Start Migration';
 			} else {
@@ -383,9 +388,9 @@ const createWizard = (root) => {
 
 			refs.nextButton.disabled = disabled;
 			refs.nextButton.textContent = label;
-			refs.nextButton.classList.toggle('efs-wizard-next--validating', state.currentStep === 1 && runtime.validatingConnect);
-			refs.nextButton.classList.toggle('efs-wizard-next--loading', state.currentStep === 3 && runtime.migrationRunning);
-			refs.nextButton.setAttribute('aria-busy', state.currentStep === 3 && runtime.migrationRunning ? 'true' : 'false');
+			refs.nextButton.classList.toggle('efs-wizard-next--validating', state.currentStep === 2 && runtime.validatingConnect);
+			refs.nextButton.classList.toggle('efs-wizard-next--loading', state.currentStep === 4 && runtime.migrationRunning);
+			refs.nextButton.setAttribute('aria-busy', state.currentStep === 4 && runtime.migrationRunning ? 'true' : 'false');
 		}
 	};
 
@@ -394,7 +399,7 @@ const createWizard = (root) => {
 			const step = Number(stepButton.getAttribute('data-efs-step-nav') || '1');
 			stepButton.classList.toggle('is-active', step === state.currentStep);
 			stepButton.classList.toggle('is-complete', step < state.currentStep);
-			stepButton.classList.toggle('is-clickable', step < state.currentStep && state.currentStep < 4);
+			stepButton.classList.toggle('is-clickable', step < state.currentStep && state.currentStep < 5);
 			if (step === state.currentStep) {
 				stepButton.setAttribute('aria-current', 'step');
 			} else {
@@ -742,6 +747,12 @@ const createWizard = (root) => {
 			if (refs.cssPreview) {
 				refs.cssPreview.hidden = true;
 			}
+			if (refs.previewWarnings) {
+				refs.previewWarnings.hidden = true;
+			}
+			if (refs.warningList) {
+				refs.warningList.innerHTML = '';
+			}
 			return;
 		}
 
@@ -914,17 +925,20 @@ const createWizard = (root) => {
 				refs.headlessStatus.textContent = String(status);
 				refs.headlessStatus.hidden = !status;
 			}
+			if (refs.headlessSource) {
+				refs.headlessSource.hidden = true;
+			}
 			if (refs.headlessItems) {
 				const currentItemTitle = payload?.current_item?.title || progress?.current_item_title || '';
 				if (itemsTotal > 0) {
-					let itemsText = `${itemsProcessed}/${itemsTotal}`;
+					let itemsText = `Items: ${itemsProcessed}/${itemsTotal}`;
 					if (currentItemTitle) {
 						itemsText += ` — ${currentItemTitle}`;
 					}
 					refs.headlessItems.textContent = itemsText;
 					refs.headlessItems.hidden = false;
 				} else if (itemsProcessed > 0) {
-					refs.headlessItems.textContent = String(itemsProcessed);
+					refs.headlessItems.textContent = `Items: ${itemsProcessed}`;
 					refs.headlessItems.hidden = false;
 				} else if (currentItemTitle) {
 					refs.headlessItems.textContent = currentItemTitle;
@@ -978,6 +992,9 @@ const createWizard = (root) => {
 		}
 		if (refs.progressPanel) {
 			refs.progressPanel.hidden = true;
+		}
+		if (refs.headlessScreen) {
+			refs.headlessScreen.hidden = true;
 		}
 		if (refs.progressBanner) {
 			refs.progressBanner.hidden = true;
@@ -1284,11 +1301,11 @@ const createWizard = (root) => {
 
 		renderStepShell();
 
-		if (nextStep === 2 && !runtime.discoveryLoaded) {
+		if (nextStep === 3 && !runtime.discoveryLoaded) {
 			await runDiscovery();
 		}
 
-		if (nextStep === 3) {
+		if (nextStep === 4) {
 			await renderPreview();
 		}
 
@@ -1592,7 +1609,7 @@ const createWizard = (root) => {
 	};
 
 	const handleCancel = async () => {
-		if (state.currentStep === 4) {
+		if (state.currentStep === 5) {
 			try {
 				const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || '';
 				await post(ACTION_CANCEL_MIGRATION, {
@@ -1674,7 +1691,7 @@ const createWizard = (root) => {
 		});
 
 		refs.backButton?.addEventListener('click', async () => {
-			if (state.currentStep > 1 && state.currentStep < 4) {
+			if (state.currentStep > 1 && state.currentStep < 5) {
 				await setStep(state.currentStep - 1);
 			}
 		});
@@ -1682,12 +1699,17 @@ const createWizard = (root) => {
 		refs.nextButton?.addEventListener('click', async () => {
 			try {
 				if (state.currentStep === 1) {
-					await validateConnectStep();
 					await setStep(2);
 					return;
 				}
 
 				if (state.currentStep === 2) {
+					await validateConnectStep();
+					await setStep(3);
+					return;
+				}
+
+				if (state.currentStep === 3) {
 					if (!hasValidStep2Selection()) {
 						setMessage(refs.selectMessage, 'Select at least one post type and mapping to continue.', 'error');
 						return;
@@ -1697,18 +1719,18 @@ const createWizard = (root) => {
 						setMessage(refs.selectMessage, mappingErrors.join('; '), 'error');
 						return;
 					}
-					await setStep(3);
+					await setStep(4);
 					return;
 				}
 
-				if (state.currentStep === 3) {
+				if (state.currentStep === 4) {
 					await startMigration();
 				}
 			} catch (error) {
 				const message = error?.message || 'Unable to continue to the next step.';
-				if (state.currentStep === 1) {
+				if (state.currentStep === 2) {
 					setMessage(refs.connectMessage, message, 'error');
-				} else if (state.currentStep === 2) {
+				} else if (state.currentStep === 3) {
 					setMessage(refs.selectMessage, message, 'error');
 				} else {
 					showResult('error', message);
@@ -1805,7 +1827,7 @@ const createWizard = (root) => {
 		refs.stepNav.forEach((button) => {
 			button.addEventListener('click', async () => {
 				const step = Number(button.getAttribute('data-efs-step-nav') || '1');
-				if (step < state.currentStep && state.currentStep < 4) {
+				if (step < state.currentStep && state.currentStep < 5) {
 					await setStep(step);
 				}
 			});
@@ -2078,8 +2100,8 @@ const createWizard = (root) => {
 
 		const resumed = await autoResumeMigration();
 		if (!resumed) {
-			if (state.currentStep >= 4) {
-				state.currentStep = hasValidStep2Selection() ? 3 : 1;
+			if (state.currentStep >= 5) {
+				state.currentStep = hasValidStep2Selection() ? 4 : 1;
 				resetTabTitle();
 				removeProgressChip(runtime.progressChip);
 				runtime.progressChip = null;

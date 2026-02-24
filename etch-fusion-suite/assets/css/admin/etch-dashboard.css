@@ -76,6 +76,19 @@
 	color: var(--efs-neutral-light);
 }
 
+[data-efs-pairing-code-result]:not([hidden]) {
+	display: flex;
+	flex-direction: column;
+	gap: var(--efs-space-s);
+}
+
+code.efs-pairing-code {
+	padding: var(--efs-space-m);
+	background: var(--efs-base-dark);
+	border: 1px solid var(--efs-border-color-light);
+	border-radius: var(--efs-radius);
+}
+
 .efs-etch-dashboard__actions {
 	display: flex;
 	gap: 12px;
@@ -253,91 +266,14 @@
 
 .efs-etch-receiving-takeover__inner {
 	position: relative;
-	width: min(720px, 100%);
-	display: flex;
-	flex-direction: column;
-	gap: var(--efs-space-m);
-	padding: 32px;
-	border-radius: var(--efs-radius);
-	border: 1px solid color-mix(in oklch, var(--efs-white) 15%, transparent);
-	background: var(--efs-base);
-	box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
 	animation: efs-receiving-enter 160ms ease-out;
 }
 
-.efs-etch-receiving-takeover__inner .efs-badge {
-	display: inline-block;
-	padding: 6px 12px;
-	border-radius: var(--efs-radius);
-	border: 1px solid color-mix(in oklch, var(--efs-primary) 65%, transparent);
-	background: color-mix(in oklch, var(--efs-primary) 14%, transparent);
-	color: var(--efs-primary);
-	font-size: 13px;
-	font-weight: 500;
-}
-
-.efs-etch-receiving-takeover__inner h3 {
-	color: var(--efs-white);
-	font-size: 1.25rem;
-	font-weight: 600;
-	margin: 0 0 var(--efs-space-xs) 0;
-}
-
-.efs-etch-receiving-takeover__subtitle {
-	margin: 0;
-	font-size: 14px;
-	color: color-mix(in oklch, var(--efs-white) 68%, transparent);
-}
-
-.efs-etch-receiving-takeover .efs-progress-bar {
-	height: 8px;
-	border-radius: var(--efs-radius);
-	background: var(--efs-base-dark);
-	overflow: hidden;
-}
-
-.efs-etch-receiving-takeover .efs-progress-fill {
-	height: 100%;
-	background: var(--efs-primary);
-	border-radius: inherit;
-	transition: width 0.2s ease;
-}
-
-.efs-etch-receiving-takeover__percent {
-	font-size: 28px;
-	font-weight: 600;
-	color: var(--efs-primary);
-	margin: 0;
-}
-
-.efs-etch-receiving-takeover__percent[hidden] {
-	display: none !important;
-}
-
-.efs-etch-receiving-takeover__status,
-.efs-etch-receiving-takeover__source,
-.efs-etch-receiving-takeover__items,
-.efs-etch-receiving-takeover__elapsed {
-	margin: 0;
-	font-size: 14px;
-	color: color-mix(in oklch, var(--efs-white) 68%, transparent);
-}
-
-.efs-etch-receiving-takeover__status {
-	color: var(--efs-primary);
-}
-
-.efs-etch-receiving-takeover__source[hidden],
-.efs-etch-receiving-takeover__items[hidden],
-.efs-etch-receiving-takeover__elapsed[hidden] {
-	display: none !important;
-}
-
-.efs-etch-dashboard.is-receiving-completed .efs-etch-receiving-takeover__status {
+.efs-etch-dashboard.is-receiving-completed .efs-migration-progress-card__status {
 	color: var(--efs-success);
 }
 
-.efs-etch-dashboard.is-receiving-stale .efs-etch-receiving-takeover__status {
+.efs-etch-dashboard.is-receiving-stale .efs-migration-progress-card__status {
 	color: var(--efs-warning);
 }
 

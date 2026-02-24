@@ -304,17 +304,38 @@ const applyFilter = () => {
     if (!container) {
         return;
     }
-    const allEntries = container.querySelectorAll('article.efs-log-entry');
+    const allEntries = Array.from(container.querySelectorAll('article.efs-log-entry'));
+    let visibleCount = 0;
     allEntries.forEach((entry) => {
         const isMigration = entry.hasAttribute('data-migration-id');
         if (currentFilter === 'all') {
             entry.hidden = false;
+            visibleCount++;
         } else if (currentFilter === 'migration') {
             entry.hidden = !isMigration;
+            if (isMigration) visibleCount++;
         } else if (currentFilter === 'security') {
             entry.hidden = isMigration;
+            if (!isMigration) visibleCount++;
         }
     });
+    let emptyState = container.querySelector('.efs-empty-state');
+    if (visibleCount === 0 && allEntries.length > 0) {
+        if (!emptyState) {
+            emptyState = document.createElement('p');
+            emptyState.className = 'efs-empty-state';
+            container.appendChild(emptyState);
+        }
+        emptyState.hidden = false;
+        emptyState.textContent = currentFilter === 'migration'
+            ? 'No migration runs for this filter.'
+            : 'No security logs for this filter.';
+    } else if (emptyState) {
+        emptyState.hidden = visibleCount > 0;
+        if (visibleCount === 0) {
+            emptyState.textContent = 'No logs yet. Migration activity will appear here.';
+        }
+    }
 };
 
 const renderAll = () => {

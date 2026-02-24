@@ -60,7 +60,7 @@
 
 .efs-wizard-steps {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: var(--efs-space-s);
 }
 
@@ -425,6 +425,10 @@
 	background: color-mix(in oklch, var(--efs-wizard-warning) 14%, transparent);
 }
 
+.efs-wizard-warnings[hidden] {
+	display: none !important;
+}
+
 .efs-wizard-warnings ul {
 	padding-left: 18px;
 }
@@ -510,47 +514,7 @@
 	display: none !important;
 }
 
-/* Headless migration screen: same card style as progress panel, fully opaque */
-.efs-headless-screen {
-	width: min(720px, 100%);
-	background: var(--efs-base);
-	border: 1px solid var(--efs-wizard-border);
-	border-radius: var(--efs-radius);
-	padding: 32px;
-	display: flex;
-	flex-direction: column;
-	gap: var(--efs-space-m);
-	box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
-}
-
 .efs-headless-screen[hidden] {
-	display: none !important;
-}
-
-.efs-headless-screen h3 {
-	color: var(--efs-white);
-	font-size: 1.25rem;
-	font-weight: 600;
-	margin: 0 0 var(--efs-space-xs) 0;
-}
-
-.efs-headless-screen .efs-wizard-progress__percent {
-	font-size: 28px;
-	font-weight: 600;
-	color: var(--efs-primary);
-}
-
-.efs-headless-screen__status,
-.efs-headless-screen__items,
-.efs-headless-screen__elapsed {
-	margin: 0;
-	font-size: 14px;
-	color: color-mix(in oklch, var(--efs-white) 68%, transparent);
-}
-
-.efs-headless-screen__status[hidden],
-.efs-headless-screen__items[hidden],
-.efs-headless-screen__elapsed[hidden] {
 	display: none !important;
 }
 

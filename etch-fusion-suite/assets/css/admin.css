@@ -45,7 +45,7 @@
 	--efs-success-hover: oklch(0.714937 0.197865 146.441783);
 
 	/* Border Radius - Unified at 16px */
-	--efs-radius: 16px;
+	--efs-radius: 8px;
 
 	/* Border Width & Style */
 	--efs-border-size: 1px;
@@ -310,24 +310,115 @@ h1 {
 	inset: 0;
 	background: linear-gradient(90deg,
 			transparent,
-			color-mix(in oklch, var(--efs-white) 30%, transparent),
+			color-mix(in oklch, var(--efs-primary) 100%, transparent),
 			transparent);
-	animation: progress-shine 2s infinite;
+	animation: progress-shine 5s ease-in-out infinite;
 }
 
 @keyframes progress-shine {
 	0% {
-		transform: translateX(-100%);
+		transform: translateX(-200%);
 	}
 
 	100% {
-		transform: translateX(100%);
+		transform: translateX(200%);
+	}
+}
+
+/* Weichere Alternative: breiter Glanz, langsamer, ease-in-out */
+.efs-progress-fill--soft::after {
+	width: 80%;
+	left: -40%;
+	background: linear-gradient(90deg,
+			transparent,
+			color-mix(in oklch, var(--efs-white) 18%, transparent),
+			transparent);
+	animation: progress-shine-soft 4s ease-in-out infinite;
+}
+
+@keyframes progress-shine-soft {
+
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+
+	50% {
+		transform: translateX(120%);
 	}
 }
 
 .efs-progress-fill.is-indeterminate {
 	width: 40%;
 	animation: progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+/* Migration progress card: einheitliches Layout für Headless (Bricks) + Receiving (Etch) */
+.efs-migration-progress-card {
+	width: min(720px, 100%);
+	display: flex;
+	flex-direction: column;
+	gap: var(--efs-space-m);
+	padding: 32px;
+	border-radius: var(--efs-radius);
+	border: 1px solid color-mix(in oklch, var(--efs-white) 15%, transparent);
+	background: var(--efs-base);
+	box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
+}
+
+.efs-migration-progress-card h3 {
+	color: var(--efs-white);
+	font-size: 1.25rem;
+	font-weight: 600;
+	margin: 0 0 var(--efs-space-xs) 0;
+}
+
+.efs-migration-progress-card .efs-badge {
+	display: inline-block;
+	padding: 6px 12px;
+	border-radius: var(--efs-radius);
+	border: 1px solid color-mix(in oklch, var(--efs-primary) 65%, transparent);
+	background: color-mix(in oklch, var(--efs-primary) 14%, transparent);
+	color: var(--efs-primary);
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.efs-migration-progress-card__desc {
+	margin: 0;
+	font-size: 14px;
+	color: color-mix(in oklch, var(--efs-white) 68%, transparent);
+}
+
+.efs-migration-progress-card__percent {
+	font-size: 28px;
+	font-weight: 600;
+	color: var(--efs-primary);
+	margin: 0;
+}
+
+.efs-migration-progress-card__status,
+.efs-migration-progress-card__source,
+.efs-migration-progress-card__items,
+.efs-migration-progress-card__elapsed {
+	margin: 0;
+	font-size: 14px;
+	color: color-mix(in oklch, var(--efs-white) 68%, transparent);
+}
+
+.efs-migration-progress-card__status {
+	color: var(--efs-primary);
+}
+
+.efs-migration-progress-card__percent[hidden],
+.efs-migration-progress-card__source[hidden],
+.efs-migration-progress-card__items[hidden],
+.efs-migration-progress-card__elapsed[hidden] {
+	display: none !important;
+}
+
+.efs-migration-progress-card .efs-progress-bar {
+	background: var(--efs-base-dark);
 }
 
 @keyframes progress-indeterminate {
@@ -513,6 +604,10 @@ h1 {
 	background: var(--efs-base-dark);
 	border: 1px solid var(--efs-border-color-light);
 	color: var(--efs-neutral-ultra-light);
+}
+
+.efs-log-entry[hidden] {
+	display: none !important;
 }
 
 .efs-log-entry__header {
@@ -905,7 +1000,7 @@ h1 {
 
 /* Migration notice: match dashboard design and width of efs-admin-wrap (only on our plugin page) */
 body.toplevel_page_etch-fusion-suite .efs-migration-notice {
-	max-width: 800px;
+	max-width: 960px;
 	width: 100%;
 	box-sizing: border-box;
 	margin-block: auto;
@@ -935,6 +1030,7 @@ body.toplevel_page_etch-fusion-suite .efs-migration-notice.notice-error {
 
 body.toplevel_page_etch-fusion-suite .efs-migration-notice.notice-info {
 	border-left: 4px solid var(--efs-primary);
+	margin-inline: auto;
 }
 
 .efs-admin-wrap {
@@ -983,12 +1079,12 @@ textarea[readonly] {
 	border: 1px solid color-mix(in oklch, var(--efs-white) 20%, transparent);
 }
 
-/* Admin Wrap — boxed/centered layout (ref: Etch Site Setup, max-width 800px) */
+/* Admin Wrap — boxed/centered layout; 960px fits 5 wizard steps in one row */
 .efs-admin-wrap {
 	display: flex;
 	flex-direction: column;
 	gap: 32px;
-	max-width: 800px;
+	max-width: 960px;
 	width: 100%;
 	box-sizing: border-box;
 	margin-inline: auto;

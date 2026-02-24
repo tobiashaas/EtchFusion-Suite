@@ -176,9 +176,14 @@ class EFS_Pre_Flight_Checker {
 				'message' => __( 'Skipped – no target URL.', 'etch-fusion-suite' ),
 			);
 		} else {
+			// Use internal URL for server-side request (e.g. Docker: localhost:8889 → container host).
+			$request_url = function_exists( 'etch_fusion_suite_convert_to_internal_url' )
+				? etch_fusion_suite_convert_to_internal_url( $target_url )
+				: $target_url;
+
 			// Target reachability check.
 			$response = wp_remote_get(
-				$target_url,
+				$request_url,
 				array(
 					'timeout'   => 5,
 					'sslverify' => false,
@@ -221,7 +226,7 @@ class EFS_Pre_Flight_Checker {
 
 			// Disk space check.
 			$disk_response = wp_remote_get(
-				trailingslashit( $target_url ) . 'wp-json/efs/v1/disk-space',
+				trailingslashit( $request_url ) . 'wp-json/efs/v1/disk-space',
 				array(
 					'timeout'   => 5,
 					'sslverify' => false,
