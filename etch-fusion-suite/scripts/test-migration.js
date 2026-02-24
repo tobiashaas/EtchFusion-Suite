@@ -45,9 +45,8 @@ function generateMigrationKey(targetUrl, sourceUrl) {
 
 function triggerMigration(migrationKey, targetUrl) {
   console.log('> Triggering migration via WP-CLI (headless mode)...');
-  // Limit to post/page only; bricks_template requires a dedicated converter
-  // and is handled separately via the template extractor service.
-  const cmd = `if (!function_exists('bricks_is_builder')) { function bricks_is_builder() { return true; } } $result=etch_fusion_suite_container()->get('migration_controller')->start_migration(array('migration_key'=>'${migrationKey}','target_url'=>'${targetUrl}','batch_size'=>50,'mode'=>'headless','selected_post_types'=>array('post','page'),'post_type_mappings'=>array('post'=>'post','page'=>'page'))); if (is_wp_error($result)) { fwrite(STDERR, $result->get_error_message()); exit(1); } echo wp_json_encode($result);`;
+  // Migrate post, page, and bricks_template (→ patterns on the Etch site).
+  const cmd = `if (!function_exists('bricks_is_builder')) { function bricks_is_builder() { return true; } } $result=etch_fusion_suite_container()->get('migration_controller')->start_migration(array('migration_key'=>'${migrationKey}','target_url'=>'${targetUrl}','batch_size'=>50,'mode'=>'headless','selected_post_types'=>array('post','page','bricks_template'),'post_type_mappings'=>array('post'=>'post','page'=>'page','bricks_template'=>'patterns'))); if (is_wp_error($result)) { fwrite(STDERR, $result->get_error_message()); exit(1); } echo wp_json_encode($result);`;
   const rawOutput = runWpCli(['cli'], ['eval', cmd]);
   const match = rawOutput.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   return match ? match[0] : null;

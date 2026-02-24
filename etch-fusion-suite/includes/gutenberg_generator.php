@@ -806,7 +806,7 @@ class EFS_Gutenberg_Generator {
 	/**
 	 * Convert Bricks to Gutenberg and save to database (FOR ECH PROCESSING!)
 	 */
-	public function convert_bricks_to_gutenberg( $post ) {
+	public function convert_bricks_to_gutenberg( $post, $target_post_type = null ) {
 		$this->error_handler->log_info( 'Gutenberg Generator: convert_bricks_to_gutenberg called for post ' . $post->ID );
 
 		// Check for Bricks content first
@@ -891,11 +891,14 @@ class EFS_Gutenberg_Generator {
 		// Send blocks to Etch via HTTP (using efs/v1 REST API endpoint)
 		$endpoint_url = rtrim( $target_url, '/' ) . '/wp-json/efs/v1/import/post';
 
-		// Convert bricks_template to page
-		$target_post_type = $post->post_type;
+		// Resolve target post type: use caller-supplied value, fall back to source type.
+		if ( null === $target_post_type ) {
+			$target_post_type = $post->post_type;
+		}
+		// bricks_template has no direct Etch equivalent — 'page' as default fallback
+		// when no explicit $target_post_type was passed by the caller.
 		if ( 'bricks_template' === $target_post_type ) {
 			$target_post_type = 'page';
-			$this->error_handler->log_info( 'Gutenberg Generator: Converting bricks_template to page for post ' . $post->post_title );
 		}
 
 		// Prepare payload in format expected by /import/post endpoint

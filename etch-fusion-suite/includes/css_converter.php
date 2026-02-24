@@ -42,6 +42,20 @@ class EFS_CSS_Converter {
 	private $has_scanned_bricks_content = false;
 
 	/**
+	 * Runtime cache for bricks_global_classes option.
+	 *
+	 * @var array|null
+	 */
+	private $bricks_global_classes_cache = null;
+
+	/**
+	 * Runtime cache for the parsed breakpoint map.
+	 *
+	 * @var array|null
+	 */
+	private $breakpoint_map_cache = null;
+
+	/**
 	 * Constructor
 	 *
 	 * @param EFS_Error_Handler $error_handler
@@ -114,6 +128,10 @@ class EFS_CSS_Converter {
 	 * @return array<string,array<string,int|string>>
 	 */
 	private function get_breakpoint_width_map() {
+		if ( null !== $this->breakpoint_map_cache ) {
+			return $this->breakpoint_map_cache;
+		}
+
 		$definitions = array(
 			'tablet_landscape' => array(
 				'type'  => 'max',
@@ -192,7 +210,35 @@ class EFS_CSS_Converter {
 			$definitions = array_merge( array( 'desktop' => $desktop_definition ), $definitions );
 		}
 
+		$this->breakpoint_map_cache = $definitions;
 		return $definitions;
+	}
+
+	/**
+	 * Return parsed bricks_global_classes, with a request-lifetime in-memory cache.
+	 *
+	 * @return array
+	 */
+	private function get_bricks_global_classes_cached(): array {
+		if ( null !== $this->bricks_global_classes_cache ) {
+			return $this->bricks_global_classes_cache;
+		}
+
+		$raw = get_option( 'bricks_global_classes', array() );
+		if ( is_string( $raw ) ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) ) {
+				$raw = $decoded;
+			} else {
+				$maybe = maybe_unserialize( $raw );
+				$raw   = is_array( $maybe ) ? $maybe : array();
+			}
+		} elseif ( ! is_array( $raw ) ) {
+			$raw = array();
+		}
+
+		$this->bricks_global_classes_cache = $raw;
+		return $this->bricks_global_classes_cache;
 	}
 
 	/**
@@ -338,18 +384,7 @@ class EFS_CSS_Converter {
 		$this->log_debug_info( 'CSS Converter: Starting conversion' );
 		$this->acss_inline_style_map = array();
 
-		$bricks_classes = get_option( 'bricks_global_classes', array() );
-		if ( is_string( $bricks_classes ) ) {
-			$decoded = json_decode( $bricks_classes, true );
-			if ( is_array( $decoded ) ) {
-				$bricks_classes = $decoded;
-			} else {
-				$maybe          = maybe_unserialize( $bricks_classes );
-				$bricks_classes = is_array( $maybe ) ? $maybe : array();
-			}
-		} elseif ( ! is_array( $bricks_classes ) ) {
-			$bricks_classes = array();
-		}
+		$bricks_classes = $this->get_bricks_global_classes_cached();
 
 		$this->log_debug_info(
 			'CSS Converter: Loaded Bricks classes',
@@ -1096,18 +1131,7 @@ class EFS_CSS_Converter {
 	 * @return array{total: int, to_migrate: int}
 	 */
 	public function get_css_class_counts( array $selected_post_types, bool $restrict_to_used ): array {
-		$bricks_classes = get_option( 'bricks_global_classes', array() );
-		if ( is_string( $bricks_classes ) ) {
-			$decoded = json_decode( $bricks_classes, true );
-			if ( is_array( $decoded ) ) {
-				$bricks_classes = $decoded;
-			} else {
-				$maybe          = maybe_unserialize( $bricks_classes );
-				$bricks_classes = is_array( $maybe ) ? $maybe : array();
-			}
-		} elseif ( ! is_array( $bricks_classes ) ) {
-			$bricks_classes = array();
-		}
+		$bricks_classes = $this->get_bricks_global_classes_cached();
 
 		$total = count( $bricks_classes );
 		if ( $restrict_to_used ) {
@@ -3138,7 +3162,7 @@ class EFS_CSS_Converter {
 		$css_variables = array();
 
 		// Extract CSS variables from Bricks global classes
-		$bricks_classes = get_option( 'bricks_global_classes', array() );
+		$bricks_classes = $this->get_bricks_global_classes_cached();
 
 		foreach ( $bricks_classes as $class ) {
 			if ( ! empty( $class['settings']['_cssCustom'] ) ) {
@@ -3995,8 +4019,44 @@ class EFS_CSS_Converter {
 		// Get existing etch_styles (for Etch Editor)
 		$existing_styles = $this->style_repository->get_etch_styles();
 
-		// Merge with new styles
-		$merged_styles = array_merge( $existing_styles, $etch_styles );
+		// Step A: Deduplicate the incoming styles by selector, combining CSS when
+		// the same selector appears more than once in the payload (e.g. when
+		// convert_bricks_classes_to_etch() generates separate entries for the
+		// settings-based CSS and the _cssCustom-based CSS of the same class).
+		$incoming = array();
+		foreach ( $etch_styles as $style ) {
+			$sel = $style['selector'] ?? '';
+			if ( '' === $sel ) {
+				continue;
+			}
+			if ( ! isset( $incoming[ $sel ] ) ) {
+				$incoming[ $sel ] = $style;
+			} else {
+				// Same selector appears twice — combine CSS, skip identical content.
+				$existing_css = trim( $incoming[ $sel ]['css'] ?? '' );
+				$new_css      = trim( $style['css'] ?? '' );
+				if ( '' !== $new_css && $new_css !== $existing_css ) {
+					$incoming[ $sel ]['css'] = '' !== $existing_css
+						? $existing_css . "\n  " . $new_css
+						: $new_css;
+				}
+			}
+		}
+
+		// Step B: Merge with pre-existing etch_styles: existing entries are the
+		// base; incoming styles overwrite any matching selector so that re-running
+		// the migration always reflects the latest Bricks source data.
+		$index = array();
+		foreach ( $existing_styles as $style ) {
+			$sel = $style['selector'] ?? '';
+			if ( '' !== $sel ) {
+				$index[ $sel ] = $style;
+			}
+		}
+		foreach ( $incoming as $sel => $style ) {
+			$index[ $sel ] = $style;
+		}
+		$merged_styles = array_values( $index );
 
 		// NOTE: We only save to etch_styles, NOT etch_global_stylesheets
 		// - etch_styles: Used by Etch's StylesRegister to render styles on pages that use them
