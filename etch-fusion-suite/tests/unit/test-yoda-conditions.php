@@ -206,6 +206,58 @@ CSS;
 	}
 
 	/**
+	 * Bricks uses both _widthMin/_widthMax (older) and _widthMax/_widthMin (newer) setting keys.
+	 * Both must produce the correct CSS logical property.
+	 */
+	public function test_css_converter_sizing_accepts_both_naming_conventions() : void {
+		/** @var Style_Repository_Interface&MockObject $style_repository */
+		$style_repository = $this->createMock( Style_Repository_Interface::class );
+		/** @var \Bricks2Etch\Core\EFS_Error_Handler&MockObject $error_handler */
+		$error_handler = $this->createMock( \Bricks2Etch\Core\EFS_Error_Handler::class );
+		$converter     = new EFS_CSS_Converter( $error_handler, $style_repository );
+
+		// _widthMax (newer convention) → max-inline-size
+		$result = $converter->convert_bricks_class_to_etch(
+			array(
+				'id'       => 'cls1',
+				'name'     => 'my-heading',
+				'settings' => array( '_widthMax' => '35ch' ),
+			)
+		);
+		self::assertStringContainsString( 'max-inline-size: 35ch;', $result['css'] );
+
+		// _widthMin (newer convention) → min-inline-size
+		$result = $converter->convert_bricks_class_to_etch(
+			array(
+				'id'       => 'cls2',
+				'name'     => 'my-content',
+				'settings' => array( '_widthMin' => 'var(--width-m)' ),
+			)
+		);
+		self::assertStringContainsString( 'min-inline-size: var(--width-m);', $result['css'] );
+
+		// _heightMin (newer convention) → min-block-size
+		$result = $converter->convert_bricks_class_to_etch(
+			array(
+				'id'       => 'cls3',
+				'name'     => 'my-wrapper',
+				'settings' => array( '_heightMin' => '0px' ),
+			)
+		);
+		self::assertStringContainsString( 'min-block-size: 0px;', $result['css'] );
+
+		// _maxWidth (older convention) still works
+		$result = $converter->convert_bricks_class_to_etch(
+			array(
+				'id'       => 'cls4',
+				'name'     => 'my-container',
+				'settings' => array( '_maxWidth' => '60rem' ),
+			)
+		);
+		self::assertStringContainsString( 'max-inline-size: 60rem;', $result['css'] );
+	}
+
+	/**
 	 * Ensures audit logger severity filter remains correct after Yoda conversion.
 	 */
 	public function test_audit_logger_severity_filtering_with_yoda_comparison() : void {

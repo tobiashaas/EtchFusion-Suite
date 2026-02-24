@@ -2557,20 +2557,31 @@ class EFS_CSS_Converter {
 			$css[] = 'block-size: ' . $settings['_height'] . ';';
 		}
 
+		// Bricks stores min/max dimensions under two naming conventions:
+		// _minWidth/_maxWidth (older) and _widthMin/_widthMax (newer).
+		// Handle both so classes using either key produce the correct CSS.
 		if ( ! empty( $settings['_minWidth'] ) ) {
 			$css[] = 'min-inline-size: ' . $settings['_minWidth'] . ';';
+		} elseif ( ! empty( $settings['_widthMin'] ) ) {
+			$css[] = 'min-inline-size: ' . $settings['_widthMin'] . ';';
 		}
 
 		if ( ! empty( $settings['_minHeight'] ) ) {
 			$css[] = 'min-block-size: ' . $settings['_minHeight'] . ';';
+		} elseif ( ! empty( $settings['_heightMin'] ) ) {
+			$css[] = 'min-block-size: ' . $settings['_heightMin'] . ';';
 		}
 
 		if ( ! empty( $settings['_maxWidth'] ) ) {
 			$css[] = 'max-inline-size: ' . $settings['_maxWidth'] . ';';
+		} elseif ( ! empty( $settings['_widthMax'] ) ) {
+			$css[] = 'max-inline-size: ' . $settings['_widthMax'] . ';';
 		}
 
 		if ( ! empty( $settings['_maxHeight'] ) ) {
 			$css[] = 'max-block-size: ' . $settings['_maxHeight'] . ';';
+		} elseif ( ! empty( $settings['_heightMax'] ) ) {
+			$css[] = 'max-block-size: ' . $settings['_heightMax'] . ';';
 		}
 
 		if ( ! empty( $settings['_aspectRatio'] ) ) {
