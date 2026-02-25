@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.8] - 2026-02-25
+
+### Fixed
+- **PHP 8 Kompatibilität: `(string)`-Cast nach `preg_replace()` in `EFS_ACSS_Handler::register_acss_inline_style()` (2026-02-25)**: `preg_replace()` gibt `string|null` zurück; fehlender Cast führte zu einem `ValueError` in `ltrim()` auf PHP 8, wenn PCRE unerwartet fehlschlug. Casts wurden ergänzt — konsistent mit der identischen Logik in `EFS_CSS_Converter` (`includes/css/class-acss-handler.php`).
+- **CSS-Wrapping-Logik in `EFS_Style_Importer::save_to_global_stylesheets()` (2026-02-25)**: Die frühere `strpos()`-Prüfung zur Erkennung bereits gewrappter CSS-Blöcke erzeugte false positives, wenn der Selektorname in einem Property-Wert vorkam (z.B. `content: ".btn"`). Ersetzt durch eine `startsWith(selector) + {`-Prüfung (`includes/css/class-style-importer.php`).
+- **`uniqid()` ohne Entropie für Style Manager IDs (2026-02-25)**: `uniqid()` ohne zweiten Parameter basiert ausschliesslich auf Mikrosekunden und ist theoretisch kollisionsanfällig bei schnellen Loops. Auf `uniqid('', true)` umgestellt, das einen zufälligen Floating-Point-Suffix anhängt (`includes/css_converter.php`).
+
 ### Security
+- **PHPCS: `$wpdb->prepare()` für LIKE-Query in `convert_classes()` (2026-02-25)**: Die `SELECT`-Query für `efs_inline_css_*`-Options-Einträge verwendete keinen `prepare()`-Wrapper. Obwohl kein User-Input vorliegt, erfordern WordPress Coding Standards `prepare()` für jede Query mit LIKE-Klauseln (`includes/css_converter.php`).
 - **SQL Injection: `$wpdb->prepare()` für alle LIKE-Queries in `deactivate()` (2026-02-24)**: Die drei rohen `$wpdb->query()`-Aufrufe in der Deaktivierungsroutine wurden durch `$wpdb->prepare()` mit `$wpdb->esc_like()` abgesichert (`etch-fusion-suite.php`).
 - **Path Traversal: Pfadvalidierung in `EFS_Migration_Logger::get_log_path()` (2026-02-24)**: Defense-in-depth-Check mit `wp_normalize_path()` und `strpos()`-Vergleich stellt sicher, dass der aufgelöste Pfad innerhalb des Log-Verzeichnisses bleibt. Außerdem wird die `migration_id` im AJAX-Handler nun vor Verwendung auf das Format `[a-zA-Z0-9_-]{1,64}` validiert (`class-migration-logger.php`, `class-logs-ajax.php`).
 - **CSRF: Nonce-Verifizierung im Debug-AJAX-Handler (2026-02-24)**: `efs_query_db` fehlte eine Nonce-Prüfung; `wp_verify_nonce()` gegen `efs_nonce` wurde ergänzt (`class-debug-ajax.php`).

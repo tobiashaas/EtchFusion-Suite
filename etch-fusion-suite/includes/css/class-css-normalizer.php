@@ -144,7 +144,9 @@ class EFS_CSS_Normalizer {
 			return $css;
 		}
 
-		// Rule 1: hsl(var(--token-hsl) / alpha) → color-mix(…)
+		// Rules 1 & 2: both are handled by the same regex — the alpha group is optional.
+		//   With alpha:    hsl(var(--token-hsl) / 0.5)  →  color-mix(in oklab, var(--token) 50%, transparent)
+		//   Without alpha: hsl(var(--token-hsl))         →  var(--token)
 		$normalized = preg_replace_callback(
 			'/hsl\(\s*var\(\s*--([a-z0-9_-]+)-hsl\s*\)\s*(?:\/\s*([^)]+))?\)/i',
 			function ( $matches ) {

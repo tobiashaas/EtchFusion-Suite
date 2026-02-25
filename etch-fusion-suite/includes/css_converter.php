@@ -232,7 +232,9 @@ class EFS_CSS_Converter {
 
 		$etch_styles     = array(); // Final Etch styles registry.
 		$style_map       = array(); // Bricks class ID → { id: Etch Style Manager ID, selector }.
-		$acss_stub_index = array(); // Tracks ACSS classes already added as empty stubs.
+		// normalised_acss_name → stub_id.  Prevents duplicate stubs and lets
+		// multiple Bricks IDs that share the same normalised name reuse the stub.
+		$acss_stub_index = array();
 
 		// Seed with built-in Etch framework element styles (type-3, read-only).
 		$etch_styles = array_merge( $etch_styles, $this->get_etch_element_styles() );
@@ -264,8 +266,9 @@ class EFS_CSS_Converter {
 				continue;
 			}
 
-			// ACSS utilities: build inline style map for inline-style transfer and
-			// create an empty stub so the Etch Builder lists the class.
+			// ACSS utilities: build inline style map (mechanism 1) and register an
+			// empty stub in etch_styles (mechanism 2) so the class appears in the
+			// Etch Builder UI.  See EFS_ACSS_Handler class docblock for details.
 			if ( $this->acss_handler->is_acss_class( $class ) ) {
 				$this->acss_handler->register_acss_inline_style( $class );
 
@@ -273,20 +276,32 @@ class EFS_CSS_Converter {
 				$acss_name = ltrim( (string) preg_replace( '/^acss_import_/', '', $acss_name ), '.' );
 				$acss_name = (string) preg_replace( '/^fr-/', '', $acss_name );
 
-				if ( '' !== $acss_name && ! isset( $acss_stub_index[ $acss_name ] ) ) {
-					$stub_id                       = substr( md5( 'acss_' . $acss_name ), 0, 7 );
-					$etch_styles[ $stub_id ]       = array(
-						'type'       => 'class',
-						'selector'   => '.' . $acss_name,
-						'collection' => 'default',
-						'css'        => '',
-						'readonly'   => false,
-					);
-					$acss_stub_index[ $acss_name ] = true;
-					$style_map[ $class['id'] ]     = array(
-						'id'       => $stub_id,
-						'selector' => '.' . $acss_name,
-					);
+				if ( '' !== $acss_name ) {
+					// Create the stub only once per unique normalised name.  Two Bricks class
+					// entries can share the same normalised name (e.g. an ACSS v3 import entry
+					// "acss_import_bg--primary" and an ACSS v4 entry "bg--primary" with
+					// category:acss both normalise to "bg--primary").  The stub ID is stored
+					// in $acss_stub_index (not just a boolean) so later duplicates can reuse it.
+					if ( ! isset( $acss_stub_index[ $acss_name ] ) ) {
+						$stub_id                       = substr( md5( 'acss_' . $acss_name ), 0, 7 );
+						$etch_styles[ $stub_id ]       = array(
+							'type'       => 'class',
+							'selector'   => '.' . $acss_name,
+							'collection' => 'default',
+							'css'        => '',
+							'readonly'   => false,
+						);
+						$acss_stub_index[ $acss_name ] = $stub_id;
+					}
+
+					// Always register a style_map entry for this Bricks class ID so element
+					// converters can find it regardless of which class entry they encountered.
+					if ( ! empty( $class['id'] ) ) {
+						$style_map[ $class['id'] ] = array(
+							'id'       => $acss_stub_index[ $acss_name ],
+							'selector' => '.' . $acss_name,
+						);
+					}
 				}
 
 				continue;
@@ -347,9 +362,14 @@ class EFS_CSS_Converter {
 		}
 
 		// Collect inline CSS produced by code-block elements during content parsing.
+		// Uses prepare() even though the pattern is a literal constant — PHPCS
+		// WordPress standards require prepare() for every query with a LIKE clause.
 		global $wpdb;
 		$inline_css_options = $wpdb->get_results(
-			"SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'efs_inline_css_%'",
+			$wpdb->prepare(
+				"SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE %s",
+				'efs_inline_css_%'
+			),
 			ARRAY_A
 		);
 		foreach ( $inline_css_options as $option ) {
@@ -371,7 +391,7 @@ class EFS_CSS_Converter {
 			}
 
 			if ( $this->acss_handler->is_acss_class( $class ) ) {
-				$this->acss_handler->register_acss_inline_style( $class );
+				// Inline style map and empty stubs were already registered in Step 1 — skip.
 				++$excluded_count;
 				continue;
 			}
@@ -384,7 +404,9 @@ class EFS_CSS_Converter {
 			$converted_class = $this->convert_bricks_class_to_etch( $class );
 			if ( $converted_class ) {
 				// Fresh 7-char Style Manager ID (type-2) — unrelated to element HTML ids (type-1).
-				$style_id                 = substr( uniqid(), -7 );
+				// extra_entropy=true appends a random floating-point suffix, making collisions
+				// negligible even when many classes are converted in rapid succession.
+				$style_id                 = substr( uniqid( '', true ), -7 );
 				$etch_styles[ $style_id ] = $converted_class;
 				++$converted_count;
 

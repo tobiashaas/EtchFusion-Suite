@@ -5,12 +5,19 @@
  * Handles everything related to Automatic.css (ACSS) utility classes during
  * CSS migration.
  *
- * ACSS utility classes are treated differently from regular Bricks global
- * classes: instead of generating Etch style entries from Bricks settings data,
- * their CSS declarations are copied verbatim from the installed automatic.css
- * stylesheet.  This produces a compact "inline style map" that the content
- * converter (EFS_Gutenberg_Generator / EFS_Base_Element) can use to inline ACSS
- * class styles directly onto elements that reference them.
+ * ACSS utility classes are handled differently from regular Bricks global
+ * classes via two complementary mechanisms:
+ *
+ * 1. INLINE STYLE MAP — CSS declarations are copied verbatim from the installed
+ *    automatic.css stylesheet and stored in $inline_style_map.  Content converters
+ *    (EFS_Gutenberg_Generator / EFS_Base_Element) use this map to inline the ACSS
+ *    declarations directly onto elements that reference the class.
+ *
+ * 2. EMPTY ETCH STUBS — The orchestrator (EFS_CSS_Converter) also registers an
+ *    empty style entry in etch_styles for each unique ACSS class so that the class
+ *    appears in the Etch Builder UI and can be assigned to elements visually.
+ *    These stubs intentionally carry no CSS; the actual declarations come from the
+ *    ACSS framework stylesheet already enqueued by the ACSS plugin.
  *
  * @package EtchFusionSuite\CSS
  */
@@ -25,11 +32,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Detects ACSS utility classes and builds the inline style map.
  *
- * The inline style map is keyed by Bricks class ID and class name:
+ * The inline style map is keyed by three lookup forms so element converters
+ * can find the declarations regardless of which key format they hold:
  *   [
- *     'bricks-class-id-xyz' => 'background-color: var(--primary);',
- *     'bg--primary'         => 'background-color: var(--primary);',
- *     'acss_import_bg--primary' => 'background-color: var(--primary);',
+ *     'bricks-class-id-xyz'     => 'background-color: var(--primary);',  // (1) Bricks UUID
+ *     'bg--primary'             => 'background-color: var(--primary);',  // (2) normalised name
+ *     'acss_import_bg--primary' => 'background-color: var(--primary);',  // (3) original name
  *   ]
  */
 class EFS_ACSS_Handler {
@@ -122,8 +130,10 @@ class EFS_ACSS_Handler {
 		}
 
 		// Strip known prefixes to obtain the bare utility class name.
-		$normalized_class_name = ltrim( preg_replace( '/^acss_import_/', '', $class_name ), '.' );
-		$normalized_class_name = preg_replace( '/^fr-/', '', $normalized_class_name );
+		// preg_replace() returns string|null; cast to string before ltrim() to
+		// avoid a ValueError on PHP 8 when PCRE unexpectedly fails.
+		$normalized_class_name = ltrim( (string) preg_replace( '/^acss_import_/', '', $class_name ), '.' );
+		$normalized_class_name = (string) preg_replace( '/^fr-/', '', $normalized_class_name );
 		if ( '' === $normalized_class_name ) {
 			return;
 		}

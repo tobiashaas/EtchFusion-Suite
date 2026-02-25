@@ -1,10 +1,24 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2025-11-04 21:22
+**Updated:** 2026-02-25 (Code-Review-Fixes)
 
 ## 🚀 Current Development
 
+### 🐛 Open Bugs
+
+- [ ] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **Entdeckt:** 2026-02-25
+  - `VideoConverterTest::test_video_css_classes_and_styles` (Zeile 155) erwartet per `assertStringNotContainsString`, dass `"class":"video-wrapper"` **nicht** im `attributes`-JSON des erzeugten Blocks steht — der VideoConverter legt die Klasse aber genau dort ab.
+  - Unklar ob der Test falsch ist (Klasse darf im `attributes`-Objekt stehen) oder der Converter (Klasse soll stattdessen nur im `styles`-Array erscheinen).
+  - Datei: `tests/unit/Converters/VideoConverterTest.php:155` / `includes/converters/elements/` (VideoConverter)
+
 ### ✅ Completed Tasks
+
+- [✅] **Code-Review: 5 Bugfixes aus statischer Analyse** - **Completed:** 2026-02-25
+  - `(string)`-Cast nach `preg_replace()` in `EFS_ACSS_Handler::register_acss_inline_style()` ergänzt (PHP 8 Kompatibilität)
+  - CSS-Wrapping-Logik in `save_to_global_stylesheets()` von fragiler `strpos()`-Prüfung auf `startsWith(selector) + {` umgestellt
+  - `uniqid()` auf `uniqid('', true)` für Style Manager IDs (reduziert Kollisionsrisiko)
+  - `$wpdb->prepare()` für LIKE-Query in `convert_classes()` ergänzt (PHPCS-Compliance)
+  - Zu langen `$acss_stub_index`-Kommentar auf zwei Zeilen aufgeteilt (PHPCS Line-Length)
 
 - [✅] **Plugin-Review: 7 Bugfixes + Legacy-Präfix-Migration** - **Completed:** 2026-02-23
   - **Root cause Migration-Blocker gefunden und behoben**: Debug-Log zeigte dauerhaft `"code":"migration_in_progress"`. Ein vorheriger Run ließ `status: 'running'` in der DB. Behoben durch: (1) Stale-Detection-Fix für ungültige Timestamps, (2) Headless-TTL von 300s auf 120s reduziert, (3) explizite State-Bereinigung in `start_migration_async()` für stale-States, (4) HTTP 409 mit `existing_migration_id` im AJAX-Fehler.

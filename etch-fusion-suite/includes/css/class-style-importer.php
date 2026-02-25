@@ -351,6 +351,11 @@ class EFS_Style_Importer {
 	 * Merges new entries with any pre-existing global stylesheets so that existing
 	 * manually authored global CSS is preserved.
 	 *
+	 * NOTE: This method is reserved for a planned feature that would allow Bricks
+	 * global CSS (stored in the Bricks settings panel) to be pushed into Etch's
+	 * etch_global_stylesheets option.  It is NOT called by import_etch_styles();
+	 * class styles go into etch_styles instead (see the NOTE in that method).
+	 *
 	 * @param array<string,array<string,mixed>> $etch_styles Indexed etch_styles array.
 	 * @return bool True when the database update succeeded.
 	 */
@@ -373,12 +378,19 @@ class EFS_Style_Importer {
 				continue;
 			}
 
-			// Wrap the CSS with the selector if it is not already wrapped.
-			if ( '' !== $stylesheet_name && false === strpos( $stylesheet_css, $stylesheet_name ) ) {
-				$wrapped_css = $stylesheet_name . ' { ' . $stylesheet_css . ' }';
-			} else {
-				$wrapped_css = $stylesheet_css;
-			}
+			// Wrap the CSS declarations with the selector unless the string is already
+			// a complete rule block.  A bare strpos() check is not reliable because
+			// the selector name can appear inside property values (e.g. content: ".btn").
+			// Instead we check whether the CSS starts with the selector followed by
+			// optional whitespace and an opening brace.
+			$trimmed_css = ltrim( $stylesheet_css );
+			$is_wrapped  = '' !== $stylesheet_name
+				&& 0 === strpos( $trimmed_css, $stylesheet_name )
+				&& false !== strpos( $trimmed_css, '{' );
+
+			$wrapped_css = $is_wrapped
+				? $stylesheet_css
+				: $stylesheet_name . ' { ' . $stylesheet_css . ' }';
 
 			$new_stylesheets[ $style_id ] = array(
 				'name' => $stylesheet_name,
