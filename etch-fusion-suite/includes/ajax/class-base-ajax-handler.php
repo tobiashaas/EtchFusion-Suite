@@ -150,9 +150,8 @@ abstract class EFS_Base_Ajax_Handler {
 			return false;
 		}
 
-		if ( $this->audit_logger ) {
-			$this->audit_logger->log_authentication_attempt( true, 'user_' . $user_id, 'nonce' );
-		}
+		// Successful auth is not logged — routine admin AJAX calls would flood
+		// the audit log with noise. Only failures (above) are security-relevant.
 
 		return true;
 	}
