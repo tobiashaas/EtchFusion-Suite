@@ -98,17 +98,34 @@ strip_php_comments() {
   # Uses PHP's token_get_all() to strip all comments (T_COMMENT, T_DOC_COMMENT)
   # from every .php file in the build directory. Newlines inside comments are
   # preserved so line numbers in stack traces remain accurate.
+  # The first T_DOC_COMMENT that appears before any non-trivial token is kept:
+  # it is the WordPress plugin header and must not be removed.
   while IFS= read -r -d '' file; do
     php -r "
       \$src = file_get_contents(\$argv[1]);
       \$tokens = token_get_all(\$src);
       \$out = '';
+      \$header_kept = false;
+      \$seen_code = false;
       foreach (\$tokens as \$tok) {
-        if (is_array(\$tok) && (\$tok[0] === T_COMMENT || \$tok[0] === T_DOC_COMMENT)) {
-          \$out .= str_repeat(\"\n\", substr_count(\$tok[1], \"\n\"));
-        } elseif (is_array(\$tok)) {
-          \$out .= \$tok[1];
+        if (is_array(\$tok)) {
+          if (\$tok[0] === T_DOC_COMMENT) {
+            if (!\$header_kept && !\$seen_code) {
+              \$out .= \$tok[1];
+              \$header_kept = true;
+            } else {
+              \$out .= str_repeat(\"\n\", substr_count(\$tok[1], \"\n\"));
+            }
+          } elseif (\$tok[0] === T_COMMENT) {
+            \$out .= str_repeat(\"\n\", substr_count(\$tok[1], \"\n\"));
+          } else {
+            if (\$tok[0] !== T_OPEN_TAG && \$tok[0] !== T_WHITESPACE) {
+              \$seen_code = true;
+            }
+            \$out .= \$tok[1];
+          }
         } else {
+          \$seen_code = true;
           \$out .= \$tok;
         }
       }
