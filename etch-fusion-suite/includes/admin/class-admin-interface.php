@@ -122,11 +122,10 @@ class EFS_Admin_Interface {
 		// Enqueue admin JavaScript (ES6 module)
 		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
 		if ( file_exists( $js_path ) ) {
-			$js_version = ETCH_FUSION_SUITE_VERSION;
+			// Always include the plugin version so the URL changes on every release,
+			// even when file timestamps are identical between ZIP builds.
 			$js_mtime   = filemtime( $js_path );
-			if ( false !== $js_mtime ) {
-				$js_version = $js_mtime;
-			}
+			$js_version = ETCH_FUSION_SUITE_VERSION . ( false !== $js_mtime ? '-' . $js_mtime : '' );
 			wp_enqueue_script(
 				'efs-admin-main',
 				ETCH_FUSION_SUITE_URL . 'assets/js/admin/main.js',
