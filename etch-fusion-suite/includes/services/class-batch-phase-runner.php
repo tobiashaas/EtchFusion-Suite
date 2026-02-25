@@ -167,14 +167,54 @@ class EFS_Batch_Phase_Runner {
 
 				if ( is_wp_error( $result ) ) {
 					if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
-						$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ) );
+						$this->migration_logger->log(
+							$migration_id,
+							'warning',
+							'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+							array(
+								'post_id' => $id,
+								'attempt' => $attempts[ $id_key ],
+							)
+						);
 						$remaining[] = $id;
-						$this->error_handler->log_warning( 'W010', array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Batch post conversion retry scheduled' ) );
+						$this->error_handler->log_warning(
+							'W010',
+							array(
+								'post_id'       => $id,
+								'attempt'       => $attempts[ $id_key ],
+								'error_message' => $result->get_error_message(),
+								'action'        => 'Batch post conversion retry scheduled',
+							)
+						);
 					} else {
-						$this->migration_logger->log( $migration_id, 'warning', 'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(), array( 'post_id' => $id, 'attempt' => $attempts[ $id_key ] ) );
+						$this->migration_logger->log(
+							$migration_id,
+							'warning',
+							'Item failed: post_id ' . $id . ', error: ' . $result->get_error_message(),
+							array(
+								'post_id' => $id,
+								'attempt' => $attempts[ $id_key ],
+							)
+						);
 						$failed_ids[] = $id;
-						$this->error_handler->log_warning( 'W011', array( 'post_id' => $id, 'attempts_made' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Batch post conversion failed after max retries' ) );
-						$this->error_handler->log_error( 'E107', array( 'post_id' => $id, 'attempts_made' => $attempts[ $id_key ], 'error_message' => $result->get_error_message(), 'action' => 'Failed to send post to target site after all retry attempts' ) );
+						$this->error_handler->log_warning(
+							'W011',
+							array(
+								'post_id'       => $id,
+								'attempts_made' => $attempts[ $id_key ],
+								'error_message' => $result->get_error_message(),
+								'action'        => 'Batch post conversion failed after max retries',
+							)
+						);
+						$this->error_handler->log_error(
+							'E107',
+							array(
+								'post_id'       => $id,
+								'attempts_made' => $attempts[ $id_key ],
+								'error_message' => $result->get_error_message(),
+								'action'        => 'Failed to send post to target site after all retry attempts',
+							)
+						);
 					}
 					continue;
 				}

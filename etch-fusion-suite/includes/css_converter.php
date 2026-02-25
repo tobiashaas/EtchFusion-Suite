@@ -230,8 +230,8 @@ class EFS_CSS_Converter {
 			)
 		);
 
-		$etch_styles     = array(); // Final Etch styles registry.
-		$style_map       = array(); // Bricks class ID → { id: Etch Style Manager ID, selector }.
+		$etch_styles = array(); // Final Etch styles registry.
+		$style_map   = array(); // Bricks class ID → { id: Etch Style Manager ID, selector }.
 		// normalised_acss_name → stub_id.  Prevents duplicate stubs and lets
 		// multiple Bricks IDs that share the same normalised name reuse the stub.
 		$acss_stub_index = array();

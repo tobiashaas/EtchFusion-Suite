@@ -231,8 +231,8 @@ class EFS_Migration_Starter {
 			$media_result = array( 'skipped' => true );
 			if ( isset( $steps['media'] ) ) {
 				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
-				$media_ids    = $this->media_service->get_media_ids( $selected_post_types );
-				$media_total  = count( $media_ids );
+				$media_ids           = $this->media_service->get_media_ids( $selected_post_types );
+				$media_total         = count( $media_ids );
 				$this->progress_manager->update_progress( 'media', 60, __( 'Migrating media files...', 'etch-fusion-suite' ), 0, $media_total, null, false );
 				$media_result = $this->media_service->migrate_media( $target, $migration_key, $selected_post_types );
 				if ( is_wp_error( $media_result ) ) {

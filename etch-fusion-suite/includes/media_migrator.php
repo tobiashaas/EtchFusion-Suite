@@ -105,8 +105,7 @@ class EFS_Media_Migrator {
 					gc_collect_cycles();
 				}
 			}
-
-			}
+		}
 
 		$this->error_handler->log_info( 'Media Migration: Complete - Total: ' . $total_media . ', Migrated: ' . $migrated_media . ', Skipped: ' . $skipped_media . ', Failed: ' . ( $total_media - $migrated_media - $skipped_media ) );
 
