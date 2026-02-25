@@ -153,7 +153,7 @@ Bricks Site                    Etch Site
 The plugin uses `@wordpress/env` (wp-env) to provide a Docker-based development environment with two WordPress instances:
 
 - **Bricks Site** (development environment): Source site running Bricks Builder on port 8888
-- **Etch Site** (tests environment): Target site running Etch PageBuilder on port 8889
+- **Etch Site** (tests environment): Target site running Etch on port 8889
 
 This dual-instance setup allows testing migrations in isolation without affecting source data.
 

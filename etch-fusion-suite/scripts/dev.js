@@ -104,9 +104,35 @@ async function checkComposerInContainer() {
   return result.code === 0;
 }
 
+/**
+ * Return true when the given TCP port is already bound by another process.
+ * Never throws — safe to call as a probe before deciding whether to start.
+ */
+async function isPortInUse(port) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(port, () => {
+      server.once('close', () => resolve(false));
+      server.close();
+    });
+    server.on('error', () => resolve(true));
+  });
+}
+
+/**
+ * Return true when BOTH wp-env ports are already occupied.
+ * When both are busy we assume wp-env is already running and skip `wp-env start`.
+ * When only one is busy a third-party service is conflicting — we still abort.
+ */
+async function areBothWpEnvPortsInUse(port1, port2) {
+  const [p1, p2] = await Promise.all([isPortInUse(port1), isPortInUse(port2)]);
+  return p1 && p2;
+}
+
 async function checkPrerequisites() {
   log('> Checking prerequisites...');
-  
+
   // Check Docker
   try {
     await runCommandQuiet('docker', ['ps']);
@@ -114,7 +140,7 @@ async function checkPrerequisites() {
   } catch (error) {
     throw new Error('Docker is not running. Please start Docker Desktop and try again.');
   }
-  
+
   // Check Node version
   const nodeVersion = process.version;
   const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0]);
@@ -122,21 +148,21 @@ async function checkPrerequisites() {
     throw new Error(`Node.js ${nodeVersion} detected. Node.js >= 18 is required.`);
   }
   log(`[OK] Node.js ${nodeVersion}`);
-  
+
   // Load wp-env config to get custom ports
   const config = loadWpEnvConfig();
-  
-  // Check port availability
+
+  // Check port availability (only called when we are about to run wp-env start).
   await checkPortAvailability(config.port);
   await checkPortAvailability(config.testsPort);
 }
 
 async function checkPortAvailability(port) {
   const net = require('net');
-  
+
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    
+
     server.listen(port, () => {
       server.once('close', () => {
         log(`[OK] Port ${port} is available`);
@@ -144,7 +170,7 @@ async function checkPortAvailability(port) {
       });
       server.close();
     });
-    
+
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         reject(new Error(`Port ${port} is already in use. Please stop the service using this port or use --ports flag to specify different ports.`));
@@ -200,96 +226,133 @@ async function main() {
   const args = process.argv.slice(2);
   const skipComposer = args.includes('--skip-composer');
   const skipActivation = args.includes('--skip-activation');
-  
-  log('> Starting WordPress environments via wp-env...');
-  
-  await checkPrerequisites();
+  const forceRestart = args.includes('--restart');
 
-  log('> Checking commercial plugins setup...');
-  const pluginsSetup = await checkCommercialPlugins();
-  if (!pluginsSetup) {
-    log('[!] Running commercial plugins setup...');
-    await runCommand('node', [join('scripts', 'setup-commercial-plugins.js')]);
-  } else {
-    log('[OK] Commercial plugins setup detected');
-  }
+  log('> EtchFusion Suite — dev environment startup');
 
-  const spinner = showSpinner();
-  
+  // Docker must be running in all cases.
   try {
-    await runCommand(WP_ENV_CMD, ['start']);
-  } finally {
-    clearInterval(spinner);
-    process.stdout.write('\r');
+    await runCommandQuiet('docker', ['ps']);
+    log('[OK] Docker is running');
+  } catch (error) {
+    throw new Error('Docker is not running. Please start Docker Desktop and try again.');
   }
-  
-  log('> Verifying WordPress instances...');
-  
-  // Load wp-env config to get custom ports
+
   const config = loadWpEnvConfig();
-  
-  log(`... Waiting for Bricks instance (port ${config.port})...`);
-  await waitForWordPress({ port: config.port, timeout: 120 });
-  
-  log(`... Waiting for Etch instance (port ${config.testsPort})...`);
-  await waitForWordPress({ port: config.testsPort, timeout: 120 });
 
-  if (!skipComposer) {
-    log('> Installing Composer dependencies...');
-    const hasComposer = await checkComposerInContainer();
+  // Detect whether wp-env containers are already up.
+  // When both dedicated ports are occupied we assume wp-env is running and skip
+  // `wp-env start` — this is the common situation after a Windows reboot or a
+  // Docker Desktop restart where containers come back automatically.
+  // Pass --restart to force a full stop + start cycle.
+  const alreadyRunning = !forceRestart && await areBothWpEnvPortsInUse(config.port, config.testsPort);
 
-    if (hasComposer) {
-      const envs = ['cli', 'tests-cli'];
-      for (const env of envs) {
-        log(`[OK] Composer found in container, installing dependencies in ${env}...`);
-        await runCommandWithRetry(WP_ENV_CMD, [
-          'run',
-          env,
-          '--env-cwd=wp-content/plugins/etch-fusion-suite',
-          'composer',
-          'install',
-          '--no-dev',
-          '--optimize-autoloader'
-        ]);
-        const verify = await runCommandQuiet(WP_ENV_CMD, [
-          'run',
-          env,
-          'test',
-          '-f',
-          'wp-content/plugins/etch-fusion-suite/vendor/autoload.php'
-        ]);
-        if (verify.code !== 0) {
-          log(`Missing autoload.php in ${env} - Run \`npm run composer:install\` manually`);
-          process.exit(1);
+  if (alreadyRunning) {
+    log(`> wp-env already running (ports ${config.port}/${config.testsPort} occupied) — skipping start`);
+    log('  Tip: use --restart to force a full stop + start cycle.');
+  } else {
+    // -----------------------------------------------------------------------
+    // Full startup path: prerequisites → commercial plugins → wp-env start →
+    // wait for WP → Composer install.
+    // -----------------------------------------------------------------------
+
+    // Node version check (Docker already verified above).
+    const nodeVersion = process.version;
+    const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0]);
+    if (majorVersion < 18) {
+      throw new Error(`Node.js ${nodeVersion} detected. Node.js >= 18 is required.`);
+    }
+    log(`[OK] Node.js ${nodeVersion}`);
+
+    // Port availability — will throw if a non-wp-env service is using the port.
+    await checkPortAvailability(config.port);
+    await checkPortAvailability(config.testsPort);
+
+    log('> Checking commercial plugins setup...');
+    const pluginsSetup = await checkCommercialPlugins();
+    if (!pluginsSetup) {
+      log('[!] Running commercial plugins setup...');
+      await runCommand('node', [join('scripts', 'setup-commercial-plugins.js')]);
+    } else {
+      log('[OK] Commercial plugins setup detected');
+    }
+
+    const spinner = showSpinner();
+    try {
+      await runCommand(WP_ENV_CMD, ['start']);
+    } finally {
+      clearInterval(spinner);
+      process.stdout.write('\r');
+    }
+
+    log('> Verifying WordPress instances...');
+    log(`... Waiting for Bricks instance (port ${config.port})...`);
+    await waitForWordPress({ port: config.port, timeout: 120 });
+
+    log(`... Waiting for Etch instance (port ${config.testsPort})...`);
+    await waitForWordPress({ port: config.testsPort, timeout: 120 });
+
+    if (!skipComposer) {
+      log('> Installing Composer dependencies...');
+      const hasComposer = await checkComposerInContainer();
+
+      if (hasComposer) {
+        const envs = ['cli', 'tests-cli'];
+        for (const env of envs) {
+          log(`[OK] Composer found in container, installing dependencies in ${env}...`);
+          await runCommandWithRetry(WP_ENV_CMD, [
+            'run',
+            env,
+            '--env-cwd=wp-content/plugins/etch-fusion-suite',
+            'composer',
+            'install',
+            '--no-dev',
+            '--optimize-autoloader'
+          ]);
+          const verify = await runCommandQuiet(WP_ENV_CMD, [
+            'run',
+            env,
+            'test',
+            '-f',
+            'wp-content/plugins/etch-fusion-suite/vendor/autoload.php'
+          ]);
+          if (verify.code !== 0) {
+            log(`Missing autoload.php in ${env} - Run \`npm run composer:install\` manually`);
+            process.exit(1);
+          }
+        }
+      } else {
+        log('[!] Composer not found in container, attempting host installation...');
+        const pluginDir = join(__dirname, '..');
+
+        try {
+          await runCommandWithRetry('composer', ['install', '--no-dev', '--optimize-autoloader'], { cwd: pluginDir });
+          log('[OK] Composer dependencies installed from host (may not propagate to containers)');
+        } catch (error) {
+          throw new Error(
+            'Composer is not available in the wp-env container or on the host.\n' +
+            'Please install Composer locally or bootstrap it in the container.\n' +
+            'See README for details.'
+          );
         }
       }
     } else {
-      log('[!] Composer not found in container, attempting host installation...');
-      const { join } = require('path');
-      const pluginDir = join(__dirname, '..');
-
-      try {
-        await runCommandWithRetry('composer', ['install', '--no-dev', '--optimize-autoloader'], { cwd: pluginDir });
-        log('[OK] Composer dependencies installed from host (may not propagate to containers)');
-      } catch (error) {
-        throw new Error(
-          'Composer is not available in the wp-env container or on the host.\n' +
-          'Please install Composer locally or bootstrap it in the container.\n' +
-          'See README for details.'
-        );
-      }
+      log('[skip] Skipping Composer installation');
     }
-  } else {
-    log('[skip] Skipping Composer installation');
   }
-  
+
+  // -------------------------------------------------------------------------
+  // Plugin / theme activation runs EVERY time — whether we just started wp-env
+  // or detected that it was already running.  This is the single reliable fix
+  // for "plugins inactive after Docker/Windows restart".
+  // -------------------------------------------------------------------------
   if (!skipActivation) {
-    log('> Activating required plugins and themes...');
+    log('> Activating required plugins, themes, and licenses...');
     await runCommand('node', [join('scripts', 'activate-plugins.js')]);
   } else {
     log('[skip] Skipping plugin activation');
   }
-  
+
   // Display summary
   await displaySummary();
 }

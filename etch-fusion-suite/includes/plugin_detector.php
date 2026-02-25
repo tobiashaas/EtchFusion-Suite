@@ -47,7 +47,7 @@ class EFS_Plugin_Detector {
 	}
 
 	/**
-	 * Check if Etch PageBuilder is active
+	 * Check if Etch is active
 	 */
 	public function is_etch_active() {
 		return class_exists( 'Etch\Plugin' ) || function_exists( 'etch_run_plugin' ) || defined( 'ETCH_VERSION' );
@@ -312,7 +312,7 @@ class EFS_Plugin_Detector {
 	}
 
 	/**
-	 * Get Etch PageBuilder version with fallbacks when ETCH_VERSION is not defined.
+	 * Get Etch version with fallbacks when ETCH_VERSION is not defined.
 	 *
 	 * @return string Version string or 'Unknown'.
 	 */

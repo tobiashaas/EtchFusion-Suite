@@ -45,7 +45,7 @@ If you don't have a license file:
 
 ### Port 8889 (Tests/Target)
 
-- **Always**: Shows Etch PageBuilder interface
+- **Always**: Shows Etch interface
 
 ## 🚀 Quick Start
 
@@ -66,7 +66,7 @@ npm run dev
 After setup, you'll have:
 
 - ✅ **Port 8888**: Bricks Builder ready for migration
-- ✅ **Port 8889**: Etch PageBuilder ready as target
+- ✅ **Port 8889**: Etch ready as target
 - 🎯 **Perfect development environment** for Etch Fusion testing
 
 ## 🐛 Troubleshooting

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
-const { existsSync } = require('fs');
+const { existsSync, readFileSync } = require('fs');
 const { join } = require('path');
 
 const LOCAL_PLUGINS_DIR = join(__dirname, '..', 'local-plugins');
 const CONTAINER_LOCAL_PLUGINS_DIR = '/var/www/html/wp-content/plugins/etch-fusion-suite/local-plugins';
+const LOCAL_BACKUPS_DIR = join(__dirname, '..', 'local-backups');
+const CONTAINER_LOCAL_BACKUPS_DIR = '/var/www/html/wp-content/plugins/etch-fusion-suite/local-backups';
 function spawnWpEnv(args) {
   const isWin = process.platform === 'win32';
   return spawn(
@@ -482,11 +484,11 @@ async function main() {
 
   // Ensure required commercial packages are installed from local ZIP archives.
   await ensurePluginFromZip('cli', 'frames-latest.zip', ['frames']);
-  await ensurePluginFromZip('cli', 'acss-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
+  await ensurePluginFromZip('cli', 'acss-v3-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
   await ensureThemeFromZip('cli', 'bricks-latest.zip', ['bricks']);
 
   await ensurePluginFromZip('tests-cli', 'etch-latest.zip', ['etch']);
-  await ensurePluginFromZip('tests-cli', 'acss-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
+  await ensurePluginFromZip('tests-cli', 'acss-v4-latest.zip', ['automaticcss', 'automatic-css', 'automatic.css', 'automattic-css']);
   await ensureThemeFromZip('tests-cli', 'etch-theme-latest.zip', ['etch-theme']);
 
   [devPlugins, testPlugins, devThemes, testThemes] = await Promise.all([
@@ -636,6 +638,284 @@ async function main() {
     await removeUnneededThemes('tests-cli', ['etch-theme']);
     await removeDemoContentIfFresh('cli');
     await removeDemoContentIfFresh('tests-cli');
+  }
+
+  if (!dryRun) {
+    await activateLicenses();
+    await importBricksAssets();
+  }
+}
+
+// =============================================================================
+// License key activation
+// =============================================================================
+
+/**
+ * Parse a .env file into a plain key→value object.
+ * Only handles KEY=value lines; ignores comments and blank lines.
+ *
+ * @param {string} content Raw file content.
+ * @returns {Record<string,string>}
+ */
+function parseEnvFile(content) {
+  const vars = {};
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    if (key && value) {
+      vars[key] = value;
+    }
+  }
+  return vars;
+}
+
+/**
+ * Read license keys from .env and write them to the WordPress options table via
+ * WP-CLI so that each plugin is immediately licensed without manual admin-panel
+ * interaction.
+ *
+ * License WP option names — confirmed by reading the plugin/theme source:
+ *   Bricks (cli):      bricks_license_key          (simple string)
+ *   ACSS (both):       automatic_css_license_key   (simple string, same v3 + v4)
+ *   Frames (cli):      frames_license_key          (simple string)
+ *   Etch plugin:       etch_license_key            (simple string, tests-cli)
+ *   Etch Theme:        "Etch Theme_license_options" → { license_key: "…" }
+ *                      (SureCart nested array, tests-cli)
+ *
+ * Keys are read from .env (gitignored). The .env.example shows the expected
+ * variable names with empty values.
+ */
+async function activateLicenses() {
+  const envPath = join(__dirname, '..', '.env');
+  if (!existsSync(envPath)) {
+    // No .env file — silently skip.
+    return;
+  }
+
+  let envVars;
+  try {
+    envVars = parseEnvFile(readFileSync(envPath, 'utf8'));
+  } catch (err) {
+    console.warn(`WARNING License activation: could not read .env (${err.message})`);
+    return;
+  }
+
+  console.log('\nLicense key activation...');
+
+  // Simple string options: wp option update <option> <value>.
+  // Only plugins that store the key directly as a plain option and do not
+  // require a SureCart activation API round-trip belong here.
+  const simpleTargets = [
+    {
+      envKey: 'BRICKS_LICENSE_KEY',
+      label: 'Bricks',
+      targets: [{ env: 'cli', option: 'bricks_license_key' }]
+    },
+    {
+      envKey: 'ACSS_LICENSE_KEY',
+      label: 'Automatic.css',
+      targets: [
+        { env: 'cli',       option: 'automatic_css_license_key' },
+        { env: 'tests-cli', option: 'automatic_css_license_key' }
+      ]
+    },
+    {
+      envKey: 'FRAMES_LICENSE_KEY',
+      label: 'Frames',
+      targets: [{ env: 'cli', option: 'frames_license_key' }]
+    }
+  ];
+
+  let anyFound = false;
+
+  for (const { envKey, label, targets } of simpleTargets) {
+    const key = envVars[envKey];
+    if (!key) continue;
+    anyFound = true;
+    for (const { env, option } of targets) {
+      await runTask(
+        `Set ${label} license key on ${env}`,
+        ['run', env, 'wp', 'option', 'update', option, key],
+        0
+      );
+    }
+  }
+
+  // Etch plugin — uses SureCart licensing. Storing just `etch_license_key` is
+  // not enough: the plugin also needs `etch_license_status=valid` and
+  // `etch_license_options` containing sc_license_id + sc_activation_id, which
+  // are returned by the SureCart API on first activation. We call the plugin's
+  // own activate_license() method so it performs the API call and writes all
+  // three options itself.
+  const etchPluginKey = envVars['ETCH_LICENSE_KEY'];
+  if (etchPluginKey) {
+    anyFound = true;
+    const safeKey = etchPluginKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const phpSnippet = [
+      '$license = \\Etch\\WpAdmin\\License::get_instance();',
+      '$license->init();',
+      '$result = $license->activate_license( "' + safeKey + '" );',
+      'if ( is_wp_error( $result ) ) { echo "ERROR: " . $result->get_error_message(); exit( 1 ); } else { echo "OK"; }'
+    ].join(' ');
+    await runTask(
+      'Activate Etch plugin license on tests-cli',
+      ['run', 'tests-cli', 'wp', 'eval', phpSnippet],
+      0
+    );
+  }
+
+  // Etch Theme — also uses SureCart. The correct option key is
+  // `etchtheme_license_options` (generated from the client name "Etch Theme")
+  // and the stored fields are sc_license_key, sc_license_id, sc_activation_id.
+  // We instantiate the theme's SureCart Client directly (classes already loaded
+  // because the theme is active) and call activate() so the API round-trip
+  // happens and all fields are written correctly.
+  const etchThemeKey = envVars['ETCH_THEME_LICENSE_KEY'];
+  if (etchThemeKey) {
+    anyFound = true;
+    const safeKey = etchThemeKey.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const phpSnippet = [
+      '$client = new \\Etch_Theme\\SureCart\\Licensing\\Client( "Etch Theme", "pt_7eCsZFuK2NuCXK97jzkennFi", get_stylesheet_directory() . "/functions.php" );',
+      '$result = $client->license()->activate( "' + safeKey + '" );',
+      'if ( is_wp_error( $result ) ) { echo "ERROR: " . $result->get_error_message(); exit( 1 ); } else { echo "OK"; }'
+    ].join(' ');
+    await runTask(
+      'Activate Etch Theme license on tests-cli',
+      ['run', 'tests-cli', 'wp', 'eval', phpSnippet],
+      0
+    );
+  }
+
+  if (!anyFound) {
+    console.log('  No license keys found in .env — skipping');
+  }
+}
+
+// =============================================================================
+// Bricks asset import
+// =============================================================================
+
+/**
+ * Import Bricks settings, theme styles, SQL data, and media into the Bricks
+ * (cli) environment.
+ *
+ * Files are read inside the container via PHP's file_get_contents so no
+ * shell-escaping of JSON content is needed.
+ *
+ * Expected layout (all optional — silently skipped if absent):
+ *   local-backups/bricks_import.sql          → full DB import (WPVivid export)
+ *   local-backups/uploads/uploads/           → media files → wp-content/uploads/
+ *   local-plugins/_assets_bricks-settings-acss.json  → bricks_global_settings
+ *   local-plugins/_assets_bricks-theme-style-acss.json → bricks_theme_styles
+ *
+ * The SQL import runs first; URL search-replace follows immediately so the DB
+ * reflects the local dev URL before settings and media are applied.
+ * Uploads are copied last so they don't get wiped by the SQL import.
+ */
+async function importBricksAssets() {
+  console.log('\nBricks asset import...');
+
+  // SQL import — runs first so subsequent option writes are not overwritten.
+  // Looks for bricks_import.sql in local-backups/, falling back to
+  // bricks-data.sql in local-plugins/ for backwards compatibility.
+  const sqlCandidates = [
+    { host: join(LOCAL_BACKUPS_DIR, 'bricks_import.sql'),  container: `${CONTAINER_LOCAL_BACKUPS_DIR}/bricks_import.sql` },
+    { host: join(LOCAL_PLUGINS_DIR, 'bricks-data.sql'),    container: `${CONTAINER_LOCAL_PLUGINS_DIR}/bricks-data.sql` }
+  ];
+  const sqlFile = sqlCandidates.find((c) => existsSync(c.host));
+  if (sqlFile) {
+    await runTask(
+      'Import Bricks SQL data on cli',
+      ['run', 'cli', 'wp', 'db', 'import', sqlFile.container],
+      0
+    );
+    // Replace the live site URL with the local dev URL throughout all tables.
+    // WPVivid backups use https://bricks.getframes.io — must become http://localhost:8888.
+    await runTask(
+      'Replace URLs in Bricks DB on cli',
+      ['run', 'cli', 'wp', 'search-replace', 'https://bricks.getframes.io', 'http://localhost:8888', '--all-tables'],
+      0
+    );
+    // The SQL import replaces the whole DB, wiping plugin/theme activation.
+    // Re-activate Bricks theme and migration plugin so the environment stays
+    // functional without requiring a full npm run dev cycle.
+    await runTask('Re-activate Bricks theme after SQL import',    ['run', 'cli', 'wp', 'theme',  'activate', 'bricks'],                 0);
+    await runTask('Re-activate migration plugin after SQL import', ['run', 'cli', 'wp', 'plugin', 'activate', 'etch-fusion-suite'],        0);
+    await runTask('Re-activate ACSS after SQL import',             ['run', 'cli', 'wp', 'plugin', 'activate', 'automaticcss-plugin'],      0);
+    await runTask('Re-activate Frames after SQL import',           ['run', 'cli', 'wp', 'plugin', 'activate', 'frames-plugin'],            0);
+  } else {
+    console.log('  No Bricks SQL file found — skipping SQL import');
+    console.log('  Expected: local-backups/bricks_import.sql');
+  }
+
+  // Bricks global settings — strip the _last_updated meta key before storing.
+  const settingsHostPath = join(LOCAL_PLUGINS_DIR, '_assets_bricks-settings-acss.json');
+  if (existsSync(settingsHostPath)) {
+    const settingsContainerPath = `${CONTAINER_LOCAL_PLUGINS_DIR}/_assets_bricks-settings-acss.json`;
+    // Merge over existing settings so keys from the SQL import (e.g. customCss)
+    // are not wiped — the JSON file only provides the base/default values.
+    const phpSnippet = [
+      '$raw = file_get_contents( "' + settingsContainerPath + '" );',
+      '$new = json_decode( $raw, true );',
+      'unset( $new["_last_updated"] );',
+      '$existing = get_option( "bricks_global_settings", [] );',
+      '$merged = array_merge( $new, $existing );',
+      'update_option( "bricks_global_settings", $merged );',
+      'echo "OK";'
+    ].join(' ');
+    await runTask(
+      'Import Bricks settings on cli',
+      ['run', 'cli', 'wp', 'eval', phpSnippet],
+      0
+    );
+  } else {
+    console.log('  No _assets_bricks-settings-acss.json found — skipping');
+  }
+
+  // Bricks theme styles — stored as an associative array keyed by style ID.
+  // The JSON file contains a single style object with a top-level "id" field.
+  const themeStyleHostPath = join(LOCAL_PLUGINS_DIR, '_assets_bricks-theme-style-acss.json');
+  if (existsSync(themeStyleHostPath)) {
+    const themeStyleContainerPath = `${CONTAINER_LOCAL_PLUGINS_DIR}/_assets_bricks-theme-style-acss.json`;
+    const phpSnippet = [
+      '$raw = file_get_contents( "' + themeStyleContainerPath + '" );',
+      '$style = json_decode( $raw, true );',
+      '$id = $style["id"] ?? "standard";',
+      // Store the full style object (including id) keyed by its ID, matching
+      // the format Bricks uses in BRICKS_DB_THEME_STYLES.
+      '$existing = get_option( BRICKS_DB_THEME_STYLES, [] );',
+      '$existing[ $id ] = $style;',
+      'update_option( BRICKS_DB_THEME_STYLES, $existing );',
+      'echo "OK";'
+    ].join(' ');
+    await runTask(
+      'Import Bricks theme styles on cli',
+      ['run', 'cli', 'wp', 'eval', phpSnippet],
+      0
+    );
+  } else {
+    console.log('  No _assets_bricks-theme-style-acss.json found — skipping');
+  }
+
+  // Uploads copy — runs last so the SQL import cannot wipe freshly copied files.
+  // WPVivid extracts to uploads/uploads/ (the ZIP contains an uploads/ subfolder).
+  // We copy the contents into the container's wp-content/uploads/ directory.
+  const uploadsHostPath = join(LOCAL_BACKUPS_DIR, 'uploads', 'uploads');
+  if (existsSync(uploadsHostPath)) {
+    const uploadsSrc = `${CONTAINER_LOCAL_BACKUPS_DIR}/uploads/uploads/.`;
+    const uploadsDst = '/var/www/html/wp-content/uploads/';
+    await runTask(
+      'Copy Bricks uploads into wp-content/uploads on cli',
+      ['run', 'cli', 'bash', '-c', `cp -r ${uploadsSrc} ${uploadsDst}`],
+      0
+    );
+  } else {
+    console.log('  No uploads found — skipping media copy');
+    console.log('  Expected: local-backups/uploads/uploads/');
   }
 }
 

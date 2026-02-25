@@ -261,7 +261,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<dd class="efs-etch-environment__value"><?php echo isset( $is_bricks_site ) && $is_bricks_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></dd>
 			</div>
 			<div class="efs-etch-environment__row">
-				<dt class="efs-etch-environment__label"><?php esc_html_e( 'Etch PageBuilder', 'etch-fusion-suite' ); ?></dt>
+				<dt class="efs-etch-environment__label"><?php esc_html_e( 'Etch', 'etch-fusion-suite' ); ?></dt>
 				<dd class="efs-etch-environment__value"><?php echo isset( $is_etch_site ) && $is_etch_site ? esc_html__( 'Detected', 'etch-fusion-suite' ) : esc_html__( 'Not detected', 'etch-fusion-suite' ); ?></dd>
 			</div>
 			<div class="efs-etch-environment__row">

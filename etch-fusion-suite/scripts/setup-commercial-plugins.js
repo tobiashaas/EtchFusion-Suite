@@ -200,14 +200,34 @@ const PLUGINS = [
     matches: (fileName) => /^frames.*\.zip$/i.test(fileName) && !/^frames-latest\.zip$/i.test(fileName)
   },
   {
-    id: 'acss',
-    label: 'Automatic.css',
+    id: 'acss-v3',
+    label: 'Automatic.css v3 (Bricks)',
     required: false,
-    latestFile: 'acss-latest.zip',
+    latestFile: 'acss-v3-latest.zip',
     envVar: 'ACSS_LICENSE_KEY',
-    matches: (fileName) =>
-      /^automatic.*\.zip$/i.test(fileName) &&
-      !/^acss-latest\.zip$/i.test(fileName)
+    // Only match v3.x files (major version 3).
+    matches: (fileName) => {
+      if (!/^automatic.*\.zip$/i.test(fileName)) return false;
+      if (/^acss-v\d+-latest\.zip$/i.test(fileName)) return false;
+      const version = extractVersion(fileName);
+      const parsed = parseVersion(version);
+      return Boolean(parsed && parsed.core[0] === 3);
+    }
+  },
+  {
+    id: 'acss-v4',
+    label: 'Automatic.css v4 (Etch)',
+    required: false,
+    latestFile: 'acss-v4-latest.zip',
+    envVar: 'ACSS_LICENSE_KEY',
+    // Only match v4.x files (major version 4).
+    matches: (fileName) => {
+      if (!/^automatic.*\.zip$/i.test(fileName)) return false;
+      if (/^acss-v\d+-latest\.zip$/i.test(fileName)) return false;
+      const version = extractVersion(fileName);
+      const parsed = parseVersion(version);
+      return Boolean(parsed && parsed.core[0] === 4);
+    }
   },
   {
     id: 'etch',

@@ -28,7 +28,7 @@ End-to-end migration and orchestration toolkit for transforming Bricks Builder s
 - WordPress 5.0+
 - PHP 7.4+
 - Bricks Builder (source site)
-- Etch PageBuilder (target site)
+- Etch (target site)
 - Docker (for local testing)
 
 ---
@@ -475,7 +475,7 @@ composer test
 The plugin uses a dual-instance wp-env architecture for optimal development:
 
 - **Bricks Site** (development environment): Source site running Bricks Builder on port 8888
-- **Etch Site** (tests environment): Target site running Etch PageBuilder on port 8889
+- **Etch Site** (tests environment): Target site running Etch on port 8889
 - **Shared Plugin Code**: Both instances mount the same plugin directory from your local filesystem
 - **Independent Data**: Each instance has its own database, uploads, and configuration
 

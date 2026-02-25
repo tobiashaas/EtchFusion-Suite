@@ -4,7 +4,7 @@
 
 ### Overview
 
-Etch Fusion Suite is a WordPress plugin that migrates sites from Bricks Builder to Etch PageBuilder. Development uses `@wordpress/env` (Docker) with a dual-instance setup. See `CLAUDE.md` for full project documentation and all standard commands.
+Etch Fusion Suite is a WordPress plugin that migrates sites from Bricks Builder to Etch. Development uses `@wordpress/env` (Docker) with a dual-instance setup. See `CLAUDE.md` for full project documentation and all standard commands.
 
 ### System prerequisites (pre-installed in the VM snapshot)
 

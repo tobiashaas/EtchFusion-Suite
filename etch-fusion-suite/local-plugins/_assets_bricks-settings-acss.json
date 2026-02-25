@@ -1,0 +1,31 @@
+{
+  "_last_updated": "2025-11-09T11:36:00+01:00",
+  "postTypes": ["page"],
+  "elementAttsAsNeeded": true,
+  "saveFormSubmissions": true,
+  "wp_auth_url_behavior": "default",
+  "remoteTemplates": [
+    {
+      "name": "Frames",
+      "url": "https://bricks.getframes.io/",
+      "password": ""
+    }
+  ],
+  "builderAutosaveDisabled": true,
+  "builderMode": "dark",
+  "builderLocale": "site-default",
+  "builderToolbarLogoLink": "current",
+  "builderToolbarLogoLinkNewTab": true,
+  "builderResponsiveControlIndicator": "any",
+  "disableElementSpacing": true,
+  "structureDuplicateElement": true,
+  "structureDeleteElement": true,
+  "structureCollapsed": true,
+  "structureAutoSync": true,
+  "importImageOnPaste": true,
+  "enableDynamicDataPreview": true,
+  "builderGlobalClassesImport": "never",
+  "disableClassChaining": true,
+  "executeCodeEnabled": true,
+  "customCss": "/* 1. Zentrierter Container */\n.centered-box {\n  max-width: 800px;\n  margin-inline: auto;\n  padding: 2rem;\n  background: #f5f5f5;\n  border-radius: 0.75rem;\n}\n\n/* 2. Primärer Button */\n.btn-primary {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 0.5rem;\n  padding: 0.7rem 1.4rem;\n  border-radius: 999px;\n  border: none;\n  background: linear-gradient(135deg, #2563eb, #1d4ed8);\n  color: #fff;\n  font-weight: 600;\n  cursor: pointer;\n  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.25);\n  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;\n}\n.btn-primary:hover {\n  transform: translateY(-1px);\n  filter: brightness(1.06);\n  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.3);\n}\n.btn-primary:active {\n  transform: translateY(0);\n  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.28);\n}\n\n/* 3. Card mit Shadow */\n.card-elevated {\n  border-radius: 1rem;\n  background: #ffffff;\n  padding: 1.5rem;\n  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);\n  border: 1px solid rgba(148, 163, 184, 0.3);\n}\n\n/* 4. Flex Row Utilities */\n.flex-row-center {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 1rem;\n}\n\n/* 5. Badge */\n.badge-pill {\n  display: inline-flex;\n  align-items: center;\n  padding: 0.2rem 0.75rem;\n  border-radius: 999px;\n  background: rgba(56, 189, 248, 0.12);\n  color: #0369a1;\n  font-size: 0.75rem;\n  font-weight: 600;\n  letter-spacing: 0.04em;\n  text-transform: uppercase;\n}\n\n/* 6. Typo-Highlight */\n.text-gradient {\n  background: linear-gradient(135deg, #6366f1, #ec4899, #f97316);\n  -webkit-background-clip: text;\n  color: transparent;\n}\n\n/* 7. Simple Grid */\n.grid-3 {\n  display: grid;\n  grid-template-columns: repeat(3, minmax(0, 1fr));\n  gap: 1.25rem;\n}\n\n/* 8. Image Hover */\n.img-zoom {\n  display: block;\n  border-radius: 0.75rem;\n  overflow: hidden;\n}\n.img-zoom img {\n  display: block;\n  width: 100%;\n  height: auto;\n  transition: transform 0.3s ease;\n}\n.img-zoom:hover img {\n  transform: scale(1.06);\n}\n\n/* 9. Subtile Border-Section */\n.section-soft {\n  padding: 2.5rem 2rem;\n  border-radius: 1.25rem;\n  border: 1px solid rgba(148, 163, 184, 0.35);\n  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.06), transparent 55%),\n              radial-gradient(circle at bottom right, rgba(236, 72, 153, 0.06), transparent 55%);\n}\n\n/* 10. Utility Spacing (Rem-Scale) */\n.mt-4 { margin-top: 1rem; }\n.mb-4 { margin-bottom: 1rem; }\n.mx-auto { margin-left: auto; margin-right: auto; }\n.p-4 { padding: 1rem; }\n.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }"
+}

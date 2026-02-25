@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Etch Fusion Suite is a WordPress plugin that migrates sites from **Bricks Builder** to **Etch PageBuilder**. It converts CSS/global classes, content (posts/pages/Gutenberg blocks), media, components, custom fields (ACF/metaboxes), and dynamic data between the two page builders.
+Etch Fusion Suite is a WordPress plugin that migrates sites from **Bricks Builder** to **Etch**. It converts CSS/global classes, content (posts/pages/Gutenberg blocks), media, components, custom fields (ACF/metaboxes), and dynamic data between the two builders.
 
 The main plugin code lives in `etch-fusion-suite/`. The root directory contains project-level config, CI/CD, and the root PHPUnit config.
 
