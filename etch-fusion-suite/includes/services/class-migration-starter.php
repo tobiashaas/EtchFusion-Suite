@@ -280,6 +280,10 @@ class EFS_Migration_Starter {
 				return $finalization_result;
 			}
 
+			// Notify the Etch site that all data has been sent so the receiving
+			// popup transitions to 'completed' instead of going stale.
+			$this->api_client->send_migration_complete( $target, $migration_key );
+
 			$this->progress_manager->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
 			$this->progress_manager->store_active_migration( array() );
 

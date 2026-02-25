@@ -329,6 +329,21 @@ class EFS_API_Client {
 	}
 
 	/**
+	 * Signal migration completion to the target (Etch) site.
+	 *
+	 * Called once all data has been transferred. Transitions the Etch-side
+	 * receiving-status popup from 'receiving' to 'completed' so it closes
+	 * cleanly instead of waiting for the stale TTL to expire.
+	 *
+	 * @param string $url       Target site URL.
+	 * @param string $jwt_token Migration JWT token.
+	 * @return array|mixed Response from the target site.
+	 */
+	public function send_migration_complete( $url, $jwt_token ) {
+		return $this->send_request( $url, $jwt_token, '/import/complete', 'POST', array() );
+	}
+
+	/**
 	 * Send media data to target site.
 	 */
 	public function send_media_data( $url, $jwt_token, $media_payload ) {

@@ -438,6 +438,11 @@ class EFS_Batch_Phase_Runner {
 			$posts_result['counts_by_post_type'] = $counts_by_post_type;
 
 			$this->run_finalizer->finalize_migration( $posts_result, $batch_migrator_warnings );
+
+			// Notify the Etch site that all data has been sent so the receiving
+			// popup transitions to 'completed' instead of going stale.
+			$this->api_client->send_migration_complete( $target_url, $migration_key );
+
 			$this->progress_manager->update_progress( 'completed', 100, $completion_message );
 			$this->progress_manager->store_active_migration( array() );
 			$this->checkpoint_repository->delete_checkpoint();

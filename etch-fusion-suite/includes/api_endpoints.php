@@ -2006,6 +2006,49 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Mark an incoming migration as completed on the Etch (receiving) side.
+	 *
+	 * Called by the Bricks source site after all data has been sent. Transitions
+	 * the receiving state from 'receiving' to 'completed' so the Etch-side popup
+	 * shows the correct completion status instead of going stale after the TTL.
+	 *
+	 * @param  \WP_REST_Request $request REST request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function complete_migration( $request ) {
+		$token = self::validate_bearer_migration_token( $request );
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+
+		$source_check = self::check_source_origin( $request, $token );
+		if ( is_wp_error( $source_check ) ) {
+			return $source_check;
+		}
+
+		$repository = self::resolve_migration_repository();
+		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
+			return new \WP_Error( 'service_unavailable', __( 'Migration repository unavailable.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
+		}
+
+		$current = $repository->get_receiving_state();
+		$current = is_array( $current ) ? $current : array();
+
+		$repository->save_receiving_state(
+			array_merge(
+				$current,
+				array(
+					'status'       => 'completed',
+					'last_updated' => current_time( 'mysql' ),
+					'is_stale'     => false,
+				)
+			)
+		);
+
+		return new \WP_REST_Response( array( 'success' => true ), 200 );
+	}
+
+	/**
 	 * Receive media payload and create attachment.
 	 *
 	 * @param  \WP_REST_Request $request REST request.
@@ -2307,6 +2350,16 @@ class EFS_API_Endpoints {
 			'/receive-media',
 			array(
 				'callback'            => array( __CLASS__, 'receive_media' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/complete',
+			array(
+				'callback'            => array( __CLASS__, 'complete_migration' ),
 				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
