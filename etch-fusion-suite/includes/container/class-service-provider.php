@@ -737,7 +737,8 @@ class EFS_Service_Provider {
 					$c->get( 'api_client' ),
 					$c->get( 'rate_limiter' ),
 					$c->get( 'input_validator' ),
-					$c->get( 'audit_logger' )
+					$c->get( 'audit_logger' ),
+					$c->get( 'token_manager' )
 				);
 			}
 		);

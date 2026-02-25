@@ -1,6 +1,5 @@
 import { setLoading, showToast } from './ui.js';
-
-const REST_PATH_PAIRING_CODE = 'efs/v1/generate-pairing-code';
+import { post as ajaxPost } from './api.js';
 
 const bindPairingCodeButton = () => {
     const btn     = document.querySelector('[data-efs-generate-pairing-code]');
@@ -15,36 +14,9 @@ const bindPairingCodeButton = () => {
     btn.addEventListener('click', async () => {
         setLoading(btn, true);
         try {
-            const rawRestUrl = (window.efsData?.rest_url || '').replace(/\/$/, '');
-            const restNonce  = window.efsData?.rest_nonce || '';
-
-            // Normalize the REST URL to the current window origin so the request
-            // is always same-origin. On live domains rest_url() may differ in
-            // www/non-www or http/https from the browsed URL, which makes the
-            // fetch cross-origin, drops the auth cookie, and causes a 403.
-            let restUrl = rawRestUrl;
-            try {
-                const restOrigin    = new URL(rawRestUrl).origin;
-                const currentOrigin = window.location.origin;
-                if (restOrigin !== currentOrigin) {
-                    restUrl = rawRestUrl.replace(restOrigin, currentOrigin);
-                }
-            } catch (_) {
-                // keep raw URL if parsing fails
-            }
-
-            const res = await fetch(
-                `${restUrl}/${REST_PATH_PAIRING_CODE}`,
-                {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { 'X-WP-Nonce': restNonce },
-                }
-            );
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
-            }
-            const data    = await res.json();
+            // Use the AJAX infrastructure (efs_nonce) instead of the REST API.
+            // REST nonce auth fails on some hosts due to cookie/origin mismatches.
+            const data = await ajaxPost('efs_generate_pairing_code');
             const siteUrl = (window.efsData?.site_url || '').replace(/\/$/, '');
             display.textContent = `${siteUrl}/?_efs_pair=${data.raw_code}`;
             result.hidden = false;

@@ -5,6 +5,7 @@ use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
 use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Controllers\EFS_Settings_Controller;
 use Bricks2Etch\Repositories\Interfaces\Settings_Repository_Interface;
+use Bricks2Etch\Core\EFS_Migration_Token_Manager;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -20,15 +21,24 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	private $api_client;
 
 	/**
+	 * Token manager instance (used for pairing code generation).
+	 *
+	 * @var EFS_Migration_Token_Manager|null
+	 */
+	private $token_manager;
+
+	/**
 	 * Constructor
 	 *
-	 * @param mixed $api_client API client instance.
-	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null $rate_limiter Rate limiter instance (optional).
+	 * @param mixed                               $api_client    API client instance.
+	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null   $rate_limiter  Rate limiter instance (optional).
 	 * @param \Bricks2Etch\Security\EFS_Input_Validator|null $input_validator Input validator instance (optional).
-	 * @param \Bricks2Etch\Security\EFS_Audit_Logger|null $audit_logger Audit logger instance (optional).
+	 * @param \Bricks2Etch\Security\EFS_Audit_Logger|null   $audit_logger  Audit logger instance (optional).
+	 * @param EFS_Migration_Token_Manager|null    $token_manager Token manager instance (optional).
 	 */
-	public function __construct( $api_client = null, $rate_limiter = null, $input_validator = null, $audit_logger = null ) {
-		$this->api_client = $api_client;
+	public function __construct( $api_client = null, $rate_limiter = null, $input_validator = null, $audit_logger = null, ?EFS_Migration_Token_Manager $token_manager = null ) {
+		$this->api_client    = $api_client;
+		$this->token_manager = $token_manager;
 		parent::__construct( $rate_limiter, $input_validator, $audit_logger );
 	}
 
@@ -38,6 +48,57 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_save_settings', array( $this, 'save_settings' ) );
 		add_action( 'wp_ajax_efs_test_connection', array( $this, 'test_connection' ) );
 		add_action( 'wp_ajax_efs_save_feature_flags', array( $this, 'save_feature_flags' ) );
+		add_action( 'wp_ajax_efs_generate_pairing_code', array( $this, 'generate_pairing_code' ) );
+	}
+
+	/**
+	 * Generate a one-time pairing code via AJAX.
+	 *
+	 * Uses the standard AJAX + efs_nonce infrastructure instead of the REST API
+	 * to avoid cookie/authentication issues on hosts where REST nonce auth fails.
+	 */
+	public function generate_pairing_code() {
+		if ( ! $this->verify_request( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! $this->check_rate_limit( 'generate_pairing_code', 5, 60 ) ) {
+			return;
+		}
+
+		$token_manager = $this->token_manager;
+		if ( ! $token_manager && function_exists( 'etch_fusion_suite_container' ) ) {
+			try {
+				$container = etch_fusion_suite_container();
+				if ( $container->has( 'token_manager' ) ) {
+					$token_manager = $container->get( 'token_manager' );
+				}
+			} catch ( \Exception $e ) {
+				// Silently fall through to the error below.
+			}
+		}
+
+		if ( ! $token_manager ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Token manager unavailable.', 'etch-fusion-suite' ),
+					'code'    => 'service_unavailable',
+				),
+				503
+			);
+			return;
+		}
+
+		$code = $token_manager->generate_pairing_code();
+
+		wp_send_json_success(
+			array(
+				'code'       => strtoupper( substr( $code, 0, 4 ) ) . '-' . strtoupper( substr( $code, 4 ) ),
+				'raw_code'   => $code,
+				'expires_in' => 15 * MINUTE_IN_SECONDS,
+				'expires_at' => wp_date( 'Y-m-d H:i:s', time() + 15 * MINUTE_IN_SECONDS, new \DateTimeZone( 'UTC' ) ),
+			)
+		);
 	}
 
 	/**
