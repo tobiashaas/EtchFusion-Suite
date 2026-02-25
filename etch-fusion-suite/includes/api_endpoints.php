@@ -2230,7 +2230,7 @@ class EFS_API_Endpoints {
 			'/generate-pairing-code',
 			array(
 				'callback'            => array( __CLASS__, 'generate_pairing_code_endpoint' ),
-				'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
+				'permission_callback' => array( __CLASS__, 'require_admin_with_cookie_fallback' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)
 		);
@@ -2407,6 +2407,44 @@ class EFS_API_Endpoints {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Permission callback for admin-only endpoints on hosts where the standard
+	 * WordPress REST cookie authentication middleware may be intercepted or
+	 * stripped by a proxy/CDN before reaching WordPress.
+	 *
+	 * First tries the standard REST auth path (current_user_can). If that fails
+	 * it falls back to validating the WordPress logged-in cookie directly via
+	 * wp_validate_auth_cookie(), which reads $_COOKIE and bypasses the REST
+	 * authentication middleware entirely.
+	 *
+	 * @param  \WP_REST_Request $request REST request.
+	 * @return true|\WP_Error
+	 */
+	public static function require_admin_with_cookie_fallback( $request ) {  // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		// Standard path: REST middleware already set the current user.
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+
+		// Fallback: validate the logged-in cookie directly. Some hosting
+		// environments strip authentication headers or cookies from REST
+		// requests before they reach WordPress, causing current_user_can()
+		// to return false even for a fully authenticated admin session.
+		$user_id = wp_validate_auth_cookie( '', 'logged_in' );
+		if ( $user_id ) {
+			wp_set_current_user( $user_id );
+			if ( current_user_can( 'manage_options' ) ) {
+				return true;
+			}
+		}
+
+		return new \WP_Error(
+			'rest_forbidden',
+			__( 'You do not have permission to access this endpoint.', 'etch-fusion-suite' ),
+			array( 'status' => 403 )
+		);
 	}
 
 	/**
