@@ -35,8 +35,6 @@ bash
 install-wp-tests.sh
 
 # Configuration files (not needed in production)
-composer.json
-composer.lock
 package.json
 package-lock.json
 phpunit.xml.dist
