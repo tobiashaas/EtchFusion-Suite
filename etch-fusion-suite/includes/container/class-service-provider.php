@@ -156,10 +156,90 @@ class EFS_Service_Provider {
 			}
 		);
 
+		// CSS sub-modules — registered before the main css_converter so they can be
+		// injected as explicit dependencies rather than constructed inline.
+		$container->singleton(
+			'css_normalizer',
+			function () {
+				return new \Bricks2Etch\CSS\EFS_CSS_Normalizer();
+			}
+		);
+
+		$container->singleton(
+			'breakpoint_resolver',
+			function () {
+				return new \Bricks2Etch\CSS\EFS_Breakpoint_Resolver();
+			}
+		);
+
+		$container->singleton(
+			'acss_handler',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_ACSS_Handler( $c->get( 'css_normalizer' ) );
+			}
+		);
+
+		$container->singleton(
+			'settings_css_converter',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_Settings_CSS_Converter(
+					$c->get( 'breakpoint_resolver' ),
+					$c->get( 'css_normalizer' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'css_stylesheet_parser',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_CSS_Stylesheet_Parser(
+					$c->get( 'css_normalizer' ),
+					$c->get( 'breakpoint_resolver' ),
+					$c->get( 'error_handler' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'class_reference_scanner',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_Class_Reference_Scanner( $c->get( 'error_handler' ) );
+			}
+		);
+
+		$container->singleton(
+			'element_id_style_collector',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_Element_ID_Style_Collector(
+					$c->get( 'settings_css_converter' ),
+					$c->get( 'css_normalizer' ),
+					$c->get( 'breakpoint_resolver' )
+				);
+			}
+		);
+
+		$container->singleton(
+			'css_style_importer',
+			function ( $c ) {
+				return new \Bricks2Etch\CSS\EFS_Style_Importer( $c->get( 'error_handler' ), $c->get( 'style_repository' ) );
+			}
+		);
+
 		$container->singleton(
 			'css_converter',
 			function ( $c ) {
-				return new \Bricks2Etch\Parsers\EFS_CSS_Converter( $c->get( 'error_handler' ), $c->get( 'style_repository' ) );
+				return new \Bricks2Etch\Parsers\EFS_CSS_Converter(
+					$c->get( 'error_handler' ),
+					$c->get( 'style_repository' ),
+					$c->get( 'css_normalizer' ),
+					$c->get( 'breakpoint_resolver' ),
+					$c->get( 'acss_handler' ),
+					$c->get( 'settings_css_converter' ),
+					$c->get( 'css_stylesheet_parser' ),
+					$c->get( 'class_reference_scanner' ),
+					$c->get( 'element_id_style_collector' ),
+					$c->get( 'css_style_importer' )
+				);
 			}
 		);
 

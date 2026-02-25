@@ -36,6 +36,7 @@ spl_autoload_register(
 			'Admin\\'                    => 'admin/',
 			'Ajax\\Handlers\\'           => 'ajax/handlers/',
 			'Ajax\\'                     => 'ajax/',
+			'CSS\\'                      => 'css/',
 			'Parsers\\'                  => '',
 			'Templates\\Interfaces\\'    => 'templates/interfaces/',
 			'Templates\\'                => 'templates/',
