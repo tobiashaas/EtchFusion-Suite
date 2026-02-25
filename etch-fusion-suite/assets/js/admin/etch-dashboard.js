@@ -15,12 +15,29 @@ const bindPairingCodeButton = () => {
     btn.addEventListener('click', async () => {
         setLoading(btn, true);
         try {
-            const restUrl   = (window.efsData?.rest_url || '').replace(/\/$/, '');
-            const restNonce = window.efsData?.rest_nonce || '';
+            const rawRestUrl = (window.efsData?.rest_url || '').replace(/\/$/, '');
+            const restNonce  = window.efsData?.rest_nonce || '';
+
+            // Normalize the REST URL to the current window origin so the request
+            // is always same-origin. On live domains rest_url() may differ in
+            // www/non-www or http/https from the browsed URL, which makes the
+            // fetch cross-origin, drops the auth cookie, and causes a 403.
+            let restUrl = rawRestUrl;
+            try {
+                const restOrigin    = new URL(rawRestUrl).origin;
+                const currentOrigin = window.location.origin;
+                if (restOrigin !== currentOrigin) {
+                    restUrl = rawRestUrl.replace(restOrigin, currentOrigin);
+                }
+            } catch (_) {
+                // keep raw URL if parsing fails
+            }
+
             const res = await fetch(
                 `${restUrl}/${REST_PATH_PAIRING_CODE}`,
                 {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: { 'X-WP-Nonce': restNonce },
                 }
             );
