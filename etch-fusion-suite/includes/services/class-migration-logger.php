@@ -120,6 +120,26 @@ class EFS_Migration_Logger {
 	}
 
 	/**
+	 * Delete all migration log files from the log directory.
+	 *
+	 * Only removes files matching the expected `migration-*.log` pattern
+	 * so that the .htaccess / index.php guard files are left intact.
+	 */
+	public function delete_all_logs(): void {
+		$log_dir = $this->get_log_dir();
+		if ( ! is_dir( $log_dir ) ) {
+			return;
+		}
+		$files = glob( $log_dir . '/migration-*.log' );
+		if ( ! is_array( $files ) ) {
+			return;
+		}
+		foreach ( $files as $file ) {
+			wp_delete_file( $file );
+		}
+	}
+
+	/**
 	 * Append a structured NDJSON log line to the migration log file.
 	 *
 	 * Only writes when WP_DEBUG_LOG is explicitly true.

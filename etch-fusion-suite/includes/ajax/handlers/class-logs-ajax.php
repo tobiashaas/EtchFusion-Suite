@@ -2,6 +2,7 @@
 namespace Bricks2Etch\Ajax\Handlers;
 
 use Bricks2Etch\Ajax\EFS_Base_Ajax_Handler;
+use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Security\EFS_Audit_Logger;
 use Bricks2Etch\Services\EFS_Migration_Logger;
 use Bricks2Etch\Services\EFS_Pre_Flight_Checker;
@@ -41,6 +42,13 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	protected $migration_logger;
 
 	/**
+	 * Error handler instance (holds the efs_migration_log WP option).
+	 *
+	 * @var EFS_Error_Handler|null
+	 */
+	protected $error_handler;
+
+	/**
 	 * Constructor
 	 *
 	 * @param EFS_Audit_Logger|null                                                   $audit_logger              Audit logger instance.
@@ -48,13 +56,15 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 	 * @param \Bricks2Etch\Security\EFS_Rate_Limiter|null                            $rate_limiter              Rate limiter instance (optional).
 	 * @param \Bricks2Etch\Security\EFS_Input_Validator|null                         $input_validator           Input validator instance (optional).
 	 * @param EFS_Migration_Logger|null                                               $migration_logger          Migration logger instance (optional).
-	 * @param EFS_Pre_Flight_Checker|null                                             $preflight_checker          Pre-flight checker (optional).
+	 * @param EFS_Pre_Flight_Checker|null                                             $preflight_checker         Pre-flight checker (optional).
+	 * @param EFS_Error_Handler|null                                                  $error_handler             Error handler (optional).
 	 */
-	public function __construct( ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null, ?EFS_Migration_Logger $migration_logger = null, ?EFS_Pre_Flight_Checker $preflight_checker = null ) {
+	public function __construct( ?EFS_Audit_Logger $audit_logger = null, ?\Bricks2Etch\Repositories\EFS_Migration_Runs_Repository $migration_runs_repository = null, $rate_limiter = null, $input_validator = null, ?EFS_Migration_Logger $migration_logger = null, ?EFS_Pre_Flight_Checker $preflight_checker = null, ?EFS_Error_Handler $error_handler = null ) {
 		$this->migration_logger          = $migration_logger;
 		$this->audit_logger              = $audit_logger;
 		$this->migration_runs_repository = $migration_runs_repository;
 		$this->preflight_checker         = $preflight_checker;
+		$this->error_handler             = $error_handler;
 
 		if ( null === $this->migration_runs_repository && function_exists( 'etch_fusion_suite_container' ) ) {
 			try {
@@ -111,6 +121,19 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				500
 			);
 			return;
+		}
+
+		// Clear the efs_migration_log WP option written by EFS_Error_Handler.
+		if ( $this->error_handler ) {
+			$this->error_handler->clear_log();
+		} else {
+			// Fallback: delete the option directly when the handler is not injected.
+			delete_option( 'efs_migration_log' );
+		}
+
+		// Delete per-migration log files from uploads/efs-migration-logs/.
+		if ( $this->migration_logger ) {
+			$this->migration_logger->delete_all_logs();
 		}
 
 		if ( $this->migration_runs_repository ) {

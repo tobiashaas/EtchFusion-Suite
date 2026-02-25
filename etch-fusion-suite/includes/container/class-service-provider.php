@@ -724,7 +724,8 @@ class EFS_Service_Provider {
 					$c->get( 'rate_limiter' ),
 					$c->get( 'input_validator' ),
 					$c->get( 'migration_logger' ),
-					$c->get( 'preflight_checker' )
+					$c->get( 'preflight_checker' ),
+					$c->get( 'error_handler' )
 				);
 			}
 		);
