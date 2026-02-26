@@ -133,4 +133,10 @@ const bootstrap = () => {
     }
 };
 
-document.addEventListener('DOMContentLoaded', bootstrap);
+// Guard for async/defer loading: if DOMContentLoaded already fired (e.g. when an
+// optimisation plugin adds async/defer to the script tag), run bootstrap immediately.
+if ( document.readyState === 'loading' ) {
+    document.addEventListener( 'DOMContentLoaded', bootstrap );
+} else {
+    bootstrap();
+}

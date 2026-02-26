@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-02-26
+
+### Fixed
+- **IIFE bootstrap timing:** `main.js` now checks `document.readyState` before registering the `DOMContentLoaded` listener. If performance/caching plugins add `async` or `defer` to the script tag, DOMContentLoaded may already have fired by the time the bundle runs — in that case `bootstrap()` is called immediately. Fixes the silent "button does nothing" regression introduced in 0.13.0.
+
 ## [0.13.0] - 2026-02-26
 
 ### Changed

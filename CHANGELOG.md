@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-02-26
+
+### 🐛 Bug Fixes
+- **IIFE bootstrap timing:** `main.js` checks `document.readyState` before adding the `DOMContentLoaded` listener. Performance/caching plugins that add `async`/`defer` to script tags can cause DOMContentLoaded to fire before the bundle runs; bootstrap now executes immediately in that case. Fixes silent "button does nothing" regression in 0.13.0.
+
 ## [0.13.0] — 2026-02-26
 
 ### ⚡ Performance / Build
