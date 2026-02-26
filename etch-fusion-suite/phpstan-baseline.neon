@@ -199,34 +199,10 @@ parameters:
 			path: includes/migrators/class-component-migrator.php
 
 		-
-			message: '#^Call to method register\(\) on an unknown class Bricks2Etch\\Migrators\\B2E_Migrator_Registry\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migrators/class-migrator-discovery.php
-
-		-
 			message: '#^Function etch_fusion_suite_container not found\.$#'
 			identifier: function.notFound
 			count: 1
 			path: includes/migrators/class-migrator-discovery.php
-
-		-
-			message: '#^Parameter \$registry of method Bricks2Etch\\Migrators\\EFS_Migrator_Discovery\:\:auto_discover_from_directory\(\) has invalid type Bricks2Etch\\Migrators\\B2E_Migrator_Registry\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migrators/class-migrator-discovery.php
-
-		-
-			message: '#^Property Bricks2Etch\\Migrators\\EFS_Migrator_Registry\:\:\$instance has unknown class Bricks2Etch\\Migrators\\B2E_Migrator_Registry as its type\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migrators/class-migrator-registry.php
-
-		-
-			message: '#^Static property Bricks2Etch\\Migrators\\EFS_Migrator_Registry\:\:\$instance \(Bricks2Etch\\Migrators\\B2E_Migrator_Registry\|null\) does not accept Bricks2Etch\\Migrators\\EFS_Migrator_Registry\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: includes/migrators/class-migrator-registry.php
 
 		-
 			message: '#^Call to method log_warning\(\) on an unknown class EFS_Error_Handler\.$#'
@@ -274,12 +250,6 @@ parameters:
 			message: '#^PHPDoc tag @param references unknown parameter\: \$api_key$#'
 			identifier: parameter.notFound
 			count: 2
-			path: includes/services/class-css-service.php
-
-		-
-			message: '#^PHPDoc tag @return has invalid value \(array\|\\\\WP_Error API response or error\.\)\: Unexpected token "\\\\\\\\WP_Error", expected type at offset 278 on line 8$#'
-			identifier: phpDoc.parseError
-			count: 1
 			path: includes/services/class-css-service.php
 
 		-
