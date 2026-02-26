@@ -2236,6 +2236,9 @@ const createWizard = (root) => {
 		}
 		
 		await restoreState();
+		
+		// Always render step shell to apply CSS classes (is-active, hidden) after restoring state
+		renderStepShell();
 
 		// Run pre-flight silently on wizard load (no target URL yet)
 		runPreflightCheck('', state.mode || 'browser').catch(() => {});

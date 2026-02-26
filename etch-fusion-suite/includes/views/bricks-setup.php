@@ -43,7 +43,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	</nav>
 
 	<div class="efs-wizard-panels">
-		<section class="is-active" data-efs-step-panel="1">
+		<section class="efs-wizard-panel is-active" data-efs-step-panel="1">
 			<h3><?php esc_html_e( 'Environment Check', 'etch-fusion-suite' ); ?></h3>
 			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'System checks run before migration. Resolve any errors before continuing.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-preflight" data-efs-preflight aria-live="polite">
