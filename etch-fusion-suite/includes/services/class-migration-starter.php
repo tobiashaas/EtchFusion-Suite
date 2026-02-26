@@ -67,6 +67,9 @@ class EFS_Migration_Starter {
 	/** @var EFS_Headless_Migration_Job */
 	private $headless_job;
 
+	/** @var EFS_Background_Spawn_Handler */
+	private $spawn_handler;
+
 	/**
 	 * @param EFS_Migration_Token_Manager    $token_manager       Non-nullable; caller must ensure token manager is configured.
 	 * @param EFS_Progress_Manager           $progress_manager
@@ -81,6 +84,7 @@ class EFS_Migration_Starter {
 	 * @param Migration_Repository_Interface $migration_repository
 	 * @param EFS_Migration_Logger           $migration_logger
 	 * @param EFS_Headless_Migration_Job     $headless_job
+	 * @param EFS_Background_Spawn_Handler   $spawn_handler       Fires the non-blocking background POST for browser-mode migrations.
 	 */
 	public function __construct(
 		EFS_Migration_Token_Manager $token_manager,
@@ -95,7 +99,8 @@ class EFS_Migration_Starter {
 		EFS_Plugin_Detector $plugin_detector,
 		Migration_Repository_Interface $migration_repository,
 		EFS_Migration_Logger $migration_logger,
-		EFS_Headless_Migration_Job $headless_job
+		EFS_Headless_Migration_Job $headless_job,
+		EFS_Background_Spawn_Handler $spawn_handler
 	) {
 		$this->token_manager        = $token_manager;
 		$this->progress_manager     = $progress_manager;
@@ -110,6 +115,7 @@ class EFS_Migration_Starter {
 		$this->migration_repository = $migration_repository;
 		$this->migration_logger     = $migration_logger;
 		$this->headless_job         = $headless_job;
+		$this->spawn_handler        = $spawn_handler;
 	}
 
 	/**
@@ -412,6 +418,12 @@ class EFS_Migration_Starter {
 					'steps'       => $this->progress_manager->get_steps_state(),
 				);
 			}
+
+			// Fire a non-blocking loopback POST so that the long-running phases
+			// (validation, CSS, collection) run in a separate request while this
+			// AJAX call returns immediately to the browser. Falls back to
+			// synchronous inline execution when loopback is unavailable.
+			$this->spawn_handler->spawn_migration_background_request( $migration_id, $nonce );
 
 			return array(
 				'progress'    => $this->progress_manager->get_progress_data(),

@@ -60,6 +60,11 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		add_action( 'wp_ajax_efs_cancel_headless_job', array( $this, 'cancel_headless_job' ) );
 		add_action( 'wp_ajax_efs_generate_report', array( $this, 'generate_report' ) );
 		add_action( 'wp_ajax_efs_generate_migration_key', array( $this, 'generate_migration_key' ) );
+		// Background spawn target: receives the non-blocking loopback POST fired by EFS_Background_Spawn_Handler.
+		// Nopriv omitted intentionally — the bg_token transient provides auth, but WordPress must still
+		// know about this action for admin-ajax.php to dispatch it.
+		add_action( 'wp_ajax_efs_run_migration_background', array( $this, 'run_migration_background' ) );
+		add_action( 'wp_ajax_nopriv_efs_run_migration_background', array( $this, 'run_migration_background' ) );
 	}
 
 	/**
@@ -391,5 +396,33 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		wp_send_json_success( $payload );
+	}
+
+	/**
+	 * Handle the background spawn request fired by EFS_Background_Spawn_Handler.
+	 *
+	 * Authenticated by a short-lived bg_token stored in a transient rather than
+	 * the standard nonce — this is a server-to-server loopback POST, not a
+	 * browser request, so standard nonce verification does not apply.
+	 * The migration controller validates the token and deletes it after use.
+	 */
+	public function run_migration_background() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- bg_token transient provides authentication.
+		$migration_id = isset( $_POST['migration_id'] ) ? sanitize_text_field( wp_unslash( $_POST['migration_id'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- bg_token transient provides authentication.
+		$bg_token = isset( $_POST['bg_token'] ) ? sanitize_text_field( wp_unslash( $_POST['bg_token'] ) ) : '';
+
+		if ( ! $this->require_migration_controller( 'Background migration aborted: migration controller unavailable.' ) ) {
+			return;
+		}
+
+		$result = $this->migration_controller->run_migration_execution( $migration_id, $bg_token );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+			return;
+		}
+
+		wp_send_json_success( $result );
 	}
 }

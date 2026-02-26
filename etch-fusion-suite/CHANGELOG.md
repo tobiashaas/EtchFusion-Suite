@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-02-26
+
+### Fixed
+- **Migration failed immediately with "background request could not reach the server":** `EFS_Background_Spawn_Handler` was deleted during the async-refactor but never replaced, so `start_migration_async()` returned the migration ID without ever firing the loopback POST. As a result, no PHP process ever ran validation, CSS conversion, or content collection; the migration stayed at 0 % and was detected as stale. Fix: restore `EFS_Background_Spawn_Handler`, re-inject it into `EFS_Migration_Starter`, call `spawn_migration_background_request()` at the end of `start_migration_async()` (browser mode only), and re-register the `efs_run_migration_background` AJAX action (`wp_ajax` + `wp_ajax_nopriv`) so the loopback POST is handled.
+
 ## [0.13.4] - 2026-02-26
 
 ### Fixed

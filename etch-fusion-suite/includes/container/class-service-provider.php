@@ -526,6 +526,16 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'background_spawn_handler',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Background_Spawn_Handler(
+					$c->get( 'error_handler' ),
+					$c->get( 'async_migration_runner' )
+				);
+			}
+		);
+
+		$container->singleton(
 			'migration_starter',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Starter(
@@ -541,7 +551,8 @@ class EFS_Service_Provider {
 					$c->get( 'plugin_detector' ),
 					$c->get( 'migration_repository' ),
 					$c->get( 'migration_logger' ),
-					$c->get( 'headless_migration_job' )
+					$c->get( 'headless_migration_job' ),
+					$c->get( 'background_spawn_handler' )
 				);
 			}
 		);

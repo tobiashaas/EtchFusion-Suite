@@ -121,9 +121,9 @@ class EFS_Pre_Flight_Checker {
 		// - Server-side cron (system cron, hosting provider's custom cron, xCloud-Cron, etc.)
 		// - Any task scheduler that calls the action-scheduler looper endpoint
 		// This check only fails if somehow Action Scheduler is not available, which should never happen.
-		$wp_cron_disabled = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
+		$wp_cron_disabled     = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
 		$has_action_scheduler = function_exists( 'as_enqueue_async_action' ) || class_exists( 'EFS_Vendor_ActionScheduler' );
-		
+
 		if ( 'headless' === $mode && ! $has_action_scheduler ) {
 			$checks[] = array(
 				'id'      => 'wp_cron',
