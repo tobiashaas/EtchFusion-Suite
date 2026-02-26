@@ -256,8 +256,9 @@ code.efs-pairing-code {
 	align-items: center;
 	justify-content: center;
 	padding: var(--efs-space-l);
-	background: color-mix(in oklch, var(--efs-base-ultra-dark) 98%, transparent);
+	background: color-mix(in oklch, var(--efs-base-ultra-dark) 90%, transparent);
 	overflow: auto;
+	backdrop-filter: blur(3px);
 }
 
 .efs-etch-receiving-takeover[hidden] {

@@ -564,14 +564,7 @@ class EFS_API_Endpoints {
 			return $response;
 		}
 
-		// /generate-key is intentionally CORS-exempt: the Bricks source dashboard calls it
-		// cross-origin and the source origin is unknown at setup time. The pairing code
-		// provides authentication; CORS here would create a chicken-and-egg deadlock.
-		if ( false !== strpos( $route, '/generate-key' ) ) {
-			return $response;
-		}
-
-		// Perform CORS check
+		// Perform CORS check and set headers if allowed
 		$cors_check = self::check_cors_origin();
 		if ( is_wp_error( $cors_check ) ) {
 			// Log the violation with route information
@@ -594,6 +587,11 @@ class EFS_API_Endpoints {
 				);
 			}
 			return $cors_check;
+		}
+
+		// CORS check passed: add CORS headers via manager
+		if ( self::$cors_manager ) {
+			self::$cors_manager->add_cors_headers();
 		}
 
 		return $response;
