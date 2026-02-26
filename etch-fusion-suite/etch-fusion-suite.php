@@ -292,31 +292,31 @@ class Etch_Fusion_Suite_Plugin {
 		if ( $container->has( 'cors_manager' ) ) {
 			$cors_manager = $container->get( 'cors_manager' );
 
-			// Use WordPress native CORS headers (rest_send_cors_headers) but add our validation
-			// We don't remove the default handler, just add our validation before it
-			add_filter(
-				'rest_pre_serve_request',
-				function ( $served, $result, $request, $server ) use ( $cors_manager ) {
-					// Only validate our own endpoints
-					$route = $request->get_route();
-					if ( strpos( $route, '/efs/v1/' ) === 0 ) {
-						// Perform CORS validation - reject if not allowed
+			// Send CORS headers VERY EARLY before any output or errors
+			// This ensures headers are set even for 404 responses
+			add_action(
+				'template_redirect',
+				function () use ( $cors_manager ) {
+					// Check if this is a REST API request to /efs/v1/*
+					$rest_prefix = rest_get_url_prefix();
+					$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+					
+					// Match /wp-json/efs/v1/* or /index.php?rest_route=/efs/v1/*
+					if ( strpos( $request_uri, "/{$rest_prefix}/efs/v1/" ) !== false ||
+						 strpos( $request_uri, 'rest_route=' ) !== false && strpos( $request_uri, '/efs/v1/' ) !== false ) {
+						// Validate CORS origin
+						$origin = '';
 						if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
 							$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
-							if ( ! empty( $origin ) && ! $cors_manager->is_origin_allowed( $origin ) ) {
-								// Origin not allowed - don't allow request to proceed
-								// Let WordPress return 403 via its normal error handling
-								if ( function_exists( 'rest_error_response' ) ) {
-									return new \WP_Error( 'cors_violation', 'Origin not allowed', array( 'status' => 403 ) );
-								}
-							}
+						}
+						
+						if ( ! empty( $origin ) && $cors_manager->is_origin_allowed( $origin ) ) {
+							// Origin is allowed, set CORS headers
+							$cors_manager->add_cors_headers();
 						}
 					}
-					// Return unchanged - let WordPress native CORS handler continue
-					return $served;
 				},
-				9, // Run BEFORE rest_send_cors_headers (priority 10)
-				4
+				1 // Run early
 			);
 		}
 	}
