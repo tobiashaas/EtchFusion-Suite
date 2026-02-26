@@ -564,6 +564,13 @@ class EFS_API_Endpoints {
 			return $response;
 		}
 
+		// /generate-key is intentionally CORS-exempt: the Bricks source dashboard calls it
+		// cross-origin and the source origin is unknown at setup time. The pairing code
+		// provides authentication; CORS here would create a chicken-and-egg deadlock.
+		if ( false !== strpos( $route, '/generate-key' ) ) {
+			return $response;
+		}
+
 		// Perform CORS check
 		$cors_check = self::check_cors_origin();
 		if ( is_wp_error( $cors_check ) ) {
@@ -749,11 +756,9 @@ class EFS_API_Endpoints {
 			return $rate;
 		}
 
-		// CORS check — source browser calls this cross-origin in the reverse-generation flow.
-		$cors = self::check_cors_origin();
-		if ( is_wp_error( $cors ) ) {
-			return $cors;
-		}
+		// No CORS check here: this endpoint is intentionally open to cross-origin requests.
+		// The Bricks source dashboard calls it from an unknown origin; the pairing code
+		// provides authentication. See enforce_cors_globally() for the bypass.
 
 		// Pairing code validation (required).
 		$pairing_code = $request->get_param( 'pairing_code' );
@@ -2217,10 +2222,11 @@ class EFS_API_Endpoints {
 			'/generate-key',
 			array(
 				'callback'            => array( __CLASS__, 'generate_migration_key' ),
-				// Public: source dashboard calls this cross-origin (reverse-generation flow).
-				// CORS allowlist + rate limiting are the access controls; token writes are
-				// tied to the source origin via X-EFS-Source-Origin on import endpoints.
-				'permission_callback' => array( __CLASS__, 'allow_public_request' ),
+				// The pairing code in the request IS the authentication for this endpoint.
+				// CORS must not block it: the Bricks source dashboard calls cross-origin
+				// and the origin is unknown at setup time. Rate limiting + single-use
+				// pairing codes are the access controls.
+				'permission_callback' => '__return_true',
 				'methods'             => \WP_REST_Server::READABLE . ', ' . \WP_REST_Server::CREATABLE,
 			)
 		);

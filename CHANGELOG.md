@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [0.13.3] — 2026-02-26
+
+### 🐛 Bug Fixes
+- **`/generate-key` 403 CORS deadlock:** The Bricks source dashboard calls this endpoint cross-origin, but the Etch target site doesn't know the source origin before the connection is made. CORS blocked it in three places (`rest_request_before_callbacks`, `allow_public_request`, internal handler check). The pairing code (single-use, 15 min TTL, rate-limited) is the actual auth — CORS is not needed here. All three CORS checks are now bypassed for this route.
+
 ## [0.13.2] — 2026-02-26
 
 ### 🐛 Bug Fixes

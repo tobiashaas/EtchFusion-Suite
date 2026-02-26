@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-02-26
+
+### Fixed
+- **`/generate-key` REST endpoint returns 403 (CORS):** The Bricks source site calls this endpoint cross-origin when the user enters a connection URL, but the Etch target site didn't know the Bricks origin at setup time — a chicken-and-egg deadlock. The endpoint was blocked in three independent places: the `rest_request_before_callbacks` filter, the `allow_public_request` permission callback, and the handler's internal CORS check. Fixed by exempting `/generate-key` from all three CORS checks. The pairing code (single-use, 15 min TTL, rate-limited) is sufficient authentication for this endpoint.
+
 ## [0.13.2] - 2026-02-26
 
 ### Fixed
