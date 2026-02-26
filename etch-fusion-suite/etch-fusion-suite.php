@@ -281,8 +281,14 @@ class Etch_Fusion_Suite_Plugin {
 	 */
 	public function init_rest_api() {
 		set_transient( 'efs_init_rest_api_called', 1, 3600 );
-		EFS_API_Endpoints::set_container( etch_fusion_suite_container() );
-		EFS_API_Endpoints::init();
+		try {
+			EFS_API_Endpoints::set_container( etch_fusion_suite_container() );
+			set_transient( 'efs_set_container_ok', 1, 3600 );
+			EFS_API_Endpoints::init();
+			set_transient( 'efs_api_endpoints_init_ok', 1, 3600 );
+		} catch ( \Exception $e ) {
+			set_transient( 'efs_init_rest_api_error', $e->getMessage(), 3600 );
+		}
 	}
 
 	/**
