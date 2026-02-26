@@ -1146,8 +1146,10 @@ const createWizard = (root) => {
 	const runBatchLoop = async (migrationId) => {
 		runtime.batchFailCount = 0;
 		let currentBatchSize = BATCH_SIZE;
+		const MAX_PARALLEL_REQUESTS = 5;
+		let shouldContinue = true;
 
-		const processBatch = async () => {
+		const submitBatch = async () => {
 			try {
 				const payload = await post(ACTION_MIGRATE_BATCH, {
 					migrationId: migrationId,
@@ -1173,21 +1175,17 @@ const createWizard = (root) => {
 				}
 
 				if (payload?.completed) {
+					shouldContinue = false;
 					perfMetrics.endMigration();
 					const hints = perfMetrics.getBottleneckHints();
 					if (hints && hints.length > 0) {
 						console.warn('[EFS][Perf] Bottleneck hints:', hints);
 					}
-					runtime.migrationRunning = false;
-					showResult('success', 'Migration finished successfully.');
-					return;
 				}
-
-				// Yield to event loop then continue.
-				window.setTimeout(processBatch, 100);
 			} catch (error) {
 				runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
 				if (runtime.batchFailCount >= 3) {
+					shouldContinue = false;
 					runtime.migrationRunning = false;
 					stopPolling();
 					try {
@@ -1210,13 +1208,63 @@ const createWizard = (root) => {
 						refs.retryButton.hidden = false;
 					}
 					showResult('error', error?.message || 'Batch processing failed. Try resuming the migration.');
-					return;
+					throw error;
 				}
-				window.setTimeout(processBatch, POLL_INTERVAL_MS);
 			}
 		};
 
-		await processBatch();
+		// Parallel batch processor: maintains up to MAX_PARALLEL_REQUESTS active at once
+		const batchPool = async () => {
+			const promises = [];
+
+			// Start initial batch of requests
+			for (let i = 0; i < MAX_PARALLEL_REQUESTS && shouldContinue; i++) {
+				promises.push(
+					submitBatch().catch((err) => {
+						console.error('[EFS] Batch submission error:', err);
+					})
+				);
+			}
+
+			// As requests complete, submit new ones
+			while (shouldContinue && promises.length > 0) {
+				await Promise.race(promises);
+				const completedIndex = promises.findIndex((p) => p.resolved !== false);
+				promises.splice(completedIndex, 1);
+
+				if (shouldContinue) {
+					promises.push(
+						submitBatch().catch((err) => {
+							console.error('[EFS] Batch submission error:', err);
+						})
+					);
+				}
+			}
+
+			// Wait for remaining requests to finish
+			if (promises.length > 0) {
+				await Promise.all(promises).catch((err) => {
+					console.error('[EFS] Final batch errors:', err);
+				});
+			}
+
+			// Check completion status
+			if (shouldContinue) {
+				try {
+					const finalProgress = await post(ACTION_GET_PROGRESS, {
+						migrationId: migrationId,
+					});
+					if (finalProgress?.progress?.completed) {
+						runtime.migrationRunning = false;
+						showResult('success', 'Migration finished successfully.');
+					}
+				} catch (err) {
+					console.warn('[EFS] Could not verify final status:', err);
+				}
+			}
+		};
+
+		await batchPool();
 	};
 
 	const resumeMigration = async (migrationId) => {
