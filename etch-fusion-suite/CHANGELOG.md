@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-02-26
+
+### Changed
+- **JS Bundling (esbuild):** All 15 admin ES6 modules are now compiled into a single IIFE bundle (`assets/js/dist/main.js`). WordPress enqueues only this one file; the `?ver=` cache-busting parameter covers the entire bundle on every update. Eliminates stale-sub-module caching that caused `etch-dashboard.js` to call the deprecated REST endpoint after 0.12.9. Added `build` / `watch` npm scripts and `esbuild ^0.25.0` devDependency. Removed `type="module"` and `script_loader_tag` filter from `class-admin-interface.php`.
+
 ## [0.12.8] - 2026-02-25
 
 ### Fixed

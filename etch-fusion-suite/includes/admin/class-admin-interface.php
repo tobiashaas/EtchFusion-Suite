@@ -38,7 +38,6 @@ class EFS_Admin_Interface {
 		}
 
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
-		add_filter( 'script_loader_tag', array( $this, 'add_module_type_attribute' ), 10, 3 );
 	}
 
 	public function add_admin_menu() {
@@ -119,8 +118,9 @@ class EFS_Admin_Interface {
 			);
 		}
 
-		// Enqueue admin JavaScript (ES6 module)
-		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/admin/main.js';
+		// Enqueue bundled admin JavaScript (single IIFE bundle — no sub-module requests,
+		// cache-busted automatically via ?ver= on every release).
+		$js_path = ETCH_FUSION_SUITE_DIR . 'assets/js/dist/main.js';
 		if ( file_exists( $js_path ) ) {
 			// Always include the plugin version so the URL changes on every release,
 			// even when file timestamps are identical between ZIP builds.
@@ -128,13 +128,11 @@ class EFS_Admin_Interface {
 			$js_version = ETCH_FUSION_SUITE_VERSION . ( false !== $js_mtime ? '-' . $js_mtime : '' );
 			wp_enqueue_script(
 				'efs-admin-main',
-				ETCH_FUSION_SUITE_URL . 'assets/js/admin/main.js',
+				ETCH_FUSION_SUITE_URL . 'assets/js/dist/main.js',
 				array(),
 				$js_version,
 				true
 			);
-
-			wp_script_add_data( 'efs-admin-main', 'type', 'module' );
 
 			// Localize script data
 			$context                      = $this->dashboard_controller->get_dashboard_context();
@@ -157,24 +155,5 @@ class EFS_Admin_Interface {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: logs missing admin asset for debugging when WP_DEBUG is enabled
 			error_log( sprintf( '[EFS] Admin script not found: %s', $js_path ) );
 		}
-	}
-
-	/**
-	 * Add type="module" attribute to admin script tag.
-	 *
-	 * @param string $tag    The script tag HTML.
-	 * @param string $handle The script handle.
-	 * @param string $src    The script source URL.
-	 * @return string Modified script tag.
-	 */
-	public function add_module_type_attribute( $tag, $handle, $src ) {
-		if ( 'efs-admin-main' !== $handle ) {
-			return $tag;
-		}
-
-		// Replace the opening script tag to include type="module"
-		$tag = str_replace( '<script ', '<script type="module" ', $tag );
-
-		return $tag;
 	}
 }

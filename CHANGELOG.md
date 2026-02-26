@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-02-26
+
+### ⚡ Performance / Build
+
+- **JS Bundling (esbuild):** All 15 admin ES6 modules are now bundled into a single IIFE (`assets/js/dist/main.js`) via esbuild. WordPress enqueues only this one file; the `?ver=` cache-busting parameter covers every sub-module automatically after each update. Eliminates the stale-sub-module problem that caused `etch-dashboard.js` to call the deprecated REST endpoint after `0.12.9`. `type="module"` and the `script_loader_tag` filter have been removed. Added `build` and `watch` npm scripts; `esbuild ^0.25.0` added as devDependency.
+
 ### 🐛 Bug Fixes
 
 - **Class Migration — ACSS Double-Skip:** Removed the ACSS-availability drop check from `get_css_classes()` in `class-base-element.php`. When a class existed in `style_map` but `efs_acss_inline_style_map` was empty (ACSS not installed or CSS not generated), the class was silently dropped from `get_css_classes()` *and* subsequently skipped by `get_resolved_global_class_names()` (which skips style_map entries to prevent duplicates). This double-skip caused all ACSS global classes to disappear from migrated HTML. The fix: always output the class name if it is in `style_map`, regardless of ACSS inline-style availability.
