@@ -64,7 +64,7 @@ check_dependencies() {
 }
 
 run_grep_check() {
-  info "Scanning for forbidden debug file-write patterns"
+  info "Scanning for forbidden debug file-write patterns" >&2
   local all_matches=""
   local match
   local exclude_dirs=( --exclude-dir=vendor --exclude-dir=tests --exclude-dir=scripts )
