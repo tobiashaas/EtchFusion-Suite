@@ -69,10 +69,13 @@ export const post = async (action, payload = {}, options = {}) => {
         }
     }
 
-    if (typeof options?.timeoutMs === 'number' && options.timeoutMs > 0) {
+    const timeoutMs = options?.timeoutMs ?? 60000;
+    if (typeof timeoutMs === 'number' && timeoutMs > 0) {
         timeoutId = window.setTimeout(() => {
-            controller.abort(new Error('Request timed out.'));
-        }, options.timeoutMs);
+            const error = new Error('Request timed out.');
+            error.code = 'timeout';
+            controller.abort(error);
+        }, timeoutMs);
     }
 
     let response;

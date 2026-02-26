@@ -1,5 +1,5 @@
 import { post } from './api.js';
-import { showToast } from './ui.js';
+import { showToast, updateProgress } from './ui.js';
 import { perfMetrics } from './utilities/perf-metrics.js';
 import { updateTabTitle, resetTabTitle } from './utilities/tab-title.js';
 import { createProgressChip, updateProgressChip, removeProgressChip } from './utilities/progress-chip.js';
@@ -1097,7 +1097,7 @@ const createWizard = (root) => {
 		const processBatch = async () => {
 			try {
 				const payload = await post(ACTION_MIGRATE_BATCH, {
-					migration_id: migrationId,
+					migrationId: migrationId,
 					batch_size: currentBatchSize,
 				});
 				runtime.batchFailCount = 0;
@@ -1136,6 +1136,23 @@ const createWizard = (root) => {
 				runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
 				if (runtime.batchFailCount >= 3) {
 					runtime.migrationRunning = false;
+					stopPolling();
+					try {
+						const progressPayload = await post(ACTION_GET_PROGRESS, {
+							migrationId: migrationId,
+						});
+						if (progressPayload?.progress) {
+							updateProgress({
+								percentage: progressPayload.progress.percentage || 0,
+								status: progressPayload.progress.message || 'Batch processing failed',
+								items_processed: progressPayload.progress.items_processed || 0,
+								items_total: progressPayload.progress.items_total || 0,
+								items_skipped: progressPayload.progress.items_skipped || 0,
+							});
+						}
+					} catch (progressError) {
+						console.warn('[EFS] Could not fetch final progress after batch failure:', progressError);
+					}
 					if (refs.retryButton) {
 						refs.retryButton.hidden = false;
 					}
@@ -1152,7 +1169,7 @@ const createWizard = (root) => {
 	const resumeMigration = async (migrationId) => {
 		try {
 			const payload = await post(ACTION_RESUME_MIGRATION, {
-				migration_id: migrationId,
+				migrationId: migrationId,
 			});
 
 			if (payload?.resumed) {
@@ -1197,7 +1214,7 @@ const createWizard = (root) => {
 		const poll = async () => {
 			try {
 				const payload = await post(ACTION_GET_PROGRESS, {
-					migration_id: migrationId,
+					migrationId: migrationId,
 				});
 				runtime.pollingFailCount = 0;
 				const progress = payload?.progress || {};
@@ -1613,11 +1630,13 @@ const createWizard = (root) => {
 			try {
 				const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || '';
 				await post(ACTION_CANCEL_MIGRATION, {
-					migration_id: migrationId,
+					migrationId: migrationId,
 				});
 				showToast('Migration cancelled.', 'info');
 			} catch (error) {
 				showToast(error?.message || 'Unable to cancel migration.', 'error');
+			} finally {
+				stopPolling();
 			}
 		}
 
@@ -1910,14 +1929,16 @@ const createWizard = (root) => {
 		refs.cancelHeadlessButton?.addEventListener('click', async () => {
 			try {
 				const migrationId = state.migrationId || '';
-				await post(ACTION_CANCEL_MIGRATION, { migration_id: migrationId });
+				await post(ACTION_CANCEL_MIGRATION, { migrationId: migrationId });
 				await post('efs_cancel_headless_job', {
 					action_scheduler_id: state.actionSchedulerId || 0,
-					migration_id: migrationId,
+					migrationId: migrationId,
 				});
 				showToast('Headless migration cancelled.', 'info');
 			} catch (error) {
 				showToast(error?.message || 'Unable to cancel migration.', 'error');
+			} finally {
+				stopPolling();
 			}
 			await resetWizard();
 		});

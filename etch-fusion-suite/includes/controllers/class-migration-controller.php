@@ -27,6 +27,16 @@ class EFS_Migration_Controller {
 			: null;
 	}
 
+	/**
+	 * Validate if a string is a valid UUID v4 format.
+	 *
+	 * @param string $value The value to validate.
+	 * @return bool True if valid UUID v4 format, false otherwise.
+	 */
+	private function is_valid_uuid( $value ) {
+		return (bool) preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value );
+	}
+
 	public function start_migration( array $data ) {
 		$migration_key = isset( $data['migration_key'] ) ? sanitize_textarea_field( $data['migration_key'] ) : '';
 		$batch         = isset( $data['batch_size'] ) ? intval( $data['batch_size'] ) : 50;
@@ -132,8 +142,12 @@ class EFS_Migration_Controller {
 
 	public function get_progress( array $data = array() ) {
 		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
-		$result       = $this->manager->get_progress( $migration_id );
+		if ( ! empty( $migration_id ) && ! $this->is_valid_uuid( $migration_id ) ) {
+			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
+		}
+		$result = $this->manager->get_progress( $migration_id );
 		if ( is_wp_error( $result ) ) {
+			$result->add_data( array( 'migrationId' => $migration_id ) );
 			return $result;
 		}
 
@@ -178,10 +192,14 @@ class EFS_Migration_Controller {
 
 	public function process_batch( array $data ) {
 		$migration_id        = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		if ( ! empty( $migration_id ) && ! $this->is_valid_uuid( $migration_id ) ) {
+			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
+		}
 		$batch               = isset( $data['batch'] ) ? (array) $data['batch'] : array();
 		$batch['batch_size'] = isset( $data['batch_size'] ) ? max( 1, (int) $data['batch_size'] ) : 10;
 		$result              = $this->manager->process_batch( $migration_id, $batch );
 		if ( is_wp_error( $result ) ) {
+			$result->add_data( array( 'migrationId' => $migration_id ) );
 			return $result;
 		}
 		return array(
@@ -206,13 +224,31 @@ class EFS_Migration_Controller {
 		if ( empty( $migration_id ) ) {
 			return new \WP_Error( 'missing_migration_id', __( 'Migration ID is required.', 'etch-fusion-suite' ) );
 		}
-		return $this->manager->resume_migration_execution( $migration_id );
+		if ( ! $this->is_valid_uuid( $migration_id ) ) {
+			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
+		}
+		$result = $this->manager->resume_migration_execution( $migration_id );
+		if ( is_wp_error( $result ) ) {
+			$result->add_data( array( 'migrationId' => $migration_id ) );
+			return $result;
+		}
+		return array(
+			'message'     => isset( $result['message'] ) ? $result['message'] : __( 'Migration resumed.', 'etch-fusion-suite' ),
+			'progress'    => isset( $result['progress'] ) ? $result['progress'] : array(),
+			'steps'       => isset( $result['steps'] ) ? $result['steps'] : array(),
+			'migrationId' => isset( $result['migrationId'] ) ? $result['migrationId'] : $migration_id,
+			'resumed'     => ! empty( $result['resumed'] ),
+		);
 	}
 
 	public function cancel_migration( array $data = array() ) {
 		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
-		$result       = $this->manager->cancel_migration( $migration_id );
+		if ( ! empty( $migration_id ) && ! $this->is_valid_uuid( $migration_id ) ) {
+			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
+		}
+		$result = $this->manager->cancel_migration( $migration_id );
 		if ( is_wp_error( $result ) ) {
+			$result->add_data( array( 'migrationId' => $migration_id ) );
 			return $result;
 		}
 		return array(

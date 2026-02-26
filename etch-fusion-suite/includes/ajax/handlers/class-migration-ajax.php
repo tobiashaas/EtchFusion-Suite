@@ -105,7 +105,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			wp_send_json_error( $error_extra, 409 );
 			return;
 		}
-		$extra_data = is_wp_error( $result ) ? array() : array( 'migration_id' => $result['migrationId'] ?? null );
+		$extra_data = is_wp_error( $result ) ? array() : array( 'migrationId' => $result['migrationId'] ?? null );
 		$this->send_controller_response( $result, 'migration_start_failed', 'Migration started successfully.', $extra_data );
 	}
 
@@ -242,7 +242,10 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 		$action_scheduler_id = (int) $this->get_post( 'action_scheduler_id', 0, 'int' );
-		$migration_id        = $this->get_post( 'migration_id', '', 'text' );
+		$migration_id        = $this->get_post( 'migrationId', '', 'text' );
+		if ( '' === $migration_id ) {
+			$migration_id = $this->get_post( 'migration_id', '', 'text' );
+		}
 		if ( function_exists( 'as_unschedule_action' ) ) {
 			as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
 		} elseif ( class_exists( 'EFS_Vendor_ActionScheduler' ) ) {
@@ -363,13 +366,14 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				array( 'code' => $error_code )
 			);
 
-			wp_send_json_error(
-				array(
-					'message' => $result->get_error_message(),
-					'code'    => $error_code,
-				),
-				$status
+			$error_payload = array(
+				'message' => $result->get_error_message(),
+				'code'    => $error_code,
 			);
+			if ( is_array( $error_data ) && isset( $error_data['migrationId'] ) ) {
+				$error_payload['migrationId'] = sanitize_text_field( $error_data['migrationId'] );
+			}
+			wp_send_json_error( $error_payload, $status );
 			return;
 		}
 
