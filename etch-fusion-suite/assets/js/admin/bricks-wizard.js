@@ -228,9 +228,9 @@ const createWizard = (root) => {
 			return;
 		}
 
-		// Filter out connection-specific checks (wp_cron, target_site_reachable) from Step 1 display.
+		// Filter out connection-specific checks (wp_cron, target_reachable) from Step 1 display.
 		// These will be shown separately during connection validation in Step 2.
-		const systemChecks = result.checks.filter((c) => !['wp_cron', 'target_site_reachable'].includes(c.id));
+		const systemChecks = result.checks.filter((c) => !['wp_cron', 'target_reachable'].includes(c.id));
 
 		const rows = systemChecks.map((check) => {
 			const hint = (check.status === 'error' || check.status === 'warning')
@@ -310,7 +310,7 @@ const createWizard = (root) => {
 			return;
 		}
 
-		const connectChecks = result.checks.filter((c) => ['wp_cron', 'target_site_reachable'].includes(c.id));
+		const connectChecks = result.checks.filter((c) => ['wp_cron', 'target_reachable'].includes(c.id));
 		if (!connectChecks.length) {
 			if (refs.preflightConnectResults) {
 				refs.preflightConnectResults.hidden = true;
@@ -1281,6 +1281,10 @@ const createWizard = (root) => {
 				runtime.lastProcessedCount = itemsProcessed;
 				runtime.lastPollTime = performance.now();
 
+				// Validate migration ID hasn't changed unexpectedly
+				if (payload?.migrationId && payload.migrationId !== migrationId) {
+					console.warn('[EFS] Migration ID mismatch detected:', { expected: migrationId, received: payload.migrationId });
+				}
 				state.migrationId = payload?.migrationId || migrationId;
 
 				// Keep action_scheduler_id up to date for cancel support.
@@ -1340,7 +1344,15 @@ const createWizard = (root) => {
 				// In headless mode the server handles batching — keep polling instead.
 				if ((currentStep === 'media' || currentStep === 'posts') && status === 'running' && state.mode !== 'headless') {
 					stopPolling();
-					await runBatchLoop(migrationId);
+					try {
+						await runBatchLoop(migrationId);
+					} catch (batchError) {
+						runtime.migrationRunning = false;
+						if (refs.retryButton) {
+							refs.retryButton.hidden = false;
+						}
+						showResult('error', batchError?.message || 'Batch processing failed. Migration may still be running on the server.');
+					}
 					return;
 				}
 
@@ -1349,6 +1361,7 @@ const createWizard = (root) => {
 				runtime.pollingFailCount = (runtime.pollingFailCount || 0) + 1;
 				if (runtime.pollingFailCount >= 3) {
 					runtime.migrationRunning = false;
+					stopPolling();
 					if (refs.retryButton) {
 						refs.retryButton.hidden = false;
 					}
@@ -2090,7 +2103,7 @@ const createWizard = (root) => {
 
 		try {
 			const payload = await post(ACTION_GET_PROGRESS, {
-				migration_id: migrationId,
+				migrationId: migrationId,
 			});
 			const pollStatus = String(payload?.progress?.status || payload?.progress?.current_step || '').toLowerCase();
 			const pollPercentage = Number(payload?.progress?.percentage ?? 0);
@@ -2103,7 +2116,7 @@ const createWizard = (root) => {
 			if (isStale && (pollCurrentStep === 'media' || pollCurrentStep === 'posts')) {
 				state.migrationId = payload?.migrationId || migrationId;
 				try {
-				const resumed = await post(ACTION_RESUME_MIGRATION, { migration_id: state.migrationId });
+				const resumed = await post(ACTION_RESUME_MIGRATION, { migrationId: state.migrationId });
 				if (resumed?.resumed) {
 						await setStep(4, { skipSave: true });
 						if (refs.progressTakeover) {

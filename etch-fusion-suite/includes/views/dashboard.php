@@ -5,7 +5,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 ?>
 <div class="efs-typography efs-admin-wrap">
-	<h1 class="efs-page-title"><?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?></h1>
+	<h1 class="efs-page-title">
+		<?php esc_html_e( 'Etch Fusion Suite', 'etch-fusion-suite' ); ?>
+		<span class="efs-version-badge">v<?php echo esc_html( ETCH_FUSION_SUITE_VERSION ); ?></span>
+	</h1>
 
 	<?php if ( ! $is_bricks_site && ! $is_etch_site ) : ?>
 		<div class="efs-card efs-card--warning">

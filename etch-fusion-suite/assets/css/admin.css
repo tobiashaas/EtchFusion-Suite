@@ -1039,10 +1039,27 @@ body.toplevel_page_etch-fusion-suite .efs-migration-notice.notice-info {
 
 .efs-admin-wrap h1,
 .efs-page-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
 	font-size: 28px;
 	font-weight: 600;
 	line-height: 1.3;
 	color: var(--efs-neutral-ultra-light);
+}
+
+.efs-version-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: color-mix(in oklch, var(--efs-primary) 14%, transparent);
+	border: 1px solid color-mix(in oklch, var(--efs-primary) 35%, transparent);
+	color: color-mix(in oklch, var(--efs-primary) 80%, var(--efs-neutral-ultra-light));
+	font-size: 13px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	vertical-align: middle;
 }
 
 .efs-logs-container {
