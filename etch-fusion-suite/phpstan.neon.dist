@@ -10,8 +10,4 @@ parameters:
         - vendor-prefixed/
     bootstrapFiles:
         - vendor/autoload.php
-    ignoreErrors:
-        # The constant is defined in the plugin header guard - PHPStan can't see it across the ABSPATH check
-        - message: '/Constant ETCH_FUSION_SUITE_VERSION not found/'
-        # Constructor signature was updated but PHPStan may have stale cache
-        - message: '/constructor invoked with 13 parameters, 14 required/'
+        - etch-fusion-suite.php

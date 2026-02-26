@@ -141,6 +141,7 @@ class EFS_Migration_Manager {
 			$migration_logger,
 			$migration_repository
 		);
+		$spawn_handler       = new \Bricks2Etch\Services\EFS_Background_Spawn_Handler( $api_client, $error_handler );
 		$starter             = new \Bricks2Etch\Services\EFS_Migration_Starter(
 			$token_manager,
 			$progress_manager,
@@ -154,7 +155,8 @@ class EFS_Migration_Manager {
 			$plugin_detector,
 			$migration_repository,
 			$migration_logger,
-			$headless_job
+			$headless_job,
+			$spawn_handler
 		);
 		$orchestrator        = new \Bricks2Etch\Services\EFS_Migration_Orchestrator(
 			$starter,
