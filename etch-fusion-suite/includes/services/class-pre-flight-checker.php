@@ -114,12 +114,25 @@ class EFS_Pre_Flight_Checker {
 		}
 
 		// WP Cron check.
-		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON && 'headless' === $mode ) {
+		// Headless mode can use either WP Cron or Action Scheduler for background task execution.
+		// This check verifies that at least one is available. On xCloud with DISABLE_WP_CRON=true,
+		// Action Scheduler will be triggered by xCloud-Cron ensuring reliable background execution.
+		$wp_cron_disabled = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
+		$has_action_scheduler = function_exists( 'as_enqueue_async_action' ) || class_exists( 'EFS_Vendor_ActionScheduler' );
+		
+		if ( $wp_cron_disabled && 'headless' === $mode && ! $has_action_scheduler ) {
 			$checks[] = array(
 				'id'      => 'wp_cron',
 				'status'  => 'error',
 				'value'   => 'disabled',
-				'message' => __( 'WP Cron is disabled (DISABLE_WP_CRON) and migration mode is headless. Switch to Browser Mode or enable WP Cron.', 'etch-fusion-suite' ),
+				'message' => __( 'WP Cron is disabled (DISABLE_WP_CRON) and Action Scheduler is not available. Headless mode requires Action Scheduler or WP Cron. Enable WP Cron or use Browser Mode instead.', 'etch-fusion-suite' ),
+			);
+		} elseif ( $wp_cron_disabled && $has_action_scheduler ) {
+			$checks[] = array(
+				'id'      => 'wp_cron',
+				'status'  => 'ok',
+				'value'   => 'disabled_with_scheduler',
+				'message' => __( 'WP Cron is disabled but Action Scheduler is available. Headless mode will use Action Scheduler for background tasks.', 'etch-fusion-suite' ),
 			);
 		} else {
 			$checks[] = array(
