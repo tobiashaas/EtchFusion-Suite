@@ -191,7 +191,7 @@ class EFS_Migration_Controller {
 	}
 
 	public function process_batch( array $data ) {
-		$migration_id        = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
+		$migration_id = isset( $data['migrationId'] ) ? sanitize_text_field( $data['migrationId'] ) : '';
 		if ( ! empty( $migration_id ) && ! $this->is_valid_uuid( $migration_id ) ) {
 			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
 		}
