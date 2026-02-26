@@ -320,25 +320,6 @@ class Etch_Fusion_Suite_Plugin {
 			);
 		}
 	}
-			add_action(
-				'rest_api_init',
-				function () use ( $cors_manager ) {
-					add_filter(
-						'rest_pre_dispatch',
-						function ( $result, $server, $request ) use ( $cors_manager ) {
-							if ( $request->get_method() === 'OPTIONS' ) {
-								$cors_manager->handle_preflight_request();
-								return new WP_REST_Response( null, 200 );
-							}
-							return $result;
-						},
-						10,
-						3
-					);
-				}
-			);
-		}
-	}
 
 	/**
 	 * Add security headers to HTTP responses
