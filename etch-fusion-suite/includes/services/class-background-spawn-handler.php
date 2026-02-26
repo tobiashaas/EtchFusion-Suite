@@ -46,18 +46,6 @@ class EFS_Background_Spawn_Handler {
 	}
 
 	/**
-	 * Generate a unique migration identifier.
-	 *
-	 * @return string UUID v4 when available, otherwise prefixed uniqid.
-	 */
-	public function generate_migration_id(): string {
-		if ( function_exists( 'wp_generate_uuid4' ) ) {
-			return wp_generate_uuid4();
-		}
-		return uniqid( 'efs_migration_', true );
-	}
-
-	/**
 	 * Build the URL for the background self-request.
 	 *
 	 * Resolves the internal Docker host when running inside wp-env so the
