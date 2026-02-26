@@ -6,5 +6,7 @@ parameters:
     level: 3
     paths:
         - includes/
+    scanDirectories:
+        - vendor-prefixed/
     bootstrapFiles:
         - vendor/autoload.php

@@ -120,23 +120,6 @@ parameters:
 			count: 1
 			path: includes/container/class-service-container.php
 
-		-
-			message: '#^Class Bricks2Etch\\Container\\EFS_Service_Container implements unknown interface EtchFusionSuite\\Vendor\\Psr\\Container\\ContainerInterface\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/container/class-service-container.php
-
-		-
-			message: '#^Anonymous class implements unknown interface EtchFusionSuite\\Vendor\\Psr\\Container\\NotFoundExceptionInterface\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/container/class-service-container.php
-
-		-
-			message: '#^Anonymous class implements unknown interface EtchFusionSuite\\Vendor\\Psr\\Container\\ContainerExceptionInterface\.$#'
-			identifier: class.notFound
-			count: 4
-			path: includes/container/class-service-container.php
 
 		-
 			message: '#^Function efs_is_framer_enabled not found\.$#'
