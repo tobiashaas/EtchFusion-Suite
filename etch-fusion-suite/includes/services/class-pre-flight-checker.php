@@ -114,32 +114,36 @@ class EFS_Pre_Flight_Checker {
 		}
 
 		// WP Cron check.
-		// Headless mode can use either WP Cron or Action Scheduler for background task execution.
-		// This check verifies that at least one is available. On xCloud with DISABLE_WP_CRON=true,
-		// Action Scheduler will be triggered by xCloud-Cron ensuring reliable background execution.
+		// Headless mode uses Action Scheduler (bundled with this plugin) for background task execution.
+		// Action Scheduler is always available (vendor'd as EFS_Vendor_ActionScheduler).
+		// It can be triggered by:
+		// - WP Cron (if enabled)
+		// - xCloud-Cron (recommended for DISABLE_WP_CRON=true environments)
+		// - Any external server-side cron (e.g., system cron calling /wp-json endpoint)
+		// This check only fails if somehow Action Scheduler is not available, which should never happen.
 		$wp_cron_disabled = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
 		$has_action_scheduler = function_exists( 'as_enqueue_async_action' ) || class_exists( 'EFS_Vendor_ActionScheduler' );
 		
-		if ( $wp_cron_disabled && 'headless' === $mode && ! $has_action_scheduler ) {
+		if ( 'headless' === $mode && ! $has_action_scheduler ) {
 			$checks[] = array(
 				'id'      => 'wp_cron',
 				'status'  => 'error',
-				'value'   => 'disabled',
-				'message' => __( 'WP Cron is disabled (DISABLE_WP_CRON) and Action Scheduler is not available. Headless mode requires Action Scheduler or WP Cron. Enable WP Cron or use Browser Mode instead.', 'etch-fusion-suite' ),
+				'value'   => 'no_scheduler',
+				'message' => __( 'Critical error: Action Scheduler is not available. This should never happen. Please ensure the plugin is correctly installed.', 'etch-fusion-suite' ),
 			);
-		} elseif ( $wp_cron_disabled && $has_action_scheduler ) {
+		} elseif ( $wp_cron_disabled ) {
 			$checks[] = array(
 				'id'      => 'wp_cron',
 				'status'  => 'ok',
 				'value'   => 'disabled_with_scheduler',
-				'message' => __( 'WP Cron is disabled but Action Scheduler is available. Headless mode will use Action Scheduler for background tasks.', 'etch-fusion-suite' ),
+				'message' => __( 'WP Cron is disabled. Headless mode will use Action Scheduler, which will be triggered by xCloud-Cron or another server-side cron.', 'etch-fusion-suite' ),
 			);
 		} else {
 			$checks[] = array(
 				'id'      => 'wp_cron',
 				'status'  => 'ok',
 				'value'   => 'enabled',
-				'message' => __( 'WP Cron is available.', 'etch-fusion-suite' ),
+				'message' => __( 'WP Cron is enabled. Background tasks will be executed via WP Cron or Action Scheduler.', 'etch-fusion-suite' ),
 			);
 		}
 
