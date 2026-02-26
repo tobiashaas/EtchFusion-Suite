@@ -292,10 +292,9 @@ class Etch_Fusion_Suite_Plugin {
 		if ( $container->has( 'cors_manager' ) ) {
 			$cors_manager = $container->get( 'cors_manager' );
 
-			// Send CORS headers VERY EARLY before any output or errors
-			// This ensures headers are set even for 404 responses
+			// Send CORS headers IMMEDIATELY on init hook - before anything else
 			add_action(
-				'template_redirect',
+				'init',
 				function () use ( $cors_manager ) {
 					// Check if this is a REST API request to /efs/v1/*
 					$rest_prefix = rest_get_url_prefix();
@@ -303,7 +302,7 @@ class Etch_Fusion_Suite_Plugin {
 					
 					// Match /wp-json/efs/v1/* or /index.php?rest_route=/efs/v1/*
 					if ( strpos( $request_uri, "/{$rest_prefix}/efs/v1/" ) !== false ||
-						 strpos( $request_uri, 'rest_route=' ) !== false && strpos( $request_uri, '/efs/v1/' ) !== false ) {
+						 ( strpos( $request_uri, 'rest_route=' ) !== false && strpos( $request_uri, '/efs/v1/' ) !== false ) ) {
 						// Validate CORS origin
 						$origin = '';
 						if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
@@ -316,7 +315,7 @@ class Etch_Fusion_Suite_Plugin {
 						}
 					}
 				},
-				1 // Run early
+				1 // Run early on init
 			);
 		}
 	}
