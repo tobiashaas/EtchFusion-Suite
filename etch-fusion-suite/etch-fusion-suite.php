@@ -292,22 +292,34 @@ class Etch_Fusion_Suite_Plugin {
 		if ( $container->has( 'cors_manager' ) ) {
 			$cors_manager = $container->get( 'cors_manager' );
 
-			// Add CORS headers for REST API requests
-			add_action(
-				'rest_api_init',
-				function () use ( $cors_manager ) {
-					remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
-					add_filter(
-						'rest_pre_serve_request',
-						function ( $value ) use ( $cors_manager ) {
-							$cors_manager->add_cors_headers();
-							return $value;
+			// Use WordPress native CORS headers (rest_send_cors_headers) but add our validation
+			// We don't remove the default handler, just add our validation before it
+			add_filter(
+				'rest_pre_serve_request',
+				function ( $served, $result, $request, $server ) use ( $cors_manager ) {
+					// Only validate our own endpoints
+					$route = $request->get_route();
+					if ( strpos( $route, '/efs/v1/' ) === 0 ) {
+						// Perform CORS validation - reject if not allowed
+						if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+							$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+							if ( ! empty( $origin ) && ! $cors_manager->is_origin_allowed( $origin ) ) {
+								// Origin not allowed - don't allow request to proceed
+								// Let WordPress return 403 via its normal error handling
+								if ( function_exists( 'rest_error_response' ) ) {
+									return new \WP_Error( 'cors_violation', 'Origin not allowed', array( 'status' => 403 ) );
+								}
+							}
 						}
-					);
-				}
+					}
+					// Return unchanged - let WordPress native CORS handler continue
+					return $served;
+				},
+				9, // Run BEFORE rest_send_cors_headers (priority 10)
+				4
 			);
-
-			// Handle preflight OPTIONS requests
+		}
+	}
 			add_action(
 				'rest_api_init',
 				function () use ( $cors_manager ) {
