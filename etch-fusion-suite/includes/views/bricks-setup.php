@@ -45,7 +45,7 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 	<div class="efs-wizard-panels">
 		<section class="is-active" data-efs-step-panel="1">
 			<h3><?php esc_html_e( 'Environment Check', 'etch-fusion-suite' ); ?></h3>
-			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'System and target site checks run before migration. Resolve any errors before continuing.', 'etch-fusion-suite' ); ?></p>
+			<p class="efs-wizard-panel__desc"><?php esc_html_e( 'System checks run before migration. Resolve any errors before continuing.', 'etch-fusion-suite' ); ?></p>
 			<div class="efs-preflight" data-efs-preflight aria-live="polite">
 				<div class="efs-preflight__loading" data-efs-preflight-loading hidden>
 					<span class="efs-wizard-loading__spinner" aria-hidden="true"></span>
@@ -83,6 +83,10 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 			</div>
 			<input type="hidden" data-efs-wizard-migration-key value="<?php echo esc_attr( $etch_fusion_suite_key ); ?>" />
 			<p class="efs-wizard-message" data-efs-connect-message hidden></p>
+			<!-- Target site and WP Cron checks shown during connection validation -->
+			<div class="efs-preflight" data-efs-preflight-connect aria-live="polite">
+				<div class="efs-preflight__results" data-efs-preflight-connect-results hidden></div>
+			</div>
 		</section>
 
 		<section class="efs-wizard-panel" data-efs-step-panel="3" hidden>

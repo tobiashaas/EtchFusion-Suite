@@ -150,6 +150,8 @@ const createWizard = (root) => {
 		preflightOverride: root.querySelector('[data-efs-preflight-override]'),
 		preflightConfirm: root.querySelector('[data-efs-preflight-confirm]'),
 		preflightRecheck: root.querySelector('[data-efs-preflight-recheck]'),
+		preflightConnectContainer: root.querySelector('[data-efs-preflight-connect]'),
+		preflightConnectResults: root.querySelector('[data-efs-preflight-connect-results]'),
 		modeRadios: Array.from(root.querySelectorAll('[data-efs-mode-radio]')),
 		cronIndicator: root.querySelector('[data-efs-cron-indicator]'),
 		headlessScreen: root.querySelector('[data-efs-headless-screen]'),
@@ -226,7 +228,11 @@ const createWizard = (root) => {
 			return;
 		}
 
-		const rows = result.checks.map((check) => {
+		// Filter out connection-specific checks (wp_cron, target_site_reachable) from Step 1 display.
+		// These will be shown separately during connection validation in Step 2.
+		const systemChecks = result.checks.filter((c) => !['wp_cron', 'target_site_reachable'].includes(c.id));
+
+		const rows = systemChecks.map((check) => {
 			const hint = (check.status === 'error' || check.status === 'warning')
 				? (PREFLIGHT_HINTS[check.id] || '')
 				: '';
@@ -242,8 +248,8 @@ const createWizard = (root) => {
 			</div>`;
 		}).join('');
 
-		const errorCount = result.checks.filter((c) => c.status === 'error').length;
-		const warnCount = result.checks.filter((c) => c.status === 'warning').length;
+		const errorCount = systemChecks.filter((c) => c.status === 'error').length;
+		const warnCount = systemChecks.filter((c) => c.status === 'warning').length;
 
 		let barClass = '';
 		let barText = 'All checks passed.';
@@ -266,6 +272,9 @@ const createWizard = (root) => {
 		}
 
 		updateNavigationState();
+
+		// Store full result for connection validation.
+		state.preflight = result;
 
 		// Initialize headless radio disabled state based on WP Cron preflight result.
 		const wpCronResult = result.checks?.find((c) => c.id === 'wp_cron');
@@ -295,22 +304,66 @@ const createWizard = (root) => {
 		}
 	};
 
-	const runPreflightCheck = async (targetUrl = '', mode = 'browser') => {
-		if (refs.preflightLoading) { refs.preflightLoading.hidden = false; }
-		if (refs.preflightResults) { refs.preflightResults.hidden = true; }
-		if (refs.preflightActions) { refs.preflightActions.hidden = true; }
+	// Render connection-specific checks (target site reachable, WP Cron) during Step 2 connection validation.
+	const renderConnectChecks = (result) => {
+		if (!result || !Array.isArray(result.checks)) {
+			return;
+		}
+
+		const connectChecks = result.checks.filter((c) => ['wp_cron', 'target_site_reachable'].includes(c.id));
+		if (!connectChecks.length) {
+			if (refs.preflightConnectResults) {
+				refs.preflightConnectResults.hidden = true;
+			}
+			return;
+		}
+
+		const rows = connectChecks.map((check) => {
+			const hint = (check.status === 'error' || check.status === 'warning')
+				? (PREFLIGHT_HINTS[check.id] || '')
+				: '';
+			const hintHtml = hint
+				? `<span class="efs-preflight__hint">${hint}</span>`
+				: '';
+			return `<div class="efs-preflight__row">
+				<span class="efs-preflight__badge efs-preflight__badge--${check.status}">${check.status}</span>
+				<div class="efs-preflight__row-content">
+					<span>${check.message || check.id}</span>
+					${hintHtml}
+				</div>
+			</div>`;
+		}).join('');
+
+		if (refs.preflightConnectResults) {
+			refs.preflightConnectResults.innerHTML = rows;
+			refs.preflightConnectResults.hidden = false;
+		}
+	};
+
+	const runPreflightCheck = async (targetUrl = '', mode = 'browser', context = 'step1') => {
+		if (context === 'step1') {
+			if (refs.preflightLoading) { refs.preflightLoading.hidden = false; }
+			if (refs.preflightResults) { refs.preflightResults.hidden = true; }
+			if (refs.preflightActions) { refs.preflightActions.hidden = true; }
+		}
 
 		try {
 			const result = await post(ACTION_RUN_PREFLIGHT, { target_url: targetUrl, mode });
 			state.preflight = result;
-			renderPreflightUI(result);
-		} catch {
-			if (refs.preflightLoading) { refs.preflightLoading.hidden = true; }
-			if (refs.preflightResults) {
-				refs.preflightResults.hidden = false;
-				refs.preflightResults.innerHTML = '<p>Environment check failed &ndash; please try again.</p>';
+			if (context === 'step1') {
+				renderPreflightUI(result);
+			} else if (context === 'connect') {
+				renderConnectChecks(result);
 			}
-			updateNavigationState();
+		} catch {
+			if (context === 'step1') {
+				if (refs.preflightLoading) { refs.preflightLoading.hidden = true; }
+				if (refs.preflightResults) {
+					refs.preflightResults.hidden = false;
+					refs.preflightResults.innerHTML = '<p>Environment check failed &ndash; please try again.</p>';
+				}
+				updateNavigationState();
+			}
 		}
 	};
 
@@ -1453,7 +1506,7 @@ const createWizard = (root) => {
 			state.migrationKey = token;
 			state.targetUrl = targetUrl;
 			runtime.validatedMigrationUrl = targetUrl;
-			runPreflightCheck(state.targetUrl, state.mode || 'browser').catch(() => {});
+			runPreflightCheck(state.targetUrl, state.mode || 'browser', 'connect').catch(() => {});
 			if (refs.keyInput) {
 				refs.keyInput.value = token;
 			}
@@ -2114,6 +2167,12 @@ const createWizard = (root) => {
 
 	const init = async () => {
 		bindEvents();
+		
+		// Hide Step 2 connection check results on initial load (will show after URL validation)
+		if (refs.preflightConnectResults) {
+			refs.preflightConnectResults.hidden = true;
+		}
+		
 		await restoreState();
 
 		// Run pre-flight silently on wizard load (no target URL yet)
