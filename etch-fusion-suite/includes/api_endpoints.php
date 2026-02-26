@@ -91,8 +91,8 @@ class EFS_API_Endpoints {
 		add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
 		add_action( 'wp_ajax_efs_revoke_migration_key', array( __CLASS__, 'revoke_migration_key' ) );
 
-		// Add global CORS enforcement filter
-		add_filter( 'rest_request_before_callbacks', array( __CLASS__, 'enforce_cors_globally' ), 10, 3 );
+		// Add CORS headers early - use rest_pre_serve_request which fires BEFORE output
+		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'add_cors_headers_to_request' ), 10, 4 );
 	}
 
 	/**
@@ -539,6 +539,56 @@ class EFS_API_Endpoints {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Add CORS headers to REST API responses (fires before output)
+	 *
+	 * Uses rest_pre_serve_request which ensures headers are sent before any output.
+	 * This is the proper hook for setting CORS headers in WordPress REST API.
+	 *
+	 * @param bool                  $served Whether the request has been served. Default false.
+	 * @param \WP_REST_Response     $result Result to send to the client.
+	 * @param \WP_REST_Request      $request The request object.
+	 * @param \WP_REST_Server       $server Server instance.
+	 * @return bool Whether to serve the request (unchanged).
+	 */
+	public static function add_cors_headers_to_request( $served, $result, $request, $server ) {
+		// Only handle /efs/v1/* endpoints
+		$route = $request->get_route();
+		if ( strpos( $route, '/efs/v1/' ) !== 0 ) {
+			return $served;
+		}
+
+		// Validate CORS origin - reject if not allowed
+		$cors_check = self::check_cors_origin();
+		if ( is_wp_error( $cors_check ) ) {
+			// Log CORS violation
+			if ( self::$audit_logger ) {
+				$origin = '';
+				if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
+					$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
+				}
+				self::$audit_logger->log_security_event(
+					'cors_violation',
+					'medium',
+					'REST API CORS check failed',
+					array(
+						'origin' => $origin,
+						'route'  => $route,
+						'method' => $request->get_method(),
+					)
+				);
+			}
+			return $served;
+		}
+
+		// CORS check passed: add CORS headers via manager
+		if ( self::$cors_manager ) {
+			self::$cors_manager->add_cors_headers();
+		}
+
+		return $served;
 	}
 
 	/**
