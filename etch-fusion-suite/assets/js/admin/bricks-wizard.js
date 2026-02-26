@@ -231,7 +231,14 @@ const createWizard = (root) => {
 		// Filter out connection-specific checks from Step 1 display.
 		// These will be shown separately during connection validation in Step 2.
 		// Excluded checks: wp_cron, wp_cron_delay, target_reachable, disk_space
-		const systemChecks = result.checks.filter((c) => !['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'].includes(c.id));
+		const systemChecks = result.checks.filter((c) => {
+			const excludedIds = ['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'];
+			const shouldExclude = excludedIds.includes(c.id);
+			if (shouldExclude) {
+				console.log(`[EFS] Step 1: Excluding check "${c.id}" - "${c.message}"`);
+			}
+			return !shouldExclude;
+		});
 
 		const rows = systemChecks.map((check) => {
 			const hint = (check.status === 'error' || check.status === 'warning')
