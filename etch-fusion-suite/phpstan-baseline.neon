@@ -16,19 +16,19 @@ parameters:
 			message: '#^Constant ETCH_FUSION_SUITE_DIR not found\.$#'
 			identifier: constant.notFound
 			count: 4
-			path: includes/admin_interface.php
+			path: includes/admin/class-admin-interface.php
 
 		-
 			message: '#^Constant ETCH_FUSION_SUITE_URL not found\.$#'
 			identifier: constant.notFound
 			count: 4
-			path: includes/admin_interface.php
+			path: includes/admin/class-admin-interface.php
 
 		-
 			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
 			identifier: constant.notFound
 			count: 4
-			path: includes/admin_interface.php
+			path: includes/admin/class-admin-interface.php
 
 		-
 			message: '#^Action callback returns string but should not return anything\.$#'
