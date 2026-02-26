@@ -84,6 +84,14 @@ jobs:
           fi
         shell: bash
 
+      - name: Delete existing release if present
+        # Prevents a 422 "already_exists" error when a release was created
+        # manually (e.g. via gh release create) before CI ran for this tag.
+        run: gh release delete "v${VERSION}" --yes --cleanup-tag=false 2>/dev/null || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
