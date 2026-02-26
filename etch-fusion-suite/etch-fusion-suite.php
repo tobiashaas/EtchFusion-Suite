@@ -167,6 +167,7 @@ class Etch_Fusion_Suite_Plugin {
 	 * Initialize hooks
 	 */
 	private function init_hooks() {
+		set_transient( 'efs_init_hooks_called', 1, 3600 );
 		add_action( 'init', array( $this, 'init' ) );
 
 		// Initialize Action Scheduler before other plugins_loaded hooks (Strauss-prefixed when used).
