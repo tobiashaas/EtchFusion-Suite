@@ -151,47 +151,6 @@ parameters:
 			count: 1
 			path: includes/gutenberg_generator.php
 
-		-
-			message: '#^Call to static method decode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Call to static method encode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Call to static method urlsafeB64Decode\(\) on an unknown class EtchFusionSuite\\Vendor\\Firebase\\JWT\\JWT\.$#'
-			identifier: class.notFound
-			count: 2
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\BeforeValidException not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\ExpiredException not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Caught class EtchFusionSuite\\Vendor\\Firebase\\JWT\\SignatureInvalidException not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
-
-		-
-			message: '#^Instantiated class EtchFusionSuite\\Vendor\\Firebase\\JWT\\Key not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: includes/migration_token_manager.php
 
 		-
 			message: '#^Function etch_fusion_suite_container not found\.$#'
