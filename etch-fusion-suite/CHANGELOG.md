@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-02-26
+
+### Fixed
+- **Release ZIP missing `assets/js/dist/main.js`:** `.distignore` contained `dist/` without a leading `/`, so rsync excluded every `dist/` subdirectory including `assets/js/dist/`. Additionally `package.json` is excluded, so the `npm run build` fallback in `build-release.sh` never ran. Result: the bundle was absent from the ZIP, `file_exists()` returned false, no script was enqueued, and the admin page was completely non-functional with no console errors. Fix: remove the bare `dist/` entry from `.distignore` (the root-level `dist/` release-output directory is outside the rsync source tree and was never at risk of being included).
+
 ## [0.13.1] - 2026-02-26
 
 ### Fixed

@@ -20,7 +20,6 @@
 node_modules/
 vendor/
 build/
-dist/
 tests/
 test-results/
 test-reports/

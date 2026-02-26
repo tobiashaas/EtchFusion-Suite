@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [0.13.2] — 2026-02-26
+
+### 🐛 Bug Fixes
+- **Release ZIP missing bundle:** `.distignore` had a bare `dist/` entry that excluded `assets/js/dist/main.js` from the release ZIP via rsync. Because `package.json` is also excluded, the `npm run build` fallback in `build-release.sh` never ran either. PHP's `file_exists()` returned false → no script enqueued → admin page completely silent (no errors, no network requests). Fix: removed bare `dist/` from `.distignore`.
+
 ## [0.13.1] — 2026-02-26
 
 ### 🐛 Bug Fixes
