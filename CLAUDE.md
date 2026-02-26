@@ -104,7 +104,15 @@ GitHub Actions (`.github/workflows/ci.yml`):
 2. **Test** — PHPUnit across PHP 7.4, 8.1, 8.2, 8.3, 8.4 with MySQL
 3. **Node** — Playwright E2E (non-blocking)
 
-Release workflow builds ZIP with checksums on `v*.*.*` tags.
+Release workflow (`.github/workflows/release.yml`) builds ZIP with checksums on `v*.*.*` tags.
+
+**Release process — do it in this order:**
+1. Bump version in `etch-fusion-suite.php` (header + constant) and `CHANGELOG.md`
+2. Commit + push to `main`
+3. Create and push the tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
+4. CI picks up the tag, builds the ZIP, and publishes the GitHub Release automatically
+
+**Never run `gh release create` manually before pushing the tag** — the CI workflow handles release creation. If a release already exists when CI runs it causes a 422 conflict (the workflow deletes and recreates it, but manual pre-creation is unnecessary noise).
 
 ## Documentation & Comments
 
