@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-02-26
+
+### Fixed
+- **Migration polling: stale migration ID after `startMigration`:** AJAX calls in `bricks-wizard.js` used `migration_id` (snake_case) inconsistently with the controller's expected `migrationId` (camelCase), causing the poller to track the wrong migration after start. All AJAX calls now use `migrationId` consistently.
+- **UUID validation missing in migration controller:** `get_progress()`, `resume_migration()`, `process_batch()`, and `cancel_migration()` accepted any string as `migrationId`. Added format validation (UUID regex) returning `invalid_migration_id` on mismatch, preventing SQL injection and invalid-ID errors.
+- **Missing `updateProgress` import in `bricks-wizard.js`:** `ReferenceError` was thrown when batch processing failed because `updateProgress` was called but not imported. Import added.
+- **AJAX requests had no timeout:** `api.js` requests could hang indefinitely. Added a default 60-second timeout; timeout errors expose `error.code = 'timeout'` for caller detection. Overridable per-request via `options.timeoutMs`.
+- **Polling not stopped on cancel errors:** `stopPolling()` was only called on successful cancels. Added `stopPolling()` in the `finally` block of both regular and headless cancel paths so polling always stops.
+- **Final progress state not shown on batch failure:** On batch processing failure the UI jumped straight to the error state. The checkpoint is now fetched and displayed first so users can see how much was processed before the failure.
+- **`migrationId` absent from error responses:** `migration-ajax.php` now includes `migrationId` in `WP_Error` data, making it easier to correlate client-side error logs with the correct migration run.
+
 ## [0.13.3] - 2026-02-26
 
 ### Fixed
