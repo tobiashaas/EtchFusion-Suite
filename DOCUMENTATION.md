@@ -14,12 +14,14 @@
 3. [Security Configuration](#security-configuration)
 4. [CSS Migration](#css-migration)
     1. [CSS Converter](#css-converter)
-5. [Content Migration](#content-migration)
-6. [Media Migration](#media-migration)
-7. [API Communication](#api-communication)
-8. [Frontend Rendering](#frontend-rendering)
-9. [Continuous Integration](#continuous-integration)
-10. [Security](#security)
+5. [Migration Execution Architecture](#migration-execution-architecture)
+6. [Content Migration](#content-migration)
+7. [Media Migration](#media-migration)
+8. [API Communication](#api-communication)
+9. [Frontend Rendering](#frontend-rendering)
+10. [Continuous Integration](#continuous-integration)
+    1. [Release Process](#release-process)
+11. [Security](#security)
     1. [Security Architecture](#security-architecture)
     2. [Input Validation](#input-validation)
     3. [Output Escaping](#output-escaping)
@@ -1046,6 +1048,79 @@ For a full breakdown of helper methods, breakpoint mappings, logical property tr
 
 ---
 
+## Migration Execution Architecture
+
+**Updated:** 2026-02-26
+
+### Overview
+
+The migration runs across two separate HTTP requests so that the initial AJAX call returns immediately to the browser without hitting PHP execution time limits.
+
+```
+Browser
+  │
+  ├─► POST wp-admin/admin-ajax.php?action=efs_start_migration
+  │       │
+  │       ├─ Validate key, init progress (status=running, 0%)
+  │       ├─ Store active migration record
+  │       ├─ [headless] Enqueue Action Scheduler job → return
+  │       └─ [browser] Fire non-blocking loopback POST → return migrationId
+  │
+  │   [Second PHP process — loopback POST]
+  │       │
+  │       └─► wp-admin/admin-ajax.php?action=efs_run_migration_background
+  │               │
+  │               ├─ Validate bg_token transient (120 s TTL, one-time)
+  │               ├─ Validation phase (EFS_Plugin_Detector)
+  │               ├─ Content analysis
+  │               ├─ Migrator execution (CPTs, ACF, etc.)
+  │               ├─ CSS class migration
+  │               ├─ Global CSS migration
+  │               ├─ Collect media IDs + post IDs
+  │               └─ Save checkpoint {phase, remaining_ids, …}
+  │
+  │   [JS-driven batch loop]
+  │       │
+  │       └─► Poll efs_get_migration_progress until step = 'media' or 'posts'
+  │               └─► POST efs_migrate_batch (repeated) until completed
+```
+
+### Key Classes
+
+| Class | File | Role |
+|-------|------|------|
+| `EFS_Migration_Starter` | `services/class-migration-starter.php` | Entry point; sync (REST) and async (AJAX) paths |
+| `EFS_Background_Spawn_Handler` | `services/class-background-spawn-handler.php` | Fires the loopback POST; sync fallback on failure |
+| `EFS_Async_Migration_Runner` | `services/class-async-migration-runner.php` | Runs all pre-batch phases; saves checkpoint |
+| `EFS_Batch_Processor` | `services/class-batch-processor.php` | Processes one JS-driven batch (media or posts) |
+| `EFS_Progress_Manager` | `services/class-progress-manager.php` | Reads/writes progress state |
+
+### Two Migration Entry Points
+
+`EFS_Migration_Starter` contains two completely separate paths:
+
+| Method | Triggered by | Does |
+|--------|-------------|------|
+| `start_migration()` | REST `/efs/v1/migrate` | Runs entire migration synchronously in one request |
+| `start_migration_async()` | AJAX `efs_start_migration` | Initialises state, spawns background process, returns immediately |
+
+The browser-mode Wizard always uses the async AJAX path.
+
+### Background Spawn Security
+
+The loopback POST is authenticated by a short-lived transient instead of a nonce (because it is a server-to-server request, not a browser request):
+
+- **Token**: `bin2hex(random_bytes(16))` — 32-character hex string (128 bits)
+- **Storage**: WordPress transient `efs_bg_{migration_id}`, TTL 120 seconds
+- **Validation**: Controller checks exact match, then deletes the transient immediately
+- **Fallback**: If `wp_remote_post()` returns a `WP_Error`, `EFS_Async_Migration_Runner::run_migration_execution()` is called synchronously in the same request
+
+### Headless Mode
+
+When mode is `headless`, `start_migration_async()` skips the loopback spawn and instead calls `EFS_Headless_Migration_Job::enqueue_job()`, which registers an Action Scheduler task. This is required for environments where loopback requests are blocked (e.g. some managed hosts).
+
+---
+
 ## Content Migration
 
 **Updated:** 2025-02-08
@@ -1387,14 +1462,33 @@ POST /wp-json/efs/v1/import-styles
 
 ## Continuous Integration
 
-**Updated:** 2025-10-30 09:22
+**Updated:** 2026-02-26
 
 GitHub Actions provides automated linting, testing, and static analysis:
 
 - **CI** workflow handles PHP linting (PHPCS), multi-version PHPUnit, and JS tooling checks
-- **Release** workflow builds signed artifacts from version tags, now restricted to `v*.*.*` patterns and hardened for Ubuntu runners via POSIX-compliant version parsing.
+- **Release** workflow builds signed artifacts from version tags, restricted to `v*.*.*` patterns
 - **CodeQL** workflow performs security scanning
 - **dependency-review** workflow blocks insecure dependency updates on PRs
+
+### Release Process
+
+**Do not create GitHub Releases manually.** The release workflow handles everything automatically when a version tag is pushed.
+
+**Correct order:**
+
+1. Bump `* Version:` header and `ETCH_FUSION_SUITE_VERSION` constant in `etch-fusion-suite/etch-fusion-suite.php`
+2. Add a `## [X.Y.Z] - YYYY-MM-DD` entry to `etch-fusion-suite/CHANGELOG.md`
+3. Commit both files: `git commit -m "chore(release): bump version to X.Y.Z"`
+4. Create and push an annotated tag:
+   ```bash
+   git tag -a vX.Y.Z -m "Release vX.Y.Z"
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+5. CI detects the tag, runs `build-release.sh`, and publishes the GitHub Release with the ZIP + SHA256 checksum automatically.
+
+**Why not `gh release create` manually?** If a release for the tag already exists when CI runs, `softprops/action-gh-release` returns 422 and retries until it aborts. The workflow includes a "delete existing release" step as a safety net, but the correct workflow is to always let CI create the release.
 
 ### CI Workflow Breakdown (2025-10-26 refresh)
 
