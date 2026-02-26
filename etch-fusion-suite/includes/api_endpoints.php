@@ -86,7 +86,7 @@ class EFS_API_Endpoints {
 	 * Initialize the API endpoints
 	 */
 	public static function init() {
-		error_log( '[EFS DEBUG] EFS_API_Endpoints::init() called' );
+		set_transient( 'efs_init_called', 1, 3600 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_action( 'wp_ajax_efs_dismiss_migration_run', array( __CLASS__, 'dismiss_migration_run' ) );
 		add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
@@ -2179,7 +2179,7 @@ class EFS_API_Endpoints {
 	 * Register REST API routes.
 	 */
 	public static function register_routes() {
-		error_log( '[EFS DEBUG] register_routes() called' );
+		set_transient( 'efs_register_routes_called', 1, 3600 );
 		$namespace = 'efs/v1';
 
 		// Template extractor routes are only exposed when Framer extraction is enabled at the PHP level.
