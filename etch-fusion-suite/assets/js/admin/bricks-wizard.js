@@ -228,9 +228,10 @@ const createWizard = (root) => {
 			return;
 		}
 
-		// Filter out connection-specific checks (wp_cron, target_reachable) from Step 1 display.
+		// Filter out connection-specific checks from Step 1 display.
 		// These will be shown separately during connection validation in Step 2.
-		const systemChecks = result.checks.filter((c) => !['wp_cron', 'target_reachable'].includes(c.id));
+		// Excluded checks: wp_cron, wp_cron_delay, target_reachable, disk_space
+		const systemChecks = result.checks.filter((c) => !['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'].includes(c.id));
 
 		const rows = systemChecks.map((check) => {
 			const hint = (check.status === 'error' || check.status === 'warning')
@@ -310,7 +311,7 @@ const createWizard = (root) => {
 			return;
 		}
 
-		const connectChecks = result.checks.filter((c) => ['wp_cron', 'target_reachable'].includes(c.id));
+		const connectChecks = result.checks.filter((c) => ['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'].includes(c.id));
 		if (!connectChecks.length) {
 			if (refs.preflightConnectResults) {
 				refs.preflightConnectResults.hidden = true;
