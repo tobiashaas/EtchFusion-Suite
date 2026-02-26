@@ -2,6 +2,7 @@
 namespace Bricks2Etch\Controllers;
 
 use Bricks2Etch\Core\EFS_Migration_Manager;
+use Bricks2Etch\Core\EFS_Migration_Token_Manager;
 use Bricks2Etch\Api\EFS_API_Client;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,15 +17,14 @@ class EFS_Migration_Controller {
 	/**
 	 * Constructor
 	 *
-	 * @param EFS_Migration_Manager $manager
-	 * @param EFS_API_Client $api_client
+	 * @param EFS_Migration_Manager          $manager
+	 * @param EFS_API_Client                 $api_client
+	 * @param EFS_Migration_Token_Manager|null $token_manager Optional; used to decode migration keys for target-URL resolution.
 	 */
-	public function __construct( EFS_Migration_Manager $manager, EFS_API_Client $api_client ) {
+	public function __construct( EFS_Migration_Manager $manager, EFS_API_Client $api_client, ?EFS_Migration_Token_Manager $token_manager = null ) {
 		$this->manager       = $manager;
 		$this->api_client    = $api_client;
-		$this->token_manager = function_exists( 'etch_fusion_suite_container' ) && etch_fusion_suite_container()->has( 'token_manager' )
-			? etch_fusion_suite_container()->get( 'token_manager' )
-			: null;
+		$this->token_manager = $token_manager;
 	}
 
 	/**

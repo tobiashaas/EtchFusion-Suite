@@ -635,7 +635,8 @@ class EFS_Service_Provider {
 			function ( $c ) {
 				return new \Bricks2Etch\Controllers\EFS_Migration_Controller(
 					new \Bricks2Etch\Core\EFS_Migration_Manager( $c->get( 'migration_service' ), $c->get( 'migration_repository' ) ),
-					$c->get( 'api_client' )
+					$c->get( 'api_client' ),
+					$c->get( 'token_manager' )
 				);
 			}
 		);
