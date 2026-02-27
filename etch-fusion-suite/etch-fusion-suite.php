@@ -55,6 +55,12 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 // Load Action Scheduler headless configuration (disables WP-Cron, enables loopback runner)
 require_once ETCH_FUSION_SUITE_DIR . 'action-scheduler-config.php';
 
+// Explicitly load Action Scheduler (uses global classes, not namespaced)
+// This must happen after DISABLE_WP_CRON is defined
+if ( ! class_exists( 'ActionScheduler', false ) ) {
+	require_once ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
+}
+
 // Manual PSR-4 loader for Action_Scheduler namespace (Strauss generation issue)
 // Action_Scheduler classes are in vendor-prefixed but not registered in composer autoloader
 if ( ! function_exists( 'efs_autoload_action_scheduler' ) ) {
