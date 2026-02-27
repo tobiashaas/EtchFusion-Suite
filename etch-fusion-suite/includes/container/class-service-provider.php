@@ -526,6 +526,13 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
+			'action_scheduler_loopback_runner',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Action_Scheduler_Loopback_Runner();
+			}
+		);
+
+		$container->singleton(
 			'background_spawn_handler',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Background_Spawn_Handler(

@@ -44,6 +44,9 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	require_once $etch_fusion_suite_vendor_prefixed;
 }
 
+// Load Action Scheduler headless configuration (disables WP-Cron, enables loopback runner)
+require_once ETCH_FUSION_SUITE_DIR . 'action-scheduler-config.php';
+
 // Manual PSR-4 loader for Action_Scheduler namespace (Strauss generation issue)
 // Action_Scheduler classes are in vendor-prefixed but not registered in composer autoloader
 if ( ! function_exists( 'efs_autoload_action_scheduler' ) ) {
@@ -189,6 +192,9 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
+		// Initialize Action Scheduler loopback runner (before plugins_loaded is too late)
+		add_action( 'plugins_loaded', array( $this, 'init_action_scheduler_runner' ), 5 );
+
 		// Initialize REST API endpoints immediately
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
@@ -281,6 +287,16 @@ class Etch_Fusion_Suite_Plugin {
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $container->has( 'debug_ajax' ) ) {
 			$container->get( 'debug_ajax' );
+		}
+	}
+
+	/**
+	 * Initialize Action Scheduler loopback runner
+	 */
+	public function init_action_scheduler_runner() {
+		$container = etch_fusion_suite_container();
+		if ( $container->has( 'action_scheduler_loopback_runner' ) ) {
+			\Bricks2Etch\Services\EFS_Action_Scheduler_Loopback_Runner::init();
 		}
 	}
 
