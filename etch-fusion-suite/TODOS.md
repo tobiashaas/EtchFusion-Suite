@@ -132,6 +132,8 @@
 
 ### 🎯 High Priority
 
+⚠️ **NOTE (2026-02-27)**: Viele der folgenden Todos sehen bereits implementiert aus (Batch Processing, Progress Tracking, Error Logging, REST API, Admin Dashboard). Morgen systematisch überprüfen welche wirklich noch offen sind vs. welche schon erledigt sind aber nicht als [✅] markiert wurden.
+
 - [ ] **Migration Performance Optimization**
   - Implement batch processing for large datasets
   - Add database transaction optimization
@@ -183,6 +185,8 @@
 ## 🐛 Known Issues
 
 ### 🔍 Current Issues
+
+⚠️ **NOTE (2026-02-27)**: Einige dieser "Known Issues" könnten durch existierende Features bereits teilweise adressiert sein (Error Handling, Logging, Retry-Logik). Bitte morgen mit der Codebase abgleichen.
 
 - [ ] **Memory Usage**: Large migrations may exceed memory limits on low-spec systems
   - **Impact**: Medium
