@@ -173,6 +173,11 @@ class EFS_Batch_Processor {
 	/**
 	 * Resume a JS-driven batch loop after a timeout or error.
 	 *
+	 * Refreshes the heartbeat before returning so that the computed status in
+	 * get_progress_data() is 'running' rather than 'stale' for the resumed session.
+	 * Without this, auto-resume on page reload would still see a stale status on the
+	 * very next progress poll, potentially triggering another (redundant) resume cycle.
+	 *
 	 * @param string $migration_id Migration ID to resume.
 	 *
 	 * @return array|\WP_Error
@@ -188,6 +193,10 @@ class EFS_Batch_Processor {
 		$remaining = 'media' === $phase
 			? count( isset( $checkpoint['remaining_media_ids'] ) ? (array) $checkpoint['remaining_media_ids'] : array() )
 			: count( isset( $checkpoint['remaining_post_ids'] ) ? (array) $checkpoint['remaining_post_ids'] : array() );
+
+		// Reset the stale flag immediately so the next get_progress_data() call
+		// returns status='running' instead of 'stale'.
+		$this->progress_manager->touch_progress_heartbeat();
 
 		return array(
 			'resumed'     => true,

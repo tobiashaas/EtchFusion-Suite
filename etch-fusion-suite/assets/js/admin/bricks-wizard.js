@@ -235,7 +235,8 @@ const createWizard = (root) => {
 			const excludedIds = ['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'];
 			const shouldExclude = excludedIds.includes(c.id);
 			if (shouldExclude) {
-				console.log(`[EFS] Step 1: Excluding check "${c.id}" - "${c.message}"`);
+				// Use debug level — these are intentionally deferred to Step 2; not errors.
+				console.debug(`[EFS] Step 1: Excluding check "${c.id}" - "${c.message}"`);
 			}
 			return !shouldExclude;
 		});
@@ -1221,55 +1222,31 @@ const createWizard = (root) => {
 			}
 		};
 
-		// Parallel batch processor: maintains up to MAX_PARALLEL_REQUESTS active at once
+		// Parallel batch processor: runs MAX_PARALLEL_REQUESTS workers simultaneously.
+		// Each worker loops independently — when one batch request completes (success or
+		// recoverable error) the worker immediately fires the next, so we always maintain
+		// the target concurrency without the broken Promise.race()+findIndex() pattern
+		// that always returned index 0 regardless of which promise settled first.
 		const batchPool = async () => {
-			const promises = [];
-
-			// Start initial batch of requests
-			for (let i = 0; i < MAX_PARALLEL_REQUESTS && shouldContinue; i++) {
-				promises.push(
-					submitBatch().catch((err) => {
-						console.error('[EFS] Batch submission error:', err);
-					})
-				);
-			}
-
-			// As requests complete, submit new ones
-			while (shouldContinue && promises.length > 0) {
-				await Promise.race(promises);
-				const completedIndex = promises.findIndex((p) => p.resolved !== false);
-				promises.splice(completedIndex, 1);
-
-				if (shouldContinue) {
-					promises.push(
-						submitBatch().catch((err) => {
-							console.error('[EFS] Batch submission error:', err);
-						})
-					);
+			const runWorker = async () => {
+				while (shouldContinue) {
+					await submitBatch();
 				}
-			}
+			};
 
-			// Wait for remaining requests to finish
-			if (promises.length > 0) {
-				await Promise.all(promises).catch((err) => {
-					console.error('[EFS] Final batch errors:', err);
-				});
-			}
+			// Start all workers and wait for every one to finish.
+			// submitBatch() sets shouldContinue=false on payload.completed or after 3
+			// consecutive failures, so each worker exits its loop naturally.
+			const workers = Array.from({ length: MAX_PARALLEL_REQUESTS }, () =>
+				runWorker().catch((err) => {
+					// submitBatch() only throws after 3 failures (and sets shouldContinue=false).
+					// Swallow the re-throw here so Promise.all() doesn't short-circuit the
+					// remaining workers — they will exit on their next shouldContinue check.
+					console.error('[EFS] Batch worker stopped:', err);
+				})
+			);
 
-			// Check completion status
-			if (shouldContinue) {
-				try {
-					const finalProgress = await post(ACTION_GET_PROGRESS, {
-						migrationId: migrationId,
-					});
-					if (finalProgress?.progress?.completed) {
-						runtime.migrationRunning = false;
-						showResult('success', 'Migration finished successfully.');
-					}
-				} catch (err) {
-					console.warn('[EFS] Could not verify final status:', err);
-				}
-			}
+			await Promise.all(workers);
 		};
 
 		await batchPool();
@@ -1748,9 +1725,14 @@ const createWizard = (root) => {
 	};
 
 	const handleCancel = async () => {
-		if (state.currentStep === 5) {
+		// Send the server-side cancel whenever there is an active migration ID.
+		// The previous condition (state.currentStep === 5) was unreachable: setStep()
+		// clamps to STEP_COUNT (4), so currentStep could never equal 5. This meant the
+		// AJAX cancel was never sent and the server migration state was never cleared,
+		// leaving subsequent start attempts blocked by "migration_in_progress".
+		const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || '';
+		if (migrationId) {
 			try {
-				const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || '';
 				await post(ACTION_CANCEL_MIGRATION, {
 					migrationId: migrationId,
 				});
@@ -2188,6 +2170,22 @@ const createWizard = (root) => {
 					// No valid checkpoint — fall through to return false.
 				}
 				return false;
+			}
+
+			// Stale at a pre-batch phase (e.g. 'css', 'analyzing', 'validation'): the
+			// background PHP process may simply be taking longer than the stale TTL.
+			// Resume polling so we catch the moment current_step reaches media/posts and
+			// can hand off to runBatchLoop — instead of silently giving up and leaving
+			// the migration frozen with no feedback for the user.
+			if (isStale) {
+				state.migrationId = payload?.migrationId || migrationId;
+				await setStep(4, { skipSave: true });
+				if (refs.progressTakeover) {
+					refs.progressTakeover.hidden = false;
+				}
+				renderProgress(payload);
+				startPolling(state.migrationId);
+				return true;
 			}
 
 			if (payload?.completed || pollStatus === 'completed' || pollStatus === 'error' || pollPercentage >= 100 || !isRunning) {

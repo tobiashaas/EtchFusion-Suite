@@ -63,10 +63,13 @@
         options.signal.addEventListener("abort", abortListener);
       }
     }
-    if (typeof options?.timeoutMs === "number" && options.timeoutMs > 0) {
+    const timeoutMs = options?.timeoutMs ?? 6e4;
+    if (typeof timeoutMs === "number" && timeoutMs > 0) {
       timeoutId = window.setTimeout(() => {
-        controller.abort(new Error("Request timed out."));
-      }, options.timeoutMs);
+        const error = new Error("Request timed out.");
+        error.code = "timeout";
+        controller.abort(error);
+      }, timeoutMs);
     }
     let response;
     try {
@@ -1565,6 +1568,8 @@
       preflightOverride: root.querySelector("[data-efs-preflight-override]"),
       preflightConfirm: root.querySelector("[data-efs-preflight-confirm]"),
       preflightRecheck: root.querySelector("[data-efs-preflight-recheck]"),
+      preflightConnectContainer: root.querySelector("[data-efs-preflight-connect]"),
+      preflightConnectResults: root.querySelector("[data-efs-preflight-connect-results]"),
       modeRadios: Array.from(root.querySelectorAll("[data-efs-mode-radio]")),
       cronIndicator: root.querySelector("[data-efs-cron-indicator]"),
       headlessScreen: root.querySelector("[data-efs-headless-screen]"),
@@ -1637,7 +1642,15 @@
         updateNavigationState();
         return;
       }
-      const rows = result.checks.map((check) => {
+      const systemChecks = result.checks.filter((c) => {
+        const excludedIds = ["wp_cron", "wp_cron_delay", "target_reachable", "disk_space"];
+        const shouldExclude = excludedIds.includes(c.id);
+        if (shouldExclude) {
+          console.debug(`[EFS] Step 1: Excluding check "${c.id}" - "${c.message}"`);
+        }
+        return !shouldExclude;
+      });
+      const rows = systemChecks.map((check) => {
         const hint = check.status === "error" || check.status === "warning" ? PREFLIGHT_HINTS[check.id] || "" : "";
         const hintHtml = hint ? `<span class="efs-preflight__hint">${hint}</span>` : "";
         return `<div class="efs-preflight__row">
@@ -1648,8 +1661,8 @@
 				</div>
 			</div>`;
       }).join("");
-      const errorCount = result.checks.filter((c) => c.status === "error").length;
-      const warnCount = result.checks.filter((c) => c.status === "warning").length;
+      const errorCount = systemChecks.filter((c) => c.status === "error").length;
+      const warnCount = systemChecks.filter((c) => c.status === "warning").length;
       let barClass = "";
       let barText = "All checks passed.";
       if (result.has_hard_block) {
@@ -1667,6 +1680,7 @@
         refs.preflightOverride.hidden = !(result.has_soft_block && !result.has_hard_block);
       }
       updateNavigationState();
+      state.preflight = result;
       const wpCronResult = result.checks?.find((c) => c.id === "wp_cron");
       const headlessRadio = refs.modeRadios.find((r) => r instanceof HTMLInputElement && r.value === "headless");
       if (headlessRadio) {
@@ -1693,29 +1707,64 @@
         }
       }
     };
-    const runPreflightCheck = async (targetUrl = "", mode = "browser") => {
-      if (refs.preflightLoading) {
-        refs.preflightLoading.hidden = false;
+    const renderConnectChecks = (result) => {
+      if (!result || !Array.isArray(result.checks)) {
+        return;
       }
-      if (refs.preflightResults) {
-        refs.preflightResults.hidden = true;
+      const connectChecks = result.checks.filter((c) => ["wp_cron", "wp_cron_delay", "target_reachable", "disk_space"].includes(c.id));
+      if (!connectChecks.length) {
+        if (refs.preflightConnectResults) {
+          refs.preflightConnectResults.hidden = true;
+        }
+        return;
       }
-      if (refs.preflightActions) {
-        refs.preflightActions.hidden = true;
+      const rows = connectChecks.map((check) => {
+        const hint = check.status === "error" || check.status === "warning" ? PREFLIGHT_HINTS[check.id] || "" : "";
+        const hintHtml = hint ? `<span class="efs-preflight__hint">${hint}</span>` : "";
+        return `<div class="efs-preflight__row">
+				<span class="efs-preflight__badge efs-preflight__badge--${check.status}">${check.status}</span>
+				<div class="efs-preflight__row-content">
+					<span>${check.message || check.id}</span>
+					${hintHtml}
+				</div>
+			</div>`;
+      }).join("");
+      if (refs.preflightConnectResults) {
+        refs.preflightConnectResults.innerHTML = rows;
+        refs.preflightConnectResults.hidden = false;
+      }
+    };
+    const runPreflightCheck = async (targetUrl = "", mode = "browser", context = "step1") => {
+      if (context === "step1") {
+        if (refs.preflightLoading) {
+          refs.preflightLoading.hidden = false;
+        }
+        if (refs.preflightResults) {
+          refs.preflightResults.hidden = true;
+        }
+        if (refs.preflightActions) {
+          refs.preflightActions.hidden = true;
+        }
       }
       try {
         const result = await post(ACTION_RUN_PREFLIGHT, { target_url: targetUrl, mode });
         state.preflight = result;
-        renderPreflightUI(result);
+        if (context === "step1") {
+          renderPreflightUI(result);
+        } else if (context === "connect") {
+          renderConnectChecks(result);
+        }
       } catch {
-        if (refs.preflightLoading) {
-          refs.preflightLoading.hidden = true;
+        if (context === "step1") {
+          if (refs.preflightLoading) {
+            refs.preflightLoading.hidden = true;
+          }
+          if (refs.preflightResults) {
+            refs.preflightResults.hidden = false;
+            refs.preflightResults.innerHTML = "<p>Environment check failed &ndash; please try again.</p>";
+          }
+          updateNavigationState();
         }
-        if (refs.preflightResults) {
-          refs.preflightResults.hidden = false;
-          refs.preflightResults.innerHTML = "<p>Environment check failed &ndash; please try again.</p>";
-        }
-        updateNavigationState();
       }
     };
     const invalidateAndRecheck = async () => {
@@ -2397,10 +2446,12 @@
     const runBatchLoop = async (migrationId) => {
       runtime.batchFailCount = 0;
       let currentBatchSize = BATCH_SIZE;
-      const processBatch = async () => {
+      const MAX_PARALLEL_REQUESTS = 5;
+      let shouldContinue = true;
+      const submitBatch = async () => {
         try {
           const payload = await post(ACTION_MIGRATE_BATCH, {
-            migration_id: migrationId,
+            migrationId,
             batch_size: currentBatchSize
           });
           runtime.batchFailCount = 0;
@@ -2419,35 +2470,63 @@
             showToast("\u26A1 Batch size adjusted due to memory pressure", "info");
           }
           if (payload?.completed) {
+            shouldContinue = false;
             perfMetrics.endMigration();
             const hints = perfMetrics.getBottleneckHints();
             if (hints && hints.length > 0) {
               console.warn("[EFS][Perf] Bottleneck hints:", hints);
             }
-            runtime.migrationRunning = false;
-            showResult("success", "Migration finished successfully.");
-            return;
           }
-          window.setTimeout(processBatch, 100);
         } catch (error) {
           runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
           if (runtime.batchFailCount >= 3) {
+            shouldContinue = false;
             runtime.migrationRunning = false;
+            stopPolling();
+            try {
+              const progressPayload = await post(ACTION_GET_PROGRESS2, {
+                migrationId
+              });
+              if (progressPayload?.progress) {
+                updateProgress({
+                  percentage: progressPayload.progress.percentage || 0,
+                  status: progressPayload.progress.message || "Batch processing failed",
+                  items_processed: progressPayload.progress.items_processed || 0,
+                  items_total: progressPayload.progress.items_total || 0,
+                  items_skipped: progressPayload.progress.items_skipped || 0
+                });
+              }
+            } catch (progressError) {
+              console.warn("[EFS] Could not fetch final progress after batch failure:", progressError);
+            }
             if (refs.retryButton) {
               refs.retryButton.hidden = false;
             }
             showResult("error", error?.message || "Batch processing failed. Try resuming the migration.");
-            return;
+            throw error;
           }
-          window.setTimeout(processBatch, POLL_INTERVAL_MS);
         }
       };
-      await processBatch();
+      const batchPool = async () => {
+        const runWorker = async () => {
+          while (shouldContinue) {
+            await submitBatch();
+          }
+        };
+        const workers = Array.from(
+          { length: MAX_PARALLEL_REQUESTS },
+          () => runWorker().catch((err) => {
+            console.error("[EFS] Batch worker stopped:", err);
+          })
+        );
+        await Promise.all(workers);
+      };
+      await batchPool();
     };
     const resumeMigration = async (migrationId) => {
       try {
         const payload = await post(ACTION_RESUME_MIGRATION, {
-          migration_id: migrationId
+          migrationId
         });
         if (payload?.resumed) {
           hideResult();
@@ -2485,7 +2564,7 @@
       const poll = async () => {
         try {
           const payload = await post(ACTION_GET_PROGRESS2, {
-            migration_id: migrationId
+            migrationId
           });
           runtime.pollingFailCount = 0;
           const progress = payload?.progress || {};
@@ -2497,6 +2576,9 @@
           }
           runtime.lastProcessedCount = itemsProcessed;
           runtime.lastPollTime = performance.now();
+          if (payload?.migrationId && payload.migrationId !== migrationId) {
+            console.warn("[EFS] Migration ID mismatch detected:", { expected: migrationId, received: payload.migrationId });
+          }
           state.migrationId = payload?.migrationId || migrationId;
           if (payload?.progress?.action_scheduler_id) {
             state.actionSchedulerId = payload.progress.action_scheduler_id;
@@ -2543,7 +2625,15 @@
           }
           if ((currentStep === "media" || currentStep === "posts") && status === "running" && state.mode !== "headless") {
             stopPolling();
-            await runBatchLoop(migrationId);
+            try {
+              await runBatchLoop(migrationId);
+            } catch (batchError) {
+              runtime.migrationRunning = false;
+              if (refs.retryButton) {
+                refs.retryButton.hidden = false;
+              }
+              showResult("error", batchError?.message || "Batch processing failed. Migration may still be running on the server.");
+            }
             return;
           }
           runtime.pollingTimer = window.setTimeout(poll, POLL_INTERVAL_MS);
@@ -2551,6 +2641,7 @@
           runtime.pollingFailCount = (runtime.pollingFailCount || 0) + 1;
           if (runtime.pollingFailCount >= 3) {
             runtime.migrationRunning = false;
+            stopPolling();
             if (refs.retryButton) {
               refs.retryButton.hidden = false;
             }
@@ -2670,7 +2761,7 @@
         state.migrationKey = token;
         state.targetUrl = targetUrl;
         runtime.validatedMigrationUrl = targetUrl;
-        runPreflightCheck(state.targetUrl, state.mode || "browser").catch(() => {
+        runPreflightCheck(state.targetUrl, state.mode || "browser", "connect").catch(() => {
         });
         if (refs.keyInput) {
           refs.keyInput.value = token;
@@ -2814,15 +2905,17 @@
       await setStep(1, { skipSave: true });
     };
     const handleCancel = async () => {
-      if (state.currentStep === 5) {
+      const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || "";
+      if (migrationId) {
         try {
-          const migrationId = state.migrationId || window.efsData?.migrationId || window.efsData?.in_progress_migration?.migrationId || "";
           await post(ACTION_CANCEL_MIGRATION2, {
-            migration_id: migrationId
+            migrationId
           });
           showToast("Migration cancelled.", "info");
         } catch (error) {
           showToast(error?.message || "Unable to cancel migration.", "error");
+        } finally {
+          stopPolling();
         }
       }
       await resetWizard();
@@ -3082,14 +3175,16 @@
       refs.cancelHeadlessButton?.addEventListener("click", async () => {
         try {
           const migrationId = state.migrationId || "";
-          await post(ACTION_CANCEL_MIGRATION2, { migration_id: migrationId });
+          await post(ACTION_CANCEL_MIGRATION2, { migrationId });
           await post("efs_cancel_headless_job", {
             action_scheduler_id: state.actionSchedulerId || 0,
-            migration_id: migrationId
+            migrationId
           });
           showToast("Headless migration cancelled.", "info");
         } catch (error) {
           showToast(error?.message || "Unable to cancel migration.", "error");
+        } finally {
+          stopPolling();
         }
         await resetWizard();
       });
@@ -3169,7 +3264,7 @@
       }
       try {
         const payload = await post(ACTION_GET_PROGRESS2, {
-          migration_id: migrationId
+          migrationId
         });
         const pollStatus = String(payload?.progress?.status || payload?.progress?.current_step || "").toLowerCase();
         const pollPercentage = Number(payload?.progress?.percentage ?? 0);
@@ -3179,7 +3274,7 @@
         if (isStale && (pollCurrentStep === "media" || pollCurrentStep === "posts")) {
           state.migrationId = payload?.migrationId || migrationId;
           try {
-            const resumed = await post(ACTION_RESUME_MIGRATION, { migration_id: state.migrationId });
+            const resumed = await post(ACTION_RESUME_MIGRATION, { migrationId: state.migrationId });
             if (resumed?.resumed) {
               await setStep(4, { skipSave: true });
               if (refs.progressTakeover) {
@@ -3194,6 +3289,16 @@
           } catch {
           }
           return false;
+        }
+        if (isStale) {
+          state.migrationId = payload?.migrationId || migrationId;
+          await setStep(4, { skipSave: true });
+          if (refs.progressTakeover) {
+            refs.progressTakeover.hidden = false;
+          }
+          renderProgress(payload);
+          startPolling(state.migrationId);
+          return true;
         }
         if (payload?.completed || pollStatus === "completed" || pollStatus === "error" || pollPercentage >= 100 || !isRunning) {
           return false;
@@ -3234,7 +3339,11 @@
     };
     const init = async () => {
       bindEvents();
+      if (refs.preflightConnectResults) {
+        refs.preflightConnectResults.hidden = true;
+      }
       await restoreState();
+      renderStepShell();
       runPreflightCheck("", state.mode || "browser").catch(() => {
       });
       const resumed = await autoResumeMigration();

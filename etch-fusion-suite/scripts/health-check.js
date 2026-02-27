@@ -323,6 +323,76 @@ async function checkComposerDependencies(environment, name) {
   };
 }
 
+async function checkPermalinks(environment, name) {
+  // Read via wp eval — passing /%postname%/ as a CLI argument is unsafe on
+  // Windows because Git bash expands leading slashes to Windows filesystem paths.
+  const result = await runWpEnv([
+    'run', environment, 'wp', 'eval',
+    "echo get_option('permalink_structure');"
+  ]);
+
+  if (result.code !== 0) {
+    return {
+      environment,
+      category: 'permalink',
+      status: 'fail',
+      label: `${name} permalink structure`,
+      message: 'Could not read permalink_structure option.',
+      details: {
+        environment,
+        error: (result.stderr || result.stdout || `Exit code ${result.code}`).trim(),
+        fix: 'Run: npm run activate'
+      }
+    };
+  }
+
+  const value = (result.stdout || '').trim();
+
+  if (value === '/%postname%/') {
+    return {
+      environment,
+      category: 'permalink',
+      status: 'pass',
+      label: `${name} permalink structure`,
+      message: 'Permalink structure is /%postname%/ — REST API accessible at /wp-json/.',
+      details: { environment, value }
+    };
+  }
+
+  // Detect the Windows Git bash path-expansion artefact that corrupts the option
+  // when someone runs `wp option update permalink_structure /%postname%/` in a
+  // Git bash shell (the leading slash is expanded to C:/Program Files/Git/…).
+  const isWindowsArtefact = value.includes('Program Files') || value.includes(':\\');
+
+  if (!value || isWindowsArtefact) {
+    const reason = !value
+      ? 'Permalink structure is empty (plain URLs).'
+      : `Permalink structure contains a Windows path artefact: "${value}".`;
+    return {
+      environment,
+      category: 'permalink',
+      status: 'fail',
+      label: `${name} permalink structure`,
+      message: `${reason} REST API /wp-json/ will return 404.`,
+      details: {
+        environment,
+        value,
+        fix: 'Run: npm run activate  (sets /%postname%/ safely via PHP eval)'
+      }
+    };
+  }
+
+  // Some other non-standard structure — REST API may still work, but warn.
+  return {
+    environment,
+    category: 'permalink',
+    status: 'warning',
+    label: `${name} permalink structure`,
+    message: `Unexpected permalink structure: "${value}". REST API should work but /%postname%/ is recommended.`,
+    details: { environment, value }
+  };
+}
+
 async function checkRestApi(environment, name) {
   // Use internal REST dispatch to avoid container-localhost networking issues.
   const codeScript = "$request = new WP_REST_Request('GET', '/'); $response = rest_do_request($request); if (is_wp_error($response)) { fwrite(STDERR, $response->get_error_message()); exit(1); } if (!($response instanceof WP_REST_Response)) { $response = rest_ensure_response($response); } $code = (int) $response->get_status(); echo $code; if ($code < 200 || $code >= 400) { exit(2); }";
@@ -385,11 +455,12 @@ function getEnvironments(filter) {
 function sortChecks(checks) {
   const order = {
     core: 1,
-    memory: 2,
-    plugin: 3,
-    theme: 4,
-    composer: 5,
-    rest: 6
+    permalink: 2,
+    memory: 3,
+    plugin: 4,
+    theme: 5,
+    composer: 6,
+    rest: 7
   };
 
   return checks.slice().sort((a, b) => {
@@ -444,6 +515,7 @@ async function runHealthCheck(environmentFilter = null) {
 
   for (const env of envs) {
     checkPromises.push(checkWordPress(env.environment, env.name));
+    checkPromises.push(checkPermalinks(env.environment, env.name));
     checkPromises.push(checkMemoryLimit(env.environment, env.name));
     checkPromises.push(checkPluginStatus(env.environment, env.name, 'etch-fusion-suite', {
       label: `${env.name} plugin etch-fusion-suite`
@@ -499,6 +571,7 @@ if (require.main === module) {
 
 module.exports = {
   checkMemoryLimit,
+  checkPermalinks,
   checkThemeConfiguration,
   checkRestApi,
   runHealthCheck

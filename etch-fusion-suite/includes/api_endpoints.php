@@ -90,6 +90,11 @@ class EFS_API_Endpoints {
 		add_action( 'wp_ajax_efs_dismiss_migration_run', array( __CLASS__, 'dismiss_migration_run' ) );
 		add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
 		add_action( 'wp_ajax_efs_revoke_migration_key', array( __CLASS__, 'revoke_migration_key' ) );
+
+		// Add CORS headers via rest_pre_serve_request, which fires before any output is sent.
+		// This ensures headers are settable via header() for all /efs/v1/* responses,
+		// including 4xx errors that the browser must be able to read cross-origin.
+		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'add_cors_headers_to_request' ), 10, 4 );
 	}
 
 	/**
@@ -540,6 +545,51 @@ class EFS_API_Endpoints {
 
 
 	/**
+	 * Add CORS headers to REST API responses
+	 *
+	 * Hooked to rest_pre_serve_request (priority 10), which fires before any output
+	 * is written, so header() calls are always safe. Covers every /efs/v1/* response
+	 * including 4xx errors that the browser must be able to read cross-origin.
+	 *
+	 * @param bool              $served  Whether the request has already been served.
+	 * @param \WP_REST_Response $result  Result to send to the client.
+	 * @param \WP_REST_Request  $request The request object.
+	 * @param \WP_REST_Server   $server  Server instance.
+	 * @return bool $served unchanged — we never short-circuit serving.
+	 */
+	public static function add_cors_headers_to_request( $served, $result, $request, $server ) {
+		// Only handle /efs/v1/* endpoints; leave all other REST namespaces untouched.
+		$route = $request->get_route();
+		if ( strpos( $route, '/efs/v1/' ) !== 0 ) {
+			return $served;
+		}
+
+		// Validate CORS origin; skip header injection for unauthorized origins.
+		$cors_check = self::check_cors_origin();
+		if ( is_wp_error( $cors_check ) ) {
+			return $served;
+		}
+
+		// Inject CORS headers via the manager when available.
+		// Fallback: manager may be absent during very early requests that arrive before
+		// plugins_loaded has fired set_container(). In that case check_cors_origin() returns
+		// true without validating the origin, so we still need to emit headers here.
+		if ( self::$cors_manager ) {
+			self::$cors_manager->add_cors_headers();
+		} else {
+			$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
+			if ( ! empty( $origin ) ) {
+				header( 'Access-Control-Allow-Origin: ' . $origin );
+				header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+				header( 'Access-Control-Allow-Headers: Content-Type, Authorization, X-WP-Nonce, X-EFS-Source-Origin' );
+				header( 'Vary: Origin' );
+			}
+		}
+
+		return $served;
+	}
+
+	/**
 	 * Enforce CORS globally for all REST API requests
 	 *
 	 * This filter runs before any REST API callback and provides a safety net
@@ -587,9 +637,18 @@ class EFS_API_Endpoints {
 			return $cors_check;
 		}
 
-		// CORS check passed: add CORS headers via manager
+		// CORS check passed: add CORS headers via manager.
+		// Apply the same fallback as add_cors_headers_to_request for consistency.
 		if ( self::$cors_manager ) {
 			self::$cors_manager->add_cors_headers();
+		} else {
+			$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
+			if ( ! empty( $origin ) ) {
+				header( 'Access-Control-Allow-Origin: ' . $origin );
+				header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+				header( 'Access-Control-Allow-Headers: Content-Type, Authorization, X-WP-Nonce, X-EFS-Source-Origin' );
+				header( 'Vary: Origin' );
+			}
 		}
 
 		return $response;

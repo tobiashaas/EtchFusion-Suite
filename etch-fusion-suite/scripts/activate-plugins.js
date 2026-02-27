@@ -406,6 +406,61 @@ async function removeDemoContentIfFresh(environment) {
   await runTask(`Mark fresh_site=0 on ${environment}`, ['run', environment, 'wp', 'option', 'update', 'fresh_site', '0'], 0);
 }
 
+/**
+ * Ensure WordPress uses pretty permalinks (/%postname%/) so the REST API is
+ * accessible at /wp-json/.
+ *
+ * wp-env fresh installs use the plain ?p=123 structure by default. On Windows
+ * with Git bash, passing /%postname%/ as a WP-CLI argument is impossible:
+ * bash silently expands the leading slash to "C:/Program Files/Git/%postname%/".
+ * We work around this by writing the option via `wp eval` and PHP's
+ * update_option(), which bypasses shell interpretation entirely.
+ *
+ * @param {string} environment  wp-env environment name ('cli' or 'tests-cli').
+ */
+async function ensurePermalinks(environment) {
+  // Read the current value via eval to avoid any shell quoting issues.
+  const check = await runWpEnv([
+    'run', environment, 'wp', 'eval',
+    "echo get_option('permalink_structure');"
+  ]);
+  const current = (check.stdout || '').trim();
+
+  if (current === '/%postname%/') {
+    // Structure is correct; still flush so .htaccess stays in sync after
+    // container restarts that may have wiped the rewrite cache.
+    const flush = await runWpEnv(['run', environment, 'wp', 'rewrite', 'flush', '--hard']);
+    const warnEmpty = (flush.stderr || '').toLowerCase().includes('empty');
+    if (!warnEmpty) {
+      console.log(`OK Permalinks /%postname%/ confirmed on ${environment}`);
+    } else {
+      console.warn(`WARNING Permalink flush reported empty rules on ${environment}`);
+    }
+    return;
+  }
+
+  // Set to /%postname%/ using wp eval — safe against Windows Git bash expansion
+  // of leading slashes to Windows filesystem paths.
+  const setResult = await runWpEnv([
+    'run', environment, 'wp', 'eval',
+    "update_option('permalink_structure', '/%postname%/'); echo get_option('permalink_structure');"
+  ]);
+
+  const written = (setResult.stdout || '').trim();
+  if (setResult.code !== 0 || !written.includes('%postname%')) {
+    console.warn(`WARNING Failed to set permalink_structure on ${environment} (got: "${written}")`);
+    return;
+  }
+
+  // Flush to regenerate .htaccess rewrite rules for the new structure.
+  const flushResult = await runWpEnv(['run', environment, 'wp', 'rewrite', 'flush', '--hard']);
+  if (flushResult.code === 0) {
+    console.log(`OK Permalinks set to /%postname%/ on ${environment}`);
+  } else {
+    console.warn(`WARNING Permalink structure set on ${environment} but rewrite flush failed`);
+  }
+}
+
 async function ensureTestsThemeConfiguration() {
   const listResult = await runWpEnv(['run', 'tests-cli', 'wp', 'theme', 'list', '--format=json']);
   if (listResult.code !== 0) {
@@ -468,6 +523,10 @@ async function main() {
   console.log('\nMemory Configuration');
   await displayMemoryStatus('cli', 'Bricks');
   await displayMemoryStatus('tests-cli', 'Etch');
+
+  console.log('\nPermalink configuration...');
+  await ensurePermalinks('cli');
+  await ensurePermalinks('tests-cli');
 
   console.log('\nDiscovering installed plugins and themes...');
   let [devPlugins, testPlugins, devThemes, testThemes] = await Promise.all([

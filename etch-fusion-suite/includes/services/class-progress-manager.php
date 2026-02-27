@@ -44,15 +44,26 @@ class EFS_Progress_Manager {
 	/**
 	 * Get TTL in seconds after which progress is considered stale.
 	 *
+	 * Browser mode uses 300 s (5 min) because the background PHP job can legitimately
+	 * take longer than the old 60 s window (e.g. large CSS conversion or custom
+	 * migrators) without having sent a heartbeat, causing premature stale detection
+	 * and leaving the migration frozen with no recovery path for the user.
+	 *
 	 * @param string $mode 'browser' or 'headless'.
 	 * @return int
 	 */
 	private function get_stale_ttl( string $mode ): int {
-		return 'browser' === $mode ? 60 : 120;
+		return 'browser' === $mode ? 300 : 120;
 	}
 
 	/**
 	 * Initialize progress state.
+	 *
+	 * All timestamps are stored as UTC MySQL datetimes (current_time('mysql', true)) so
+	 * that the JS front-end can safely append 'Z' and parse them as UTC without a
+	 * timezone offset. Using current_time('mysql') without the true flag would store
+	 * the WP local time, causing the elapsed-time display to be wrong by the site's
+	 * UTC offset (e.g. UTC-5 site → shows '300:xx' minutes elapsed on page load).
 	 *
 	 * @param string $migration_id Migration ID.
 	 * @param array  $options      Optional. selected_post_types, post_type_mappings, include_media.
@@ -69,8 +80,8 @@ class EFS_Progress_Manager {
 			'current_phase_name'   => 'Validation',
 			'current_phase_status' => 'pending',
 			'percentage'           => 0,
-			'started_at'           => current_time( 'mysql' ),
-			'last_updated'         => current_time( 'mysql' ),
+			'started_at'           => current_time( 'mysql', true ),
+			'last_updated'         => current_time( 'mysql', true ),
 			'completed_at'         => null,
 			'items_processed'      => 0,
 			'items_total'          => 0,
@@ -103,7 +114,7 @@ class EFS_Progress_Manager {
 		$progress['current_step'] = sanitize_key( (string) $step );
 		$progress['percentage']   = $normalized_percentage;
 		$progress['message']      = $message;
-		$progress['last_updated'] = current_time( 'mysql' );
+		$progress['last_updated'] = current_time( 'mysql', true );
 		$progress['is_stale']     = false;
 
 		if ( $this->steps_manager->is_known_phase( $step ) ) {
@@ -123,12 +134,12 @@ class EFS_Progress_Manager {
 		if ( 'completed' === $step ) {
 			$progress['status']               = 'completed';
 			$progress['current_phase_status'] = 'completed';
-			$progress['completed_at']         = current_time( 'mysql' );
+			$progress['completed_at']         = current_time( 'mysql', true );
 			$this->store_active_migration( array() );
 		} elseif ( 'error' === $step ) {
 			$progress['status']               = 'error';
 			$progress['current_phase_status'] = 'failed';
-			$progress['completed_at']         = current_time( 'mysql' );
+			$progress['completed_at']         = current_time( 'mysql', true );
 			$this->store_active_migration( array() );
 		} elseif ( 'queued' === $step ) {
 			$progress['status']               = 'queued';
@@ -172,7 +183,7 @@ class EFS_Progress_Manager {
 		}
 
 		if ( empty( $progress['last_updated'] ) ) {
-			$progress['last_updated'] = isset( $progress['started_at'] ) ? $progress['started_at'] : current_time( 'mysql' );
+			$progress['last_updated'] = isset( $progress['started_at'] ) ? $progress['started_at'] : current_time( 'mysql', true );
 		}
 
 		$status = isset( $progress['status'] ) ? (string) $progress['status'] : '';
@@ -229,7 +240,7 @@ class EFS_Progress_Manager {
 	public function touch_progress_heartbeat(): void {
 		$progress = $this->progress_repository->get_progress();
 		if ( is_array( $progress ) && isset( $progress['status'] ) && in_array( $progress['status'], array( 'running', 'receiving' ), true ) ) {
-			$progress['last_updated'] = current_time( 'mysql' );
+			$progress['last_updated'] = current_time( 'mysql', true );
 			$progress['is_stale']     = false;
 			$this->progress_repository->save_progress( $progress );
 		}
@@ -298,7 +309,7 @@ class EFS_Progress_Manager {
 	 */
 	public function mark_stats_completed(): void {
 		$stats                   = $this->progress_repository->get_stats();
-		$stats['last_migration'] = current_time( 'mysql' );
+		$stats['last_migration'] = current_time( 'mysql', true );
 		$stats['status']         = 'completed';
 		$this->progress_repository->save_stats( $stats );
 	}

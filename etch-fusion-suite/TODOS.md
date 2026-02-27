@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-02-25 (Code-Review-Fixes)
+**Updated:** 2026-02-27 (Migration-Stuck-Fixes)
 
 ## 🚀 Current Development
 
