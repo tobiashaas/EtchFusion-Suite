@@ -1,8 +1,48 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-02-27 (Migration-Stuck-Fixes)
+**Updated:** 2026-02-27 (Action Scheduler Fixes + Stabilization Plan)
 
 ## 🚀 Current Development
+
+### 🔨 Active Stabilization & Audit Plan (Started: 2026-02-27)
+
+**Context:** Plugin war funktionsfähig, ist aber instabil geworden. Action Scheduler Initialization wurde behoben, nun müssen systematisch Strauss-Prefixing, PSR-4 Autoloading, Migrator-System und CSS Converter stabilisiert werden.
+
+#### Phase 1️⃣: Strauss & Vendor-Abhängigkeiten (4 Todos)
+- [ ] **audit-strauss** - Überprüfe dass firebase/php-jwt, woocommerce/action-scheduler, psr/container korrekt geprefixed sind
+- [✅] **verify-action-scheduler-load** - FIXED: ActionScheduler global classes + DISABLE_WP_CRON timing
+- [ ] **verify-firebase-jwt** - Überprüfe JWT nur unter EtchFusionSuite\Vendor\Firebase\JWT\*
+- [ ] **verify-psr-container** - Überprüfe PSR Container Verfügbarkeit
+
+#### Phase 2️⃣: PSR-4 Autoloading (3 Todos)
+- [ ] **audit-psr4** - Alle Klassen in includes/ sind autoloadbar unter Bricks2Etch\ namespace
+- [ ] **check-autoload-fallback** - autoloader.php hat all legacy classes
+- [ ] **test-psr4-autoload** - Mit npm run wp -- eval systematisch alle Klassen testen
+
+#### Phase 3️⃣: Migrator System (4 Todos)
+- [ ] **audit-migrator-registry** - Registry & Discovery robust gegen fehlende Klassen
+- [ ] **refactor-migrator-base** - Error Handling, Logging, Retry-Logik
+- [ ] **implement-migrator-validation** - Pre/Post-Validierung + Rollback
+- [ ] **fix-batch-processor** - Memory Management, Timeout, Progress, Action Cleanup
+
+#### Phase 4️⃣: CSS Converter Testable (3 Todos)
+- [ ] **audit-css-module-deps** - Alle CSS Module Abhängigkeiten überprüfen
+- [ ] **isolate-css-converter** - Für isolierte Tests refactorn (DI Interface)
+- [ ] **enable-css-converter-tests** - Unit Tests mit Mock-Daten schreiben
+
+#### Phase 5️⃣: Logging & Debugging (2 Todos)
+- [ ] **add-debug-logging** - Structured logging für Vendor, Services, Migrators, Action Scheduler
+- [ ] **add-error-messages** - User-friendly Fehlermeldungen mit Behebungsschritte
+
+#### Phase 6️⃣: Testing & Verification (2 Todos)
+- [ ] **test-full-migration-flow** - End-to-End Test nach allen Fixes
+- [ ] **performance-profile** - xdebug/phpstan Profiling, Bottleneck-Analyse
+
+#### Session Tasks (2 Todos)
+- [ ] **document-module-deps** - Module-Abhängigkeits-Diagramm erstellen
+- [ ] **improve-service-provider** - Service Provider Registration überprüfen
+
+**Dependency Chain:** Phase 1 → Phase 2 → Phases 3,4 → Phase 5 → Phase 6
 
 ### 🐛 Open Bugs
 
@@ -12,6 +52,15 @@
   - Datei: `tests/unit/Converters/VideoConverterTest.php:155` / `includes/converters/elements/` (VideoConverter)
 
 ### ✅ Completed Tasks
+
+- [✅] **Fix Action Scheduler Initialization** - **Completed:** 2026-02-27
+  - **Problem 1**: DISABLE_WP_CRON war zu spät definiert (nach vendor autoloader)
+  - **Problem 2**: ActionScheduler global classes wurden nicht explizit required
+  - **Problem 3**: Headless mode konnte nicht aktiviert werden
+  - **Fix**: (1) DISABLE_WP_CRON at top of plugin file (before vendors), (2) Explicit `require_once` for action-scheduler.php (action-scheduler-config.php now only adds filters)
+  - **Verification**: `npm run wp -- eval "echo class_exists('ActionScheduler') ? 'YES' : 'NO';"` → YES
+  - **Verification**: `npm run wp -- eval "echo defined('DISABLE_WP_CRON') && DISABLE_WP_CRON ? 'YES' : 'NO';"` → YES
+  - **Verification**: `as_schedule_single_action()` works, no fatal errors
 
 - [✅] **Code-Review: 5 Bugfixes aus statischer Analyse** - **Completed:** 2026-02-25
   - `(string)`-Cast nach `preg_replace()` in `EFS_ACSS_Handler::register_acss_inline_style()` ergänzt (PHP 8 Kompatibilität)
@@ -236,6 +285,6 @@
 
 ---
 
-**Last Updated:** 2026-02-23 00:00
-**Next Review:** 2026-03-02 00:00
+**Last Updated:** 2026-02-27 23:40
+**Next Review:** 2026-02-28 09:00
 **Maintainer:** Etch Fusion Suite Development Team
