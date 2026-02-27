@@ -34,6 +34,14 @@ define( 'ETCH_FUSION_SUITE_BASENAME', plugin_basename( __FILE__ ) );
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
 define( 'EFS_ENABLE_FRAMER', false );
 
+/**
+ * Define Action Scheduler as headless (no WP-Cron)
+ * Must be defined BEFORE Action Scheduler is loaded to take effect
+ */
+if ( ! defined( 'DISABLE_WP_CRON' ) ) {
+	define( 'DISABLE_WP_CRON', true );
+}
+
 // Always load vendor/ first (Composer infrastructure), then vendor-prefixed/ on top (Strauss namespaces).
 $etch_fusion_suite_vendor_prefixed = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/autoload.php';
 $etch_fusion_suite_vendor_plain    = ETCH_FUSION_SUITE_DIR . 'vendor/autoload.php';
