@@ -42,7 +42,15 @@ if ( file_exists( $etch_fusion_suite_vendor_plain ) ) {
 }
 if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	require_once $etch_fusion_suite_vendor_prefixed;
-} else {
+}
+
+// Load Action Scheduler explicitly (auto-initializes via its own plugins_loaded hooks)
+$efs_action_scheduler_path = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
+if ( file_exists( $efs_action_scheduler_path ) ) {
+	require_once $efs_action_scheduler_path;
+}
+
+if ( ! file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	// Shim PSR Container interfaces under Strauss namespace for plugin code that expects prefixed names.
 	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' ) && interface_exists( 'Psr\Container\ContainerInterface' ) ) {
 		class_alias( 'Psr\Container\ContainerInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' );
@@ -169,17 +177,6 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
-		// Initialize Action Scheduler before other plugins_loaded hooks (Strauss-prefixed when used).
-		add_action(
-			'plugins_loaded',
-			function () {
-				if ( class_exists( 'EFS_Vendor_ActionScheduler' ) ) {
-					EFS_Vendor_ActionScheduler::init();
-				}
-			},
-			1
-		);
-
 		// Initialize REST API endpoints immediately
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
@@ -281,43 +278,6 @@ class Etch_Fusion_Suite_Plugin {
 	public function init_rest_api() {
 		EFS_API_Endpoints::set_container( etch_fusion_suite_container() );
 		EFS_API_Endpoints::init();
-	}
-
-	/**
-	 * Initialize CORS Manager with whitelist-based policy
-	 */
-	private function init_cors_manager() {
-		$container = etch_fusion_suite_container();
-
-		if ( $container->has( 'cors_manager' ) ) {
-			$cors_manager = $container->get( 'cors_manager' );
-
-			// Send CORS headers IMMEDIATELY on init hook - before anything else
-			add_action(
-				'init',
-				function () use ( $cors_manager ) {
-					// Check if this is a REST API request to /efs/v1/*
-					$rest_prefix = rest_get_url_prefix();
-					$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-					
-					// Match /wp-json/efs/v1/* or /index.php?rest_route=/efs/v1/*
-					if ( strpos( $request_uri, "/{$rest_prefix}/efs/v1/" ) !== false ||
-						 ( strpos( $request_uri, 'rest_route=' ) !== false && strpos( $request_uri, '/efs/v1/' ) !== false ) ) {
-						// Validate CORS origin
-						$origin = '';
-						if ( isset( $_SERVER['HTTP_ORIGIN'] ) ) {
-							$origin = esc_url_raw( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) );
-						}
-						
-						if ( ! empty( $origin ) && $cors_manager->is_origin_allowed( $origin ) ) {
-							// Origin is allowed, set CORS headers
-							$cors_manager->add_cors_headers();
-						}
-					}
-				},
-				1 // Run early on init
-			);
-		}
 	}
 
 	/**
