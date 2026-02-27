@@ -44,10 +44,22 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	require_once $etch_fusion_suite_vendor_prefixed;
 }
 
-// Load Action Scheduler explicitly (auto-initializes via its own plugins_loaded hooks)
-$efs_action_scheduler_path = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
-if ( file_exists( $efs_action_scheduler_path ) ) {
-	require_once $efs_action_scheduler_path;
+// Manual PSR-4 loader for Action_Scheduler namespace (Strauss generation issue)
+// Action_Scheduler classes are in vendor-prefixed but not registered in composer autoloader
+if ( ! function_exists( 'efs_autoload_action_scheduler' ) ) {
+	function efs_autoload_action_scheduler( $class ) {
+		$prefix = 'EtchFusionSuite\\Vendor\\Action_Scheduler\\';
+		if ( strpos( $class, $prefix ) === 0 ) {
+			$relative_class = substr( $class, strlen( $prefix ) );
+			$file            = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/classes/' . str_replace( '\\', '/', $relative_class ) . '.php';
+			if ( file_exists( $file ) ) {
+				require $file;
+				return true;
+			}
+		}
+		return false;
+	}
+	spl_autoload_register( 'efs_autoload_action_scheduler' );
 }
 
 if ( ! file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
