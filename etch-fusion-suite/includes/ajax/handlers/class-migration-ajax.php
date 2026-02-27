@@ -253,6 +253,8 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 		if ( function_exists( 'as_unschedule_action' ) ) {
 			as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+		} elseif ( class_exists( 'EFS_Vendor_ActionScheduler' ) ) {
+			EFS_Vendor_ActionScheduler::store()->cancel_action( $action_scheduler_id );
 		}
 		wp_send_json_success( array( 'cancelled' => true ) );
 	}

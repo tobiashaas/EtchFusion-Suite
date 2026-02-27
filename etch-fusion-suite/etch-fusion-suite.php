@@ -177,10 +177,6 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
-		// Initialize headless migration job on plugins_loaded (before Action Scheduler runs actions)
-		// Priority 0 ensures it runs before AS priority 1
-		add_action( 'plugins_loaded', array( $this, 'init_headless_job' ), 0 );
-
 		// Initialize REST API endpoints immediately
 		add_action( 'plugins_loaded', array( $this, 'init_rest_api' ) );
 		add_action( 'plugins_loaded', array( $this, 'init_github_updater' ), 5 );
@@ -273,18 +269,6 @@ class Etch_Fusion_Suite_Plugin {
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $container->has( 'debug_ajax' ) ) {
 			$container->get( 'debug_ajax' );
-		}
-	}
-
-	/**
-	 * Initialize headless migration job (plugins_loaded priority 0, before Action Scheduler)
-	 *
-	 * Must run before Action Scheduler executes queued actions so hooks are registered.
-	 */
-	public function init_headless_job() {
-		$container = etch_fusion_suite_container();
-		if ( $container->has( 'headless_migration_job' ) ) {
-			$container->get( 'headless_migration_job' );
 		}
 	}
 

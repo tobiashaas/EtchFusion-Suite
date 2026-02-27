@@ -154,7 +154,7 @@ class EFS_Headless_Migration_Job {
 	 */
 	public function enqueue_job( string $migration_id ): int {
 		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
-			$this->migration_logger->log( $migration_id, 'error', 'Headless: Action Scheduler not available - migration cannot proceed.' );
+			$this->migration_logger->log( $migration_id, 'warning', 'Headless: as_enqueue_async_action not available.' );
 			return 0;
 		}
 		$count = $this->progress_manager->increment_headless_job_count();
