@@ -133,6 +133,11 @@ class EFS_Headless_Migration_Job {
 			$progress = $this->progress_manager->get_progress_data();
 			$status   = isset( $progress['status'] ) ? (string) $progress['status'] : '';
 			if ( in_array( $status, array( 'completed', 'error' ), true ) ) {
+				// Unschedule any pending headless job actions for this migration
+				if ( function_exists( 'as_unschedule_action' ) ) {
+					as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+				}
+				// Schedule log cleanup for 7 days later
 				if ( function_exists( 'as_schedule_single_action' ) ) {
 					as_schedule_single_action( time() + 7 * DAY_IN_SECONDS, 'efs_cleanup_migration_log', array( 'migration_id' => $migration_id ), 'efs-migration' );
 				}

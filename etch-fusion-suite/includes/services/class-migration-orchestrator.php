@@ -214,9 +214,30 @@ class EFS_Migration_Orchestrator {
 	 * @return array
 	 */
 	public function cancel_migration( $migration_id = '' ): array {
+		// Get migration_id from active migration if not provided
+		if ( empty( $migration_id ) ) {
+			$active = $this->progress_manager->get_active_migration();
+			$migration_id = isset( $active['migration_id'] ) ? (string) $active['migration_id'] : '';
+		}
+
+		// If headless mode, unschedule any pending actions before clearing state
+		if ( ! empty( $migration_id ) ) {
+			$active = $this->progress_manager->get_active_migration();
+			$mode   = isset( $active['mode'] ) ? (string) $active['mode'] : '';
+			if ( 'headless' === $mode && function_exists( 'as_unschedule_action' ) ) {
+				as_unschedule_action( 'efs_run_headless_migration', array( 'migration_id' => $migration_id ), 'efs-migration' );
+				as_unschedule_action( 'efs_cleanup_migration_log', array( 'migration_id' => $migration_id ), 'efs-migration' );
+			}
+		}
+
 		$this->migration_repository->delete_progress();
 		$this->migration_repository->delete_steps();
 		$this->migration_repository->delete_token_data();
+		// Delete the batch checkpoint so a fresh migration can start from scratch.
+		// Without this, a subsequent start_migration() could find an orphaned checkpoint
+		// from the cancelled run and behave unexpectedly (e.g. treat 0 remaining items
+		// as "already done" and complete immediately).
+		$this->migration_repository->delete_checkpoint();
 		$this->progress_manager->store_active_migration( array() );
 
 		$this->error_handler->log_warning(
