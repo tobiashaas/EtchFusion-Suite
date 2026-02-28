@@ -115,6 +115,16 @@ class EFS_Background_Spawn_Handler {
 			);
 			// Synchronous fallback: run the migration inline.
 			$this->async_runner->run_migration_execution( $migration_id );
+		} else {
+			// Non-blocking POST accepted — the background process will handle the migration.
+			$this->error_handler->debug_log(
+				'Background spawn accepted',
+				array(
+					'migration_id' => $migration_id,
+					'spawn_url'    => $url,
+				),
+				'EFS_SPAWN'
+			);
 		}
 	}
 }

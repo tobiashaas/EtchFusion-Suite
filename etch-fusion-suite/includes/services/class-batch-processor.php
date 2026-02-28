@@ -143,6 +143,11 @@ class EFS_Batch_Processor {
 				);
 			}
 
+			// Guard: batch_phase_runner is optional in the constructor (legacy/test context).
+			if ( null === $this->batch_phase_runner ) {
+				return new \WP_Error( 'no_batch_phase_runner', __( 'Batch phase runner not configured.', 'etch-fusion-suite' ) );
+			}
+
 			return $this->batch_phase_runner->run_phase(
 				$active_handler,
 				$phase,

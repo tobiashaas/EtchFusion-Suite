@@ -13,7 +13,9 @@ namespace Bricks2Etch\Migrators;
 use Bricks2Etch\Migrators\Interfaces\Migrator_Interface;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 use function esc_html;
+use function error_log;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -90,6 +92,9 @@ class EFS_Migrator_Registry {
 
 	/**
 	 * Returns all migrators sorted by priority (ascending).
+	 *
+	 * Migrators that throw during get_priority() are sorted to the end (priority PHP_INT_MAX)
+	 * and the error is logged, so a single buggy migrator cannot break the entire sort.
 	 */
 	public function get_all() {
 		$migrators = $this->migrators;
@@ -97,7 +102,19 @@ class EFS_Migrator_Registry {
 		uasort(
 			$migrators,
 			function ( Migrator_Interface $a, Migrator_Interface $b ) {
-				return $a->get_priority() <=> $b->get_priority();
+				try {
+					$pa = $a->get_priority();
+				} catch ( Throwable $e ) {
+					error_log( 'EFS_Migrator_Registry: get_priority() threw on ' . get_class( $a ) . ': ' . $e->getMessage() );
+					$pa = PHP_INT_MAX;
+				}
+				try {
+					$pb = $b->get_priority();
+				} catch ( Throwable $e ) {
+					error_log( 'EFS_Migrator_Registry: get_priority() threw on ' . get_class( $b ) . ': ' . $e->getMessage() );
+					$pb = PHP_INT_MAX;
+				}
+				return $pa <=> $pb;
 			}
 		);
 
@@ -106,12 +123,20 @@ class EFS_Migrator_Registry {
 
 	/**
 	 * Returns migrators whose supports() check returns true.
+	 *
+	 * A migrator that throws from supports() is treated as unsupported and its
+	 * error is logged, so a single broken migrator cannot prevent others from running.
 	 */
 	public function get_supported() {
 		return array_filter(
 			$this->get_all(),
 			function ( Migrator_Interface $migrator ) {
-				return (bool) $migrator->supports();
+				try {
+					return (bool) $migrator->supports();
+				} catch ( Throwable $e ) {
+					error_log( 'EFS_Migrator_Registry: supports() threw on ' . get_class( $migrator ) . ': ' . $e->getMessage() );
+					return false;
+				}
 			}
 		);
 	}

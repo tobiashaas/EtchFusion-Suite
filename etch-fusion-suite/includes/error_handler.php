@@ -71,10 +71,20 @@ class EFS_Error_Handler {
 			'description' => 'API request exceeded timeout limit',
 			'solution'    => 'Increase timeout setting or check server resources',
 		),
+		'E106' => array(
+			'title'       => 'CSS Import to Target Failed',
+			'description' => 'The converted CSS styles could not be imported to the target site API',
+			'solution'    => 'Check target site connectivity and verify the migration key is still valid; re-run the migration to retry',
+		),
 		'E107' => array(
 			'title'       => 'Failed to Send Post to Target',
 			'description' => 'Post could not be delivered to the target site after all retry attempts',
 			'solution'    => 'Check target site connectivity, verify the migration key is valid, then re-run or migrate the post individually',
+		),
+		'E108' => array(
+			'title'       => 'Post Type Not Mapped to Target',
+			'description' => 'A post\'s post type has no corresponding mapping on the target site',
+			'solution'    => 'Ensure the required post type exists on the target site; run the CPT migrator before the content migration',
 		),
 
 		// Migration Process Errors (E2xx)
@@ -121,6 +131,23 @@ class EFS_Error_Handler {
 			'title'       => 'Media File Upload Failed',
 			'description' => 'Failed to upload media file to target site',
 			'solution'    => 'Check target site upload permissions and file size limits',
+		),
+
+		// Service-level Exception Errors (E9xx)
+		'E905' => array(
+			'title'       => 'Media Migration Service Exception',
+			'description' => 'An unexpected exception occurred in the media migration service',
+			'solution'    => 'Check the error context for the exception message; ensure WP filesystem permissions are correct and retry the migration',
+		),
+		'E906' => array(
+			'title'       => 'CSS Conversion Service Exception',
+			'description' => 'An unexpected exception occurred while converting Bricks global CSS classes',
+			'solution'    => 'Check the error context for the exception message; inspect the Bricks global class data for malformed CSS',
+		),
+		'E907' => array(
+			'title'       => 'CSS Element Style Collection Exception',
+			'description' => 'An unexpected exception occurred while collecting element-level inline styles',
+			'solution'    => 'Check the error context for the exception message; re-run the migration to retry the CSS collection phase',
 		),
 
 		// Info codes (I0xx) - Success messages
@@ -266,6 +293,27 @@ class EFS_Error_Handler {
 			'title'       => 'Optional Migrator Failed',
 			'description' => 'An optional migrator (ACF, MetaBox, or Custom Fields) failed; migration continued',
 			'solution'    => 'Review the warning context for the migrator type and error message; re-run or configure the plugin on the target site',
+		),
+
+		// Component Migrator Warnings (W4xx)
+		'W401' => array(
+			'title'       => 'Component Skipped',
+			'description' => 'A Bricks component was skipped during migration — either the component ID or element list was missing, or a circular reference was detected',
+			'solution'    => 'Check the warning context for the component ID; verify the component is fully defined in Bricks and does not reference itself recursively',
+		),
+
+		// Orchestrator / System Warnings (W9xx)
+		'W900' => array(
+			'title'       => 'Migration Cancelled by User',
+			'description' => 'The migration was cancelled at user request; in-progress state has been cleaned up',
+			'solution'    => 'No action needed — start a new migration when ready',
+		),
+
+		// Background Process Warnings (W0xx continued)
+		'W013' => array(
+			'title'       => 'Background Spawn Failed — Fallback to Sync',
+			'description' => 'The non-blocking loopback POST to start the background migration process failed; the migration fell back to synchronous in-process execution',
+			'solution'    => 'This is non-fatal — the migration will still complete. If it happens repeatedly, check that loopback HTTP requests are allowed on your server (some shared hosts block them)',
 		),
 	);
 

@@ -140,8 +140,6 @@ class EFS_Async_Migration_Runner {
 	public function run_migration_execution( $migration_id = '' ) {
 		set_time_limit( 0 );
 		ignore_user_abort( true );
-		$is_cron_context           = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
-		$is_ajax_context           = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
 		$migration_id_for_shutdown = $migration_id;
 		$progress_manager_shutdown = $this->progress_manager;
 		$migration_logger_shutdown = $this->migration_logger;

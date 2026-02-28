@@ -52,23 +52,26 @@ if ( file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
 	require_once $etch_fusion_suite_vendor_prefixed;
 }
 
-// Load Action Scheduler headless configuration (disables WP-Cron, enables loopback runner)
-require_once ETCH_FUSION_SUITE_DIR . 'action-scheduler-config.php';
-
-// Explicitly load Action Scheduler (uses global classes, not namespaced)
-// This must happen after DISABLE_WP_CRON is defined
-if ( ! class_exists( 'ActionScheduler', false ) ) {
-	require_once ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
-}
-
-// Manual PSR-4 loader for Action_Scheduler namespace (Strauss generation issue)
-// Action_Scheduler classes are in vendor-prefixed but not registered in composer autoloader
+// Manual PSR-4 loader for Action_Scheduler namespace (Strauss generation issue).
+// IMPORTANT: Must be registered BEFORE action-scheduler.php is loaded. When plugins_loaded
+// has already fired (e.g. during wp plugin activate in WP-CLI), action-scheduler.php calls
+// ActionScheduler::init() immediately upon require_once, which triggers WP_CLI::add_command()
+// with our namespaced class strings. If our autoloader is not registered at that point,
+// WP-CLI cannot resolve the classes and throws a fatal "Callable does not exist" error.
+// The $dir_map corrects case mismatches between namespace segments and directory names
+// on case-sensitive Linux filesystems (e.g. namespace 'Migration' vs directory 'migration').
 if ( ! function_exists( 'efs_autoload_action_scheduler' ) ) {
 	function efs_autoload_action_scheduler( $class ) {
 		$prefix = 'EtchFusionSuite\\Vendor\\Action_Scheduler\\';
 		if ( strpos( $class, $prefix ) === 0 ) {
 			$relative_class = substr( $class, strlen( $prefix ) );
-			$file            = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/classes/' . str_replace( '\\', '/', $relative_class ) . '.php';
+			// Map namespace first-segment → actual directory name on disk.
+			$dir_map = [
+				'Migration' => 'migration',
+			];
+			$parts    = explode( '\\', $relative_class );
+			$parts[0] = isset( $dir_map[ $parts[0] ] ) ? $dir_map[ $parts[0] ] : $parts[0];
+			$file     = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/classes/' . implode( '/', $parts ) . '.php';
 			if ( file_exists( $file ) ) {
 				require $file;
 				return true;
@@ -77,6 +80,17 @@ if ( ! function_exists( 'efs_autoload_action_scheduler' ) ) {
 		return false;
 	}
 	spl_autoload_register( 'efs_autoload_action_scheduler' );
+}
+
+// Load Action Scheduler headless configuration (disables WP-Cron, enables loopback runner)
+require_once ETCH_FUSION_SUITE_DIR . 'action-scheduler-config.php';
+
+// Explicitly load Action Scheduler (uses global classes, not namespaced).
+// Runs after DISABLE_WP_CRON is defined and after efs_autoload_action_scheduler is
+// registered, so that ActionScheduler::init() (called immediately when plugins_loaded
+// has already fired) can resolve our EtchFusionSuite\Vendor\Action_Scheduler\* classes.
+if ( ! class_exists( 'ActionScheduler', false ) ) {
+	require_once ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
 }
 
 if ( ! file_exists( $etch_fusion_suite_vendor_prefixed ) ) {

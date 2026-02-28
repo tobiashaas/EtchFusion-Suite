@@ -119,11 +119,20 @@ class EFS_Migrator_Discovery {
 		}
 
 		foreach ( new DirectoryIterator( $directory ) as $file ) {
-			if ( $file->isDot() || $file->getExtension() !== 'php' ) {
+			if ( $file->isDot() || 'php' !== $file->getExtension() ) {
 				continue;
 			}
 
-			require_once $file->getPathname();
+			// Wrap require_once so a parse or compile error in a single third-party
+			// migrator file does not abort discovery of all remaining files.
+			try {
+				require_once $file->getPathname(); // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
+			} catch ( \Throwable $e ) {
+				$path = $file->getPathname();
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( 'EFS_Migrator_Discovery: failed to include ' . $path . ': ' . $e->getMessage() );
+				continue;
+			}
 		}
 
 		$container     = function_exists( 'etch_fusion_suite_container' ) ? etch_fusion_suite_container() : null;

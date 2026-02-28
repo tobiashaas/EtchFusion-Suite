@@ -92,8 +92,6 @@ class EFS_Batch_Phase_Runner {
 		string $migration_key,
 		array $active_migration_options
 	) {
-		$is_cron_context               = function_exists( 'wp_doing_cron' ) && wp_doing_cron();
-		$is_ajax_context               = function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
 		$migration_id_for_shutdown     = $migration_id;
 		$progress_manager_for_shutdown = $this->progress_manager;
 		$migration_logger_for_shutdown = $this->migration_logger;
