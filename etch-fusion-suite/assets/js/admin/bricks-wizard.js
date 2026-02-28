@@ -1157,6 +1157,7 @@ const createWizard = (root) => {
 		let currentBatchSize = BATCH_SIZE;
 		const MAX_PARALLEL_REQUESTS = 5;
 		let shouldContinue = true;
+		let hasFailedFatally = false; // Atomic flag to prevent race condition in failure handling
 
 		const submitBatch = async () => {
 			try {
@@ -1193,7 +1194,9 @@ const createWizard = (root) => {
 				}
 			} catch (error) {
 				runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
-				if (runtime.batchFailCount >= 3) {
+				// Only first worker to detect fatal failure handles error display; prevent race condition
+				if (runtime.batchFailCount >= 3 && !hasFailedFatally) {
+					hasFailedFatally = true;
 					shouldContinue = false;
 					runtime.migrationRunning = false;
 					stopPolling();
@@ -1217,6 +1220,12 @@ const createWizard = (root) => {
 						refs.retryButton.hidden = false;
 					}
 					showResult('error', error?.message || 'Batch processing failed. Try resuming the migration.');
+				} else if (runtime.batchFailCount >= 3) {
+					// Other workers also exit, but don't duplicate error handling
+					shouldContinue = false;
+				}
+				// Re-throw only if this is the first worker handling the failure, for logging purposes
+				if (hasFailedFatally && runtime.batchFailCount === 3) {
 					throw error;
 				}
 			}
