@@ -2742,6 +2742,11 @@
         state.migrationKey = token;
         state.targetUrl = targetUrl;
         runtime.validatedMigrationUrl = targetUrl;
+        try {
+          await post(ACTION_INVALIDATE_PREFLIGHT, {});
+        } catch (err) {
+          console.warn("[EFS] Preflight cache invalidation failed", err);
+        }
         runPreflightCheck(state.targetUrl, "headless", "connect").catch(() => {
         });
         if (refs.keyInput) {

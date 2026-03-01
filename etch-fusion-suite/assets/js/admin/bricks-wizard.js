@@ -1535,7 +1535,14 @@ const createWizard = (root) => {
 			state.migrationKey = token;
 			state.targetUrl = targetUrl;
 			runtime.validatedMigrationUrl = targetUrl;
-			runPreflightCheck(state.targetUrl, 'headless', 'connect').catch(() => {});
+			// Invalidate preflight cache from Step 1 (which ran without a target URL)
+// and run fresh checks with the now-provided target URL.
+try {
+await post(ACTION_INVALIDATE_PREFLIGHT, {});
+} catch (err) {
+console.warn('[EFS] Preflight cache invalidation failed', err);
+}
+runPreflightCheck(state.targetUrl, 'headless', 'connect').catch(() => {});
 			if (refs.keyInput) {
 				refs.keyInput.value = token;
 			}
@@ -2195,3 +2202,4 @@ export const initBricksWizard = () => {
 		console.error('[EFS] Failed to initialize Bricks wizard', error);
 	});
 };
+
