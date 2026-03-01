@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-01
-**Version:** 0.14.2
+**Version:** 0.15.0 (Database Persistence Release)
 
 ---
 
@@ -25,7 +25,8 @@
 14. [Security](#security)
 15. [Admin Settings UI](#admin-settings-ui)
 16. [Migration Testing Workflow](#migration-testing-workflow)
-17. [References](#references)
+17. [Database Persistence](#database-persistence)
+18. [References](#references)
 
 ---
 
@@ -1831,6 +1832,327 @@ npx wp-env run tests-cli wp eval '$s=get_option("etch_styles",[]); echo count($s
 # Filter error logs
 npm run logs:bricks:errors
 ```
+
+
+---
+
+## Database Persistence
+
+### Overview
+
+The plugin uses a **database-first persistence architecture** for migration state management. All migration data is stored in custom WordPress database tables (`wp_efs_migrations` and `wp_efs_migration_logs`) with WordPress Options API as a fallback for backward compatibility.
+
+**Key Principles:**
+- Primary source of truth: Custom database tables
+- Fallback: WordPress Options (for legacy data and compatibility)
+- Dual-write on all updates (DB + Options for safety)
+- Audit trail of all migration events
+- Crash detection via stale migration queries
+- Resume capability for interrupted migrations
+
+### Database Schema
+
+#### Migrations Table (`wp_efs_migrations`)
+
+```sql
+CREATE TABLE wp_efs_migrations (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  migration_uid VARCHAR(50) NOT NULL UNIQUE,     -- UUID with optional prefix (e.g. 'test-...')
+  source_url VARCHAR(255) NOT NULL,              -- Source Bricks Builder site URL
+  target_url VARCHAR(255) NOT NULL,              -- Target Etch site URL
+  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending → in_progress → completed/failed/canceled
+  total_items INT UNSIGNED DEFAULT 0,            -- Total items to process
+  processed_items INT UNSIGNED DEFAULT 0,        -- Items processed so far
+  progress_percent INT UNSIGNED DEFAULT 0,       -- Progress percentage (0-100)
+  current_batch INT UNSIGNED DEFAULT 0,          -- Current batch number
+  error_count INT UNSIGNED DEFAULT 0,            -- Count of errors encountered
+  error_message LONGTEXT,                        -- Last error message
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Created timestamp
+  started_at DATETIME,                           -- Migration start time
+  completed_at DATETIME,                         -- Migration completion time
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY status (status),                           -- Index for status queries
+  KEY created_at (created_at)                    -- Index for time-based queries
+)
+```
+
+#### Migration Logs Table (`wp_efs_migration_logs`)
+
+```sql
+CREATE TABLE wp_efs_migration_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  migration_uid VARCHAR(50) NOT NULL,            -- References wp_efs_migrations
+  log_level VARCHAR(10) NOT NULL,                -- info, warning, error
+  category VARCHAR(50),                          -- css, media, content, progress, migration_failed
+  message TEXT NOT NULL,                         -- Event description
+  context LONGTEXT,                              -- JSON context data
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY migration_uid (migration_uid),             -- Index for fast log retrieval
+  KEY log_level (log_level),                     -- Index for error queries
+  KEY created_at (created_at)                    -- Index for recent logs
+)
+```
+
+### Migration Lifecycle
+
+#### 1. Initialization
+
+When a migration starts via `progress_manager->init_progress()`:
+
+```php
+$progress_manager->init_progress(
+    'my-migration-123',
+    array( 'selected_post_types' => array( 'post', 'page' ) ),
+    'browser' // or 'headless'
+);
+```
+
+The repository's `save_progress()` method:
+1. Checks if migration exists in DB via `get_migration()`
+2. If not found, creates new entry via `create_migration()`
+3. Writes progress to `wp_efs_migrations` table
+4. Also writes to Options API for backward compatibility
+
+#### 2. Progress Updates
+
+During migration execution, progress updates flow through:
+
+```
+migrator_executor->on_progress()
+  → progress_manager->update_progress()
+    → migration_repository->save_progress()
+      → EFS_DB_Migration_Persistence::update_progress()
+        → $wpdb->update() wp_efs_migrations table
+```
+
+All updates:
+- Set `updated_at` to current timestamp
+- Update `progress_percent` (0-100)
+- Track `processed_items` and `total_items`
+- Log milestone events (25%, 50%, 75%, 100% progress) to logs table
+
+#### 3. Error Handling
+
+On migration error:
+
+```php
+EFS_DB_Migration_Persistence::mark_failed(
+    $migration_id,
+    'Error description',
+    array( 'error_code' => 'E101', 'context' => '...' )
+);
+```
+
+This:
+1. Logs error event to migration logs
+2. Sets status to `failed`
+3. Captures error message in `error_message` field
+4. Records timestamp for debugging
+
+#### 4. Completion
+
+On successful migration completion:
+
+```php
+$db_persist->update_status( $migration_id, 'completed' );
+```
+
+This:
+1. Sets status to `completed`
+2. Records `completed_at` timestamp
+3. Logs completion event with final statistics
+
+### Crash Detection & Recovery
+
+#### Stale Migration Detection
+
+Migrations are considered "stale" (crashed) if they meet criteria:
+- Status is `in_progress`
+- `updated_at` timestamp is older than 5 minutes (300 seconds for browser mode, 120s for headless)
+
+Query for stale migrations:
+
+```php
+$stale = EFS_DB_Migration_Persistence::get_stale_migrations();
+```
+
+Returns array of migrations that need recovery.
+
+#### Resume Capability
+
+When a stale migration is detected:
+
+```php
+// 1. Check for stale migrations
+$stale = $db_persist->get_stale_migrations();
+
+// 2. Get last known state
+if ( ! empty( $stale ) ) {
+    $last_migration = $stale[0];
+    $checkpoint = $last_migration['checkpoint']; // Contains serialized migration state
+    
+    // 3. Resume from checkpoint
+    $migration_runner->resume_migration(
+        $last_migration['migration_uid'],
+        $checkpoint
+    );
+}
+```
+
+The dashboard can display a "Resume" button for detected stale migrations.
+
+### Audit Trail & Logging
+
+All significant migration events are logged to `wp_efs_migration_logs`:
+
+```php
+EFS_DB_Migration_Persistence::log_event(
+    $migration_id,
+    'info',                    // Log level
+    'CSS classes migrated: 45', // Message
+    'css',                     // Category
+    array(                     // Context
+        'migrated' => 45,
+        'skipped' => 2,
+        'errors' => 0
+    )
+);
+```
+
+Query audit trail:
+
+```php
+$audit = $db_persist->get_audit_trail( $migration_id );
+// Returns array of all events for this migration, newest first
+```
+
+Example output:
+```
+[
+  {
+    'id' => 5,
+    'migration_uid' => 'migration-123',
+    'log_level' => 'info',
+    'category' => 'progress',
+    'message' => 'Progress: 100%',
+    'context' => '{"percentage":100,"processed":100,"total":100,"status":"completed"}',
+    'created_at' => '2026-03-01 17:52:04'
+  },
+  ...
+]
+```
+
+### Statistics & Reporting
+
+Query migration statistics:
+
+```php
+$stats = $db_persist->get_statistics();
+```
+
+Returns:
+```php
+array(
+    'total_migrations' => 42,
+    'completed' => 38,
+    'failed' => 2,
+    'in_progress' => 1,
+    'pending' => 1,
+    'success_rate' => 90.48, // percentage
+    'average_duration' => 1245, // seconds
+    'total_items_migrated' => 1523
+)
+```
+
+### Recent Migrations (Dashboard)
+
+Retrieve recent migrations for dashboard display:
+
+```php
+$recent = $db_persist->get_recent_migrations( 10 );  // Last 10
+```
+
+Returns:
+```php
+array(
+    [
+        'migration_uid' => 'migration-123',
+        'source_url' => 'https://bricks.example.com',
+        'target_url' => 'https://etch.example.com',
+        'status' => 'completed',
+        'progress_percent' => 100,
+        'created_at' => '2026-03-01 16:30:15',
+        'started_at' => '2026-03-01 16:30:45',
+        'completed_at' => '2026-03-01 16:52:04',
+        'duration' => 1279 // seconds
+    ],
+    ...
+)
+```
+
+### Backward Compatibility
+
+The system maintains full backward compatibility:
+
+1. **Legacy Data Migration**: When `get_progress()` is called and migration isn't in DB but exists in Options:
+   - Data is automatically migrated from Options to DB
+   - Future reads will use DB (faster, authoritative)
+
+2. **Dual-Write Strategy**: All `save_progress()` calls write to:
+   - `wp_efs_migrations` table (primary)
+   - `wp_options` with key `efs_migration_progress` (fallback)
+
+3. **Options API Fallback**: If DB queries fail, Options API is still readable as fallback
+
+### Implementation Details
+
+#### Key Classes
+
+**`EFS_DB_Migration_Persistence`** (`includes/repositories/class-db-migration-persistence.php`)
+- Wrapper providing high-level persistence API
+- Static methods delegate to `EFS_DB_Installer`
+- Methods: `create_migration()`, `get_migration()`, `update_progress()`, `update_status()`, `log_event()`, `mark_failed()`, `get_stale_migrations()`, `get_audit_trail()`, `get_recent_migrations()`, `get_statistics()`, `cleanup_old_migrations()`
+
+**`EFS_WordPress_Migration_Repository`** (updated `includes/repositories/class-wordpress-migration-repository.php`)
+- Implements `Migration_Repository_Interface`
+- `save_progress()` now creates migration entry and writes to DB
+- `get_progress()` reads from DB first, falls back to Options
+
+**`EFS_DB_Installer`** (`includes/core/class-db-installer.php`)
+- Low-level database operations
+- Schema management (create tables)
+- CRUD operations on migrations and logs
+- Table maintenance (cleanup old records)
+
+#### Cache Strategy
+
+Progress queries use transient cache (2-minute TTL):
+```php
+$cache_key = 'efs_cache_migration_progress';
+$progress = get_transient( $cache_key );
+if ( false === $progress ) {
+    $progress = $repo->get_progress(); // Database read
+    set_transient( $cache_key, $progress, 120 );
+}
+```
+
+Cache is invalidated on all writes via `invalidate_cache()`.
+
+### Database Cleanup
+
+Old migrations and logs are automatically cleaned up:
+
+```php
+// Cleanup migrations completed more than 90 days ago
+$db_persist->cleanup_old_migrations( 90 );
+```
+
+Default cleanup policy:
+- Completed/failed migrations: kept for 90 days
+- Logs: kept for same duration as migrations
+- In-progress migrations: never auto-deleted (for recovery)
 
 ---
 
