@@ -52,6 +52,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 
 				return $this->convert_embed_video(
 					'Video (YouTube)',
+					'youtube',
+					$youtube_id,
 					$this->build_youtube_embed_url_nocookie( $youtube_id, $settings ),
 					$style_ids,
 					$css_classes,
@@ -68,6 +70,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 
 				return $this->convert_embed_video(
 					'Video (Vimeo)',
+					'vimeo',
+					$vimeo_id,
 					$this->build_vimeo_embed_url( $vimeo_id, $settings ),
 					$style_ids,
 					$css_classes,
@@ -93,7 +97,9 @@ class EFS_Element_Video extends EFS_Base_Element {
 	 * when the user clicks the button (youtube-nocookie.com for privacy).
 	 *
 	 * @param string $label Block label.
-	 * @param string $embed_url Embed URL (youtube.com or vimeo.com).
+	 * @param string $video_type youtube|vimeo
+	 * @param string $video_id Video ID.
+	 * @param string $embed_url Embed URL (youtube-nocookie.com or vimeo.com).
 	 * @param array  $style_ids Style IDs.
 	 * @param string $css_classes CSS class list.
 	 * @param string $width Frame width.
@@ -101,10 +107,8 @@ class EFS_Element_Video extends EFS_Base_Element {
 	 * @param array  $element Original Bricks element.
 	 * @return string Etch block HTML.
 	 */
-	private function convert_embed_video( $label, $embed_url, $style_ids, $css_classes, $width, $height, $element = array() ) {
-		// Extract video type and ID from URL to get poster image.
-		$video_id   = $this->extract_video_id_from_url( $embed_url );
-		$video_type = $this->detect_embed_type( $embed_url );
+	private function convert_embed_video( $label, $video_type, $video_id, $embed_url, $style_ids, $css_classes, $width, $height, $element = array() ) {
+		// Get poster URL for the video type.
 		$poster_url = $this->get_embed_poster_url( $video_type, $video_id );
 
 		if ( '' === $video_id || '' === $poster_url ) {
@@ -402,10 +406,12 @@ class EFS_Element_Video extends EFS_Base_Element {
 	}
 
 	/**
-	 * Get a human-readable description for figcaption.
+	 * Build HTML5 video attributes.
 	 *
-	 * @param array $settings Bricks settings.
-	 * @return string
+	 * @param array  $settings Bricks settings.
+	 * @param string $width Width value.
+	 * @param string $height Height value.
+	 * @return array<string,string>
 	 */
 	private function get_video_description( $settings ) {
 		$fields = array(
@@ -427,12 +433,34 @@ class EFS_Element_Video extends EFS_Base_Element {
 	/**
 	 * Resolve video ID from settings for embed providers.
 	 *
+	 * Handles multiple naming conventions from different Bricks settings:
+	 * - YouTube: $settings['youtube'] or $settings['youTubeId'] or $settings['videoId']
+	 * - Vimeo: $settings['vimeo'] or $settings['vimeoId']
+	 *
 	 * @param array  $settings Bricks settings.
 	 * @param string $provider youtube|vimeo
 	 * @return string
 	 */
 	private function get_video_id( $settings, $provider ) {
-		$raw = $settings[ $provider ] ?? ( $settings['videoId'] ?? '' );
+		// Try multiple key variations for YouTube and Vimeo
+		$candidates = array();
+		
+		if ( 'youtube' === $provider ) {
+			$candidates = array( 'youTubeId', 'youtube', 'videoId' );
+		} elseif ( 'vimeo' === $provider ) {
+			$candidates = array( 'vimeoId', 'vimeo', 'videoId' );
+		}
+
+		foreach ( $candidates as $key ) {
+			if ( isset( $settings[ $key ] ) && '' !== $settings[ $key ] ) {
+				$raw = $settings[ $key ];
+				break;
+			}
+		}
+
+		if ( ! isset( $raw ) ) {
+			return '';
+		}
 
 		if ( is_array( $raw ) ) {
 			$raw = $raw['id'] ?? ( $raw['videoId'] ?? '' );
@@ -551,6 +579,11 @@ class EFS_Element_Video extends EFS_Base_Element {
 	 * @return string Video URL or empty string.
 	 */
 	protected function get_video_url( $settings ) {
+		// Direct src URL (modern Bricks format)
+		if ( isset( $settings['src'] ) && is_string( $settings['src'] ) && '' !== trim( $settings['src'] ) ) {
+			return trim( $settings['src'] );
+		}
+
 		$video_type = isset( $settings['videoType'] ) ? $settings['videoType'] : 'media';
 
 		if ( 'file' === $video_type ) {

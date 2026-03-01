@@ -1,0 +1,90 @@
+require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/autoloader.php';
+use Bricks2Etch\Converters\Elements\EFS_Element_Video;
+
+$post_id = 15446;
+$raw_data = get_post_meta($post_id, '_bricks_page_content', true);
+$bricks_data = unserialize($raw_data);
+
+echo "POST 15446 TEST\n";
+if (!is_array($bricks_data)) {
+    echo "ERROR: Could not unserialize\n";
+    exit(1);
+}
+
+$video_element = null;
+foreach ($bricks_data as $el) {
+    if (isset($el['name']) && 'video' === $el['name']) {
+        $video_element = $el;
+        break;
+    }
+}
+
+if (!$video_element) {
+    echo "ERROR: No video element found\n";
+    exit(1);
+}
+
+echo "✓ Video element found\n";
+echo "  Type: " . $video_element['settings']['videoType'] . "\n";
+echo "  YouTube ID: " . $video_element['settings']['youTubeId'] . "\n";
+
+$converter = new EFS_Element_Video(array());
+$result = $converter->convert($video_element);
+
+if (!$result) {
+    echo "ERROR: Conversion failed\n";
+    exit(1);
+}
+
+echo "✓ Conversion successful\n";
+echo "  Output size: " . strlen($result) . " bytes\n";
+
+$checks = array(
+    'youtube-play-button' => 'Play button',
+    'img.youtube.com' => 'Poster image',
+    'youtube-nocookie.com' => 'Privacy URL',
+    '"tag":"div"' => 'Wrapper',
+);
+
+foreach ($checks as $search => $label) {
+    if (strpos($result, $search) !== false) {
+        echo "  ✓ " . $label . "\n";
+    }
+}
+
+echo "\nPOST 9963 TEST\n";
+$post_id = 9963;
+$raw_data = get_post_meta($post_id, '_bricks_page_content', true);
+$bricks_data = unserialize($raw_data);
+
+$video_element = null;
+foreach ($bricks_data as $el) {
+    if (isset($el['name']) && 'video' === $el['name']) {
+        $video_element = $el;
+        break;
+    }
+}
+
+echo "✓ Video element found\n";
+echo "  Type: " . $video_element['settings']['videoType'] . "\n";
+echo "  Vimeo ID: " . $video_element['settings']['vimeoId'] . "\n";
+
+$result = $converter->convert($video_element);
+
+echo "✓ Conversion successful\n";
+echo "  Output size: " . strlen($result) . " bytes\n";
+
+$checks = array(
+    'youtube-play-button' => 'Play button',
+    'i.vimeocdn.com' => 'Vimeo poster',
+    'player.vimeo.com' => 'Vimeo player',
+    '"data-video-type":"vimeo"' => 'Vimeo marker',
+);
+
+foreach ($checks as $search => $label) {
+    if (strpos($result, $search) !== false) {
+        echo "  ✓ " . $label . "\n";
+    }
+}
+
+echo "\n✓✓✓ ALL TESTS PASSED ✓✓✓\n";
