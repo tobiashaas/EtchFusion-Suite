@@ -73,6 +73,8 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	/**
 	 * Save migration progress.
 	 *
+	 * NOTE: Also syncs to EFS_DB_Installer tables for persistence.
+	 *
 	 * @param array $progress Progress data to save.
 	 * @return bool True on success, false on failure.
 	 */
@@ -82,6 +84,9 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		if ( $migration_id ) {
 			update_option( self::OPTION_CURRENT_ID, $migration_id );
 			$progress['migrationId'] = $migration_id;
+
+			// Sync progress to EFS_DB_Installer for persistent storage
+			$this->sync_to_database( $migration_id, $progress );
 		}
 
 		if ( isset( $progress['last_migration'] ) ) {
@@ -89,6 +94,50 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		}
 
 		return update_option( self::OPTION_PROGRESS, $progress );
+	}
+
+	/**
+	 * Sync migration progress to database tables.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $progress Progress data.
+	 */
+	private function sync_to_database( string $migration_id, array $progress ): void {
+		// Only sync if DB installer is available
+		if ( ! class_exists( '\Bricks2Etch\Core\EFS_DB_Installer' ) ) {
+			return;
+		}
+
+		try {
+			$db_installer = '\Bricks2Etch\Core\EFS_DB_Installer';
+
+			// Extract progress data
+			$percentage = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
+			$status     = isset( $progress['status'] ) ? $progress['status'] : 'in_progress';
+			$message    = isset( $progress['message'] ) ? $progress['message'] : '';
+
+			// Update status in database
+			if ( method_exists( $db_installer, 'update_status' ) ) {
+				$db_installer::update_status( $migration_id, $status );
+			}
+
+			// Log progress event if percentage changed
+			if ( $percentage > 0 && method_exists( $db_installer, 'log_event' ) ) {
+				$db_installer::log_event(
+					$migration_id,
+					'info',
+					$message ?: "Progress: {$percentage}%",
+					'migration',
+					array(
+						'percentage' => $percentage,
+						'status'     => $status,
+					)
+				);
+			}
+		} catch ( \Exception $e ) {
+			// Silent fail - don't break migration if DB sync fails
+			error_log( '[EFS] Database sync error: ' . $e->getMessage() );
+		}
 	}
 
 	/**
