@@ -147,11 +147,22 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			$percentage = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
 			$status     = isset( $progress['status'] ) ? $progress['status'] : 'in_progress';
 			$message    = isset( $progress['message'] ) ? $progress['message'] : '';
+			$processed  = isset( $progress['processedItems'] ) ? (int) $progress['processedItems'] : 0;
+			$total      = isset( $progress['totalItems'] ) ? (int) $progress['totalItems'] : 0;
+
+			// Check if migration exists in database
+			$existing = EFS_DB_Migration_Persistence::get_migration( $migration_id );
+
+			if ( ! $existing ) {
+				// Create new migration if it doesn't exist
+				EFS_DB_Migration_Persistence::create_migration(
+					$migration_id,
+					isset( $progress['source_url'] ) ? $progress['source_url'] : '',
+					isset( $progress['target_url'] ) ? $progress['target_url'] : ''
+				);
+			}
 
 			// Update progress in database
-			$processed = isset( $progress['processedItems'] ) ? (int) $progress['processedItems'] : 0;
-			$total     = isset( $progress['totalItems'] ) ? (int) $progress['totalItems'] : 0;
-
 			if ( $processed > 0 || $total > 0 ) {
 				EFS_DB_Migration_Persistence::update_progress( $migration_id, $processed, $total );
 			}
