@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-03-01
+
+### 🚀 Features & Refactoring
+
+- **Headless-only migration:** Browser Mode toggle removed — all migrations now run via Action Scheduler + custom loopback runner. Simplifies the architecture and removes a rarely-used, error-prone code path.
+- **Test suite auto-install:** `npm run dev` now automatically installs the WordPress PHPUnit test suite on every start (step 6). After `wp-env destroy && npm run dev` the environment is fully restored — no manual steps needed. `npm run test:setup` is the quick reinstall path (`--skip-activation --skip-composer`).
+- **Documentation as Single Source of Truth:** `DOCUMENTATION.md` is now the authoritative reference for all commands, workflows and architecture decisions. CLAUDE.md enforces this with hard rules against duplication and stale content.
+
+### 🐛 Bug Fixes
+
+- **`DISABLE_WP_CRON` global removed:** Was incorrectly disabling WP-Cron site-wide for all plugins (Bricks, ACSS, Frames, etc.). The `action_scheduler_disable_wpcron` filter already correctly decouples Action Scheduler from WP-Cron without any site-wide side effects.
+- **`wizard_save_failed` false negative:** `set_transient()` returns `false` both on write failure AND when WordPress skips the DB write because the serialized value is unchanged (`update_option` optimization). The strict `===` comparison triggered a false 500 error on state saves where nothing changed. Fixed by checking `get_transient()` existence instead.
+- **`package.json` broken structure:** Last commit wrote only the scripts object as top-level JSON, losing `name`, `version`, `scripts` wrapper, `engines`, and `devDependencies`. Fully restored.
+- **`dev.js` cross-platform fix:** Replaced `bash setup-test-suite.sh` (fails on Windows) with direct `WP_ENV_CMD run cli bash install-wp-tests.sh` call. Also fixed missing `catch` block in `displaySummary()` that caused a SyntaxError preventing the file from loading.
+- **Pre-flight checker:** Replaced misleading WP Cron checks with a single Action Scheduler availability check (`as_enqueue_async_action`). Removed the confusing "✅ WP Cron active" indicator from the wizard UI.
+
 ## [0.14.2] — 2026-03-01
 
 ### 🔧 Stabilization & Hardening
