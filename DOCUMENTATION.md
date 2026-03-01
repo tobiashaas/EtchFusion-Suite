@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-01
-**Version:** 0.15.0 (Database Persistence Release)
+**Version:** 0.16.0 (Detailed Progress Tracking Release)
 
 ---
 
@@ -26,7 +26,8 @@
 15. [Admin Settings UI](#admin-settings-ui)
 16. [Migration Testing Workflow](#migration-testing-workflow)
 17. [Database Persistence](#database-persistence)
-18. [References](#references)
+18. [Detailed Progress Tracking](#detailed-progress-tracking)
+19. [References](#references)
 
 ---
 
@@ -1573,6 +1574,157 @@ wp-env extracts these archives into the appropriate instance, while the base plu
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start environments, wait for readiness, install Composer dependencies (container → host fallback), activate plugins/themes, create Etch application password |
+
+---
+
+## Detailed Progress Tracking
+
+### Overview
+
+The **Detailed Progress Tracker** logs per-item information during migration execution, providing real-time visibility into what's being processed, including post titles, media filenames, block counts, and error details.
+
+### Service: `EFS_Detailed_Progress_Tracker`
+
+**Location:** `includes/services/class-detailed-progress-tracker.php`
+
+**Purpose:** Centralized API for all services to report migration item-level events (posts, media, CSS classes).
+
+**Key Methods:**
+
+| Method | Purpose | Example |
+|--------|---------|---------|
+| `log_post_migration($id, $title, $status, $metadata)` | Log single post conversion | `log_post_migration(42, 'Home Page', 'success', ['blocks_converted'=>5, 'duration_ms'=>450])` |
+| `log_media_migration($url, $filename, $status, $metadata)` | Log media file download | `log_media_migration('https://...jpg', 'hero.jpg', 'success', ['size_bytes'=>245000])` |
+| `log_css_migration($class_name, $status, $metadata)` | Log CSS class conversion | `log_css_migration('button-primary', 'converted', ['new_class'=>'etch-btn'])` |
+| `log_batch_completion($type, $completed, $total, $errors, $metadata)` | Log batch completion | `log_batch_completion('posts', 50, 100, 2, ['avg_duration_ms'=>1250])` |
+| `set_current_item($type, $id, $title, $status)` | Track current item for dashboard | `set_current_item('post', 42, 'Home Page', 'processing')` |
+| `log_custom_fields_migration($type, $count, $status, $metadata)` | Log custom field migrations | `log_custom_fields_migration('ACF', 15, 'success', ['acf_field_groups'=>3])` |
+
+### Integration Points
+
+#### Content Service (`EFS_Content_Service`)
+
+The Content Service logs per-post details during the conversion:
+
+```php
+// In convert_bricks_to_gutenberg():
+$duration_ms = (int)((microtime(true) - $start_time) * 1000);
+
+if ($this->progress_tracker) {
+    $this->progress_tracker->log_post_migration(
+        $post_id,
+        $post_title,
+        'success',
+        array(
+            'blocks_converted'  => $block_count,
+            'fields_migrated'   => $field_count,
+            'duration_ms'       => $duration_ms,
+        )
+    );
+}
+```
+
+**Tracked Metadata per Post:**
+- `blocks_converted`: Number of Bricks blocks in original
+- `fields_migrated`: Custom fields converted
+- `duration_ms`: Conversion time in milliseconds
+- `error`: Error message (for failed posts)
+- `conversion_warning`: Non-fatal issues (e.g., placeholder inserted)
+
+#### Async Migration Runner (`EFS_Async_Migration_Runner`)
+
+Tracker is initialized at migration start:
+
+```php
+if ($this->db_persistence) {
+    $progress_tracker = new EFS_Detailed_Progress_Tracker(
+        $migration_id,
+        $this->db_persistence
+    );
+    $this->content_service->set_progress_tracker($progress_tracker);
+}
+```
+
+### Database Schema
+
+All tracker events are stored in the `efs_migration_logs` table:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | BIGINT | Auto-increment ID |
+| `migration_id` | VARCHAR(50) | Migration reference |
+| `level` | VARCHAR(20) | 'info', 'warning', 'error' |
+| `message` | LONGTEXT | Human-readable event description |
+| `category` | VARCHAR(50) | Event type (e.g., 'content_post_migrated', 'media_success') |
+| `context` | LONGTEXT | JSON with detailed metadata |
+| `timestamp` | DATETIME | UTC timestamp |
+
+### Example Audit Trail
+
+```json
+[
+  {
+    "level": "info",
+    "message": "Post migrated: \"Home Page\"",
+    "category": "content_post_migrated",
+    "context": {
+      "post_id": 42,
+      "title": "Home Page",
+      "status": "success",
+      "blocks_converted": 12,
+      "fields_migrated": 3,
+      "duration_ms": 1250
+    },
+    "timestamp": "2026-03-01 18:30:45"
+  },
+  {
+    "level": "error",
+    "message": "Post failed: \"Feature Slider\"",
+    "category": "content_post_failed",
+    "context": {
+      "post_id": 43,
+      "title": "Feature Slider",
+      "status": "failed",
+      "error": "Unsupported block type: bricks-slider",
+      "duration_ms": 850
+    },
+    "timestamp": "2026-03-01 18:30:46"
+  }
+]
+```
+
+### Dashboard Integration
+
+The tracker provides real-time progress data for dashboard display:
+
+```php
+// In migration controller:
+$progress = $db_persistence->get_audit_trail($migration_id);
+
+// Current processing:
+$current_log = end($progress);
+$ctx = json_decode($current_log['context'], true);
+
+// Display on frontend:
+echo "Currently: Post #" . $ctx['post_id'] . " '" . $ctx['title'] . "'";
+echo " - " . $ctx['blocks_converted'] . " blocks";
+```
+
+### Performance Considerations
+
+- **Per-item logging:** Each post/media/class logs one event
+- **JSON context:** Stored as-is, queryable via JSON functions in MySQL 5.7+
+- **Batch events:** Summary events logged every 10 items (batch completion)
+- **Storage:** ~200-500 bytes per event; full migration logs ~500KB for 1000-item site
+
+### Testing
+
+Unit test: `tests/unit/test-detailed-progress-tracker.php`
+
+```bash
+# After setting up WordPress test suite:
+composer test:unit
+```
 | `npm run stop` | Stop all wp-env containers |
 | `npm run destroy` | Remove environments and data (clean reset) |
 | `npm run wp [cmd]` | WP-CLI against the Bricks instance |

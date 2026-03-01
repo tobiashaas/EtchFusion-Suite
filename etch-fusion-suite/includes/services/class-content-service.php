@@ -17,14 +17,29 @@ class EFS_Content_Service {
 	/** @var EFS_Error_Handler */
 	private $error_handler;
 
+	/** @var EFS_Detailed_Progress_Tracker|null */
+	private $progress_tracker;
+
 	public function __construct(
 		EFS_Content_Parser $content_parser,
 		EFS_Gutenberg_Generator $gutenberg_generator,
-		EFS_Error_Handler $error_handler
+		EFS_Error_Handler $error_handler,
+		EFS_Detailed_Progress_Tracker $progress_tracker = null
 	) {
 		$this->content_parser      = $content_parser;
 		$this->gutenberg_generator = $gutenberg_generator;
 		$this->error_handler       = $error_handler;
+		$this->progress_tracker    = $progress_tracker;
+	}
+
+	/**
+	 * Set the progress tracker for detailed logging.
+	 *
+	 * @param EFS_Detailed_Progress_Tracker $tracker
+	 * @return void
+	 */
+	public function set_progress_tracker( EFS_Detailed_Progress_Tracker $tracker ) {
+		$this->progress_tracker = $tracker;
 	}
 
 	/**
@@ -109,18 +124,46 @@ class EFS_Content_Service {
 	 * @return array|\WP_Error
 	 */
 	public function convert_bricks_to_gutenberg( $post_id, EFS_API_Client $api_client, $target_url = null, $jwt_token = null, $post_type_mappings = array() ) {
-		$bricks_content = $this->content_parser->parse_bricks_content( $post_id );
+		$start_time      = microtime( true );
+		$post            = get_post( $post_id );
+		$post_title      = $post ? $post->post_title : "Post #$post_id";
+		$bricks_content  = $this->content_parser->parse_bricks_content( $post_id );
+		$blocks_count    = 0;
+		$error_detail    = null;
+		$unsupported     = array();
 
 		if ( ! $bricks_content || ! isset( $bricks_content['elements'] ) ) {
-			$post    = get_post( $post_id );
 			$content = ! empty( $post->post_content )
 				? $post->post_content
 				: '<!-- wp:paragraph --><p>Empty content</p><!-- /wp:paragraph -->';
 
-			return $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token, $post_type_mappings );
+			$result = $this->send_post_to_target( $post, $content, $api_client, $target_url, $jwt_token, $post_type_mappings );
+			
+			// Log empty/no Bricks content case.
+			if ( $this->progress_tracker && ! is_wp_error( $result ) ) {
+				$duration_ms = (int) ( ( microtime( true ) - $start_time ) * 1000 );
+				$this->progress_tracker->log_post_migration(
+					$post_id,
+					$post_title,
+					'success',
+					array(
+						'blocks_converted'  => 0,
+						'fields_migrated'   => 0,
+						'duration_ms'       => $duration_ms,
+						'content_type'      => 'non_bricks',
+					)
+				);
+			}
+			
+			return $result;
 		}
 
 		$etch_content = $this->gutenberg_generator->generate_gutenberg_blocks( $bricks_content['elements'] );
+
+		// Count blocks that were converted.
+		if ( ! empty( $bricks_content['elements'] ) ) {
+			$blocks_count = count( $bricks_content['elements'] );
+		}
 
 		if ( empty( $etch_content ) ) {
 			$etch_content = '<!-- wp:paragraph --><p>Content migrated from Bricks (conversion pending)</p><!-- /wp:paragraph -->';
@@ -130,15 +173,60 @@ class EFS_Content_Service {
 					'post_id' => $post_id,
 				)
 			);
+			$error_detail = 'Conversion produced empty output, placeholder inserted';
 		}
 
-		$post = get_post( $post_id );
 		if ( ! $post ) {
-			/* translators: %d is the numeric post ID. */
-			return new \WP_Error( 'post_not_found', sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id ) );
+			$error_msg = sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id );
+			
+			// Log failed post.
+			if ( $this->progress_tracker ) {
+				$duration_ms = (int) ( ( microtime( true ) - $start_time ) * 1000 );
+				$this->progress_tracker->log_post_migration(
+					$post_id,
+					$post_title,
+					'failed',
+					array(
+						'blocks_converted' => 0,
+						'fields_migrated'  => 0,
+						'duration_ms'      => $duration_ms,
+						'error'            => $error_msg,
+					)
+				);
+			}
+			
+			return new \WP_Error( 'post_not_found', $error_msg );
 		}
 
-		return $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $jwt_token, $post_type_mappings );
+		$result = $this->send_post_to_target( $post, $etch_content, $api_client, $target_url, $jwt_token, $post_type_mappings );
+		
+		// Log successful post migration with details.
+		if ( $this->progress_tracker ) {
+			$duration_ms = (int) ( ( microtime( true ) - $start_time ) * 1000 );
+			$status      = is_wp_error( $result ) ? 'failed' : 'success';
+			$metadata    = array(
+				'blocks_converted'  => $blocks_count,
+				'fields_migrated'   => 0,
+				'duration_ms'       => $duration_ms,
+			);
+			
+			if ( is_wp_error( $result ) ) {
+				$metadata['error'] = $result->get_error_message();
+			}
+			
+			if ( $error_detail ) {
+				$metadata['conversion_warning'] = $error_detail;
+			}
+			
+			$this->progress_tracker->log_post_migration(
+				$post_id,
+				$post_title,
+				$status,
+				$metadata
+			);
+		}
+		
+		return $result;
 	}
 
 	/**

@@ -90,6 +90,11 @@ class EFS_Async_Migration_Runner {
 	private $migration_logger;
 
 	/**
+	 * @var EFS_DB_Migration_Persistence
+	 */
+	private $db_persistence;
+
+	/**
 	 * @param EFS_Migrator_Executor          $migrator_executor
 	 * @param EFS_Progress_Manager           $progress_manager
 	 * @param EFS_Migration_Run_Finalizer    $run_finalizer
@@ -102,6 +107,7 @@ class EFS_Async_Migration_Runner {
 	 * @param EFS_Error_Handler              $error_handler
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param EFS_Migration_Logger           $migration_logger
+	 * @param EFS_DB_Migration_Persistence   $db_persistence
 	 */
 	public function __construct(
 		EFS_Migrator_Executor $migrator_executor,
@@ -115,7 +121,22 @@ class EFS_Async_Migration_Runner {
 		Migration_Repository_Interface $migration_repository,
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
-		EFS_Migration_Logger $migration_logger
+		EFS_Migration_Logger $migration_logger,
+		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null
+	public function __construct(
+		EFS_Migrator_Executor $migrator_executor,
+		EFS_Progress_Manager $progress_manager,
+		EFS_Migration_Run_Finalizer $run_finalizer,
+		EFS_CSS_Service $css_service,
+		EFS_Media_Service $media_service,
+		EFS_Content_Service $content_service,
+		EFS_Content_Parser $content_parser,
+		EFS_API_Client $api_client,
+		Migration_Repository_Interface $migration_repository,
+		EFS_Error_Handler $error_handler,
+		EFS_Plugin_Detector $plugin_detector,
+		EFS_Migration_Logger $migration_logger,
+		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null
 	) {
 		$this->migrator_executor    = $migrator_executor;
 		$this->progress_manager     = $progress_manager;
@@ -129,6 +150,7 @@ class EFS_Async_Migration_Runner {
 		$this->error_handler        = $error_handler;
 		$this->plugin_detector      = $plugin_detector;
 		$this->migration_logger     = $migration_logger;
+		$this->db_persistence       = $db_persistence;
 	}
 
 	/**
@@ -158,6 +180,12 @@ class EFS_Async_Migration_Runner {
 		$active = $this->migration_repository->get_active_migration();
 		if ( ! is_array( $active ) || empty( $active['migration_id'] ) || (string) $active['migration_id'] !== (string) $migration_id ) {
 			return new \WP_Error( 'migration_not_found', __( 'No active migration found for this ID.', 'etch-fusion-suite' ) );
+		}
+
+		// Initialize detailed progress tracker for per-item logging.
+		if ( $this->db_persistence ) {
+			$progress_tracker = new EFS_Detailed_Progress_Tracker( $migration_id, $this->db_persistence );
+			$this->content_service->set_progress_tracker( $progress_tracker );
 		}
 
 		$target              = isset( $active['target_url'] ) ? $active['target_url'] : '';

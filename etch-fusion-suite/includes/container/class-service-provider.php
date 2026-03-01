@@ -508,7 +508,8 @@ class EFS_Service_Provider {
 					$c->get( 'migration_repository' ),
 					$c->get( 'error_handler' ),
 					$c->get( 'plugin_detector' ),
-					$c->get( 'migration_logger' )
+					$c->get( 'migration_logger' ),
+					$c->get( 'db_migration_persistence' )
 				);
 			}
 		);
