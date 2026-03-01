@@ -684,6 +684,59 @@ Includes:
 
 ## Testing
 
+### Database Lifecycle Testing
+
+The plugin includes a comprehensive database lifecycle test that verifies all persistence operations:
+
+```bash
+npm run wp -- eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/db-lifecycle-simple-test.php';"
+```
+
+#### Test Coverage
+
+This test verifies:
+
+1. **Installation** - Tables and options created on plugin activation
+2. **Migration CRUD** - Create, read, update operations work correctly
+3. **Event Logging** - Events stored with JSON context
+4. **Data Persistence** - All data persists through page reloads
+5. **Deactivation Cleanup** - Temporary data removed, migration history preserved
+6. **Uninstall Removal** - Complete database cleanup with zero residual data
+
+#### Expected Output
+
+```
+✓ STEP 1: Database Installation
+  ✓ PASS: Tables created, DB version set
+✓ STEP 2: Create Migration & Update Data
+  ✓ Created migration UID: 87eb34c8...
+  ✓ Progress updated: 50%
+  ✓ Status updated: in_progress
+✓ STEP 3: Event Logging
+  ✓ Events logged successfully
+  ✓ Log count: 2
+✓ STEP 4: Data Verification
+  ✓ Migration data correct
+✓ STEP 5: Deactivation Cleanup
+  ✓ Migration data preserved after deactivation
+✓ STEP 6: Uninstall Cleanup
+  ✓ All tables deleted
+  ✓ All options deleted
+  ✓ Complete cleanup successful
+
+═══════════════════════════════════════
+Passed: 12
+Failed: 0
+Success: 100%
+═══════════════════════════════════════
+```
+
+**Key Guarantees:**
+- Database tables are created idempotently (safe to call install() multiple times)
+- Migration records are never lost during deactivation
+- Complete removal on uninstall leaves zero residual data in WordPress database
+- All timestamp and progress data is accurately persisted and retrieved
+
 ### Playwright Configuration
 
 The project uses Playwright for end-to-end testing with enhanced setup:
