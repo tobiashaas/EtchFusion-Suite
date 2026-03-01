@@ -1,17 +1,18 @@
 # Etch Fusion Suite Documentation
 
-**Last Updated:** March 2026
+**Last Updated:** March 1, 2026
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Development Environment](#development-environment)
 3. [Configuration](#configuration)
-4. [Security Architecture](#security-architecture)
-5. [Helper Scripts](#helper-scripts)
-6. [Testing](#testing)
-7. [Troubleshooting](#troubleshooting)
-8. [API Reference](#api-reference)
+4. [Database & Migration State](#database--migration-state)
+5. [Security Architecture](#security-architecture)
+6. [Helper Scripts](#helper-scripts)
+7. [Testing](#testing)
+8. [Troubleshooting](#troubleshooting)
+9. [API Reference](#api-reference)
 
 ---
 
@@ -147,6 +148,198 @@ Create this file for local customizations (gitignored):
 - `SAVE_LOGS_ON_SUCCESS`: Save logs even when tests pass
 - `SAVE_LOGS_ON_FAILURE`: Save logs when tests fail (default: true)
 - `SKIP_VENDOR_CHECK`: Skip vendor/autoload.php check in scripts
+
+---
+
+## Database & Migration State
+
+### Overview
+
+The plugin maintains migration state in two custom database tables created on activation:
+
+1. **wp_efs_migrations** - Migration records with progress tracking
+2. **wp_efs_migration_logs** - Detailed event logging
+
+### Table Schema
+
+#### wp_efs_migrations
+
+Stores the state and progress of each migration:
+
+```sql
+id                 BIGINT UNSIGNED PRIMARY KEY
+migration_uid      VARCHAR(36) UNIQUE - UUID identifying migration
+source_url         VARCHAR(255) - Source Bricks site URL
+target_url         VARCHAR(255) - Target Etch site URL
+status             VARCHAR(20) - pending|in_progress|completed|failed|canceled
+total_items        INT UNSIGNED - Total posts/pages to migrate
+processed_items    INT UNSIGNED - Number processed so far
+progress_percent   INT UNSIGNED - 0-100 progress indicator
+current_batch      INT UNSIGNED - Which batch being processed
+error_count        INT UNSIGNED - Number of errors encountered
+error_message      LONGTEXT - Last error detail
+created_at         DATETIME - When migration was created
+started_at         DATETIME - When migration began
+completed_at       DATETIME - When migration finished
+updated_at         DATETIME - Last update timestamp
+```
+
+#### wp_efs_migration_logs
+
+Detailed event log for debugging:
+
+```sql
+id                 BIGINT UNSIGNED PRIMARY KEY
+migration_uid      VARCHAR(36) - Foreign key to wp_efs_migrations
+log_level          VARCHAR(10) - info|warning|error
+category           VARCHAR(50) - migration|content|media|settings|etc
+message            TEXT - Log message
+context            JSON - Additional context data
+created_at         DATETIME - When event occurred
+```
+
+### Usage Examples
+
+#### Create a migration record
+
+```php
+$migration_uid = EFS_DB_Installer::create_migration(
+    'https://source.local',
+    'https://target.local'
+);
+// Returns: 550e8400-e29b-41d4-a716-446655440000
+```
+
+#### Update migration progress
+
+```php
+EFS_DB_Installer::update_progress(
+    $migration_uid,
+    25,   // Items processed
+    100   // Total items
+);
+// Automatically calculates progress_percent as 25%
+```
+
+#### Update migration status
+
+```php
+EFS_DB_Installer::update_status(
+    $migration_uid,
+    'completed'
+);
+
+// Or with error message
+EFS_DB_Installer::update_status(
+    $migration_uid,
+    'failed',
+    'Database connection lost after processing 50 items'
+);
+```
+
+#### Log migration events
+
+```php
+EFS_DB_Installer::log_event(
+    $migration_uid,
+    'info',
+    'Started processing batch 1',
+    'migration',
+    [ 'batch_id' => 1, 'items' => 25 ]
+);
+```
+
+#### Retrieve migration record
+
+```php
+$migration = EFS_DB_Installer::get_migration( $migration_uid );
+// Returns array:
+// [
+//   'id' => 1,
+//   'migration_uid' => '550e8400...',
+//   'status' => 'in_progress',
+//   'progress_percent' => 45,
+//   'error_count' => 2,
+//   ...
+// ]
+```
+
+### Installation & Cleanup
+
+#### Plugin Activation
+
+On activation, the plugin automatically:
+1. Creates both migration tables via `dbDelta()`
+2. Stores version in option `efs_db_version` 
+3. Flushes WordPress rewrite rules
+
+```bash
+npm run wp -- plugin activate etch-fusion-suite
+# Tables created, version '1.0.0' set
+```
+
+#### Plugin Deactivation
+
+On deactivation, the plugin cleans temporary data:
+- Unschedules all Action Scheduler tasks
+- Clears transients and batch locks
+- Flushes WordPress cache
+- **Preserves** migration records (for recovery)
+
+```bash
+npm run wp -- plugin deactivate etch-fusion-suite
+# Temporary data cleared, migration history preserved
+```
+
+#### Plugin Uninstall
+
+**Complete data removal** when plugin is deleted:
+- Drops both migration tables
+- Deletes 18+ plugin options
+- Removes user metadata
+- Clears transients and batch locks
+- Removes all Action Scheduler tasks
+- Flushes cache
+
+```bash
+# In WordPress admin: Plugins → Etch Fusion Suite → Delete
+# Or via wp-cli: wp plugin delete etch-fusion-suite
+# All EFS data completely removed from database
+```
+
+### Verification
+
+Check if migration database is installed:
+
+```bash
+npm run wp -- eval "
+require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/core/class-db-installer.php';
+echo EFS_DB_Installer::is_installed() ? 'Installed' : 'Not installed';
+echo ' (Version: ' . get_option('efs_db_version', 'unknown') . ')';
+"
+```
+
+Query migration history:
+
+```bash
+npm run wp -- db query "
+  SELECT migration_uid, status, progress_percent, error_count, created_at
+  FROM wp_efs_migrations
+  ORDER BY created_at DESC
+  LIMIT 10;
+"
+```
+
+View migration logs:
+
+```bash
+npm run wp -- db query "
+  SELECT log_level, category, message, created_at
+  FROM wp_efs_migration_logs
+  WHERE migration_uid = '550e8400-e29b-41d4-a716-446655440000'
+  ORDER BY created_at DESC;
+"
+```
 
 ---
 
