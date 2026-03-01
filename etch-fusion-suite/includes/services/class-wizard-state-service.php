@@ -54,9 +54,12 @@ class EFS_Wizard_State_Service {
 			return $merged;
 		}
 
-		// set_transient() can return false when the value is unchanged; treat that as success.
-		$existing = get_transient( $key );
-		if ( is_array( $existing ) && $this->normalize_state( $existing ) === $merged ) {
+		// set_transient() returns false both when the write fails AND when WordPress
+		// skips the DB write because the serialized value is unchanged (update_option
+		// optimization). We cannot distinguish the two cases without a second read,
+		// so we verify the transient still exists — if it does, the state is safe
+		// (either just written or already current) and we report success.
+		if ( false !== get_transient( $key ) ) {
 			return $merged;
 		}
 
@@ -208,7 +211,7 @@ class EFS_Wizard_State_Service {
 		}
 
 		if ( array_key_exists( 'mode', $incoming ) ) {
-			$merged['mode'] = in_array( $incoming['mode'], array( 'browser', 'headless' ), true ) ? $incoming['mode'] : 'browser';
+			$merged['mode'] = in_array( $incoming['mode'], array( 'browser', 'headless' ), true ) ? $incoming['mode'] : 'headless';
 		}
 
 		return $this->normalize_state( $merged );
@@ -249,7 +252,7 @@ class EFS_Wizard_State_Service {
 
 		$mode = isset( $state['mode'] ) && in_array( $state['mode'], array( 'browser', 'headless' ), true )
 			? $state['mode']
-			: 'browser';
+			: 'headless';
 
 		$normalized['current_step']        = $current_step;
 		$normalized['migration_url']       = $migration_url;
@@ -281,7 +284,7 @@ class EFS_Wizard_State_Service {
 			'post_type_mappings'  => array(),
 			'include_media'       => true,
 			'batch_size'          => 50,
-			'mode'                => 'browser',
+			'mode'                => 'headless',
 		);
 	}
 
