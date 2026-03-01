@@ -4,6 +4,36 @@
 
 ## [Unreleased]
 
+## [0.14.2] — 2026-03-01
+
+### 🔧 Stabilization & Hardening
+
+**Complete stabilization plan (6 phases):**
+- **Phase 1:** Strauss/Vendor autoloading fixes (case sensitivity, registration order)
+- **Phase 2:** PSR-4 autoloading verification (129 live tests passing, regression test suite added)
+- **Phase 3:** Migrator system hardening (try-catch guards, require_once checks, null coalescing)
+- **Phase 4:** CSS Converter testing (44 new unit tests in 2 test suites, dependency audit)
+- **Phase 5:** Logging & error handling (8 missing error codes added, dead variables cleaned, debug_log extended)
+- **Phase 6:** Comprehensive verification (35 checks in verification script, performance audit clean)
+
+### 📝 Test Suite Additions
+
+- `tests/unit/psr4-check.php` — PSR-4 autoloading regression verification
+- `tests/unit/psr4-stress-test.php` — Load testing for autoloader stability
+- `tests/unit/CSSConverterBaseTest.php` — CSS base functionality tests
+- `tests/unit/CSSConverterAdvancedTest.php` — CSS advanced scenarios
+- `tests/phase-fixes-verification.php` — Master verification script (35 checks)
+
+### 🐛 Bug Fixes & Improvements
+
+- Fixed potential null pointer in CSS converter global class resolution
+- Added missing error codes in logging service
+- Improved migrator error handling with explicit try-catch blocks
+- Cleaned up dead variables from migration pipeline
+- Enhanced debug logging for troubleshooting
+
+All stability improvements have been verified through automated testing and regression checks. No breaking changes.
+
 ## [0.13.3] — 2026-02-26
 
 ### 🐛 Bug Fixes
