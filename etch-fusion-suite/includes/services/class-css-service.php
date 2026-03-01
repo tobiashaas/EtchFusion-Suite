@@ -74,6 +74,20 @@ class EFS_CSS_Service {
 				);
 			}
 
+			// Log each CSS class conversion with progress tracker.
+			if ( $this->progress_tracker ) {
+				foreach ( $etch_styles as $bricks_class => $etch_class ) {
+					$this->progress_tracker->log_css_migration(
+						$bricks_class,
+						'converted',
+						array(
+							'etch_class_name' => $etch_class,
+							'conflicts'       => 0,
+						)
+					);
+				}
+			}
+
 			$response = $this->api_client->send_css_styles( $target_url, $jwt_token, $etch_styles );
 
 			if ( is_wp_error( $response ) ) {
@@ -85,6 +99,19 @@ class EFS_CSS_Service {
 					)
 				);
 
+				// Log batch failure.
+				if ( $this->progress_tracker ) {
+					$this->progress_tracker->log_batch_completion(
+						'css_classes',
+						0,
+						count( $etch_styles ),
+						count( $etch_styles ),
+						array(
+							'error' => $response->get_error_message(),
+						)
+					);
+				}
+
 				return $response;
 			}
 
@@ -95,6 +122,19 @@ class EFS_CSS_Service {
 					'css_class_names'   => array_keys( $etch_styles ),
 				)
 			);
+
+			// Log batch completion.
+			if ( $this->progress_tracker ) {
+				$this->progress_tracker->log_batch_completion(
+					'css_classes',
+					count( $etch_styles ),
+					count( $etch_styles ),
+					0,
+					array(
+						'batch_size' => count( $etch_styles ),
+					)
+				);
+			}
 
 			return array(
 				'success'  => true,

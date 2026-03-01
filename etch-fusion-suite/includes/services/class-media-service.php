@@ -104,8 +104,60 @@ class EFS_Media_Service {
 	 * @return array|\WP_Error Result with keys migrated, skipped, failed, title; or WP_Error.
 	 */
 	public function migrate_media_by_id( $media_id, $target_url, $jwt_token ) {
+		$start_time = microtime( true );
+		$attachment = get_post( $media_id );
+		$filename   = $attachment ? basename( get_attached_file( $media_id ) ) : "Attachment #$media_id";
+
 		try {
-			return $this->media_migrator->migrate_media_by_id( $media_id, $target_url, $jwt_token );
+			$result = $this->media_migrator->migrate_media_by_id( $media_id, $target_url, $jwt_token );
+
+			// Log media migration with progress tracker if available.
+			if ( $this->progress_tracker ) {
+				$duration_ms = (int) ( ( microtime( true ) - $start_time ) * 1000 );
+
+				if ( is_wp_error( $result ) ) {
+					$this->progress_tracker->log_media_migration(
+						get_the_guid( $media_id ),
+						$filename,
+						'failed',
+						array(
+							'error'        => $result->get_error_message(),
+							'media_id'     => $media_id,
+							'duration_ms'  => $duration_ms,
+						)
+					);
+				} else {
+					$file_size = filesize( get_attached_file( $media_id ) );
+					$mime_type = get_post_mime_type( $media_id );
+
+					if ( isset( $result['migrated'] ) && $result['migrated'] ) {
+						$this->progress_tracker->log_media_migration(
+							get_the_guid( $media_id ),
+							$filename,
+							'success',
+							array(
+								'media_id'      => $media_id,
+								'size_bytes'    => $file_size ? (int) $file_size : 0,
+								'mime_type'     => $mime_type,
+								'duration_ms'   => $duration_ms,
+							)
+						);
+					} elseif ( isset( $result['skipped'] ) && $result['skipped'] ) {
+						$this->progress_tracker->log_media_migration(
+							get_the_guid( $media_id ),
+							$filename,
+							'skipped',
+							array(
+								'media_id'     => $media_id,
+								'reason'       => 'Already migrated',
+								'duration_ms'  => $duration_ms,
+							)
+						);
+					}
+				}
+			}
+
+			return $result;
 		} catch ( \Throwable $exception ) {
 			$this->error_handler->log_error(
 				'E905',
@@ -114,6 +166,22 @@ class EFS_Media_Service {
 					'action'  => 'Media migration by ID failure',
 				)
 			);
+
+			// Log error to progress tracker.
+			if ( $this->progress_tracker ) {
+				$duration_ms = (int) ( ( microtime( true ) - $start_time ) * 1000 );
+				$this->progress_tracker->log_media_migration(
+					'',
+					$filename,
+					'failed',
+					array(
+						'error'       => $exception->getMessage(),
+						'media_id'    => $media_id,
+						'duration_ms' => $duration_ms,
+					)
+				);
+			}
+
 			return new \WP_Error( 'media_migration_by_id_failed', $exception->getMessage() );
 		}
 	}
