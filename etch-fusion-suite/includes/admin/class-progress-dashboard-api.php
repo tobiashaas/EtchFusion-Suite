@@ -24,7 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - GET /efs/v1/migration/{migration_id}/logs/{category}
  */
 class EFS_Progress_Dashboard_API {
-	use EFS_Migration_Progress_Logger;
 
 	/**
 	 * Register REST routes.
@@ -95,9 +94,8 @@ class EFS_Progress_Dashboard_API {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function handle_progress_request( \WP_REST_Request $request ) {
-		$instance = new self();
 		$migration_id = $request->get_param( 'migration_id' );
-		$result = $instance->get_migration_progress( $migration_id );
+		$result = EFS_Migration_Progress_Logger::get_migration_progress( $migration_id );
 
 		if ( is_wp_error( $result ) ) {
 			return rest_ensure_response(
@@ -118,9 +116,8 @@ class EFS_Progress_Dashboard_API {
 	 * @return \WP_REST_Response
 	 */
 	public static function handle_errors_request( \WP_REST_Request $request ) {
-		$instance = new self();
 		$migration_id = $request->get_param( 'migration_id' );
-		$errors = $instance->get_migration_errors( $migration_id );
+		$errors = EFS_Migration_Progress_Logger::get_migration_errors( $migration_id );
 
 		return rest_ensure_response(
 			array(
@@ -138,10 +135,9 @@ class EFS_Progress_Dashboard_API {
 	 * @return \WP_REST_Response
 	 */
 	public static function handle_category_request( \WP_REST_Request $request ) {
-		$instance = new self();
 		$migration_id = $request->get_param( 'migration_id' );
 		$category = $request->get_param( 'category' );
-		$logs = $instance->get_migration_logs_by_category( $migration_id, $category );
+		$logs = EFS_Migration_Progress_Logger::get_migration_logs_by_category( $migration_id, $category );
 
 		return rest_ensure_response(
 			array(

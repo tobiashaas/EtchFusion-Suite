@@ -37,9 +37,6 @@ class EFS_Admin_Interface {
 			add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		}
 
-		// Register REST API endpoints for dashboard progress logging.
-		add_action( 'rest_api_init', array( 'Bricks2Etch\Admin\EFS_Progress_Dashboard_API', 'register_routes' ) );
-
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 	}
 

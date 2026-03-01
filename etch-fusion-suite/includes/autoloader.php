@@ -119,6 +119,12 @@ spl_autoload_register(
 					$files[] = $underscore_slug_trimmed_no_suffix . '.php';
 				}
 
+				// Add trait pattern
+				$files[] = 'trait-' . $slug . '.php';
+				if ( $underscore_slug !== $slug ) {
+					$files[] = 'trait-' . $underscore_slug . '.php';
+				}
+
 				// Add abstract class pattern
 				$files[] = 'abstract-class-' . $slug . '.php';
 				if ( $slug_no_prefix !== $slug ) {

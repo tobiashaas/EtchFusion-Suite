@@ -239,6 +239,9 @@ class Etch_Fusion_Suite_Plugin {
 		add_action( 'plugins_loaded', array( $this, 'init_migrators' ), 20 );
 		add_action( 'plugins_loaded', array( $this, 'init_converters' ), 20 );
 
+		// Register REST API routes on rest_api_init hook (separate from general REST init)
+		add_action( 'rest_api_init', array( 'Bricks2Etch\Admin\EFS_Progress_Dashboard_API', 'register_routes' ) );
+
 		// Enable Application Passwords with environment-based HTTPS requirement
 		add_filter( 'wp_is_application_passwords_available', array( $this, 'enable_application_passwords' ) );
 

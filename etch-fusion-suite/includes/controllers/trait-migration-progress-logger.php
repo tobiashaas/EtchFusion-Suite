@@ -1,8 +1,8 @@
 <?php
 /**
- * Migration Progress Logging Trait
+ * Migration Progress Logging Helper
  *
- * Provides methods for retrieving real-time migration progress logs.
+ * Provides static methods for retrieving real-time migration progress logs.
  * Can be used by any controller or service class.
  *
  * @package Bricks2Etch\Controllers
@@ -15,11 +15,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Trait EFS_Migration_Progress_Logger
+ * Class EFS_Migration_Progress_Logger
  *
- * Methods for retrieving migration logs by category, errors, and progress.
+ * Static methods for retrieving migration logs by category, errors, and progress.
  */
-trait EFS_Migration_Progress_Logger {
+class EFS_Migration_Progress_Logger {
 
 	/**
 	 * Get real-time migration progress with item details.
@@ -27,7 +27,7 @@ trait EFS_Migration_Progress_Logger {
 	 * @param string $migration_id The migration ID to fetch logs for.
 	 * @return array|\WP_Error Array with current item and recent logs, or error.
 	 */
-	public function get_migration_progress( $migration_id ) {
+	public static function get_migration_progress( $migration_id ) {
 		if ( empty( $migration_id ) ) {
 			return new \WP_Error( 'missing_migration_id', __( 'Migration ID is required.', 'etch-fusion-suite' ) );
 		}
@@ -112,7 +112,7 @@ trait EFS_Migration_Progress_Logger {
 	 * @param string $migration_id The migration ID.
 	 * @return array Array of error log entries.
 	 */
-	public function get_migration_errors( $migration_id ) {
+	public static function get_migration_errors( $migration_id ) {
 		if ( empty( $migration_id ) ) {
 			return array();
 		}
@@ -152,7 +152,7 @@ trait EFS_Migration_Progress_Logger {
 	 * @param string $category     Log category to filter (e.g., 'content_post_migrated').
 	 * @return array Filtered log entries.
 	 */
-	public function get_migration_logs_by_category( $migration_id, $category ) {
+	public static function get_migration_logs_by_category( $migration_id, $category ) {
 		if ( empty( $migration_id ) || empty( $category ) ) {
 			return array();
 		}
