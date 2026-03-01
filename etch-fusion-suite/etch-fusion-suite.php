@@ -383,16 +383,36 @@ class Etch_Fusion_Suite_Plugin {
 	 * Plugin activation
 	 */
 	public static function activate() {
-		// Plugin activation tasks
+		// Load and execute database installer
+		$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/core/class-db-installer.php';
+		if ( file_exists( $db_installer_file ) ) {
+			require_once $db_installer_file;
+			\Bricks2Etch\Core\EFS_DB_Installer::install();
+		}
+
+		// Flush rewrite rules
 		flush_rewrite_rules();
 	}
 
 	/**
-	 * Plugin deactivation with complete cleanup
+	 * Plugin deactivation with cleanup (temporary disabling, data preserved)
+	 *
+	 * NOTE: This removes temporary data only. Use uninstall.php for complete removal.
 	 */
 	public static function deactivate() {
-		// Clear ALL plugin data on deactivation
 		global $wpdb;
+
+		// Unschedule all Action Scheduler tasks
+		$tasks = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT hook FROM {$wpdb->prefix}actionscheduler_actions WHERE hook LIKE %s GROUP BY hook",
+				'%' . $wpdb->esc_like( 'efs_' ) . '%'
+			)
+		);
+
+		foreach ( $tasks as $hook ) {
+			as_unschedule_all_actions( $hook );
+		}
 
 		// Clear transients
 		$wpdb->query(
@@ -403,6 +423,7 @@ class Etch_Fusion_Suite_Plugin {
 			)
 		);
 
+		// Clear batch locks
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
@@ -410,41 +431,15 @@ class Etch_Fusion_Suite_Plugin {
 			)
 		);
 
-		// Clear all EFS options
-		$efs_options = array(
-			'efs_settings',
-			'efs_migration_progress',
-			'efs_migration_token',
-			'efs_migration_token_value',
-			'efs_migration_token_expires',
-			'efs_private_key',
-			'efs_error_log',
-			'efs_api_key',
-			'efs_import_api_key',
-			'efs_export_api_key',
-			'efs_migration_settings',
-			'efs_feature_flags',
-		);
-
-		foreach ( $efs_options as $option ) {
-			delete_option( $option );
-		}
-
-		// Clear user meta
-		$wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s",
-				'%' . $wpdb->esc_like( 'efs' ) . '%'
-			)
-		);
-
-		// Clear WordPress object cache
+		// Clear WordPress cache
 		if ( function_exists( 'wp_cache_flush' ) ) {
 			wp_cache_flush();
 		}
 
 		// Flush rewrite rules
 		flush_rewrite_rules();
+
+		error_log( '[EFS] Plugin deactivated at ' . current_time( 'mysql' ) );
 	}
 }
 
@@ -558,6 +553,23 @@ function etch_fusion_suite() {
 // Start the plugin
 etch_fusion_suite();
 
-// Plugin activation/deactivation hooks
+// Plugin activation/deactivation/uninstall hooks
 register_activation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'deactivate' ) );
+register_uninstall_hook( __FILE__, 'efs_plugin_uninstall' );
+
+/**
+ * Plugin uninstall callback
+ * Called when plugin is deleted (not deactivated)
+ */
+function efs_plugin_uninstall() {
+	if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+		return;
+	}
+
+	$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/core/class-db-installer.php';
+	if ( file_exists( $db_installer_file ) ) {
+		require_once $db_installer_file;
+		\Bricks2Etch\Core\EFS_DB_Installer::uninstall();
+	}
+}
