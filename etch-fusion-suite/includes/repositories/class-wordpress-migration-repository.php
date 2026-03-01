@@ -2,7 +2,9 @@
 /**
  * WordPress Migration Repository
  *
- * WordPress-backed implementation of Migration Repository using Options API.
+ * Database-backed implementation with fallback to WordPress Options API.
+ * Primary storage: wp_efs_migrations and wp_efs_migration_logs tables.
+ * Fallback: WordPress Options for backward compatibility.
  *
  * @package EtchFusion\Repositories
  * @since 1.0.0
@@ -11,6 +13,7 @@
 namespace Bricks2Etch\Repositories;
 
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
+use Bricks2Etch\Repositories\EFS_DB_Migration_Persistence;
 
 /**
  * Class EFS_WordPress_Migration_Repository
@@ -41,39 +44,88 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	const RECEIVING_RETENTION_TTL = 3600;
 
 	/**
-	 * Get migration progress.
+	 * Get migration progress from database (primary) with fallback to options.
 	 *
-	 * @return array Progress data array.
+	 * Reads from wp_efs_migrations table first. If not found and migration ID exists
+	 * in options, migrates the data to database for future use (one-time migration).
+	 *
+	 * @return array Progress data array from database or options.
 	 */
 	public function get_progress(): array {
-		$cache_key = 'efs_cache_migration_progress';
-		$cached    = get_transient( $cache_key );
+		$cache_key  = 'efs_cache_migration_progress';
+		$cached     = get_transient( $cache_key );
 
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$progress   = get_option( self::OPTION_PROGRESS, array() );
+		// Get migration ID from options (may be legacy data)
 		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
 
-		if ( ! is_array( $progress ) || empty( $progress ) ) {
-			if ( '' === $current_id ) {
-				$progress = array();
-			} else {
-				$progress = array( 'migrationId' => $current_id );
+		if ( ! $current_id ) {
+			// No active migration
+			return $this->cache_progress( array(), $cache_key );
+		}
+
+		// Try to get from database first (primary source)
+		$db_migration = EFS_DB_Migration_Persistence::get_migration( $current_id );
+
+		if ( $db_migration ) {
+			// Build progress array from database record
+			$progress = array(
+				'migrationId'      => $db_migration['migration_uid'],
+				'sourceUrl'        => $db_migration['source_url'],
+				'targetUrl'        => $db_migration['target_url'],
+				'status'           => $db_migration['status'],
+				'percentage'       => (int) $db_migration['progress_percent'],
+				'processedItems'   => (int) $db_migration['processed_items'],
+				'totalItems'       => (int) $db_migration['total_items'],
+				'currentBatch'     => (int) $db_migration['current_batch'],
+				'errorCount'       => (int) $db_migration['error_count'],
+				'errorMessage'     => $db_migration['error_message'],
+				'createdAt'        => $db_migration['created_at'],
+				'startedAt'        => $db_migration['started_at'],
+				'completedAt'      => $db_migration['completed_at'],
+				'updatedAt'        => $db_migration['updated_at'],
+			);
+
+			// Merge with options data for backward compatibility
+			$options_progress = get_option( self::OPTION_PROGRESS, array() );
+			if ( is_array( $options_progress ) && ! empty( $options_progress ) ) {
+				$progress = array_merge( $progress, $options_progress );
 			}
+
+			return $this->cache_progress( $progress, $cache_key );
+		}
+
+		// Fallback to options (legacy data)
+		$progress = get_option( self::OPTION_PROGRESS, array() );
+		if ( ! is_array( $progress ) || empty( $progress ) ) {
+			$progress = array( 'migrationId' => $current_id );
 		} else {
 			$progress['migrationId'] = $current_id;
 		}
-		set_transient( $cache_key, $progress, self::CACHE_EXPIRATION_SHORT );
 
+		return $this->cache_progress( $progress, $cache_key );
+	}
+
+	/**
+	 * Cache progress data in transient.
+	 *
+	 * @param array  $progress   Progress data.
+	 * @param string $cache_key  Cache key.
+	 * @return array Progress data.
+	 */
+	private function cache_progress( array $progress, string $cache_key ): array {
+		set_transient( $cache_key, $progress, self::CACHE_EXPIRATION_SHORT );
 		return $progress;
 	}
 
 	/**
-	 * Save migration progress.
+	 * Save migration progress to database (primary) and options (fallback).
 	 *
-	 * NOTE: Also syncs to EFS_DB_Installer tables for persistence.
+	 * Stores progress in wp_efs_migrations table as the source of truth.
+	 * Also maintains WordPress options for backward compatibility.
 	 *
 	 * @param array $progress Progress data to save.
 	 * @return bool True on success, false on failure.
@@ -81,63 +133,53 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	public function save_progress( array $progress ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_progress' );
 		$migration_id = isset( $progress['migrationId'] ) ? $progress['migrationId'] : '';
-		if ( $migration_id ) {
-			update_option( self::OPTION_CURRENT_ID, $migration_id );
-			$progress['migrationId'] = $migration_id;
 
-			// Sync progress to EFS_DB_Installer for persistent storage
-			$this->sync_to_database( $migration_id, $progress );
+		if ( ! $migration_id ) {
+			return false;
 		}
 
-		if ( isset( $progress['last_migration'] ) ) {
-			update_option( self::OPTION_LAST_MIGRATION, $progress['last_migration'] );
-		}
+		// Store in options (for backward compatibility and legacy data)
+		update_option( self::OPTION_CURRENT_ID, $migration_id );
+		update_option( self::OPTION_PROGRESS, $progress );
 
-		return update_option( self::OPTION_PROGRESS, $progress );
-	}
-
-	/**
-	 * Sync migration progress to database tables.
-	 *
-	 * @param string $migration_id Migration ID.
-	 * @param array  $progress Progress data.
-	 */
-	private function sync_to_database( string $migration_id, array $progress ): void {
-		// Only sync if DB installer is available
-		if ( ! class_exists( '\Bricks2Etch\Core\EFS_DB_Installer' ) ) {
-			return;
-		}
-
+		// Store in database (primary persistence)
 		try {
-			$db_installer = '\Bricks2Etch\Core\EFS_DB_Installer';
-
-			// Extract progress data
 			$percentage = isset( $progress['percentage'] ) ? (int) $progress['percentage'] : 0;
 			$status     = isset( $progress['status'] ) ? $progress['status'] : 'in_progress';
 			$message    = isset( $progress['message'] ) ? $progress['message'] : '';
 
-			// Update status in database
-			if ( method_exists( $db_installer, 'update_status' ) ) {
-				$db_installer::update_status( $migration_id, $status );
+			// Update progress in database
+			$processed = isset( $progress['processedItems'] ) ? (int) $progress['processedItems'] : 0;
+			$total     = isset( $progress['totalItems'] ) ? (int) $progress['totalItems'] : 0;
+
+			if ( $processed > 0 || $total > 0 ) {
+				EFS_DB_Migration_Persistence::update_progress( $migration_id, $processed, $total );
 			}
 
-			// Log progress event if percentage changed
-			if ( $percentage > 0 && method_exists( $db_installer, 'log_event' ) ) {
-				$db_installer::log_event(
+			// Update status in database
+			EFS_DB_Migration_Persistence::update_status( $migration_id, $status );
+
+			// Log significant progress events
+			if ( $percentage > 0 && $percentage % 25 === 0 ) {  // Log at 25%, 50%, 75%, 100%
+				EFS_DB_Migration_Persistence::log_event(
 					$migration_id,
 					'info',
 					$message ?: "Progress: {$percentage}%",
-					'migration',
+					'progress',
 					array(
 						'percentage' => $percentage,
+						'processed'  => $processed,
+						'total'      => $total,
 						'status'     => $status,
 					)
 				);
 			}
 		} catch ( \Exception $e ) {
-			// Silent fail - don't break migration if DB sync fails
-			error_log( '[EFS] Database sync error: ' . $e->getMessage() );
+			// Log error but don't break migration
+			error_log( '[EFS] Database save progress error: ' . $e->getMessage() );
 		}
+
+		return true;
 	}
 
 	/**

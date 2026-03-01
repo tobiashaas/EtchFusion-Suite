@@ -37,7 +37,7 @@ class EFS_DB_Installer {
 		// Create migrations table
 		$migrations_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migrations (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			migration_uid VARCHAR(36) UNIQUE NOT NULL,
+			migration_uid VARCHAR(50) UNIQUE NOT NULL,
 			source_url VARCHAR(255) NOT NULL,
 			target_url VARCHAR(255) NOT NULL,
 			status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -59,7 +59,7 @@ class EFS_DB_Installer {
 		// Create logs table (without FK for MySQL 5.5+ compatibility)
 		$logs_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migration_logs (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			migration_uid VARCHAR(36) NOT NULL,
+			migration_uid VARCHAR(50) NOT NULL,
 			log_level VARCHAR(10) NOT NULL,
 			category VARCHAR(50),
 			message TEXT NOT NULL,

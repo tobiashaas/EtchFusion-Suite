@@ -9,6 +9,14 @@ class EFS_Service_Provider {
 	 * @param EFS_Service_Container $container
 	 */
 	public function register( EFS_Service_Container $container ) {
+		// Database Persistence Service
+		$container->singleton(
+			'db_migration_persistence',
+			function ( $c ) {
+				return new \Bricks2Etch\Repositories\EFS_DB_Migration_Persistence();
+			}
+		);
+
 		// Repository Services
 		$container->singleton(
 			'settings_repository',
