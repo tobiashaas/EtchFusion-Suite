@@ -1,16 +1,17 @@
 # Etch Fusion Suite Documentation
 
-**Updated:** 2025-11-04 21:22
+**Last Updated:** March 2026
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Development Environment](#development-environment)
 3. [Configuration](#configuration)
-4. [Helper Scripts](#helper-scripts)
-5. [Testing](#testing)
-6. [Troubleshooting](#troubleshooting)
-7. [API Reference](#api-reference)
+4. [Security Architecture](#security-architecture)
+5. [Helper Scripts](#helper-scripts)
+6. [Testing](#testing)
+7. [Troubleshooting](#troubleshooting)
+8. [API Reference](#api-reference)
 
 ---
 
@@ -146,6 +147,185 @@ Create this file for local customizations (gitignored):
 - `SAVE_LOGS_ON_SUCCESS`: Save logs even when tests pass
 - `SAVE_LOGS_ON_FAILURE`: Save logs when tests fail (default: true)
 - `SKIP_VENDOR_CHECK`: Skip vendor/autoload.php check in scripts
+
+---
+
+## Security Architecture
+
+This plugin implements a minimal but effective security model tailored for **admin-only migration workflows**. Security threats are mitigated through authentication, authorization, and rate limiting rather than Content Security Policy.
+
+### Design Principles
+
+1. **Admin-Only Access**: Plugin functionality is restricted to authenticated WordPress administrators
+2. **Temporary Migration Tool**: Plugin is not production code and is disabled after migration
+3. **API-First Authentication**: All cross-site migration uses JWT tokens over HTTPS
+4. **No CSP Headers**: Content Security Policy headers are intentionally disabled to preserve builder compatibility
+
+### Why CSP is Disabled
+
+Bricks Builder and Etch Editor both require resources that CSP would block:
+- **`unsafe-inline` scripts**: Builders use inline script execution
+- **`eval()` function**: Required by WordPress admin scripts and builders
+- **CDN font loading**: Google Fonts and Adobe typekit require external CDN access
+
+Enabling CSP would prevent migration workflows entirely. Since authentication is handled by JWT tokens and CORS validation, CSP is not necessary for security.
+
+### Authentication & Authorization
+
+#### JWT Tokens (Cross-Site Migration)
+Migration tokens are JWT-based and used for API calls between Bricks and Etch instances:
+
+```php
+// Generate token (source site)
+$token = $container->get('token_manager')->generate_token(
+    user_id: $user->ID,
+    expires_in: 3600 // 1 hour
+);
+
+// Verify token (target site)
+$is_valid = $container->get('token_manager')->verify_token($token);
+```
+
+**Token Properties:**
+- Signed with `AUTH_KEY` constant (from `wp-config.php`)
+- Includes user ID and issue time
+- Expires after 1 hour (configurable)
+- Verified on every API request
+
+#### WordPress Application Passwords
+Admin users can use WordPress Application Passwords for local development:
+
+```bash
+npm run wp -- user create-application-password admin migration-app
+```
+
+Credentials are exposed via `wp_localize_script` in the admin dashboard.
+
+### Rate Limiting
+
+All AJAX endpoints are protected by rate limiting using WordPress transients with a sliding window algorithm:
+
+```php
+// Check rate limit (returns false if exceeded)
+if ( !$rate_limiter->check_rate_limit( $user_id, 'migration_start' ) ) {
+    wp_send_json_error( 'Rate limit exceeded', 429 );
+}
+
+// Record request
+$rate_limiter->record_request( $user_id, 'migration_start' );
+```
+
+**Default Limits:**
+- 5 requests per minute per user per action
+- Configurable via `EFS_RATE_LIMIT_PER_MINUTE` constant
+
+### CORS (Cross-Origin Resource Sharing)
+
+REST API endpoints allow cross-origin requests from the Etch target site:
+
+```php
+// Applied automatically to all /efs/migration/* endpoints
+header( 'Access-Control-Allow-Origin: *' );
+header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
+header( 'Access-Control-Allow-Headers: Authorization, Content-Type' );
+```
+
+Credentials are sent via JWT tokens, not cookies.
+
+### Input Validation & Sanitization
+
+All user input is validated and sanitized:
+
+```php
+// AJAX handler pattern
+public function verify_request() {
+    // Check nonce
+    check_ajax_referer( 'efs_nonce' );
+    
+    // Validate input
+    $post_id = absint( $_POST['post_id'] ?? 0 );
+    $content = sanitize_textarea_field( $_POST['content'] ?? '' );
+    
+    // Proceed with validated data
+}
+```
+
+**Input Methods:**
+- `sanitize_textarea_field()` for rich content
+- `sanitize_text_field()` for plain text
+- `absint()` for numeric IDs
+- `wp_verify_nonce()` for form submissions
+
+### Action Scheduler
+
+The plugin uses Action Scheduler for asynchronous task processing (video conversion, batch migrations, etc.):
+
+**Configuration:**
+- Disabled default WP-Cron (`DISABLE_WP_CRON = true`)
+- Uses loopback HTTP requests instead (more reliable on shared hosting)
+- Tasks are stored in `wp_actionscheduler_actions` table
+
+**Cleanup:**
+- Past-due and canceled actions are automatically removed from the dashboard
+- Run manually: `npm run wp -- db query "DELETE FROM wp_actionscheduler_actions WHERE status IN ('pending', 'canceled');"`
+
+**Task Example:**
+```php
+// Schedule a video conversion task
+as_schedule_single_action( 
+    time(), 
+    'efs_convert_video', 
+    [ 'video_id' => $video_id, 'format' => 'webm' ]
+);
+
+// Handle task
+add_action( 'efs_convert_video', function( $video_id, $format ) {
+    $converter->convert( $video_id, $format );
+}, 10, 2 );
+```
+
+### Audit Logging
+
+All critical operations are logged for debugging and compliance:
+
+```php
+// Security events
+do_action( 'efs_audit_log', [
+    'event' => 'migration_started',
+    'user_id' => get_current_user_id(),
+    'source_url' => $source_url,
+    'timestamp' => current_time( 'mysql' ),
+] );
+```
+
+Logs are stored in the database and accessible via WP-CLI:
+
+```bash
+npm run wp -- eval "echo get_option('efs_audit_log');"
+```
+
+### SSL/TLS Requirements
+
+**Development (localhost):**
+- HTTPS is optional
+- HTTP allowed for 127.0.0.1
+
+**Production:**
+- HTTPS is required
+- Application Passwords are disabled on HTTP-only sites
+- JWT tokens require HTTPS for cross-site migration
+
+### Summary
+
+| Layer | Mechanism | Scope |
+|-------|-----------|-------|
+| **Authentication** | JWT tokens + WordPress users | Cross-site API calls |
+| **Authorization** | Role-based access (admin only) | Plugin functionality |
+| **Rate Limiting** | Sliding window (5 req/min) | Per user, per action |
+| **Input Validation** | WordPress sanitization functions | All user input |
+| **CORS** | Allow cross-origin from target site | REST API endpoints |
+| **Action Scheduler** | Loopback HTTP requests | Async task processing |
+| **Audit Logging** | Database event log | Critical operations |
 
 ---
 
