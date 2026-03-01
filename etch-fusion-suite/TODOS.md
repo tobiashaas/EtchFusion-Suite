@@ -162,9 +162,85 @@
   - Added troubleshooting guides and API reference
   - Documented all new scripts and configuration options
 
+## 🧹 Repository Cleanup (TODO: 2026-03-01)
+
+### 🗑️ TO DELETE IMMEDIATELY
+
+**Temp/Debug Files (keine Abhängigkeiten):**
+- `test.txt` (leere Test-Datei)
+- `etch-page-929.html` (Debugging-Dump)
+- `phase2-security.json` (alte Sicherheits-Analyse)
+- `tmp_efs_posts/` (Verzeichnis - temporäre Daten)
+- `tmp_efs_styles.json` (temporäre Stile)
+- `test-environment/` (Verzeichnis - alte Test-Setup)
+
+**Legacy Scripts (nicht in use, npm scripts preferred):**
+- `cleanup-etch.sh`
+- `commit-and-push.py`
+- `commit-fix.sh`
+- `do-commit.cmd`
+- `fix-class-aliases.ps1`
+- `fix-double-backslash.ps1`
+- `fix-service-provider.ps1`
+- `fix-symlinks.cmd`
+- `fix-symlinks.ps1`
+- `migrate-post.ps1`
+- `remove-large-files.sh`
+- `run-phpcs.ps1`
+- `run_git_commands.py`
+- `update-references.ps1`
+- `update-scripts.ps1`
+
+### 📄 DOKUMENTATION REVIEW NÖTIG
+
+- `DOCUMENTATION_DASHBOARD_LOGGING.md` - ist das noch relevant? In DOCUMENTATION.md schon abgedeckt?
+- `IMPLEMENTATION_DASHBOARD_LOGGING.md` - alt?
+- `TEST_RESULTS_DASHBOARD_LOGGING.md` - alt?
+
+→ **Action:** Checken und entweder konsolidieren oder löschen
+
+### 📦 BUILD ARTIFACTS (in .gitignore)
+
+- `build/` - Kompilierte Assets (regenerierbar via `npm run build`)
+- `.phpunit.result.cache` - PHPUnit Cache (regenerierbar)
+- `node_modules/` - npm dependencies (regenerierbar via `npm install`)
+- `vendor/` - Composer dependencies (regenerierbar via `composer install`)
+
+**Action:** Sicherstellen dass in `.gitignore` sind, sonst hinzufügen
+
+### ⚙️ IDE CONFIGS (in .gitignore, Keep)
+
+- `.claude/` - Claude.ai AI config
+- `.cursor/` - Cursor IDE config
+- `.windsurf/` - Windsurf IDE config
+- `.vscode/` - VS Code config
+
+**Action:** Keep in `.gitignore` (developer machines können unterschiedliche IDEs haben)
+
+### ✅ KEEP (Wichtig!)
+
+- `.github/` - GitHub Actions CI/CD workflows
+- `.git/`, `.gitignore`, `.gitattributes`
+- `etch-fusion-suite/` - Haupt Plugin-Code
+- `composer.json`/lock, `package.json`/lock
+- `phpunit.xml.dist`
+- `README.md`, `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `DOCUMENTATION.md`
+- `docs/`, `scripts/`, `tests/`
+
 ---
 
-## 📋 Planned Features
+## 🧹 Cleanup Plan für MORGEN:
+
+1. **Temp Files löschen** (6 Dateien)
+2. **Legacy Scripts löschen** (15 Dateien)
+3. **Dokumentation Review** (3 Dateien - entscheiden)
+4. **.gitignore überprüfen** (Build artifacts richtig excluded?)
+5. **git status checken** - keine versehentlichen tracked artifacts
+6. **Final Commit:** "cleanup: remove legacy scripts and temp files"
+
+**Estimated Time:** 10 Minuten
+**Risk:** Sehr niedrig (nur temp/legacy, keine aktiven Features)
+**Benefit:** Repo viel übersichtlicher, weniger Verwirrrung für neue Entwickler
 
 ### 🎯 High Priority
 
