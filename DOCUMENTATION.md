@@ -1278,14 +1278,14 @@ Transfers images and attachments from Bricks to Etch site.
 #### Token Generation (Etch site)
 
 1. User clicks "Generate Migration Key" in Etch admin
-2. `migration_token_manager.php` generates JWT with embedded URL and credentials
+2. `EFS_Migration_Token_Manager` class (in `migration_token_manager.php`) generates JWT with embedded URL and credentials
 3. Token is displayed as a single string to copy
 4. Token is valid for 24 hours by default
 
 #### Token Validation (Bricks site)
 
 1. User pastes JWT migration key in Bricks admin
-2. `migration_token_manager.php` decodes JWT and verifies signature
+2. `EFS_Migration_Token_Manager` class (in `migration_token_manager.php`) decodes JWT and verifies signature
 3. Expiration is checked against `exp` claim
 4. Target URL is extracted from payload
 5. Token is used as Bearer token for API requests
@@ -1309,7 +1309,7 @@ Transfers images and attachments from Bricks to Etch site.
 
 ```php
 // Check if JWT is valid
-$token_manager = etch_fusion_suite_container()->get('migration_token_manager');
+$token_manager = etch_fusion_suite_container()->get('token_manager');
 $is_valid = $token_manager->validate_migration_token($jwt_string);
 ```
 
