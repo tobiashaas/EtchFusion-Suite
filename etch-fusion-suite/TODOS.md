@@ -55,15 +55,24 @@
      - [✅] Loopback Runner aggressive mode während Migration aktiv
    - **Aber:** Migration läuft trotzdem nicht - Action in DB bleibt `status: pending`
    - **Debug Info:** REST API `/efs/v1/start-migration` Response zeigt `efs_migration_progress` mit `status: queued`
-   - **Nächste Schritte für MORGEN:**
-     1. Fresh `wp-env destroy && npm run dev` mit aktiven Plugins
-     2. Systematisches Testing Step 1-5 mit Browser DevTools offen
-     3. REST API Response + Action Scheduler DB prüfen
-     4. Hook `efs_run_headless_migration` Registrierung verifizieren
-     5. Nonce-Validierung in REST Endpoint prüfen
-     6. Debug-Logging in `class-migration-starter.php` + `class-headless-migration-job.php` hinzufügen
+   
+   - **🔥 KRITISCHER FUND (2026-03-01 22:08):**
+     - Action Scheduler Action **WIRD ERSTELLT** ✅
+     - Migration ID: `712fcd18-d0e5-48e5-99e1-28386e408dd0`
+     - Hook: `efs_run_headless_migration`
+     - Status: **PENDING** (seit 22:01:29)
+     - **DAS IST DAS ECHTE PROBLEM:** Hook wird nicht aufgerufen!
+   
+   - **Das echte Problem:** Nicht "Action wird nicht erstellt" sondern "**Hook `efs_run_headless_migration` wird nicht ausgeführt**"
+   
+   - **Morgen Debugging Fokus:**
+     1. Ist der Hook registriert? (`add_action('efs_run_headless_migration', ...)`)
+     2. Wird Hook im Loopback-Kontext aufgerufen?
+     3. Error-Handling für Hook-Callbacks
+     4. DB Query: `SELECT status FROM wp_actionscheduler_actions` - sollte `complete` sein nach ausführen
+   
    - **Commits:** b4423534, c264a336
-   - **Priorität:** 🔴 CRITICAL - Core Functionality
+   - **Priorität:** 🔴 CRITICAL - Hook nicht registriert oder wird nicht aufgerufen
 
 - [✅] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **FIXED: 2026-03-01**
    - **Problem:** Test erwartet dass CSS-Klasse nicht im `attributes`-JSON des iframes steht, aber Converter legte sie dort ab.
