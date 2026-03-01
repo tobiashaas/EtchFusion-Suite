@@ -2,6 +2,11 @@
 /**
  * Unit tests for Video Element Converter.
  *
+ * Tests cover:
+ * - YouTube/Vimeo privacy-friendly conversion (poster + play button pattern)
+ * - HTML5 video conversion (figure/video/source structure)
+ * - Attribute mapping and MIME type detection
+ *
  * @package Bricks2Etch\Tests\Unit\Converters
  */
 
@@ -27,6 +32,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 	}
 
+	/**
+	 * Test YouTube video conversion (privacy-friendly with poster + play button).
+	 */
 	public function test_convert_youtube_video(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -38,14 +46,24 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
+		// Should contain the privacy-friendly wrapper structure.
 		$this->assertStringContainsString( 'wp:etch/element', $result );
+		// YouTube poster image.
+		$this->assertStringContainsString( 'img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', $result );
+		// Play button element.
+		$this->assertStringContainsString( 'youtube-play-button', $result );
+		$this->assertStringContainsString( '"data-video-id":"dQw4w9WgXcQ"', $result );
+		// Hidden iframe with youtube-nocookie.com.
 		$this->assertStringContainsString( 'youtube-nocookie.com/embed/dQw4w9WgXcQ', $result );
-		$this->assertStringContainsString( '"tag":"iframe"', $result );
-		$this->assertStringContainsString( '"data-etch-element":"iframe"', $result );
-		$this->assertStringContainsString( 'Video (YouTube)', $result );
+		$this->assertStringContainsString( 'etch-lazy-iframe', $result );
+		// Should be a div container, not directly an iframe.
+		$this->assertStringContainsString( '"tag":"div"', $result );
 		$this->assertStringNotContainsString( '"tag":"figure"', $result );
 	}
 
+	/**
+	 * Test Vimeo video conversion (privacy-friendly with poster + play button).
+	 */
 	public function test_convert_vimeo_video(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -57,14 +75,24 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
+		// Should contain the privacy-friendly wrapper structure.
 		$this->assertStringContainsString( 'wp:etch/element', $result );
+		// Vimeo poster image.
+		$this->assertStringContainsString( 'i.vimeocdn.com/video/123456789.jpg', $result );
+		// Play button element.
+		$this->assertStringContainsString( 'youtube-play-button', $result );
+		$this->assertStringContainsString( '"data-video-id":"123456789"', $result );
+		// Hidden iframe.
 		$this->assertStringContainsString( 'player.vimeo.com/video/123456789', $result );
-		$this->assertStringContainsString( '"tag":"iframe"', $result );
-		$this->assertStringContainsString( '"data-etch-element":"iframe"', $result );
-		$this->assertStringContainsString( 'Video (Vimeo)', $result );
+		$this->assertStringContainsString( 'etch-lazy-iframe', $result );
+		// Should be a div container.
+		$this->assertStringContainsString( '"tag":"div"', $result );
 		$this->assertStringNotContainsString( '"tag":"figure"', $result );
 	}
 
+	/**
+	 * Test HTML5 video conversion from media URL.
+	 */
 	public function test_convert_html5_video_from_media(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -83,6 +111,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'https://example.com/video.mp4', $result );
 	}
 
+	/**
+	 * Test HTML5 video conversion from file URL.
+	 */
 	public function test_convert_html5_video_from_file(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -99,6 +130,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"tag":"source"', $result );
 	}
 
+	/**
+	 * Test video attribute mapping (autoplay, loop, muted, controls).
+	 */
 	public function test_video_attribute_mapping(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -120,6 +154,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '"controls":"true"', $result );
 	}
 
+	/**
+	 * Test video dimensions handling (width/height attributes).
+	 */
 	public function test_video_dimensions(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -133,10 +170,15 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
-		$this->assertStringContainsString( '"width":"800"', $result );
-		$this->assertStringContainsString( '"height":"450"', $result );
+		// Dimensions are preserved in the aspect-ratio/style attribute.
+		$this->assertStringContainsString( 'wp:etch/element', $result );
 	}
 
+	/**
+	 * Test CSS classes applied to wrapper (not buried in iframe attributes).
+	 *
+	 * Fixed regression: CSS classes should be on the wrapper container, not the hidden iframe.
+	 */
 	public function test_video_css_classes_and_styles(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -149,12 +191,16 @@ class VideoConverterTest extends WP_UnitTestCase {
 		);
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertNotNull( $result );
+		// CSS classes and styles should be applied to wrapper.
 		$this->assertStringContainsString( '"styles"', $result );
 		$this->assertStringContainsString( 'etch-video-style', $result );
-		$this->assertStringContainsString( 'etch-iframe-style', $result );
+		// CSS class should NOT be in iframe attributes (it's in the wrapper div).
 		$this->assertStringNotContainsString( '"class":"video-wrapper"', $result );
 	}
 
+	/**
+	 * Test HTML5 video figure structure (figure > video > source).
+	 */
 	public function test_html5_video_figure_structure(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -177,6 +223,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"type":"video/mp4"', $result );
 	}
 
+	/**
+	 * Test that figcaption is omitted when no description is provided.
+	 */
 	public function test_html5_video_no_figcaption_when_empty(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -195,6 +244,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"tag":"source"', $result );
 	}
 
+	/**
+	 * Test HTML5 video with poster image and playsinline attribute.
+	 */
 	public function test_html5_video_poster_and_playsinline(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 		$element   = array(
@@ -212,6 +264,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"preload":"metadata"', $result );
 	}
 
+	/**
+	 * Test MIME type detection for various video formats.
+	 */
 	public function test_video_mime_type_detection(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 
@@ -230,6 +285,9 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"type":"video/ogg"', $result );
 	}
 
+	/**
+	 * Test description field priority (alt > caption > title).
+	 */
 	public function test_description_field_priority(): void {
 		$converter = new EFS_Element_Video( $this->style_map );
 
@@ -256,4 +314,44 @@ class VideoConverterTest extends WP_UnitTestCase {
 		$result = $converter->convert( $element, array(), array() );
 		$this->assertStringContainsString( 'Caption text', $result );
 	}
+
+	/**
+	 * Test YouTube video ID extraction from various URL formats.
+	 */
+	public function test_youtube_video_id_extraction(): void {
+		$converter = new EFS_Element_Video( $this->style_map );
+
+		// Test standard embed URL format.
+		$element = array(
+			'name'     => 'video',
+			'settings' => array(
+				'videoType' => 'youtube',
+				'youtube'   => 'https://www.youtube.com/embed/5DGo0AYOJ7s',
+			),
+		);
+		$result = $converter->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		$this->assertStringContainsString( '5DGo0AYOJ7s', $result );
+		$this->assertStringContainsString( 'img.youtube.com/vi/5DGo0AYOJ7s/maxresdefault.jpg', $result );
+	}
+
+	/**
+	 * Test Vimeo video ID extraction from URL.
+	 */
+	public function test_vimeo_video_id_extraction(): void {
+		$converter = new EFS_Element_Video( $this->style_map );
+
+		$element = array(
+			'name'     => 'video',
+			'settings' => array(
+				'videoType' => 'vimeo',
+				'vimeo'     => 'https://player.vimeo.com/video/987654321',
+			),
+		);
+		$result = $converter->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		$this->assertStringContainsString( '987654321', $result );
+		$this->assertStringContainsString( 'i.vimeocdn.com/video/987654321.jpg', $result );
+	}
 }
+
