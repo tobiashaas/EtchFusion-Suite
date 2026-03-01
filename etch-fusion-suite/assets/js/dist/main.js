@@ -1477,7 +1477,7 @@
     progressMinimized: false,
     preflight: null,
     preflightConfirmed: false,
-    mode: "browser",
+    mode: "headless",
     actionSchedulerId: null
   });
   var humanize = (value) => String(value || "").replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()).trim();
@@ -1620,7 +1620,7 @@
     const PREFLIGHT_HINTS = {
       memory: "PHP memory_limit is below 64 MB. Contact your hosting provider to increase it.",
       target_reachable: "The target site is not reachable. Check the URL and ensure the site is online.",
-      wp_cron: "WP Cron is disabled (DISABLE_WP_CRON). Switch to Browser Mode or enable WP Cron.",
+      action_scheduler: "Action Scheduler is not available. Reinstall the plugin with Composer dependencies.",
       memory_warning: "Memory is limited. Large migrations may fail. Consider increasing memory_limit.",
       execution_time: "max_execution_time is low. Batch size will be reduced automatically.",
       disk_space: "Target site has less than 500 MB free disk space."
@@ -1643,7 +1643,7 @@
         return;
       }
       const systemChecks = result.checks.filter((c) => {
-        const excludedIds = ["wp_cron", "wp_cron_delay", "target_reachable", "disk_space"];
+        const excludedIds = ["target_reachable", "disk_space"];
         const shouldExclude = excludedIds.includes(c.id);
         if (shouldExclude) {
           console.debug(`[EFS] Step 1: Excluding check "${c.id}" - "${c.message}"`);
@@ -1681,37 +1681,12 @@
       }
       updateNavigationState();
       state.preflight = result;
-      const wpCronResult = result.checks?.find((c) => c.id === "wp_cron");
-      const headlessRadio = refs.modeRadios.find((r) => r instanceof HTMLInputElement && r.value === "headless");
-      if (headlessRadio) {
-        if (wpCronResult && wpCronResult.status !== "ok") {
-          headlessRadio.disabled = true;
-          if (state.mode === "headless") {
-            state.mode = "browser";
-            refs.modeRadios.forEach((r) => {
-              if (r instanceof HTMLInputElement) {
-                r.checked = r.value === "browser";
-              }
-              const modeLabel = r?.closest("[data-efs-mode-option]");
-              if (modeLabel) {
-                modeLabel.classList.toggle("efs-mode-option--selected", r instanceof HTMLInputElement && r.value === "browser");
-              }
-            });
-          }
-          if (refs.cronIndicator) {
-            refs.cronIndicator.hidden = false;
-            refs.cronIndicator.textContent = "\u26A0 WP Cron not available";
-          }
-        } else {
-          headlessRadio.disabled = false;
-        }
-      }
     };
     const renderConnectChecks = (result) => {
       if (!result || !Array.isArray(result.checks)) {
         return;
       }
-      const connectChecks = result.checks.filter((c) => ["wp_cron", "wp_cron_delay", "target_reachable", "disk_space"].includes(c.id));
+      const connectChecks = result.checks.filter((c) => ["target_reachable", "disk_space"].includes(c.id));
       if (!connectChecks.length) {
         if (refs.preflightConnectResults) {
           refs.preflightConnectResults.hidden = true;
@@ -1773,7 +1748,7 @@
       } catch (err) {
         console.warn("[EFS] Preflight cache invalidation failed", err);
       }
-      await runPreflightCheck(state.targetUrl || "", state.mode || "browser");
+      await runPreflightCheck(state.targetUrl || "", "headless");
     };
     const hasValidStep2Selection = () => {
       if (!state.discoveryData || !getDiscoveryPostTypes(state.discoveryData).length) {
@@ -1870,7 +1845,7 @@
             include_media: state.includeMedia,
             restrict_css_to_used: state.restrictCssToUsed,
             batch_size: state.batchSize,
-            mode: state.mode || "browser"
+            mode: "headless"
           })
         });
       } catch (error) {
@@ -2448,6 +2423,7 @@
       let currentBatchSize = BATCH_SIZE;
       const MAX_PARALLEL_REQUESTS = 5;
       let shouldContinue = true;
+      let hasFailedFatally = false;
       const submitBatch = async () => {
         try {
           const payload = await post(ACTION_MIGRATE_BATCH, {
@@ -2479,7 +2455,8 @@
           }
         } catch (error) {
           runtime.batchFailCount = (runtime.batchFailCount || 0) + 1;
-          if (runtime.batchFailCount >= 3) {
+          if (runtime.batchFailCount >= 3 && !hasFailedFatally) {
+            hasFailedFatally = true;
             shouldContinue = false;
             runtime.migrationRunning = false;
             stopPolling();
@@ -2503,6 +2480,10 @@
               refs.retryButton.hidden = false;
             }
             showResult("error", error?.message || "Batch processing failed. Try resuming the migration.");
+          } else if (runtime.batchFailCount >= 3) {
+            shouldContinue = false;
+          }
+          if (hasFailedFatally && runtime.batchFailCount === 3) {
             throw error;
           }
         }
@@ -2761,7 +2742,7 @@
         state.migrationKey = token;
         state.targetUrl = targetUrl;
         runtime.validatedMigrationUrl = targetUrl;
-        runPreflightCheck(state.targetUrl, state.mode || "browser", "connect").catch(() => {
+        runPreflightCheck(state.targetUrl, "headless", "connect").catch(() => {
         });
         if (refs.keyInput) {
           refs.keyInput.value = token;
@@ -2804,7 +2785,7 @@
           post_type_mappings: state.postTypeMappings,
           include_media: state.includeMedia ? "1" : "0",
           restrict_css_to_used: state.restrictCssToUsed ? "1" : "0",
-          mode: state.mode || "browser"
+          mode: "headless"
         });
         state.migrationId = payload?.migrationId ?? payload?.migration_id ?? "";
         if (!state.migrationId) {
@@ -3113,65 +3094,6 @@
       });
       refs.openLogsButton?.addEventListener("click", openLogsTab);
       refs.startNewButton?.addEventListener("click", resetWizard);
-      refs.modeRadios.forEach((radio) => {
-        radio?.addEventListener("change", async () => {
-          if (!(radio instanceof HTMLInputElement) || !radio.checked) {
-            return;
-          }
-          const newMode = radio.value === "headless" ? "headless" : "browser";
-          if (newMode === "headless") {
-            const wpCronCheck = state.preflight?.checks?.find((c) => c.id === "wp_cron");
-            if (wpCronCheck && wpCronCheck.status !== "ok") {
-              state.mode = "browser";
-              refs.modeRadios.forEach((r) => {
-                if (r instanceof HTMLInputElement) {
-                  r.checked = r.value === "browser";
-                }
-                const modeLabel = r?.closest("[data-efs-mode-option]");
-                if (modeLabel) {
-                  modeLabel.classList.toggle("efs-mode-option--selected", r instanceof HTMLInputElement && r.value === "browser");
-                }
-              });
-              if (refs.cronIndicator) {
-                refs.cronIndicator.hidden = false;
-                refs.cronIndicator.textContent = "\u26A0 WP Cron not available";
-              }
-              radio.disabled = true;
-              updateNavigationState();
-              await saveWizardState();
-              return;
-            }
-          }
-          state.mode = newMode;
-          refs.modeRadios.forEach((r) => {
-            const label = r?.closest("[data-efs-mode-option]");
-            if (label) {
-              label.classList.toggle("efs-mode-option--selected", r === radio);
-            }
-          });
-          if (refs.cronIndicator) {
-            if (newMode === "headless") {
-              const wpCronCheck = state.preflight?.checks?.find((c) => c.id === "wp_cron");
-              if (wpCronCheck) {
-                refs.cronIndicator.hidden = false;
-                if (wpCronCheck.status === "ok") {
-                  refs.cronIndicator.textContent = "\u2705 WP Cron active";
-                } else {
-                  refs.cronIndicator.textContent = "\u26A0 WP Cron not available";
-                  radio.disabled = true;
-                }
-              } else {
-                refs.cronIndicator.hidden = true;
-              }
-            } else {
-              refs.cronIndicator.hidden = true;
-            }
-          }
-          updateNavigationState();
-          await invalidateAndRecheck();
-          await saveWizardState();
-        });
-      });
       refs.cancelHeadlessButton?.addEventListener("click", async () => {
         try {
           const migrationId = state.migrationId || "";
@@ -3344,7 +3266,7 @@
       }
       await restoreState();
       renderStepShell();
-      runPreflightCheck("", state.mode || "browser").catch(() => {
+      runPreflightCheck("", "headless").catch(() => {
       });
       const resumed = await autoResumeMigration();
       if (!resumed) {

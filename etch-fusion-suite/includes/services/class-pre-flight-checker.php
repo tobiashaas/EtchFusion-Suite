@@ -113,69 +113,26 @@ class EFS_Pre_Flight_Checker {
 			);
 		}
 
-		// WP Cron check.
-		// Headless mode uses Action Scheduler (bundled with this plugin) for background task execution.
-		// Action Scheduler is always available (vendor'd as EFS_Vendor_ActionScheduler).
-		// It can be triggered by any of these mechanisms:
-		// - WP Cron (WordPress internal scheduler, if enabled)
-		// - Server-side cron (system cron, hosting provider's custom cron, xCloud-Cron, etc.)
-		// - Any task scheduler that calls the action-scheduler looper endpoint
-		// This check only fails if somehow Action Scheduler is not available, which should never happen.
-		$wp_cron_disabled     = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
-		$has_action_scheduler = function_exists( 'as_enqueue_async_action' ) || class_exists( 'EFS_Vendor_ActionScheduler' );
+		// Action Scheduler availability check.
+		// All migrations run in headless mode via Action Scheduler + our own loopback runner.
+		// WP-Cron is intentionally NOT used for migration scheduling — the plugin does not
+		// touch WP-Cron at all, so other plugins' scheduled events are unaffected.
+		$has_action_scheduler = function_exists( 'as_enqueue_async_action' );
 
-		if ( 'headless' === $mode && ! $has_action_scheduler ) {
+		if ( ! $has_action_scheduler ) {
 			$checks[] = array(
-				'id'      => 'wp_cron',
+				'id'      => 'action_scheduler',
 				'status'  => 'error',
-				'value'   => 'no_scheduler',
-				'message' => __( 'Critical error: Action Scheduler is not available. This should never happen. Please ensure the plugin is correctly installed.', 'etch-fusion-suite' ),
-			);
-		} elseif ( $wp_cron_disabled ) {
-			$checks[] = array(
-				'id'      => 'wp_cron',
-				'status'  => 'ok',
-				'value'   => 'disabled_with_scheduler',
-				'message' => __( 'WP Cron is disabled. Headless mode will use Action Scheduler with your hosting provider\'s cron system (ensure your provider has cron enabled, or configure a looper endpoint).', 'etch-fusion-suite' ),
+				'value'   => 'unavailable',
+				'message' => __( 'Action Scheduler is not available. Please ensure the plugin is correctly installed with Composer dependencies.', 'etch-fusion-suite' ),
 			);
 		} else {
 			$checks[] = array(
-				'id'      => 'wp_cron',
+				'id'      => 'action_scheduler',
 				'status'  => 'ok',
-				'value'   => 'enabled',
-				'message' => __( 'WP Cron is enabled. Background tasks will be executed via WP Cron or your hosting provider\'s cron.', 'etch-fusion-suite' ),
+				'value'   => 'ready',
+				'message' => __( 'Action Scheduler ready. Migrations run server-side via the built-in loopback runner.', 'etch-fusion-suite' ),
 			);
-		}
-
-		// WP Cron delay check.
-		$cron_array = get_option( 'cron' );
-		if ( is_array( $cron_array ) ) {
-			$next_run = null;
-			$now      = time();
-			foreach ( $cron_array as $timestamp => $hook_entries ) {
-				if ( ! is_numeric( $timestamp ) ) {
-					continue;
-				}
-				$timestamp = (int) $timestamp;
-				if ( null === $next_run || $timestamp < $next_run ) {
-					$next_run = $timestamp;
-				}
-			}
-			if ( null !== $next_run && $next_run < ( $now - 300 ) ) {
-				$checks[] = array(
-					'id'      => 'wp_cron_delay',
-					'status'  => 'info',
-					'value'   => $next_run,
-					'message' => __( 'WP Cron appears to be delayed. Some scheduled tasks may not have run.', 'etch-fusion-suite' ),
-				);
-			} else {
-				$checks[] = array(
-					'id'      => 'wp_cron_delay',
-					'status'  => 'ok',
-					'value'   => $next_run,
-					'message' => __( 'WP Cron timing looks normal.', 'etch-fusion-suite' ),
-				);
-			}
 		}
 
 		// Target URL checks.

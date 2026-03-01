@@ -2,10 +2,13 @@
 /**
  * Action Scheduler Headless Configuration
  *
- * Configures Action Scheduler to run in headless mode without WP-Cron.
- * Uses loopback HTTP requests instead for better hosting compatibility.
+ * Configures Action Scheduler to run without WP-Cron by using our own
+ * loopback HTTP runner instead. This does NOT disable WP-Cron globally —
+ * other plugins' scheduled events continue to work normally.
  *
- * Note: DISABLE_WP_CRON is defined in main plugin file before AS is loaded.
+ * The `action_scheduler_disable_wpcron` filter tells Action Scheduler not
+ * to register itself with WP-Cron. Our loopback runner
+ * (EFS_Action_Scheduler_Loopback_Runner) triggers the AS queue directly.
  *
  * @package Bricks2Etch
  */

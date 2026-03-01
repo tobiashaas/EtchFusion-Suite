@@ -387,7 +387,8 @@ class EFS_Migration_Starter {
 			$payload = $context['payload'];
 			$expires = $context['expires'];
 
-			$mode         = isset( $options['mode'] ) && in_array( $options['mode'], array( 'browser', 'headless' ), true ) ? $options['mode'] : 'browser';
+			// Always headless — browser mode has been removed from the UI.
+			$mode         = 'headless';
 			$batch_size   = $batch_size ? max( 1, (int) $batch_size ) : 50;
 			$migration_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'efs_migration_', true );
 			$this->progress_manager->init_progress( $migration_id, $options, $mode );

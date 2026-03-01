@@ -44,7 +44,7 @@ const defaultState = () => ({
 	progressMinimized: false,
 	preflight: null,
 	preflightConfirmed: false,
-	mode: 'browser',
+	mode: 'headless',
 	actionSchedulerId: null,
 });
 
@@ -209,7 +209,7 @@ const createWizard = (root) => {
 	const PREFLIGHT_HINTS = {
 		memory: 'PHP memory_limit is below 64 MB. Contact your hosting provider to increase it.',
 		target_reachable: 'The target site is not reachable. Check the URL and ensure the site is online.',
-		wp_cron: 'WP Cron is disabled (DISABLE_WP_CRON). Switch to Browser Mode or enable WP Cron.',
+		action_scheduler: 'Action Scheduler is not available. Reinstall the plugin with Composer dependencies.',
 		memory_warning: 'Memory is limited. Large migrations may fail. Consider increasing memory_limit.',
 		execution_time: 'max_execution_time is low. Batch size will be reduced automatically.',
 		disk_space: 'Target site has less than 500 MB free disk space.',
@@ -230,9 +230,9 @@ const createWizard = (root) => {
 
 		// Filter out connection-specific checks from Step 1 display.
 		// These will be shown separately during connection validation in Step 2.
-		// Excluded checks: wp_cron, wp_cron_delay, target_reachable, disk_space
+		// Excluded checks: target_reachable, disk_space
 		const systemChecks = result.checks.filter((c) => {
-			const excludedIds = ['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'];
+			const excludedIds = ['target_reachable', 'disk_space'];
 			const shouldExclude = excludedIds.includes(c.id);
 			if (shouldExclude) {
 				// Use debug level — these are intentionally deferred to Step 2; not errors.
@@ -285,41 +285,15 @@ const createWizard = (root) => {
 		// Store full result for connection validation.
 		state.preflight = result;
 
-		// Initialize headless radio disabled state based on WP Cron preflight result.
-		const wpCronResult = result.checks?.find((c) => c.id === 'wp_cron');
-		const headlessRadio = refs.modeRadios.find((r) => r instanceof HTMLInputElement && r.value === 'headless');
-		if (headlessRadio) {
-			if (wpCronResult && wpCronResult.status !== 'ok') {
-				headlessRadio.disabled = true;
-				if (state.mode === 'headless') {
-					state.mode = 'browser';
-					refs.modeRadios.forEach((r) => {
-						if (r instanceof HTMLInputElement) {
-							r.checked = r.value === 'browser';
-						}
-						const modeLabel = r?.closest('[data-efs-mode-option]');
-						if (modeLabel) {
-							modeLabel.classList.toggle('efs-mode-option--selected', r instanceof HTMLInputElement && r.value === 'browser');
-						}
-					});
-				}
-				if (refs.cronIndicator) {
-					refs.cronIndicator.hidden = false;
-					refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
-				}
-			} else {
-				headlessRadio.disabled = false;
-			}
-		}
 	};
 
-	// Render connection-specific checks (target site reachable, WP Cron) during Step 2 connection validation.
+	// Render connection-specific checks (target site reachable, disk space) during Step 2 connection validation.
 	const renderConnectChecks = (result) => {
 		if (!result || !Array.isArray(result.checks)) {
 			return;
 		}
 
-		const connectChecks = result.checks.filter((c) => ['wp_cron', 'wp_cron_delay', 'target_reachable', 'disk_space'].includes(c.id));
+		const connectChecks = result.checks.filter((c) => ['target_reachable', 'disk_space'].includes(c.id));
 		if (!connectChecks.length) {
 			if (refs.preflightConnectResults) {
 				refs.preflightConnectResults.hidden = true;
@@ -382,7 +356,7 @@ const createWizard = (root) => {
 		} catch (err) {
 			console.warn('[EFS] Preflight cache invalidation failed', err);
 		}
-		await runPreflightCheck(state.targetUrl || '', state.mode || 'browser');
+		await runPreflightCheck(state.targetUrl || '', 'headless');
 	};
 
 	const hasValidStep2Selection = () => {
@@ -494,7 +468,7 @@ const createWizard = (root) => {
 					include_media: state.includeMedia,
 					restrict_css_to_used: state.restrictCssToUsed,
 					batch_size: state.batchSize,
-					mode: state.mode || 'browser',
+					mode: 'headless',
 				}),
 			});
 		} catch (error) {
@@ -1561,7 +1535,7 @@ const createWizard = (root) => {
 			state.migrationKey = token;
 			state.targetUrl = targetUrl;
 			runtime.validatedMigrationUrl = targetUrl;
-			runPreflightCheck(state.targetUrl, state.mode || 'browser', 'connect').catch(() => {});
+			runPreflightCheck(state.targetUrl, 'headless', 'connect').catch(() => {});
 			if (refs.keyInput) {
 				refs.keyInput.value = token;
 			}
@@ -1610,7 +1584,7 @@ const createWizard = (root) => {
 				post_type_mappings: state.postTypeMappings,
 				include_media: state.includeMedia ? '1' : '0',
 				restrict_css_to_used: state.restrictCssToUsed ? '1' : '0',
-				mode: state.mode || 'browser',
+				mode: 'headless',
 			});
 
 			state.migrationId = payload?.migrationId ?? payload?.migration_id ?? '';
@@ -1968,75 +1942,7 @@ const createWizard = (root) => {
 		refs.openLogsButton?.addEventListener('click', openLogsTab);
 		refs.startNewButton?.addEventListener('click', resetWizard);
 
-		// Mode radio buttons.
-		refs.modeRadios.forEach((radio) => {
-			radio?.addEventListener('change', async () => {
-				if (!(radio instanceof HTMLInputElement) || !radio.checked) {
-					return;
-				}
-				const newMode = radio.value === 'headless' ? 'headless' : 'browser';
-
-				// Prevent selecting headless when WP Cron is unavailable.
-				if (newMode === 'headless') {
-					const wpCronCheck = state.preflight?.checks?.find((c) => c.id === 'wp_cron');
-					if (wpCronCheck && wpCronCheck.status !== 'ok') {
-						// Revert selection to browser.
-						state.mode = 'browser';
-						refs.modeRadios.forEach((r) => {
-							if (r instanceof HTMLInputElement) {
-								r.checked = r.value === 'browser';
-							}
-							const modeLabel = r?.closest('[data-efs-mode-option]');
-							if (modeLabel) {
-								modeLabel.classList.toggle('efs-mode-option--selected', r instanceof HTMLInputElement && r.value === 'browser');
-							}
-						});
-						if (refs.cronIndicator) {
-							refs.cronIndicator.hidden = false;
-							refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
-						}
-						radio.disabled = true;
-						updateNavigationState();
-						await saveWizardState();
-						return;
-					}
-				}
-
-				state.mode = newMode;
-
-				// Update label selected state.
-				refs.modeRadios.forEach((r) => {
-					const label = r?.closest('[data-efs-mode-option]');
-					if (label) {
-						label.classList.toggle('efs-mode-option--selected', r === radio);
-					}
-				});
-
-				// Update WP Cron indicator for headless option.
-				if (refs.cronIndicator) {
-					if (newMode === 'headless') {
-						const wpCronCheck = state.preflight?.checks?.find((c) => c.id === 'wp_cron');
-						if (wpCronCheck) {
-							refs.cronIndicator.hidden = false;
-							if (wpCronCheck.status === 'ok') {
-								refs.cronIndicator.textContent = '\u2705 WP Cron active';
-							} else {
-								refs.cronIndicator.textContent = '\u26A0 WP Cron not available';
-								radio.disabled = true;
-							}
-						} else {
-							refs.cronIndicator.hidden = true;
-						}
-					} else {
-						refs.cronIndicator.hidden = true;
-					}
-				}
-
-				updateNavigationState();
-				await invalidateAndRecheck();
-				await saveWizardState();
-			});
-		});
+		// Mode radio buttons — removed. Migrations always run in headless mode.
 
 		// Cancel headless job button.
 		refs.cancelHeadlessButton?.addEventListener('click', async () => {
@@ -2255,7 +2161,7 @@ const createWizard = (root) => {
 		renderStepShell();
 
 		// Run pre-flight silently on wizard load (no target URL yet)
-		runPreflightCheck('', state.mode || 'browser').catch(() => {});
+		runPreflightCheck('', 'headless').catch(() => {});
 
 		const resumed = await autoResumeMigration();
 		if (!resumed) {

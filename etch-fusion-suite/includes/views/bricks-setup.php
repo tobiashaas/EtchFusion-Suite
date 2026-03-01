@@ -149,29 +149,6 @@ $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'
 				<?php esc_html_e( 'Scans selected posts + Bricks Templates (Header, Footer, Global Sections) to find referenced classes only. Uncheck to migrate ALL Bricks Global Classes.', 'etch-fusion-suite' ); ?>
 			</p>
 
-			<div class="efs-execution-mode" data-efs-execution-mode>
-				<p class="efs-wizard-section-label">
-					<?php esc_html_e( 'Execution Mode', 'etch-fusion-suite' ); ?>
-				</p>
-				<label class="efs-mode-option efs-mode-option--selected" data-efs-mode-option="browser">
-					<input type="radio" name="efs-execution-mode" value="browser" checked
-						data-efs-mode-radio />
-					<span class="efs-mode-title">&#x1F5A5; <?php esc_html_e( 'Browser Mode', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-mode-hint">
-						<?php esc_html_e( 'Browser must stay open. Best for small migrations.', 'etch-fusion-suite' ); ?>
-					</span>
-				</label>
-				<label class="efs-mode-option" data-efs-mode-option="headless">
-					<input type="radio" name="efs-execution-mode" value="headless"
-						data-efs-mode-radio />
-					<span class="efs-mode-title">&#9881; <?php esc_html_e( 'Headless Mode', 'etch-fusion-suite' ); ?></span>
-					<span class="efs-mode-hint">
-						<?php esc_html_e( 'Runs server-side. Browser can be closed.', 'etch-fusion-suite' ); ?>
-					</span>
-					<span class="efs-cron-indicator" data-efs-cron-indicator hidden></span>
-				</label>
-			</div>
-
 			<p class="efs-wizard-message" data-efs-select-message hidden></p>
 		</section>
 
