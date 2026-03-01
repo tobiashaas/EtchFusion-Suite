@@ -242,8 +242,15 @@ class Etch_Fusion_Suite_Plugin {
 		// Enable Application Passwords with environment-based HTTPS requirement
 		add_filter( 'wp_is_application_passwords_available', array( $this, 'enable_application_passwords' ) );
 
-		// Add security headers
-		add_action( 'send_headers', array( $this, 'add_security_headers' ), 1 );
+		// NOTE: Security headers (CSP, X-Frame-Options, etc.) are INTENTIONALLY DISABLED
+		// for this migration-only plugin to avoid breaking Bricks Builder and Etch Editor
+		// which require unsafe-inline, eval, and CDN font loading. This is acceptable
+		// because:
+		// 1. Plugin is admin-only (not public-facing)
+		// 2. Migration is temporary (not production code)
+		// 3. API authentication is handled by JWT tokens + CORS validation
+		// 4. See SECURITY_ANALYSIS.md for threat model
+		// add_action( 'send_headers', array( $this, 'add_security_headers' ), 1 );
 
 		// Activation/Deactivation hooks are registered at the end of the file
 	}
