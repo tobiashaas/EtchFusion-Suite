@@ -152,23 +152,14 @@ Create this file for local customizations (gitignored):
 
 ## Security Architecture
 
-This plugin implements a minimal but effective security model tailored for **admin-only migration workflows**. Security threats are mitigated through authentication, authorization, and rate limiting rather than Content Security Policy.
+This plugin implements a minimal but effective security model tailored for **admin-only migration workflows**. Security threats are mitigated through authentication, authorization, and rate limiting.
 
 ### Design Principles
 
 1. **Admin-Only Access**: Plugin functionality is restricted to authenticated WordPress administrators
 2. **Temporary Migration Tool**: Plugin is not production code and is disabled after migration
 3. **API-First Authentication**: All cross-site migration uses JWT tokens over HTTPS
-4. **No CSP Headers**: Content Security Policy headers are intentionally disabled to preserve builder compatibility
-
-### Why CSP is Disabled
-
-Bricks Builder and Etch Editor both require resources that CSP would block:
-- **`unsafe-inline` scripts**: Builders use inline script execution
-- **`eval()` function**: Required by WordPress admin scripts and builders
-- **CDN font loading**: Google Fonts and Adobe typekit require external CDN access
-
-Enabling CSP would prevent migration workflows entirely. Since authentication is handled by JWT tokens and CORS validation, CSP is not necessary for security.
+4. **No CSP Headers**: Content Security Policy is not used because Bricks Builder and Etch Editor require `unsafe-inline` scripts, `eval()`, and external CDN resources to function
 
 ### Authentication & Authorization
 
@@ -258,104 +249,29 @@ public function verify_request() {
 
 ### Action Scheduler
 
-The plugin uses Action Scheduler for asynchronous task processing (video conversion, batch migrations, etc.).
-
-**Key Difference from Standard WordPress:**
-By default, WordPress uses WP-Cron which relies on site traffic to trigger scheduled tasks. This is unreliable on shared hosting and sites with low traffic. This plugin **disables WP-Cron entirely** and uses HTTP loopback requests instead.
+The plugin uses Action Scheduler for asynchronous task processing (video conversion, batch migrations, etc.) instead of WordPress's default WP-Cron, which is unreliable on shared hosting.
 
 **Configuration:**
+- `DISABLE_WP_CRON` is set to `true` in the main plugin file
+- Action Scheduler uses HTTP loopback requests instead (more reliable than site traffic-dependent WP-Cron)
+- Tasks are stored in `wp_actionscheduler_actions` database table
 
-The main plugin file sets:
-```php
-define( 'DISABLE_WP_CRON', true );  // Disable WordPress default WP-Cron
-```
-
-Then `action-scheduler-config.php` configures Action Scheduler to use loopback HTTP:
-```php
-// Disable Action Scheduler's built-in WP-Cron runner
-add_filter( 'action_scheduler_disable_wpcron', '__return_true' );
-
-// Handle loopback requests via EFS_Action_Scheduler_Loopback_Runner
-add_action( 'init', function() {
-    if ( isset( $_GET['efs_run_queue'] ) ) {
-        EFS_Action_Scheduler_Loopback_Runner::handle_queue_trigger();
-    }
-}, 1 );
-```
-
-**How It Works:**
-
-1. **Task Scheduling**: Async tasks (video conversion, migrations) are scheduled via `as_schedule_single_action()`
-2. **Queue Storage**: Tasks are stored in `wp_actionscheduler_actions` database table
-3. **Loopback Trigger**: Plugin schedules HTTP requests to `?efs_run_queue=1` to process the queue
-4. **Task Execution**: `EFS_Action_Scheduler_Loopback_Runner` executes pending tasks synchronously
-
-**Advantages Over WP-Cron:**
-- ✅ Reliable: Works on shared hosting without visitor traffic
-- ✅ Predictable: Tasks run at consistent intervals
-- ✅ Efficient: No background threads or external dependencies
-- ✅ Debuggable: Loopback requests appear in server logs
-
-**Cleanup:**
-Past-due and canceled actions can clutter the WordPress dashboard. Clear them manually:
+**Cleanup Dashboard Warnings:**
+Past-due actions may appear in the WordPress admin dashboard. Clear them:
 
 ```bash
 npm run wp -- db query "DELETE FROM wp_actionscheduler_actions WHERE status IN ('pending', 'canceled');"
 ```
 
-Or programmatically:
-```php
-global $wpdb;
-$wpdb->query( "DELETE FROM {$wpdb->prefix}actionscheduler_actions WHERE status IN ('pending', 'canceled')" );
-```
-
 **Task Example:**
 ```php
-// Schedule a video conversion task
-as_schedule_single_action( 
-    time(),  // When to run (now)
-    'efs_convert_video',  // Hook name
-    [ 'video_id' => $video_id, 'format' => 'webm' ]  // Arguments
-);
+// Schedule a task
+as_schedule_single_action( time(), 'efs_convert_video', [ 'video_id' => $id ] );
 
-// Handle the scheduled task
-add_action( 'efs_convert_video', function( $video_id, $format ) {
-    $converter->convert( $video_id, $format );
-}, 10, 2 );
-```
-
-**Monitoring:**
-Check scheduled tasks in the database:
-```bash
-npm run wp -- db query "SELECT hook, status, scheduled_date FROM wp_actionscheduler_actions ORDER BY scheduled_date DESC LIMIT 10;"
-```
-
-Expected output:
-```
-hook                      | status    | scheduled_date
-efs_convert_video         | complete  | 2026-03-01 16:20:00
-efs_batch_migration       | complete  | 2026-03-01 16:15:00
-efs_clear_media_cache     | complete  | 2026-03-01 16:10:00
-```
-
-### Audit Logging
-
-All critical operations are logged for debugging and compliance:
-
-```php
-// Security events
-do_action( 'efs_audit_log', [
-    'event' => 'migration_started',
-    'user_id' => get_current_user_id(),
-    'source_url' => $source_url,
-    'timestamp' => current_time( 'mysql' ),
-] );
-```
-
-Logs are stored in the database and accessible via WP-CLI:
-
-```bash
-npm run wp -- eval "echo get_option('efs_audit_log');"
+// Handle the task
+add_action( 'efs_convert_video', function( $video_id ) {
+    $converter->convert( $video_id, 'webm' );
+}, 10, 1 );
 ```
 
 ### SSL/TLS Requirements
@@ -379,7 +295,6 @@ npm run wp -- eval "echo get_option('efs_audit_log');"
 | **Input Validation** | WordPress sanitization functions | All user input |
 | **CORS** | Allow cross-origin from target site | REST API endpoints |
 | **Action Scheduler** | Loopback HTTP requests | Async task processing |
-| **Audit Logging** | Database event log | Critical operations |
 
 ---
 
