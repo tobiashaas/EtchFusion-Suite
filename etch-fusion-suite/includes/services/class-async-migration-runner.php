@@ -123,20 +123,6 @@ class EFS_Async_Migration_Runner {
 		EFS_Plugin_Detector $plugin_detector,
 		EFS_Migration_Logger $migration_logger,
 		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null
-	public function __construct(
-		EFS_Migrator_Executor $migrator_executor,
-		EFS_Progress_Manager $progress_manager,
-		EFS_Migration_Run_Finalizer $run_finalizer,
-		EFS_CSS_Service $css_service,
-		EFS_Media_Service $media_service,
-		EFS_Content_Service $content_service,
-		EFS_Content_Parser $content_parser,
-		EFS_API_Client $api_client,
-		Migration_Repository_Interface $migration_repository,
-		EFS_Error_Handler $error_handler,
-		EFS_Plugin_Detector $plugin_detector,
-		EFS_Migration_Logger $migration_logger,
-		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null
 	) {
 		$this->migrator_executor    = $migrator_executor;
 		$this->progress_manager     = $progress_manager;
@@ -186,6 +172,8 @@ class EFS_Async_Migration_Runner {
 		if ( $this->db_persistence ) {
 			$progress_tracker = new EFS_Detailed_Progress_Tracker( $migration_id, $this->db_persistence );
 			$this->content_service->set_progress_tracker( $progress_tracker );
+			$this->media_service->set_progress_tracker( $progress_tracker );
+			$this->css_service->set_progress_tracker( $progress_tracker );
 		}
 
 		$target              = isset( $active['target_url'] ) ? $active['target_url'] : '';

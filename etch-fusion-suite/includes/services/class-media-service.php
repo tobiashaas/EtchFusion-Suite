@@ -13,13 +13,28 @@ class EFS_Media_Service {
 	/** @var EFS_Error_Handler */
 	private $error_handler;
 
+	/** @var EFS_Detailed_Progress_Tracker|null */
+	private $progress_tracker;
+
 	/**
 	 * @param EFS_Media_Migrator $media_migrator
 	 * @param EFS_Error_Handler  $error_handler
+	 * @param EFS_Detailed_Progress_Tracker $progress_tracker Optional progress tracker for detailed logging.
 	 */
-	public function __construct( EFS_Media_Migrator $media_migrator, EFS_Error_Handler $error_handler ) {
-		$this->media_migrator = $media_migrator;
-		$this->error_handler  = $error_handler;
+	public function __construct( EFS_Media_Migrator $media_migrator, EFS_Error_Handler $error_handler, EFS_Detailed_Progress_Tracker $progress_tracker = null ) {
+		$this->media_migrator   = $media_migrator;
+		$this->error_handler    = $error_handler;
+		$this->progress_tracker = $progress_tracker;
+	}
+
+	/**
+	 * Set the progress tracker for detailed logging.
+	 *
+	 * @param EFS_Detailed_Progress_Tracker $tracker
+	 * @return void
+	 */
+	public function set_progress_tracker( EFS_Detailed_Progress_Tracker $tracker ) {
+		$this->progress_tracker = $tracker;
 	}
 
 	/**

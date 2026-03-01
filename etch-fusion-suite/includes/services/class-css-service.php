@@ -7,7 +7,6 @@ use Bricks2Etch\Parsers\EFS_CSS_Converter;
 
 class EFS_CSS_Service {
 
-
 	/**
 	 * @var EFS_CSS_Converter
 	 */
@@ -23,14 +22,31 @@ class EFS_CSS_Service {
 	 */
 	private $error_handler;
 
+	/**
+	 * @var EFS_Detailed_Progress_Tracker|null
+	 */
+	private $progress_tracker;
+
 	public function __construct(
 		EFS_CSS_Converter $css_converter,
 		EFS_API_Client $api_client,
-		EFS_Error_Handler $error_handler
+		EFS_Error_Handler $error_handler,
+		EFS_Detailed_Progress_Tracker $progress_tracker = null
 	) {
-		$this->css_converter = $css_converter;
-		$this->api_client    = $api_client;
-		$this->error_handler = $error_handler;
+		$this->css_converter    = $css_converter;
+		$this->api_client       = $api_client;
+		$this->error_handler    = $error_handler;
+		$this->progress_tracker = $progress_tracker;
+	}
+
+	/**
+	 * Set the progress tracker for detailed logging.
+	 *
+	 * @param EFS_Detailed_Progress_Tracker $tracker
+	 * @return void
+	 */
+	public function set_progress_tracker( EFS_Detailed_Progress_Tracker $tracker ) {
+		$this->progress_tracker = $tracker;
 	}
 
 	/**
