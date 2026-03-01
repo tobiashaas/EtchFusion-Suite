@@ -529,8 +529,6 @@ async function runHealthCheck(environmentFilter = null) {
         label: `${env.name} plugin etch`
       }));
     }
-
-    }
   }
 
   const checks = await Promise.all(checkPromises);
