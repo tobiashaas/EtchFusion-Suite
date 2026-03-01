@@ -542,20 +542,38 @@ Additional filters are available to customise behaviour without patching core se
 
 **Authenticated endpoints** continue to use CORS checks within their `permission_callback` for defense-in-depth.
 
-### Content Security Policy (CSP)
+### Content Security Policy (CSP) & Security Headers
 
-The plugin applies relaxed CSP headers to accommodate WordPress behavior.
+Security headers are managed by the `EFS_Security_Headers` class and enforced via the WordPress `send_headers` action.
+
+#### Security Headers Methods
+
+The `EFS_Security_Headers` class provides the following public methods:
+
+- `add_security_headers()` - Add all security headers to HTTP response
+- `get_csp_policy()` - Generate Content Security Policy string based on page context
+- `is_admin_page()` - Determine if current request is in admin area
+- `should_add_headers()` - Check if security headers should be applied
+
+**Headers Applied:**
+
+- `X-Frame-Options: SAMEORIGIN` - Prevent clickjacking
+- `X-Content-Type-Options: nosniff` - Prevent MIME sniffing
+- `X-XSS-Protection: 1; mode=block` - Enable XSS filter
+- `Referrer-Policy: strict-origin-when-cross-origin` - Control referrer information
+- `Permissions-Policy: geolocation=(), microphone=(), camera=()` - Disable unnecessary features
+- `Content-Security-Policy` - Comprehensive XSS protection (generated dynamically)
 
 #### Current Policy
 
-The CSP header is now generated from directive maps for both contexts and can be extended via filters:
+The CSP header is generated from directive maps for both contexts and can be extended via filters:
 
-- `efs_security_headers_csp_directives`
-- `efs_security_headers_admin_script_sources`
-- `efs_security_headers_admin_style_sources`
-- `efs_security_headers_frontend_script_sources`
-- `efs_security_headers_frontend_style_sources`
-- `efs_security_headers_csp_connect_src`
+- `efs_security_headers_csp_directives` - Customize all CSP directives
+- `efs_security_headers_admin_script_sources` - Add admin script sources
+- `efs_security_headers_admin_style_sources` - Add admin style sources
+- `efs_security_headers_frontend_script_sources` - Add frontend script sources
+- `efs_security_headers_frontend_style_sources` - Add frontend style sources
+- `efs_security_headers_csp_connect_src` - Add connect-src domains
 
 **Admin Pages (defaults):**
 
@@ -609,11 +627,27 @@ Feature flags provide runtime control over experimental or optional functionalit
 
 #### Core Implementation
 
-**Sanitization (Repository Layer):**
+**Storage (Settings Repository):**
 
+- Stored in WordPress option `efs_feature_flags` as JSON array
 - Keys sanitized via `sanitize_key()` before persistence
 - Values cast to boolean to ensure type safety
-- Implemented in `EFS_WordPress_Settings_Repository::save_feature_flags()`
+- Implemented in `EFS_WordPress_Settings_Repository::save_feature_flags()` and `get_feature_flags()`
+
+**Checking Feature Status:**
+
+```php
+$settings_repo = etch_fusion_suite_container()->get('settings_repository');
+$flags = $settings_repo->get_feature_flags();
+
+// Check if a feature is enabled
+$is_enabled = isset( $flags['template_extractor'] ) && $flags['template_extractor'];
+
+// Or use the stored method
+if ( $settings_repo->is_feature_enabled( 'template_extractor' ) ) {
+    // Feature-specific code
+}
+```
 
 **Extensibility (AJAX Layer):**
 
@@ -626,69 +660,82 @@ Feature flags provide runtime control over experimental or optional functionalit
 - `efs_feature_flags` option deleted on plugin deactivation
 - Ensures no orphaned settings remain in database
 
+#### Available Filters
+
+- `efs_allowed_feature_flags` — Customize the whitelist of valid feature flag names
+
 #### Usage Examples
 
 ```php
-// Check if a feature is enabled
-if ( efs_feature_enabled( 'template_extractor' ) ) {
-    // Feature-specific code
+$settings_repo = etch_fusion_suite_container()->get('settings_repository');
+
+// Get all feature flags
+$all_flags = $settings_repo->get_feature_flags();
+
+// Check a specific flag
+if ( $settings_repo->is_feature_enabled( 'template_extractor' ) ) {
+    // Template extractor is enabled
 }
 
-// Programmatically enable a feature
-add_filter( 'efs_feature_enabled', '__return_true' );
+// Update flags
+$settings_repo->save_feature_flags( [
+    'template_extractor' => true,
+    'custom_feature' => false,
+] );
 
 // Extend the allowed feature flags whitelist
 add_filter( 'efs_allowed_feature_flags', function( $flags ) {
     $flags[] = 'custom_feature';
     return $flags;
 } );
-
-// Disable all features in staging
-add_filter( 'efs_feature_enabled', function( $enabled, $feature ) {
-    return wp_get_environment_type() === 'staging' ? false : $enabled;
-}, 10, 2 );
 ```
-
-#### Available Filters
-
-- `efs_allowed_feature_flags` — Customize the whitelist of valid feature flag names
-- `efs_feature_enabled` — Global filter for all feature flag checks (receives flag name)
-- `efs_feature_enabled_{$feature}` — Feature-specific filter (e.g., `efs_feature_enabled_template_extractor`)
 
 ### Rate Limiting
 
-Rate limiting is applied to all AJAX and REST API endpoints.
+Rate limiting is applied to all AJAX and REST API endpoints using a sliding window algorithm with WordPress transients.
+
+#### Rate Limiter API
+
+The `EFS_Rate_Limiter` class provides transient-based rate limiting with the following methods:
+
+**Key Methods:**
+
+- `check_rate_limit($identifier, $action, $limit = 60, $window = 60)` - Check if rate limit exceeded
+- `record_request($identifier, $action, $window = 60)` - Record a request for the identifier/action
+- `reset_limit($identifier, $action)` - Reset rate limit for identifier/action  
+- `get_remaining_attempts($identifier, $action, $limit = 60, $window = 60)` - Get remaining request attempts
+- `get_identifier()` - Get current request identifier (user ID or IP address)
+- `get_default_limit($type = 'ajax')` - Get default limit for action type
+
+**Usage Example:**
+
+```php
+$rate_limiter = etch_fusion_suite_container()->get('rate_limiter');
+
+// Get current request identifier (user ID or IP)
+$identifier = $rate_limiter->get_identifier();
+
+// Check if rate limited
+if ( $rate_limiter->check_rate_limit( $identifier, 'validate_api_key', 10, 60 ) ) {
+    // Rate limit exceeded
+    wp_send_json_error( 'Too many validation attempts', 429 );
+}
+
+// Record the request
+$rate_limiter->record_request( $identifier, 'validate_api_key', 60 );
+
+// Get remaining attempts
+$remaining = $rate_limiter->get_remaining_attempts( $identifier, 'validate_api_key', 10, 60 );
+```
 
 #### Default Limits
 
-**AJAX Endpoints:**
+Built-in defaults for common action types (via `get_default_limit()`):
 
-- Authentication: 10 requests/minute
-- Read operations: 30-60 requests/minute
-- Write operations: 20-30 requests/minute
-- Sensitive operations (cleanup, logs): 5-10 requests/minute
-
-**REST API Endpoints:**
-
-- Authentication: 10 requests/minute
-- Export (read): 30 requests/minute
-- Import (write): 10-20 requests/minute
-
-#### Configuration
-
-Rate limiting settings can be configured via the settings repository:
-
-```php
-$settings_repo = etch_fusion_suite_container()->get('settings_repository');
-$security_settings = $settings_repo->get_security_settings();
-
-// Modify rate limits
-$security_settings['rate_limit_enabled'] = true;
-$security_settings['rate_limit_requests'] = 60;
-$security_settings['rate_limit_window'] = 60; // seconds
-
-$settings_repo->save_security_settings($security_settings);
-```
+- `ajax`: 60 requests/minute
+- `rest`: 30 requests/minute
+- `auth`: 10 requests/minute (for authentication attempts)
+- `sensitive`: 5 requests/minute (for cleanup, logs, etc.)
 
 ### Validation & Input Handling
 
