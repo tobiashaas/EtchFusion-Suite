@@ -52,8 +52,8 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 * @return array Progress data array from database or options.
 	 */
 	public function get_progress(): array {
-		$cache_key  = 'efs_cache_migration_progress';
-		$cached     = get_transient( $cache_key );
+		$cache_key = 'efs_cache_migration_progress';
+		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached ) {
 			return $cached;
@@ -73,20 +73,20 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		if ( $db_migration ) {
 			// Build progress array from database record
 			$progress = array(
-				'migrationId'      => $db_migration['migration_uid'],
-				'sourceUrl'        => $db_migration['source_url'],
-				'targetUrl'        => $db_migration['target_url'],
-				'status'           => $db_migration['status'],
-				'percentage'       => (int) $db_migration['progress_percent'],
-				'processedItems'   => (int) $db_migration['processed_items'],
-				'totalItems'       => (int) $db_migration['total_items'],
-				'currentBatch'     => (int) $db_migration['current_batch'],
-				'errorCount'       => (int) $db_migration['error_count'],
-				'errorMessage'     => $db_migration['error_message'],
-				'createdAt'        => $db_migration['created_at'],
-				'startedAt'        => $db_migration['started_at'],
-				'completedAt'      => $db_migration['completed_at'],
-				'updatedAt'        => $db_migration['updated_at'],
+				'migrationId'    => $db_migration['migration_uid'],
+				'sourceUrl'      => $db_migration['source_url'],
+				'targetUrl'      => $db_migration['target_url'],
+				'status'         => $db_migration['status'],
+				'percentage'     => (int) $db_migration['progress_percent'],
+				'processedItems' => (int) $db_migration['processed_items'],
+				'totalItems'     => (int) $db_migration['total_items'],
+				'currentBatch'   => (int) $db_migration['current_batch'],
+				'errorCount'     => (int) $db_migration['error_count'],
+				'errorMessage'   => $db_migration['error_message'],
+				'createdAt'      => $db_migration['created_at'],
+				'startedAt'      => $db_migration['started_at'],
+				'completedAt'    => $db_migration['completed_at'],
+				'updatedAt'      => $db_migration['updated_at'],
 			);
 
 			// Merge with options data for backward compatibility
@@ -171,11 +171,11 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			EFS_DB_Migration_Persistence::update_status( $migration_id, $status );
 
 			// Log significant progress events
-			if ( $percentage > 0 && $percentage % 25 === 0 ) {  // Log at 25%, 50%, 75%, 100%
+			if ( 0 < $percentage && 0 === $percentage % 25 ) {  // Log at 25%, 50%, 75%, 100%
 				EFS_DB_Migration_Persistence::log_event(
 					$migration_id,
 					'info',
-					$message ?: "Progress: {$percentage}%",
+					! empty( $message ) ? $message : "Progress: {$percentage}%",
 					'progress',
 					array(
 						'percentage' => $percentage,

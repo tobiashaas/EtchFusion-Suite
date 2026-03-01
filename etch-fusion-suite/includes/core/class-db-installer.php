@@ -72,8 +72,10 @@ class EFS_DB_Installer {
 		) $charset_collate;";
 
 		// Execute CREATE TABLE statements directly
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query( $migrations_table );
 		$wpdb->query( $logs_table );
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		// Store version
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
