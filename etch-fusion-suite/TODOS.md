@@ -46,7 +46,36 @@
 
 ### 🐛 Open Bugs
 
+- [ ] **🔴 CRITICAL: Migration System Hangs After Discovery** - **BLOCKED: 2026-03-01**
+   - **Problem:** Migration startet nicht nach Discovery. Bleibt in `validation/pending` state stecken.
+   - **Status:** Discovery funktioniert (512 Items gezählt), aber Migration wird nicht ausgeführt.
+   - **Actions unternommen:**
+     - [✅] Preflight Cache invalidation gelöst (Commit b4423534)
+     - [✅] Action Scheduler Queue Triggering gelöst (Commit c264a336)
+     - [✅] Loopback Runner aggressive mode während Migration aktiv
+   - **Aber:** Migration läuft trotzdem nicht - Action in DB bleibt `status: pending`
+   - **Debug Info:** REST API `/efs/v1/start-migration` Response zeigt `efs_migration_progress` mit `status: queued`
+   - **Nächste Schritte für MORGEN:**
+     1. Fresh `wp-env destroy && npm run dev` mit aktiven Plugins
+     2. Systematisches Testing Step 1-5 mit Browser DevTools offen
+     3. REST API Response + Action Scheduler DB prüfen
+     4. Hook `efs_run_headless_migration` Registrierung verifizieren
+     5. Nonce-Validierung in REST Endpoint prüfen
+     6. Debug-Logging in `class-migration-starter.php` + `class-headless-migration-job.php` hinzufügen
+   - **Commits:** b4423534, c264a336
+   - **Priorität:** 🔴 CRITICAL - Core Functionality
+
 - [✅] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **FIXED: 2026-03-01**
+   - **Problem:** Test erwartet dass CSS-Klasse nicht im `attributes`-JSON des iframes steht, aber Converter legte sie dort ab.
+   - **Lösung:** Komplette Refaktorierung zu Privacy-Pattern (Poster + Play-Button). CSS-Klasse ist jetzt auf dem Wrapper-Container (nicht dem hidden iframe).
+   - **Implementiert:** 
+     - neue Methode `build_privacy_video_container()` für 3-Teil Struktur
+     - neue Methode `detect_embed_type()` für YouTube/Vimeo-Erkennung
+     - neue Methode `extract_video_id_from_url()` für Video-ID-Extraktion
+     - neue Methode `get_embed_poster_url()` für Poster-Generierung
+     - neue Methode `build_youtube_embed_url_nocookie()` für Datenschutz-URLs
+   - **Tests:** 16 Testmethoden neu geschrieben, alle Szenarien abgedeckt
+   - **Commit:** 7c9ada3e
   - **Problem:** Test erwartet dass CSS-Klasse nicht im `attributes`-JSON des iframes steht, aber Converter legte sie dort ab.
   - **Lösung:** Komplette Refaktorierung zu Privacy-Pattern (Poster + Play-Button). CSS-Klasse ist jetzt auf dem Wrapper-Container (nicht dem hidden iframe).
   - **Implementiert:** 
@@ -296,6 +325,6 @@
 
 ---
 
-**Last Updated:** 2026-03-01  
-**Next Review:** VideoConverter refactoring complete. Ready for Docker test run.  
+**Last Updated:** 2026-03-01 22:03  
+**Current Status:** Migration system blocked after Discovery - Action Scheduler not executing. Scheduled for systematic testing tomorrow.  
 **Maintainer:** Etch Fusion Suite Development Team
