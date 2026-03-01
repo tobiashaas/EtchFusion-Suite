@@ -34,7 +34,7 @@ class EFS_DB_Installer {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
-		// Migration state table
+		// Create migrations table
 		$migrations_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migrations (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			migration_uid VARCHAR(36) UNIQUE NOT NULL,
@@ -52,31 +52,28 @@ class EFS_DB_Installer {
 			completed_at DATETIME,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
-			KEY migration_uid (migration_uid),
 			KEY status (status),
 			KEY created_at (created_at)
 		) $charset_collate;";
 
-		// Migration log table
+		// Create logs table (without FK for MySQL 5.5+ compatibility)
 		$logs_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migration_logs (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			migration_uid VARCHAR(36) NOT NULL,
 			log_level VARCHAR(10) NOT NULL,
 			category VARCHAR(50),
 			message TEXT NOT NULL,
-			context JSON,
+			context LONGTEXT,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			KEY migration_uid (migration_uid),
 			KEY log_level (log_level),
-			KEY created_at (created_at),
-			FOREIGN KEY (migration_uid) REFERENCES {$wpdb->prefix}efs_migrations(migration_uid) ON DELETE CASCADE
+			KEY created_at (created_at)
 		) $charset_collate;";
 
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
-		dbDelta( $migrations_table );
-		dbDelta( $logs_table );
+		// Execute CREATE TABLE statements directly
+		$wpdb->query( $migrations_table );
+		$wpdb->query( $logs_table );
 
 		// Store version
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
