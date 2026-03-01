@@ -32,6 +32,8 @@
     "activate": "node scripts/activate-plugins.js",
     "test:connection": "node scripts/test-connection.js",
     "test:migration": "node scripts/test-migration.js",
+    "test:unit": "wp-env run cli bash -c \"cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit WP_CORE_DIR=/tmp/wordpress php vendor/bin/phpunit -c phpunit.xml.dist --testsuite unit\"",
+    "test:unit:all": "wp-env run cli bash -c \"cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit WP_CORE_DIR=/tmp/wordpress php vendor/bin/phpunit -c phpunit.xml.dist\"",
     "analyze:elements": "node scripts/analyze-elements.js",
     "report:migration-quality": "node scripts/migration-quality-report.js",
     "test:playwright": "playwright test",
