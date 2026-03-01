@@ -1482,15 +1482,43 @@ composer test:coverage
 
 ### Testing Coverage
 
-- Unit tests:
-  - `tests/unit/TemplateExtractorServiceTest.php` validates payload shape and template validation edge cases via the service container.
-- UI tests: PHP-powered admin assertions moved to `tests/ui/AdminUITest.php` and execute under the `ui` PHPUnit suite to avoid confusion with browser automation.
-- **Current workflow:** run unit tests inside the WordPress container
+**IMPORTANT: Always run tests from within the Docker container (wp-env). This ensures proper WordPress test suite environment and consistency with CI/CD pipeline.**
 
+#### Unit Tests (162 tests)
+
+**Step 1: Install WordPress test suite in Docker** (one-time setup)
 ```bash
-docker exec -w /var/www/html/wp-content/plugins/etch-fusion-suite \
-  db8ac3ea4e961d5c0f32acfe0dd1fa3f-wordpress-1 \
-  ./vendor/bin/phpunit --configuration=phpunit.xml.dist --testsuite=unit
+cd etch-fusion-suite
+npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
+```
+
+**Step 2: Run unit tests in Docker** (recommended)
+```bash
+npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/html/wp-content/plugins/etch-fusion-suite/vendor/bin/phpunit -c /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist --testsuite unit"
+```
+
+**Result**: 162 tests, 511 assertions ✅
+
+**Why Docker?**
+- WordPress test suite installed in Docker's isolated environment (`/wordpress-phpunit`)
+- No conflicts with host PHP environment
+- MySQL connection via Docker networking (127.0.0.1:3306)
+- Consistent results across all development machines
+- Matches CI/CD pipeline (GitHub Actions runs tests in Docker)
+
+**Alternative: Local testing** (requires separate WordPress test suite installation)
+```bash
+cd etch-fusion-suite
+bash install-wp-tests.sh wordpress_test root password 127.0.0.1:$(docker port bricks-mysql 3306 | head -1 | cut -d: -f2) latest true
+WP_TESTS_DIR=/tmp/wordpress-tests-lib WP_CORE_DIR=/tmp/wordpress composer test:unit
+```
+
+**Run all test suites locally** (after installing WordPress test suite)
+```bash
+cd etch-fusion-suite
+composer test              # All test suites with coverage
+composer test:unit         # Unit tests only
+composer test:integration  # Integration tests
 ```
 
 #### WordPress Integration Tests

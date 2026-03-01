@@ -35,7 +35,14 @@ composer lint            # Run PHPCS
 composer lint:fix        # Auto-fix with PHPCBF
 composer phpcs:report    # Summary report
 
-# PHP tests (PHPUnit) — run from etch-fusion-suite/
+# PHP tests (PHPUnit) — MUST RUN FROM DOCKER
+# Install WordPress test suite in Docker first:
+npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
+
+# Run unit tests in Docker (recommended):
+npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/html/wp-content/plugins/etch-fusion-suite/vendor/bin/phpunit -c /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist --testsuite unit"
+
+# Alternative: Run locally (requires local WP test suite installation):
 composer test            # All test suites with coverage
 composer test:unit       # Unit tests only
 composer test:integration

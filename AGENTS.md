@@ -39,18 +39,35 @@ This starts two WordPress instances:
 
 ### Running PHPUnit tests
 
-**Plugin-level unit tests** (107 tests) require the WordPress test suite installed against the Docker MySQL:
+**IMPORTANT: Always run tests from within the Docker container. This ensures proper WordPress test suite environment.**
 
+**Step 1: Install WordPress test suite in Docker**
 ```bash
 cd etch-fusion-suite
+npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
+```
+
+**Step 2: Run tests in Docker (recommended approach)**
+```bash
+# Run all unit tests (162 tests)
+npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/html/wp-content/plugins/etch-fusion-suite/vendor/bin/phpunit -c /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist --testsuite unit"
+```
+
+**Why Docker?**
+- WordPress test suite is installed in Docker's isolated environment (`/wordpress-phpunit`)
+- No conflicts with host PHP environment
+- MySQL connection via Docker networking (127.0.0.1:3306)
+- Consistent results across all development machines
+- Matches CI/CD pipeline (GitHub Actions runs tests in Docker)
+
+**Alternative: Local testing (if needed)**
+```bash
+# Requires manual WP test suite installation on host
 bash install-wp-tests.sh wordpress_test root password 127.0.0.1:$(docker port bricks-mysql 3306 | head -1 | cut -d: -f2) latest true
 WP_TESTS_DIR=/tmp/wordpress-tests-lib WP_CORE_DIR=/tmp/wordpress composer test:unit
 ```
 
-The MySQL port is dynamically assigned by wp-env; query it via `docker port bricks-mysql 3306`. Password is `password`.
-
-**Root-level tests** can run without MySQL using `EFS_SKIP_WP_LOAD=1`:
-
+**Root-level tests** (no MySQL required):
 ```bash
 EFS_SKIP_WP_LOAD=1 php vendor/bin/phpunit -c phpunit.xml.dist
 ```
