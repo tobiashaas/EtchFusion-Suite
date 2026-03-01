@@ -10,7 +10,6 @@ use Bricks2Etch\Security\EFS_CORS_Manager;
 use Bricks2Etch\Security\EFS_Environment_Detector;
 use Bricks2Etch\Security\EFS_Input_Validator;
 use Bricks2Etch\Security\EFS_Rate_Limiter;
-use Bricks2Etch\Security\EFS_Security_Headers;
 use WP_UnitTestCase;
 
 class SecurityTest extends WP_UnitTestCase {
@@ -165,20 +164,6 @@ class SecurityTest extends WP_UnitTestCase {
         }
     }
 
-    public function test_security_headers_builds_admin_csp_policy(): void {
-        if ( ! function_exists( 'set_current_screen' ) ) {
-            require_once ABSPATH . 'wp-admin/includes/screen.php';
-        }
-
-        set_current_screen( 'dashboard' );
-
-        $headers = new EFS_Security_Headers();
-        $csp     = $headers->get_csp_policy();
-
-        $this->assertStringContainsString( "script-src", $csp );
-        $this->assertStringContainsString( "'unsafe-inline'", $csp );
-    }
-
     public function test_audit_logger_persists_security_events(): void {
         /** @var EFS_Audit_Logger $logger */
         $logger = $this->container->get( 'audit_logger' );
@@ -215,12 +200,7 @@ class SecurityTest extends WP_UnitTestCase {
     }
 
     public function test_security_headers_skip_options_requests(): void {
-        $headers = new EFS_Security_Headers();
-
-        $_SERVER['REQUEST_METHOD'] = 'OPTIONS';
-        $this->assertFalse( $headers->should_add_headers(), 'OPTIONS requests should bypass security headers.' );
-
-        unset( $_SERVER['REQUEST_METHOD'] );
+        $this->markTestSkipped( 'Security headers removed - CSP is intentionally disabled for builder compatibility.' );
     }
 
     public function test_ajax_handler_rate_limit_integration_allows_within_limit(): void {

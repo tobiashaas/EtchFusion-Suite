@@ -216,7 +216,7 @@ class EFS_Migration_Orchestrator {
 	public function cancel_migration( $migration_id = '' ): array {
 		// Get migration_id from active migration if not provided
 		if ( empty( $migration_id ) ) {
-			$active = $this->progress_manager->get_active_migration();
+			$active       = $this->progress_manager->get_active_migration();
 			$migration_id = isset( $active['migration_id'] ) ? (string) $active['migration_id'] : '';
 		}
 

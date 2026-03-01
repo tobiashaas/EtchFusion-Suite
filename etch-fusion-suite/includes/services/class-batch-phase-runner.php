@@ -132,9 +132,12 @@ class EFS_Batch_Phase_Runner {
 		$current_batch = array_splice( $remaining, 0, $batch_size );
 
 		// Filter out invalid IDs (0 or null) that may result from deleted posts.
-		$current_batch = array_filter( $current_batch, function ( $id ) {
-			return ! empty( $id ) && (int) $id > 0;
-		} );
+		$current_batch = array_filter(
+			$current_batch,
+			function ( $id ) {
+				return ! empty( $id ) && (int) $id > 0;
+			}
+		);
 
 		// Send the combined media + posts total so the receiving-side ETA covers both phases.
 		$other_total = 'media' === $phase

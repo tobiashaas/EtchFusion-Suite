@@ -353,17 +353,6 @@ class Etch_Fusion_Suite_Plugin {
 		EFS_API_Endpoints::init();
 	}
 
-	/**
-	 * Add security headers to HTTP responses
-	 */
-	public function add_security_headers() {
-		$container = etch_fusion_suite_container();
-
-		if ( $container->has( 'security_headers' ) ) {
-			$security_headers = $container->get( 'security_headers' );
-			$security_headers->add_security_headers();
-		}
-	}
 
 	/**
 	 * Enable Application Passwords with environment-based HTTPS requirement

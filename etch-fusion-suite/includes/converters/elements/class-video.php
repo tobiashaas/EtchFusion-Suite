@@ -183,14 +183,14 @@ class EFS_Element_Video extends EFS_Base_Element {
 
 		// Build the play button (SVG overlay).
 		$play_button_attrs = array(
-			'class'               => 'youtube-play-button',
-			'data-video-id'       => $video_id,
-			'data-video-type'     => $video_type,
-			'data-privacy-mode'   => 'nocookie',
-			'aria-label'          => __( 'Play video', 'etch-fusion-suite' ),
-			'style'               => 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: rgba(255, 0, 0, 0.8); border: none; border-radius: 50%; cursor: pointer; z-index: 10;',
+			'class'             => 'youtube-play-button',
+			'data-video-id'     => $video_id,
+			'data-video-type'   => $video_type,
+			'data-privacy-mode' => 'nocookie',
+			'aria-label'        => __( 'Play video', 'etch-fusion-suite' ),
+			'style'             => 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; background: rgba(255, 0, 0, 0.8); border: none; border-radius: 50%; cursor: pointer; z-index: 10;',
 		);
-		$play_svg = '<svg viewBox="0 0 24 24" style="width: 100%; height: 100%;"><path fill="white" d="M8 5v14l11-7z" /></svg>';
+		$play_svg          = '<svg viewBox="0 0 24 24" style="width: 100%; height: 100%;"><path fill="white" d="M8 5v14l11-7z" /></svg>';
 		$play_button_block = $this->generate_etch_element_block(
 			$this->build_attributes( 'Video Play Button', array(), $play_button_attrs, 'button' ),
 			array( $this->generate_etch_text_block( $play_svg ) )
@@ -198,12 +198,12 @@ class EFS_Element_Video extends EFS_Base_Element {
 
 		// Build the hidden iframe (loads on click via JavaScript).
 		$iframe_attrs = array(
-			'class'             => 'youtube-iframe etch-lazy-iframe',
-			'data-src'          => $embed_url,
-			'style'             => 'display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;',
-			'allow'             => 'accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share',
-			'referrerpolicy'    => 'strict-origin-when-cross-origin',
-			'loading'           => 'lazy',
+			'class'          => 'youtube-iframe etch-lazy-iframe',
+			'data-src'       => $embed_url,
+			'style'          => 'display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;',
+			'allow'          => 'accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share',
+			'referrerpolicy' => 'strict-origin-when-cross-origin',
+			'loading'        => 'lazy',
 		);
 		$iframe_block = $this->generate_etch_element_block(
 			$this->build_attributes( 'Video IFrame', array(), $iframe_attrs, 'iframe' )
@@ -444,7 +444,7 @@ class EFS_Element_Video extends EFS_Base_Element {
 	private function get_video_id( $settings, $provider ) {
 		// Try multiple key variations for YouTube and Vimeo
 		$candidates = array();
-		
+
 		if ( 'youtube' === $provider ) {
 			$candidates = array( 'youTubeId', 'youtube', 'videoId' );
 		} elseif ( 'vimeo' === $provider ) {

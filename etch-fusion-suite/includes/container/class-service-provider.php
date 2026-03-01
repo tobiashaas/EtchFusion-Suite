@@ -89,13 +89,6 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
-			'security_headers',
-			function ( $c ) {
-				return new \Bricks2Etch\Security\EFS_Security_Headers();
-			}
-		);
-
-		$container->singleton(
 			'audit_logger',
 			function ( $c ) {
 				return new \Bricks2Etch\Security\EFS_Audit_Logger( $c->get( 'error_handler' ) );
