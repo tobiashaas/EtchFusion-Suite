@@ -136,14 +136,17 @@ npm install
 npm run dev
 ```
 
-This command performs:
-- Pre-flight checks (Docker running, ports available)
-- Starts both WordPress instances
-- Waits for WordPress to be ready
-- Installs Composer dependencies
-- Activates required plugins and themes
-- Runs health checks
-- Displays access URLs and credentials
+This command performs (in order):
+1. Pre-flight checks (Docker running, ports available)
+2. Starts both WordPress instances (skipped if already running)
+3. Waits for WordPress to be ready
+4. Installs Composer dependencies
+5. Activates required plugins and themes + sets license keys
+6. Imports Bricks DB/assets from `local-backups/` (if present)
+7. Installs the WordPress PHPUnit test suite in Docker
+8. Displays environment summary (URLs, credentials, status)
+
+The sequence runs **every time** — whether containers were freshly started or already running. After `npm run destroy && npm run dev`, everything is restored automatically.
 
 #### 4. Access the sites
 
@@ -245,7 +248,7 @@ Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as
 
 | Script | Description | Example |
 | --- | --- | --- |
-| `npm run test:setup` | Install WordPress test suite in Docker | `npm run test:setup` |
+| `npm run test:setup` | Reinstall test suite only, without full dev cycle (`--skip-activation --skip-composer`) | `npm run test:setup` |
 | `npm run test:unit` | Run unit tests (162 tests) | `npm run test:unit` |
 | `npm run test:unit:all` | Run all PHPUnit tests | `npm run test:unit:all` |
 | `npm run test:connection` | Verify API connectivity | `npm run test:connection` |
@@ -269,14 +272,13 @@ Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as
 #### Starting a Fresh Development Session
 
 ```bash
-npm run dev                  # Start environment
+npm run dev                  # Full setup: start + activate + DB import + test suite
 npm run health               # Verify everything is working
-npm run test:setup           # Install WordPress test suite in Docker
 npm run test:unit            # Run unit tests (162 tests)
-npm run create-test-content  # Add test data
+npm run create-test-content  # Add test data (optional)
 ```
 
-**Important:** After `npm run destroy && npm run dev`, you must run `npm run test:setup` to reinstall the WordPress test suite.
+`npm run dev` is the single command to reach a fully working state — including after `npm run destroy`. No manual follow-up steps required.
 
 #### Debugging Migration Issues
 
@@ -1493,15 +1495,11 @@ composer test:coverage
 
 #### Unit Tests (162 tests)
 
-**Step 1: Install WordPress test suite in Docker** (one-time setup)
-```bash
-cd etch-fusion-suite
-npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
-```
+The WordPress test suite is installed automatically by `npm run dev`. After running `npm run dev`, tests are ready immediately:
 
-**Step 2: Run unit tests in Docker** (recommended)
 ```bash
-npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/html/wp-content/plugins/etch-fusion-suite/vendor/bin/phpunit -c /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist --testsuite unit"
+npm run test:unit        # Run 162 unit tests
+npm run test:unit:all    # Run all PHPUnit tests
 ```
 
 **Result**: 162 tests, 511 assertions ✅
@@ -1513,37 +1511,19 @@ npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/h
 - Consistent results across all development machines
 - Matches CI/CD pipeline (GitHub Actions runs tests in Docker)
 
-**Alternative: Local testing** (requires separate WordPress test suite installation)
+**If test suite needs to be reinstalled** (e.g. after `wp-env` container restart without `npm run dev`):
 ```bash
-cd etch-fusion-suite
-bash install-wp-tests.sh wordpress_test root password 127.0.0.1:$(docker port bricks-mysql 3306 | head -1 | cut -d: -f2) latest true
-WP_TESTS_DIR=/tmp/wordpress-tests-lib WP_CORE_DIR=/tmp/wordpress composer test:unit
+npm run test:setup       # Reinstalls test suite only (no plugin activation, no Composer)
 ```
 
-**Run all test suites locally** (after installing WordPress test suite)
+**Manual fallback** (last resort if npm scripts fail):
 ```bash
-cd etch-fusion-suite
-composer test              # All test suites with coverage
-composer test:unit         # Unit tests only
-composer test:integration  # Integration tests
+npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
 ```
 
 #### WordPress Integration Tests
 
-The WordPress test suite provides full WordPress core integration testing with database access and WordPress hooks.
-
-**Setup (one-time)**:
-
-```bash
-# Install dependencies in wp-env container
-docker exec db8ac3ea4e961d5c0f32acfe0dd1fa3f-wordpress-1 apt-get update
-docker exec db8ac3ea4e961d5c0f32acfe0dd1fa3f-wordpress-1 apt-get install -y mariadb-client subversion
-
-# Provision WordPress test suite
-docker exec -w /var/www/html/wp-content/plugins/etch-fusion-suite \
-  db8ac3ea4e961d5c0f32acfe0dd1fa3f-wordpress-1 \
-  bash install-wp-tests.sh wordpress_test root password mysql latest true
-```
+The WordPress test suite provides full WordPress core integration testing with database access and WordPress hooks. It is installed inside the wp-env Docker container at `/wordpress-phpunit`.
 
 **Run tests**:
 

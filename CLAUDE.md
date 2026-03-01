@@ -1,3 +1,8 @@
+---
+description: 
+alwaysApply: true
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -36,14 +41,15 @@ composer lint:fix        # Auto-fix with PHPCBF
 composer phpcs:report    # Summary report
 
 # PHP tests (PHPUnit) — MUST RUN FROM DOCKER
-# Install WordPress test suite in Docker FIRST:
-npm run test:setup       # Install test suite (run after npm run dev or npm run destroy)
+# `npm run dev` installs the test suite automatically every time it runs.
+# Use test:setup only when you need to reinstall without a full dev cycle:
+npm run test:setup       # Reinstall test suite only (no plugin activation, no Composer)
 
 # Run unit tests in Docker (recommended):
 npm run test:unit        # Run 162 unit tests
 npm run test:unit:all    # Run all PHPUnit tests
 
-# Manual Docker test suite installation (if npm script fails):
+# Manual Docker test suite installation (last resort fallback):
 npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
 
 # JavaScript linting
@@ -113,6 +119,24 @@ Release workflow (`.github/workflows/release.yml`) builds ZIP with checksums on 
 4. CI picks up the tag, builds the ZIP, and publishes the GitHub Release automatically
 
 **Never run `gh release create` manually before pushing the tag** — the CI workflow handles release creation. If a release already exists when CI runs it causes a 422 conflict (the workflow deletes and recreates it, but manual pre-creation is unnecessary noise).
+
+## Documentation as Single Source of Truth
+
+`DOCUMENTATION.md` is the **authoritative reference** for all technical decisions, commands, workflows, and system behaviour.
+
+**Rules — enforced without exception:**
+- Every code change that affects behaviour, commands, or architecture **must** update `DOCUMENTATION.md` in the same session — no exceptions
+- No duplicated content: CLAUDE.md and MEMORY.md reference `DOCUMENTATION.md`; they do not repeat it
+- Stale content must be removed immediately — outdated docs cause regressions
+- Before changing any established workflow (e.g. `npm run dev` startup sequence), verify the current state in `DOCUMENTATION.md` first
+- `DOCUMENTATION.md` is the first thing to read when something breaks unexpectedly
+
+**What belongs in `DOCUMENTATION.md`:**
+- Full npm script reference with correct, tested descriptions
+- Complete `npm run dev` startup sequence (what it does, in order)
+- Architecture decisions and their rationale
+- All migration workflows with exact commands
+- Known gotchas and their fixes
 
 ## Documentation & Comments
 

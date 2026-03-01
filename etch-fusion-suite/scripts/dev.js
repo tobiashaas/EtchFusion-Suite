@@ -226,6 +226,7 @@ async function main() {
   const args = process.argv.slice(2);
   const skipComposer = args.includes('--skip-composer');
   const skipActivation = args.includes('--skip-activation');
+  const skipTests = args.includes('--skip-tests');
   const forceRestart = args.includes('--restart');
 
   log('> EtchFusion Suite — dev environment startup');
@@ -353,6 +354,29 @@ async function main() {
     log('[skip] Skipping plugin activation');
   }
 
+  // -------------------------------------------------------------------------
+  // WordPress test suite setup — run after plugin activation so the environment
+  // is fully ready. This is idempotent and can be run multiple times safely.
+  // -------------------------------------------------------------------------
+  if (!skipTests) {
+    log('> Setting up WordPress test suite in Docker...');
+    try {
+      // Run install-wp-tests.sh directly inside the wp-env CLI container so this
+      // works cross-platform (no dependency on a host-side bash executable).
+      await runCommand(WP_ENV_CMD, [
+        'run', 'cli', 'bash',
+        '/var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh',
+        'wordpress_test', 'root', 'password', '127.0.0.1:3306', 'latest', 'true'
+      ]);
+      log('[OK] WordPress test suite ready for testing');
+    } catch (error) {
+      log(`[!] WordPress test suite setup failed: ${error.message}`);
+      log('    You can run manually later: npm run test:setup');
+    }
+  } else {
+    log('[skip] Skipping test suite setup');
+  }
+
   // Display summary
   await displaySummary();
 }
@@ -408,12 +432,17 @@ async function displaySummary() {
     log(`Vendor deps: cli - ${vendorCli.code === 0 ? 'PASS' : 'FAIL (run composer:install)'}`);
     log(`Vendor deps: tests-cli - ${vendorTestsCli.code === 0 ? 'PASS' : 'FAIL (run composer:install)'}`);
 
+    // Test suite status
+    const testSuiteCheck = await runCommandQuiet(WP_ENV_CMD, ['run', 'cli', 'test', '-d', '/wordpress-phpunit']);
+    log(`Test suite: ${testSuiteCheck.code === 0 ? 'READY' : 'NOT INSTALLED (run npm run test:setup)'}`);
+
+    log('\nAvailable commands:');
+    log('   npm run test:unit         - Run 162 unit tests');
+    log('   npm run test:connection   - Test API connectivity');
+    log('   npm run test:migration    - End-to-end migration test');
   } catch (error) {
-    log(`[!] Could not gather complete environment info: ${error.message}`);
+    log(`[!] Could not display summary: ${error.message}`);
   }
-  
-  log('[OK] Use npm run wp / npm run wp:etch for WP-CLI access');
-  log('[OK] Use npm run health to check environment health');
 }
 
 main().catch((error) => {
