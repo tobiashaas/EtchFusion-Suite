@@ -245,6 +245,9 @@ Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as
 
 | Script | Description | Example |
 | --- | --- | --- |
+| `npm run test:setup` | Install WordPress test suite in Docker | `npm run test:setup` |
+| `npm run test:unit` | Run unit tests (162 tests) | `npm run test:unit` |
+| `npm run test:unit:all` | Run all PHPUnit tests | `npm run test:unit:all` |
 | `npm run test:connection` | Verify API connectivity | `npm run test:connection` |
 | `npm run test:migration` | Run end-to-end migration test | `npm run test:migration` |
 | `npm run test:playwright` | Run Playwright browser tests | `npm run test:playwright` |
@@ -268,8 +271,12 @@ Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as
 ```bash
 npm run dev                  # Start environment
 npm run health               # Verify everything is working
+npm run test:setup           # Install WordPress test suite in Docker
+npm run test:unit            # Run unit tests (162 tests)
 npm run create-test-content  # Add test data
 ```
+
+**Important:** After `npm run destroy && npm run dev`, you must run `npm run test:setup` to reinstall the WordPress test suite.
 
 #### Debugging Migration Issues
 

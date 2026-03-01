@@ -26,7 +26,7 @@ All npm commands run from `etch-fusion-suite/`:
 # Environment
 npm run dev              # Start both WordPress instances + full setup
 npm run stop             # Stop instances
-npm run destroy          # Complete teardown
+npm run destroy          # Complete teardown (⚠️ deletes test suite!)
 npm run health           # Health check on both instances
 
 # PHP linting (PHPCS - WordPress Coding Standards)
@@ -36,22 +36,15 @@ composer lint:fix        # Auto-fix with PHPCBF
 composer phpcs:report    # Summary report
 
 # PHP tests (PHPUnit) — MUST RUN FROM DOCKER
-# Install WordPress test suite in Docker first:
-npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
+# Install WordPress test suite in Docker FIRST:
+npm run test:setup       # Install test suite (run after npm run dev or npm run destroy)
 
 # Run unit tests in Docker (recommended):
-npx wp-env run cli bash -c "export WP_TESTS_DIR=/wordpress-phpunit && /var/www/html/wp-content/plugins/etch-fusion-suite/vendor/bin/phpunit -c /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist --testsuite unit"
+npm run test:unit        # Run 162 unit tests
+npm run test:unit:all    # Run all PHPUnit tests
 
-# Alternative: Run locally (requires local WP test suite installation):
-composer test            # All test suites with coverage
-composer test:unit       # Unit tests only
-composer test:integration
-
-# Run a single PHPUnit test file
-php vendor/bin/phpunit -c phpunit.xml.dist tests/unit/SomeTest.php
-
-# Run a single test method
-php vendor/bin/phpunit -c phpunit.xml.dist --filter testMethodName
+# Manual Docker test suite installation (if npm script fails):
+npx wp-env run cli bash /var/www/html/wp-content/plugins/etch-fusion-suite/install-wp-tests.sh wordpress_test root password 127.0.0.1:3306 latest true
 
 # JavaScript linting
 npm run lint             # ESLint on assets/js
