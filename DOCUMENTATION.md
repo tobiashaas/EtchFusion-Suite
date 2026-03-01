@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-01
-**Version:** 0.16.0 (Detailed Progress Tracking Release)
+**Version:** 0.17.0 (Dashboard Real-Time Logging Release)
 
 ---
 
@@ -27,7 +27,8 @@
 16. [Migration Testing Workflow](#migration-testing-workflow)
 17. [Database Persistence](#database-persistence)
 18. [Detailed Progress Tracking](#detailed-progress-tracking)
-19. [References](#references)
+19. [Dashboard Real-Time Logging API](#dashboard-real-time-logging-api)
+20. [References](#references)
 
 ---
 
@@ -2305,6 +2306,218 @@ Default cleanup policy:
 - Completed/failed migrations: kept for 90 days
 - Logs: kept for same duration as migrations
 - In-progress migrations: never auto-deleted (for recovery)
+
+---
+
+## Dashboard Real-Time Logging API
+
+The EFS Dashboard provides real-time migration progress visibility through a REST API that fetches live logs from the database. This enables users to see per-item migration details (posts with titles, media files with sizes, CSS classes with conversion status) as the migration progresses.
+
+### REST API Endpoints
+
+Three endpoints provide different views of migration progress:
+
+**Get Migration Progress** (Most useful for dashboard)
+```
+GET /wp-json/efs/v1/migration/{migration_id}/progress
+```
+
+Returns current item and last 10 log entries with summary statistics:
+```json
+{
+  "migration_id": "12345678-abcd-efgh-ijkl",
+  "current_item": {
+    "timestamp": "2024-12-20T14:23:45Z",
+    "category": "content_post_migrated",
+    "message": "Post migrated: \"About Us\"",
+    "context": {
+      "post_id": 42,
+      "title": "About Us",
+      "blocks_converted": 5,
+      "fields_migrated": 3,
+      "duration_ms": 1250
+    }
+  },
+  "recent_logs": [...],
+  "statistics": {
+    "total_events": 47,
+    "posts_migrated": 12,
+    "posts_failed": 0,
+    "media_processed": 23,
+    "css_classes": 12,
+    "total_duration_ms": 45320
+  }
+}
+```
+
+**Get Errors** (For troubleshooting)
+```
+GET /wp-json/efs/v1/migration/{migration_id}/errors
+```
+
+Returns all error log entries with context details.
+
+**Get Logs by Category** (For filtering)
+```
+GET /wp-json/efs/v1/migration/{migration_id}/logs/{category}
+```
+
+Supported categories:
+- `content_post_migrated` - Successfully migrated posts
+- `content_post_failed` - Failed post migrations
+- `media_success` - Successfully migrated media
+- `media_failed` - Failed media migrations
+- `css_class_converted` - CSS class conversions
+
+### Security
+
+All endpoints require:
+- User to be logged in
+- User to have `manage_options` capability (WordPress admin)
+
+Non-admin requests return **403 Forbidden**. This prevents migration logs from being exposed to regular users.
+
+### Service Integration
+
+Three services integrate with the progress tracker to log item-level details:
+
+**Content Service** - Posts with block/field counts:
+```php
+$this->progress_tracker->log_post_migration(
+    $post_id,
+    $post->post_title,
+    'success',
+    array(
+        'blocks_converted'    => 5,
+        'fields_migrated'     => 3,
+        'duration_ms'         => 1250,
+    )
+);
+```
+
+**Media Service** - Files with size and MIME type:
+```php
+$this->progress_tracker->log_media_migration(
+    get_the_guid($media_id),
+    $filename,
+    'success',
+    array(
+        'media_id'    => $media_id,
+        'size_bytes'  => 2048000,
+        'mime_type'   => 'image/jpeg',
+        'duration_ms' => 890,
+    )
+);
+```
+
+**CSS Service** - Class conversions:
+```php
+$this->progress_tracker->log_css_migration(
+    $bricks_class,
+    'converted',
+    array(
+        'etch_class_name' => $etch_class,
+        'conflicts'       => 0,
+    )
+);
+```
+
+### Database Storage
+
+All progress events are stored in `wp_efs_audit_trail` with JSON context:
+
+```sql
+CREATE TABLE wp_efs_audit_trail (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  migration_id  VARCHAR(255) NOT NULL,
+  timestamp     DATETIME DEFAULT CURRENT_TIMESTAMP,
+  level         ENUM('info', 'warning', 'error') DEFAULT 'info',
+  category      VARCHAR(100),
+  message       TEXT,
+  context       JSON,
+  KEY (migration_id),
+  KEY (timestamp)
+);
+```
+
+The `context` JSON field stores item-specific metadata (post IDs, filenames, durations, error messages, etc.).
+
+### Dashboard Integration
+
+The dashboard at `/wp-admin/admin.php?page=etch-fusion-suite` displays progress logs using the existing `logs.js` JavaScript module:
+
+1. **Initial Load**: Dashboard fetches all logs via AJAX action `efs_get_logs`
+2. **Real-Time Updates**: During active migration, auto-polls REST API every 2-5 seconds
+3. **Log Filtering**: UI allows filtering by All, Migration, Security categories
+4. **Per-Item Details**: Click to expand migration runs and see post/media/CSS details
+
+### Performance Considerations
+
+**Pagination**: Progress endpoint returns:
+- Last 10 logs (not all logs)
+- Summary statistics (not per-item lists)
+- Typical response: 10-20 KB
+
+**Polling**: Recommended intervals:
+- **Active migration**: 2-5 seconds (responsive vs. server load)
+- **Idle**: On-demand only (no background polling)
+
+**Retention**: Logs persist indefinitely; use "Clear Logs" button in dashboard to delete:
+```php
+$db_persist->clear_migration_logs($migration_id);
+```
+
+### Testing
+
+Integration tests verify components are correctly registered:
+
+```bash
+cd etch-fusion-suite
+php tests/integration/test-dashboard-logging.php
+```
+
+Unit tests verify REST API permission checks and error handling:
+
+```bash
+EFS_SKIP_WP_LOAD=1 php vendor/bin/phpunit -c phpunit.xml.dist tests/unit/test-progress-dashboard-api.php
+```
+
+### Example: Fetch Migration Progress via cURL
+
+```bash
+curl -X GET \
+  'http://localhost:8889/wp-json/efs/v1/migration/abc-123/progress' \
+  -u 'admin:password'
+```
+
+Or from browser console during migration:
+
+```javascript
+const response = await fetch('/wp-json/efs/v1/migration/abc-123/progress');
+const data = await response.json();
+console.log(`Progress: ${data.statistics.posts_migrated}/${data.statistics.total_events}`);
+```
+
+### Architecture Overview
+
+```
+EFS_Progress_Dashboard_API (REST endpoints)
+├── Uses EFS_Migration_Progress_Logger trait
+│   ├── get_migration_progress()
+│   ├── get_migration_errors()
+│   └── get_migration_logs_by_category()
+└── Queries EFS_DB_Migration_Persistence
+    └── Reads from wp_efs_audit_trail table
+
+Services log progress
+├── Content_Service
+├── Media_Service
+└── CSS_Service
+└── → EFS_Detailed_Progress_Tracker
+    └── Writes to wp_efs_audit_trail
+```
+
+For complete API specifications and error handling guide, see [DOCUMENTATION_DASHBOARD_LOGGING.md](DOCUMENTATION_DASHBOARD_LOGGING.md).
 
 ---
 
