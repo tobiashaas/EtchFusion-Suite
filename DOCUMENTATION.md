@@ -2,53 +2,34 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2025-11-02 23:45  
-**Version:** 0.11.27
+**Last Updated:** 2026-03-01
+**Version:** 0.14.2
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Architecture](#architecture)
-2. [GitHub Updater](#github-updater)
-3. [Security Configuration](#security-configuration)
-4. [CSS Migration](#css-migration)
-    1. [CSS Converter](#css-converter)
-5. [Migration Execution Architecture](#migration-execution-architecture)
-6. [Content Migration](#content-migration)
-7. [Media Migration](#media-migration)
-8. [API Communication](#api-communication)
-9. [Frontend Rendering](#frontend-rendering)
-10. [Continuous Integration](#continuous-integration)
-    1. [Release Process](#release-process)
-11. [Security](#security)
-    1. [Security Architecture](#security-architecture)
-    2. [Input Validation](#input-validation)
-    3. [Output Escaping](#output-escaping)
-    4. [Authentication & Authorization](#authentication--authorization)
-    5. [Security Best Practices](#security-best-practices)
-    6. [Security Verification](#security-verification)
-11. [Core Infrastructure Files](#core-infrastructure-files)
-12. [Admin Settings UI](#admin-settings-ui)
-13. [Testing Coverage](#testing-coverage)
-14. [PHPCS Standards & Compliance](#phpcs-standards--compliance)
-    1. [Ruleset & Scope](#ruleset--scope)
-    2. [Enabled Sniffs](#enabled-sniffs)
-    3. [Running PHPCS & PHPCBF](#running-phpcs--phpcbf)
-    4. [Composer Commands](#composer-commands)
-    5. [Verification Scripts](#verification-scripts)
-    6. [CI Enforcement](#ci-enforcement)
-    7. [Git Hooks](#git-hooks)
-    8. [Phase Reports & References](#phase-reports--references)
-    9. [Developer Checklist](#developer-checklist)
-    10. [Phase 12: Review & Validation](#phase-12-review--validation)
-15. [References](#references)
+2. [Development Environment Setup](#development-environment-setup)
+3. [GitHub Updater](#github-updater)
+4. [Security Configuration](#security-configuration)
+5. [CSS Migration](#css-migration)
+6. [Migration Execution Architecture](#migration-execution-architecture)
+7. [Content Migration](#content-migration)
+8. [Media Migration](#media-migration)
+9. [API Communication](#api-communication)
+10. [Frontend Rendering](#frontend-rendering)
+11. [Testing Coverage](#testing-coverage)
+12. [Continuous Integration](#continuous-integration)
+13. [PHPCS Standards & Compliance](#phpcs-standards--compliance)
+14. [Security](#security)
+15. [Admin Settings UI](#admin-settings-ui)
+16. [Migration Testing Workflow](#migration-testing-workflow)
+17. [References](#references)
 
 ---
 
 ## Architecture
-
-**Updated:** 2025-10-23 23:40
 
 ### Plugin Structure
 
@@ -77,8 +58,6 @@ etch-fusion-suite/
 
 ### Service Container
 
-**Updated:** 2025-10-23 23:40
-
 The plugin uses a dependency injection container for service management:
 
 **Key Services:**
@@ -93,30 +72,9 @@ The plugin uses a dependency injection container for service management:
 
 ### Autoloading & Namespaces
 
-**Updated:** 2025-10-28 10:48
-
-### Phase 10 PHPCS Cleanup (includes/)
-
-**Updated:** 2025-11-02 12:15
-
-- Completed Phase 10 of the PHPCS initiative across all remaining files inside `includes/`.
-- Replaced short ternaries, enforced Yoda conditions, added strict `in_array()` checks, and normalised assignment alignment across migrators, services, generators, and views.
-- Added missing `translators:` comments for progress strings and standardised container exceptions via anonymous classes to satisfy WPCS naming constraints.
-- Verified a clean `vendor/bin/phpcs includes` run to close out the phase.
-- Phase 11 follow-up (2025-11-02): Retired legacy `efs_*` hooks/functions in favour of the `etch_fusion_suite_*` prefix, added deprecated wrappers where needed, and hardened view templates by wrapping inline variables inside prefixed namespaces to satisfy `PrefixAllGlobals` sniffs.
-- Updated the GitHub updater filters to the new prefix and introduced `apply_filters_deprecated()` bridges to avoid fatal breakage for existing integrations.
-- Refactored AJAX handlers and repositories to eliminate short ternaries, replacing `?:` usage with explicit conditionals.
-- Normalised nonce lookups in `class-security-headers.php` using `filter_input()` to reduce direct superglobal access and quiet nonce verification warnings.
-- Confirmed zero PHPCS violations via `vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary` after changes.
-
-- Composer (`vendor/autoload.php`) wird eingebunden, sobald vorhanden.
-- Zusätzlich bleibt der WordPress-optimierte Autoloader (`includes/autoloader.php`) immer aktiv, damit Legacy-Dateinamen (`class-*.php`) weiterhin funktionieren.
-- Namespace-Mappings decken Sicherheitsklassen (`Bricks2Etch\Security\...`) sowie Repository-Interfaces (`Bricks2Etch\Repositories\Interfaces\...`) ab.
-- Dateinamens-Erkennung schließt Interface-Dateien (`interface-*.php`) mit ein, damit Admin-Aufrufe ohne CLI-Kontext sauber funktionieren.
+PSR-4 autoloading is managed by Composer. The plugin includes `vendor/autoload.php` as the primary autoloader. A legacy `includes/autoloader.php` remains active for backward compatibility with older class names (`class-*.php` files).
 
 ### Repository Pattern
-
-**Updated:** 2025-10-23 23:40
 
 All data access goes through repository interfaces:
 
@@ -134,21 +92,9 @@ All data access goes through repository interfaces:
 - Targeted cache invalidation (no `wp_cache_flush()`)
 - Prevents site-wide performance impact
 
-### Data Flow
-
-```text
-Bricks Site                    Etch Site
-    ↓                              ↓
-1. CSS Converter          →   Etch Styles
-2. Media Migrator         →   Media Library
-3. Content Converter      →   Gutenberg Blocks
-```
-
 ---
 
 ## Development Environment Setup
-
-**Updated:** 2025-11-04 21:30
 
 ### Overview
 
@@ -467,8 +413,6 @@ When reporting issues, include:
 
 ## GitHub Updater
 
-**Updated:** 2025-10-30 08:18
-
 The plugin includes a GitHub-based update system that integrates with WordPress's native plugin updater to fetch releases directly from the repository.
 
 ### Features
@@ -543,8 +487,6 @@ This ensures version requirements stay synchronized between the plugin header an
 
 ## Security Configuration
 
-**Updated:** 2025-10-30 11:05
-
 ### CORS (Cross-Origin Resource Sharing)
 
 The plugin implements whitelist-based CORS for secure cross-origin API requests with comprehensive enforcement across all REST endpoints.
@@ -553,13 +495,13 @@ The plugin implements whitelist-based CORS for secure cross-origin API requests 
 
 ```bash
 # Get current CORS origins
-wp option get b2e_cors_allowed_origins --format=json
+wp option get efs_cors_allowed_origins --format=json
 
 # Set CORS origins
-wp option update b2e_cors_allowed_origins '["http://localhost:8888","http://localhost:8889","https://yourdomain.com"]' --format=json
+wp option update efs_cors_allowed_origins '["http://localhost:8888","http://localhost:8889","https://yourdomain.com"]' --format=json
 
 # Add single origin (append to existing)
-wp option patch insert b2e_cors_allowed_origins end "https://newdomain.com"
+wp option patch insert efs_cors_allowed_origins end "https://newdomain.com"
 ```
 
 #### Default Origins
@@ -579,13 +521,11 @@ If no origins are configured, the following development defaults are used:
 
 #### CORS Enforcement
 
-**Updated:** 2025-10-27 20:52
-
 The plugin enforces CORS validation at multiple levels:
 
 1. **Per-endpoint checks**: Each endpoint handler calls `check_cors_origin()` early
-2. **Global enforcement filter**: A `rest_request_before_callbacks` filter provides a safety net for all `/b2e/v1/*` routes
-3. **Header injection**: The `B2E_CORS_Manager::add_cors_headers()` method sets appropriate headers via `rest_pre_serve_request`
+2. **Global enforcement filter**: A `rest_request_before_callbacks` filter provides a safety net for all `/efs/v1/*` routes
+3. **Header injection**: The `EFS_CORS_Manager::add_cors_headers()` method sets appropriate headers via `rest_pre_serve_request`
 4. **Preflight handling**: OPTIONS requests now short-circuit with HTTP 204, inherit the same header set, and respect a configurable `Access-Control-Max-Age`
 
 Additional filters are available to customise behaviour without patching core services:
@@ -594,26 +534,13 @@ Additional filters are available to customise behaviour without patching core se
 - `efs_cors_allowed_headers`
 - `efs_cors_max_age`
 
-**Public endpoints** (e.g., `/b2e/v1/migrate`, `/b2e/v1/validate`) now enforce CORS validation despite using `permission_callback => '__return_true'`. This ensures:
+**Public endpoints** (e.g., `/efs/v1/migrate`, `/efs/v1/validate`) now enforce CORS validation despite using `permission_callback => '__return_true'`. This ensures:
 
 - Server actively rejects disallowed origins with 403 JSON error (not just browser-level blocking)
 - All CORS violations are logged with route, method, and origin information
 - Future endpoints cannot bypass origin validation
 
 **Authenticated endpoints** continue to use CORS checks within their `permission_callback` for defense-in-depth.
-
-#### Automated Coverage
-
-**Updated:** 2025-10-26 23:20
-
-The WordPress security test suite now asserts:
-
-- `EFS_CORS_Manager` behaviour for trusted vs. untrusted origins.
-- `EFS_Rate_Limiter` request accounting, reset, and integration within AJAX handlers.
-- `EFS_Security_Headers` conditional header emission (OPTIONS bypass, admin CSP composition).
-- `EFS_Input_Validator` structured error context surfaced via AJAX JSON payloads.
-
-See `tests/unit/WordPress/SecurityTest.php` for the consolidated scenarios.
 
 ### Content Security Policy (CSP)
 
@@ -668,7 +595,7 @@ object-src 'none'
 
 ```php
 // Get security settings
-$settings_repo = b2e_container()->get('settings_repository');
+$settings_repo = etch_fusion_suite_container()->get('settings_repository');
 $security_settings = $settings_repo->get_security_settings();
 
 // Modify settings
@@ -677,8 +604,6 @@ $settings_repo->save_security_settings($security_settings);
 ```
 
 ### Feature Flags
-
-**Updated:** 2025-10-29 23:35
 
 Feature flags provide runtime control over experimental or optional functionality. The system includes built-in sanitization, extensibility filters, and automatic cleanup on deactivation.
 
@@ -710,7 +635,7 @@ if ( efs_feature_enabled( 'template_extractor' ) ) {
 }
 
 // Programmatically enable a feature
-add_filter( 'efs_feature_enabled_template_extractor', '__return_true' );
+add_filter( 'efs_feature_enabled', '__return_true' );
 
 // Extend the allowed feature flags whitelist
 add_filter( 'efs_allowed_feature_flags', function( $flags ) {
@@ -754,7 +679,7 @@ Rate limiting is applied to all AJAX and REST API endpoints.
 Rate limiting settings can be configured via the settings repository:
 
 ```php
-$settings_repo = b2e_container()->get('settings_repository');
+$settings_repo = etch_fusion_suite_container()->get('settings_repository');
 $security_settings = $settings_repo->get_security_settings();
 
 // Modify rate limits
@@ -767,9 +692,7 @@ $settings_repo->save_security_settings($security_settings);
 
 ### Validation & Input Handling
 
-**Updated:** 2025-10-26 22:57
-
-The central `EFS_Input_Validator` now records machine-readable error codes together with sanitized context for every validation failure. This enables:
+The central `EFS_Input_Validator` records machine-readable error codes together with sanitized context for every validation failure. This enables:
 
 - Generic, PHPCS-compliant exception messages (e.g. "Value is required.")
 - Richer feedback in the admin UI by looking up `get_user_error_message()` with the stored code/context
@@ -793,8 +716,6 @@ API keys must meet the following requirements:
 
 ### Audit Logging
 
-**Updated:** 2025-10-27 20:52
-
 All security events are logged with severity levels:
 
 - **Low**: Routine operations
@@ -806,10 +727,10 @@ All security events are logged with severity levels:
 
 ```bash
 # Via WP-CLI
-wp option get b2e_security_log --format=json
+wp option get efs_security_log --format=json
 
 # Via PHP
-$audit_logger = b2e_container()->get('audit_logger');
+$audit_logger = etch_fusion_suite_container()->get('audit_logger');
 $logs = $audit_logger->get_security_logs(100); // Last 100 events
 ```
 
@@ -818,8 +739,6 @@ The logger now sanitizes event metadata, masks sensitive keys (API keys, tokens,
 ---
 
 ## Admin Settings UI
-
-**Updated:** 2025-11-03 21:32
 
 ### Migration key & token alignment
 
@@ -858,8 +777,6 @@ The admin settings UI provides a centralized interface for configuring Etch Fusi
 - Dashboard accordions expose `data-efs-accordion-section`, `data-efs-accordion-header`, and `data-efs-accordion-content` attributes used by both Playwright and PHPUnit regression tests.
 
 ## Testing Coverage
-
-**Updated:** 2025-11-04 21:30
 
 The plugin includes comprehensive testing infrastructure with PHPUnit unit tests, integration tests, and Playwright end-to-end browser tests.
 
@@ -984,7 +901,7 @@ Reference existing test files in `tests/playwright/` for examples:
 Settings can be configured via the settings repository:
 
 ```php
-$settings_repo = b2e_container()->get('settings_repository');
+$settings_repo = etch_fusion_suite_container()->get('settings_repository');
 $security_settings = $settings_repo->get_security_settings();
 
 // Modify settings
@@ -995,8 +912,6 @@ $settings_repo->save_security_settings($security_settings);
 ---
 
 ## CSS Migration
-
-**Updated:** 2025-10-29 09:05
 
 ### CSS Converter
 
@@ -1032,12 +947,6 @@ The CSS Converter handles the end-to-end migration of Bricks global classes into
 - Detailed architecture: `etch-fusion-suite/docs/css-converter-architecture.md`
 - Implementation reference: `etch-fusion-suite/includes/css_converter.php`
 
-**PHPCS Compliance Improvements:**
-
-- Replaced 49 `error_log()` calls with `log_info()` invocations.
-- Corrected Yoda condition for selector matching (`$selector === '.' . $class_name`).
-- Added inline comments describing the conversion workflow, custom CSS parsing strategy, import options, and rebuild triggers.
-
 **Testing Recommendations:**
 
 - Run CSS conversion tests (where available) to confirm no behavioural regressions.
@@ -1049,8 +958,6 @@ For a full breakdown of helper methods, breakpoint mappings, logical property tr
 ---
 
 ## Migration Execution Architecture
-
-**Updated:** 2026-02-26
 
 ### Overview
 
@@ -1123,17 +1030,13 @@ When mode is `headless`, `start_migration_async()` skips the loopback spawn and 
 
 ## Content Migration
 
-**Updated:** 2025-02-08
-
 ### Overview
 
-Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Factory supports 18 converter types in total, including Phase 2 converters: HTML (`etch/raw-html`), Shortcode (`etch/raw-html`), Text-Link (`etch/element` with anchor), and Rich Text (`etch/element`, multiple blocks via DOMDocument). See `etch-fusion-suite/includes/converters/README.md` for full converter documentation.
+Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Factory supports 18 converter types in total, including converters: HTML (`etch/raw-html`), Shortcode (`etch/raw-html`), Text-Link (`etch/element` with anchor), and Rich Text (`etch/element`, multiple blocks via DOMDocument). See `etch-fusion-suite/includes/converters/README.md` for full converter documentation.
 
 ### Element Types
 
-#### 0. Listen (ul, ol, li)
-
-**Updated:** 2025-10-21 23:40
+#### 0. Lists (ul, ol, li)
 
 **Block Type:** `core/group` (Container mit custom tag)
 
@@ -1172,7 +1075,7 @@ Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Fac
 </ul>
 ```
 
-**Unterstützte Tags:**
+**Supported Tags:**
 
 - `ul` - Unordered List
 - `ol` - Ordered List
@@ -1221,8 +1124,6 @@ Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Fac
 ```
 
 #### 3. Images
-
-**Updated:** 2025-10-21 22:24
 
 **Block Type:** `core/image`
 
@@ -1301,8 +1202,6 @@ Converts Bricks elements to Gutenberg blocks with Etch metadata. The Element Fac
 
 ## Media Migration
 
-**Updated:** 2025-10-21 23:20
-
 ### Overview
 
 Transfers images and attachments from Bricks to Etch site.
@@ -1318,8 +1217,6 @@ Transfers images and attachments from Bricks to Etch site.
 ---
 
 ## API Communication
-
-**Updated:** 2025-11-04 21:30
 
 ### Authentication & Migration Keys
 
@@ -1365,7 +1262,7 @@ Transfers images and attachments from Bricks to Etch site.
 
 ```php
 // Check if JWT is valid
-$token_manager = $container->get('migration_token_manager');
+$token_manager = etch_fusion_suite_container()->get('migration_token_manager');
 $is_valid = $token_manager->validate_migration_token($jwt_string);
 ```
 
@@ -1421,8 +1318,6 @@ POST /wp-json/efs/v1/import-styles
 
 ## Frontend Rendering
 
-**Updated:** 2025-10-21 22:24
-
 ### Key Insight
 
 **Etch renders CSS classes from `etchData.attributes.class`, NOT from `etchData.styles`!**
@@ -1461,8 +1356,6 @@ POST /wp-json/efs/v1/import-styles
 ---
 
 ## Continuous Integration
-
-**Updated:** 2026-02-26
 
 GitHub Actions provides automated linting, testing, and static analysis:
 
@@ -1538,8 +1431,6 @@ composer test:coverage
 - GitHub Actions updates cover `.github/workflows/*.yml`
 
 ### Testing Coverage
-
-**Updated:** 2025-10-27 23:48
 
 - Unit tests:
   - `tests/unit/TemplateExtractorServiceTest.php` validates payload shape and template validation edge cases via the service container.
@@ -1658,102 +1549,79 @@ The previous Docker Compose setup remains in `test-environment/docker-compose.ym
 
 ## Security
 
-**Updated:** 2025-10-29 09:26
+Etch Fusion Suite applies a layered security model that consolidates nonce verification, capability checks, rate limiting, CORS validation, and audit logging.
 
 ### Security Architecture
 
-Etch Fusion Suite applies a layered security model that consolidates nonce verification, capability checks, rate limiting, CORS validation, and audit logging. Full architecture details, including handler walkthroughs and rate limit tables, are tracked in [`docs/security-architecture.md`](etch-fusion-suite/docs/security-architecture.md).
+Full architecture details, including handler walkthroughs and rate limit tables, are tracked in `docs/security-architecture.md`.
 
 ### Input Validation
 
-AJAX handlers use `EFS_Base_Ajax_Handler::validate_input()` while REST endpoints rely on the same `EFS_Input_Validator::validate_request_data()` ruleset. Supported validation types include `url`, `api_key`, `token`, `text`, `integer`, and recursive arrays. Refer to [`includes/ajax/class-base-ajax-handler.php`](etch-fusion-suite/includes/ajax/class-base-ajax-handler.php) and [`includes/security/class-input-validator.php`](etch-fusion-suite/includes/security/class-input-validator.php).
+AJAX handlers use `EFS_Base_Ajax_Handler::validate_input()` while REST endpoints rely on the same `EFS_Input_Validator::validate_request_data()` ruleset. Supported validation types include `url`, `api_key`, `token`, `text`, `integer`, and recursive arrays.
 
 ### Output Escaping
 
-All responses flow through `wp_send_json_success()`, `wp_send_json_error()`, or `WP_REST_Response`. Admin data is localized via `wp_localize_script()`, avoiding direct echoes. See the new architecture document for examples of safe output patterns.
+All responses flow through `wp_send_json_success()`, `wp_send_json_error()`, or `WP_REST_Response`. Admin data is localized via `wp_localize_script()`, avoiding direct echoes.
 
 ### Authentication & Authorization
 
-`EFS_Base_Ajax_Handler::verify_request()` enforces nonce verification, capability checks (`manage_options`), rate limiting, and audit logging for every AJAX call. REST endpoints validate origins through `EFS_CORS_Manager` and tokens via `EFS_Migration_Token_Manager`. Review [`includes/ajax/class-base-ajax-handler.php`](etch-fusion-suite/includes/ajax/class-base-ajax-handler.php) and [`includes/api_endpoints.php`](etch-fusion-suite/includes/api_endpoints.php).
+`EFS_Base_Ajax_Handler::verify_request()` enforces nonce verification, capability checks (`manage_options`), rate limiting, and audit logging for every AJAX call. REST endpoints validate origins through `EFS_CORS_Manager` and tokens via `EFS_Migration_Token_Manager`.
 
 ### Nonce Verification
 
 Etch Fusion Suite protects every AJAX request with a centralized nonce architecture:
 
 - **Single nonce action** — All handlers share `'efs_nonce'`, generated in `admin_interface.php::enqueue_admin_assets()` and localized to JavaScript as `efsData.nonce`.
-- **Handler-level verification** — All AJAX handlers call `verify_request()` as the first line to run nonce + capability checks and audit logging; nonce creation happens in `admin_interface.php`, verification only in handlers.
-- **Comprehensive coverage** — All nine AJAX handler classes extend the base handler and invoke `verify_request()` before touching input, ensuring 100% compliance.
+- **Handler-level verification** — All AJAX handlers call `verify_request()` as the first line to run nonce + capability checks and audit logging.
+- **Comprehensive coverage** — All AJAX handler classes extend the base handler and invoke `verify_request()` before touching input.
 
 **Documentation:**
 
-- [`docs/nonce-strategy.md`](etch-fusion-suite/docs/nonce-strategy.md) — Canonical nonce lifecycle, diagrams, testing guidance.
-- [`docs/security-architecture.md`](etch-fusion-suite/docs/security-architecture.md) — Layered security overview.
-- [`docs/security-best-practices.md`](etch-fusion-suite/docs/security-best-practices.md) — Implementation guidelines for new handlers.
-- [`docs/security-verification-checklist.md`](etch-fusion-suite/docs/security-verification-checklist.md) — Nonce compliance checks and sign-off items.
+- `docs/nonce-strategy.md` — Canonical nonce lifecycle, diagrams, testing guidance.
+- `docs/security-architecture.md` — Layered security overview.
+- `docs/security-best-practices.md` — Implementation guidelines for new handlers.
+- `docs/security-verification-checklist.md` — Nonce compliance checks and sign-off items.
 - `tests/phpunit/BaseAjaxHandlerTest.php` — PHPUnit coverage for invalid nonce, missing capability, and success paths.
-- `tests/phpunit/bootstrap.php` — Supports `EFS_SKIP_WP_LOAD=1` to bypass WordPress bootstrapping so security unit tests can execute without database connectivity.
 
 ### Security Best Practices
 
-Development guidelines for new handlers, REST endpoints, and admin integrations are maintained in [`docs/security-best-practices.md`](etch-fusion-suite/docs/security-best-practices.md). Follow the documented patterns for sanitization, logging, and testing.
+Development guidelines for new handlers, REST endpoints, and admin integrations are maintained in `docs/security-best-practices.md`. Follow the documented patterns for sanitization, logging, and testing.
 
 ### Security Verification
 
-Prior to release, complete the checklist in [`docs/security-verification-checklist.md`](etch-fusion-suite/docs/security-verification-checklist.md) covering AJAX handlers, REST endpoints, admin flows, services, and PHPCS audits.
+Prior to release, complete the checklist in `docs/security-verification-checklist.md` covering AJAX handlers, REST endpoints, admin flows, services, and PHPCS audits.
 
 ---
 
-## Core Infrastructure Files
+## Admin Settings UI
 
-**Updated:** 2025-10-29 09:26
+The admin settings UI provides a centralized interface for configuring Etch Fusion Suite.
 
-Three core infrastructure files underpin the admin experience, error handling, and security telemetry. They require minimal, well-documented changes to preserve stability while remaining PHPCS compliant.
+### Key Features
 
-### Files
-
-- `includes/admin_interface.php` – Admin menu/dashboard bootstrap, script localization, nonce generation.
-- `includes/error_handler.php` – Centralized log routing, structured option storage, WordPress debug mirroring.
-- `includes/security/class-audit-logger.php` – Security event pipeline with severity filtering, sanitization, and optional error handler delegation.
-
-### Phase 9 Compliance Summary
-
-- **Scope:** 1,187 lines reviewed under Phase 9 (Kleinere Core-Dateien).
-- **PHPCS Fixes:** 4 Yoda comparisons corrected (`strpos` checks, `array_filter` callbacks). All intentional `error_log()` calls annotated with `phpcs:ignore` plus rationale.
-- **Security Verification:** Confirmed nonce verification in handlers via `EFS_Base_Ajax_Handler::verify_request()`, recursive sanitization (payload + audit logger contexts), masked sensitive keys, `wp_send_json_*` responses, and strict `in_array()` usage.
-- **Documentation:** See [`docs/phase9-core-files-compliance.md`](etch-fusion-suite/docs/phase9-core-files-compliance.md) for change log, rationale, and testing guidance.
-
-### Why `error_log()` Remains
-
-1. **Logging Infrastructure (`error_handler.php`)** – Cannot self-depend; mirrors structured logs to `debug.log` for operators.
-2. **Admin Interface (`admin_interface.php`)** – Avoids injecting the error handler dependency; only logs missing assets and container resolution failures during development.
-3. **Audit Logger (`class-audit-logger.php`)** – High/critical security events need immediate surfaced alerts in server logs in addition to structured storage.
-
-### Testing Checklist
-
-- Load admin dashboard and confirm assets/localized data.
-- Exercise AJAX settings/validation flows; verify nonce failures are blocked.
-- Trigger error handler logging paths and confirm `debug.log` mirrors entries.
-- Generate security events (e.g., simulated suspicious activity) and verify dual logging (audit option + `debug.log`).
-
-### Developer Guidance
-
-- Treat these files as high-sensitivity; prefer surgical diff-sized changes.
-- Document any future `phpcs:ignore` directives with explicit rationale.
-- Re-run `vendor/bin/phpcs` on the trio and update [`docs/phase9-core-files-compliance.md`](etch-fusion-suite/docs/phase9-core-files-compliance.md) if changes occur.
+- **Target URL Normalization**: Docker hosts are automatically translated to `host.docker.internal` for seamless communication between containers.
+- **Connection Flow**: Settings, validation, and migration key generation operate solely on JWT migration keys.
+- **Target Validation**: Test Connection coordinates with `EFS_API_Client::validate_migration_key_on_target()` to call the Etch `/efs/v1/validate` REST endpoint.
+- **Status Endpoint Details**: The Etch `/wp-json/efs/v1/status` endpoint returns `status` and `version` fields alongside plugin activation state.
+- **Accessibility Enhancements**: Field labels expose `aria-labelledby` relationships, and non-JavaScript fallbacks ensure usability when scripting is disabled.
+- **REST Validation Route**: `/wp-json/efs/v1/auth/validate` powers the connection test and returns structured responses.
+- **CORS Defaults**: Server-origin requests are accepted by the REST layer so container-to-container calls succeed.
+- **Migration Key Endpoint**: The admin form calls the target `/wp-json/efs/v1/generate-key` endpoint.
+- **Service Container**: `token_manager` is registered in the plugin service container so REST endpoints can resolve `EFS_Migration_Token_Manager` without fatal errors.
+- **Feature Discovery**: The Template Extractor tab remains visible even when disabled, presenting a locked state with a call-to-action.
+- Tab navigation is keyboard accessible via `data-efs-tab` attributes and aria roles.
 
 ---
 
 ## PHPCS Standards & Compliance
 
-**Updated:** 2025-10-29 12:55
-
 Etch Fusion Suite maintains a single PHPCS workflow spanning local development, verification scripts, and CI enforcement. Use this section as the authoritative reference for coding standards, tooling, and compliance artefacts.
 
 ### Ruleset & Scope
 
-- **Ruleset:** [`etch-fusion-suite/phpcs.xml.dist`](etch-fusion-suite/phpcs.xml.dist)
+- **Ruleset:** `etch-fusion-suite/phpcs.xml.dist`
 - **Scanned paths:** `includes/`, `assets/` (non-minified), and `etch-fusion-suite.php`
-- **Excluded paths:** `vendor/`, `node_modules/`, `tests/`, `scripts/`, minified assets (`*.min.js`, `*.min.css`), and tooling artefacts (e.g., `phpunit.xml.dist`)
+- **Excluded paths:** `vendor/`, `node_modules/`, `tests/`, `scripts/`, minified assets, and tooling artefacts
 - **Runtime flags:** parallelism (`--parallel=8`), UTF-8 encoding, progress output, and colorized reports
 
 ### Enabled Sniffs
@@ -1769,7 +1637,7 @@ The ruleset builds on `WordPress-Core` while enabling targeted sniffs for securi
 - `WordPress.NamingConventions.PrefixAllGlobals`
 - `WordPress.WP.I18n`
 
-Custom allowances include short array syntax, PSR-4 file naming, and a curated prefix list (`efs`, `etch_fusion_suite`, `EtchFusionSuite`, `Bricks2Etch`, etc.) to satisfy the prefixing sniff without impeding autoloading.
+Custom allowances include short array syntax, PSR-4 file naming, and a curated prefix list (`efs`, `etch_fusion_suite`, `EtchFusionSuite`, `Bricks2Etch`, etc.).
 
 ### Running PHPCS & PHPCBF
 
@@ -1808,117 +1676,114 @@ composer phpcs:full     # Full report
 
 Verification scripts live in `etch-fusion-suite/scripts/` and are executable directly or via the Composer aliases above:
 
-- `verify-phpcs-compliance.sh` — Runs PHPCS (`--report=json`), persists the last run to `build/phpcs-last-run.json`, and orchestrates all supplemental verification scripts. Supports `--report` to regenerate `docs/phpcs-final-verification-report.md`.
-- `verify-strict-comparison.sh` — Confirms every `in_array()` call uses strict comparison and regenerates `docs/phpcs-strict-comparison-verification.md` when invoked with reporting flags.
-- `verify-yoda-conditions.sh` — Detects non-Yoda comparisons, producing `docs/yoda-conditions-violations-report.md`.
-- `verify-hook-prefixing.sh` — Audits hooks and globals against the prefix list, updating `docs/hook-prefixing-verification-report.md`.
-- `verify-datetime-functions.sh` — Flags prohibited PHP time helpers (`date()`, `gmdate()`) and refreshes `docs/datetime-functions-verification-report.md`.
-
-> Tip: `scripts/analyze-phpcs-violations.sh` remains available for exploratory analysis and backlog generation but is not part of the automated verification chain.
+- `verify-phpcs-compliance.sh` — Runs PHPCS, persists results, and orchestrates supplemental verification scripts
+- `verify-strict-comparison.sh` — Confirms every `in_array()` call uses strict comparison
+- `verify-yoda-conditions.sh` — Detects non-Yoda comparisons
+- `verify-hook-prefixing.sh` — Audits hooks and globals against the prefix list
+- `verify-datetime-functions.sh` — Flags prohibited PHP time helpers
 
 ### CI Enforcement
 
 - **Workflow:** `.github/workflows/ci.yml`
-- **Lint job:** Installs Composer dependencies, runs `vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary`, and executes all four verification scripts followed by `verify-phpcs-compliance.sh`. Failing any step blocks the pipeline.
-- **Artifacts:** Summary output surfaces in the GitHub Actions log; final verification reports are written under `etch-fusion-suite/docs/` when the aggregate script succeeds with `--report`.
+- **Lint job:** Installs Composer dependencies, runs PHPCS, and executes verification scripts. Failing any step blocks the pipeline.
+- **Artifacts:** Summary output surfaces in the GitHub Actions log; verification reports are written under `etch-fusion-suite/docs/`.
 
 ### Git Hooks
 
 - **Template:** `etch-fusion-suite/scripts/pre-commit`
-- **Installer:** `etch-fusion-suite/scripts/install-git-hooks.sh` (non-interactive when invoked via `composer install-hooks`)
-- **Behaviour:** Runs PHPCS on staged PHP/PHTML files using the project ruleset and optionally (`--verify-all`) chains the four supplemental verification scripts. Failing checks block the commit until resolved.
-- **Manual install:**
-
-  ```bash
-  composer install-hooks
-  # or
-  ./etch-fusion-suite/scripts/install-git-hooks.sh
-  ```
-
-### Phase Reports & References
-
-- `etch-fusion-suite/docs/phpcs-auto-fixes-2025-10-28.md`
-- `etch-fusion-suite/docs/phpcs-strict-comparison-verification.md`
-- `etch-fusion-suite/docs/yoda-conditions-strategy.md`
-- `etch-fusion-suite/docs/hook-prefixing-verification-report.md`
-- `etch-fusion-suite/docs/datetime-functions-verification-report.md`
-- `etch-fusion-suite/docs/css-converter-architecture.md`
-- `etch-fusion-suite/docs/phase9-core-files-compliance.md`
-- `etch-fusion-suite/docs/phase10-remaining-files-compliance.md`
-- `etch-fusion-suite/docs/phpcs-final-verification-report.md`
-- `etch-fusion-suite/docs/phpcs-lessons-learned.md`
+- **Installer:** `etch-fusion-suite/scripts/install-git-hooks.sh`
+- **Behaviour:** Runs PHPCS on staged PHP/PHTML files and optionally chains verification scripts. Failing checks block the commit.
 
 ### Developer Checklist
 
-1. Run `composer phpcs` (or the pre-commit hook) before staging commits.
-2. Apply automated fixes with `composer phpcbf` or `./etch-fusion-suite/scripts/run-phpcbf.sh`.
-3. Execute targeted verification scripts (`composer verify-*`) when touching security, comparison, or hook-sensitive code.
-4. Use `composer verify-phpcs` before requesting reviews to refresh the final verification report.
-5. Install or refresh Git hooks via `composer install-hooks` after pulling changes to tooling.
+1. Run `composer phpcs` before staging commits.
+2. Apply automated fixes with `composer phpcbf`.
+3. Execute targeted verification scripts when touching security-sensitive code.
+4. Use `composer verify-phpcs` before requesting reviews.
+5. Install or refresh Git hooks via `composer install-hooks` after pulling changes.
 6. Archive compliance evidence by committing regenerated docs under `etch-fusion-suite/docs/`.
 
 ---
 
-### Phase 12: Review & Validation
+## Migration Testing Workflow
 
-**Status:** ✓ Complete (2025-10-29 13:30)
+### Validated Standard Test
 
-**Updated:** 2025-10-29 13:55
+```bash
+# In etch-fusion-suite/
+SKIP_BASELINE=1 npm run test:migration
+```
 
-**Review Activities:**
+Migrates `post` and `page` types from Bricks (port 8888) to Etch (port 8889). Uses the full headless flow — the only correct way to run a migration.
 
-- PHPCS compliance verified: 0 violations (`vendor/bin/phpcs --standard=phpcs.xml.dist --report=summary`)
-- All verification scripts validated (`composer verify-phpcs`, `verify-strict`, `verify-yoda`, `verify-hooks`, `verify-datetime`)
-- `phpcs:ignore` directives documented across `includes/ajax/class-base-ajax-handler.php`, `includes/error_handler.php`, `includes/admin_interface.php`, DOM utilities (`includes/templates/class-html-parser.php`, `includes/templates/class-template-analyzer.php`), and migrator discovery to justify nonce access, infrastructure logging, DOM property access, and legacy hook filters
-- Test coverage documented (PHPUnit prerequisites, integration scripts; Playwright E2E automation maintained in external Etch Fusion Suite QA repository)
-- Lessons learned consolidated in `docs/phpcs-lessons-learned.md`
+### What the Headless Flow Does (Order Matters)
 
-**Documentation Created:**
+The script `scripts/test-migration.js` calls these steps in sequence:
 
-- `etch-fusion-suite/docs/phase12-review-checklist.md` — Comprehensive verification checklist
-- `etch-fusion-suite/docs/phpcs-quick-reference.md` — Developer quick reference guide
-- `etch-fusion-suite/docs/test-execution-report.md` — Test status and coverage analysis
+1. `ensureEnvironmentReady()` — checks plugins/themes are active, auto-repairs if needed
+2. `generateMigrationKey()` — generates JWT token on Etch side (`tests-cli`)
+3. `triggerMigration()` — calls `start_migration(mode: headless)` on Bricks side (`cli`)
+4. `driveHeadlessMigration()` — calls `run_headless_job()` synchronously via WP-CLI
 
-**Key Findings:**
+`run_headless_job()` internally runs `run_migration_execution()` which does:
+- **CSS phase first**: `css_converter->convert_bricks_classes_to_etch()` generates Etch styles, populates `efs_style_map`
+- **Content phase second**: for each post, `_cssGlobalClasses` entries are looked up in `efs_style_map` to produce styling in block output
 
-- `phpcs:ignore` directives remain in security-critical files (`includes/ajax/class-base-ajax-handler.php`, `includes/error_handler.php`, `includes/admin_interface.php`, DOM utilities, migrator discovery) with documented rationales for nonce access, infrastructure logging, DOM API usage, and legacy compatibility hooks
-- PHPUnit suite requires WordPress test environment (covers nonce verification in `BaseAjaxHandlerTest.php`)
-- Playwright suite (4 admin interface E2E tests) resides under `etch-fusion-suite/tests/playwright/`; wp-env storage state setup required before execution
-- Integration scripts available for CSS converter, AJAX handlers, and content migration
-- Recommendation: Expand automated coverage for converters, parsers, migrators in future sprints
+**CSS must run before content.** If content runs without CSS, blocks get `"styles":[]` and `"class":""`.
 
-**Developer Guidance:**
+### How Styles Are Stored
 
-1. Reference the quick guide (`docs/phpcs-quick-reference.md`) for day-to-day commands and patterns
-2. Use the review checklist before releases to confirm compliance artefacts
-3. Capture test execution outcomes in `docs/test-execution-report.md`
-4. Continue documenting lessons in `docs/phpcs-lessons-learned.md` as processes evolve
+| Storage | Location | Format | Used for |
+|---------|----------|--------|----------|
+| `etch_styles` | Etch side | numerically-indexed array with `selector`, `css` | CSS file generation by Etch |
+| `efs_style_map` | Both sides | `{bricks_id: {id, selector}}` | Bricks→Etch ID lookup during migration |
 
----
+The 7-char style IDs in blocks (e.g. `"styles":["9359405"]`) match entries in `efs_style_map` via `id` field. The HTML `class` attribute carries the CSS class name that Etch renders.
 
-## Development Workflow
+### Resetting Before a Test
 
-**Updated:** 2025-10-29 12:55
+```bash
+# Reset Etch side (styles + pages)
+node scripts/reset-etch-migration-state.js
 
-### Code Quality Checks
+# Also clear Bricks migration state
+npx wp-env run cli wp option delete efs_style_map efs_migration_progress efs_migration_checkpoint efs_active_migration
+```
 
-The plugin enforces code quality through CI workflows. All checks run automatically on push and pull requests:
+### Post-Type Mappings
 
-- **PHPCS (WordPress Coding Standards)** - Enforced in CI lint job
-- **PHPCompatibility** - Enforced in CI compatibility job (PHP 7.4-8.4)
-- **PHPUnit** - Enforced in CI test job with WordPress test suite
+| Bricks type | Etch target |
+|-------------|-------------|
+| `post` | `post` |
+| `page` | `page` |
+| `bricks_template` | `wp_block` or `page` |
 
-### Running PHPCBF
+`test-migration.js` resolves `bricks_template` target dynamically. The standard test does **not** include `bricks_template` in `selected_post_types`.
 
-Refer to [PHPCS Standards & Compliance](#phpcs-standards--compliance) for full guidance on PHPCBF usage, logging outputs, and available flags.
+### What NOT to Do
 
-### PHPCS Violation Analysis
+Do not use these methods for targeted migration — they bypass the CSS phase:
 
-The exploratory reporting workflow (`scripts/analyze-phpcs-violations.sh`) is documented under [PHPCS Standards & Compliance](#phpcs-standards--compliance). Use it after large refactors to regenerate the manual fixes backlog.
+- `migration_service->migrate_single_post()` — no `post_type_mappings`, no CSS
+- `content_service->convert_bricks_to_gutenberg()` called directly — no CSS setup
 
-### Manual Git Hooks (Optional)
+Always go through `start_migration()` + `run_headless_job()` so CSS and content run in the correct order.
 
-Local hook installation steps and behaviour are centralised in [Git Hooks](#git-hooks). Re-run `composer install-hooks` whenever the hook template changes.
+### Debugging
+
+```bash
+# Check migration progress (Bricks side)
+npx wp-env run cli wp option get efs_migration_progress --format=json
+
+# Check style map is populated
+npx wp-env run cli wp eval '$m=get_option("efs_style_map",[]); echo count($m)." entries";'
+
+# Check styles reached Etch
+npx wp-env run tests-cli wp eval '$s=get_option("etch_styles",[]); echo count($s)." styles";'
+
+# Filter error logs
+npm run logs:bricks:errors
+```
 
 ---
 
@@ -1929,8 +1794,3 @@ Local hook installation steps and behaviour are centralised in [Git Hooks](#git-
 - [etch-fusion-suite/README.md](etch-fusion-suite/README.md) - Plugin setup and wp-env workflow
 - [etch-fusion-suite/TESTING.md](etch-fusion-suite/TESTING.md) - Comprehensive testing documentation
 - [test-environment/README.md](test-environment/README.md) - Test environment overview
-
----
-
-**Last Updated:** 2025-10-28 12:58  
-**Version:** 0.11.20
