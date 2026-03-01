@@ -46,10 +46,17 @@
 
 ### 🐛 Open Bugs
 
-- [ ] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **Entdeckt:** 2026-02-25
-  - `VideoConverterTest::test_video_css_classes_and_styles` (Zeile 155) erwartet per `assertStringNotContainsString`, dass `"class":"video-wrapper"` **nicht** im `attributes`-JSON des erzeugten Blocks steht — der VideoConverter legt die Klasse aber genau dort ab.
-  - Unklar ob der Test falsch ist (Klasse darf im `attributes`-Objekt stehen) oder der Converter (Klasse soll stattdessen nur im `styles`-Array erscheinen).
-  - Datei: `tests/unit/Converters/VideoConverterTest.php:155` / `includes/converters/elements/` (VideoConverter)
+- [✅] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **FIXED: 2026-03-01**
+  - **Problem:** Test erwartet dass CSS-Klasse nicht im `attributes`-JSON des iframes steht, aber Converter legte sie dort ab.
+  - **Lösung:** Komplette Refaktorierung zu Privacy-Pattern (Poster + Play-Button). CSS-Klasse ist jetzt auf dem Wrapper-Container (nicht dem hidden iframe).
+  - **Implementiert:** 
+    - neue Methode `build_privacy_video_container()` für 3-Teil Struktur
+    - neue Methode `detect_embed_type()` für YouTube/Vimeo-Erkennung
+    - neue Methode `extract_video_id_from_url()` für Video-ID-Extraktion
+    - neue Methode `get_embed_poster_url()` für Poster-Generierung
+    - neue Methode `build_youtube_embed_url_nocookie()` für Datenschutz-URLs
+  - **Tests:** 16 Testmethoden neu geschrieben, alle Szenarien abgedeckt
+  - **Commit:** 7c9ada3e
 
 ### ✅ Completed Tasks
 
@@ -289,6 +296,6 @@
 
 ---
 
-**Last Updated:** 2026-02-28
-**Next Review:** Stabilisierungsplan vollständig abgeschlossen. Nächste Schritte: End-to-End Migration in Docker, PHPCS CI-Run, Release.
+**Last Updated:** 2026-03-01  
+**Next Review:** VideoConverter refactoring complete. Ready for Docker test run.  
 **Maintainer:** Etch Fusion Suite Development Team
