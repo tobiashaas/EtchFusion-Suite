@@ -67,8 +67,17 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			return false;
 		}
 
-		// Only on 1 in 100 requests to avoid overhead.
-		// (most sites won't have frequent requests; adjust as needed).
+		// If an EFS migration is active, always process the queue (aggressive mode).
+		// This ensures headless migrations don't stall waiting for the random 1-in-100 trigger.
+		$progress = get_option( 'efs_migration_progress', [] );
+		if ( ! empty( $progress['migrationId'] ) && ! empty( $progress['status'] ) ) {
+			if ( 'completed' !== $progress['status'] && 'cancelled' !== $progress['status'] ) {
+				return true; // Always trigger during active migrations.
+			}
+		}
+
+		// Otherwise, only on 1 in 100 requests to avoid overhead (for non-migration requests).
+		// This is fine for most WordPress sites that don't use Action Scheduler heavily.
 		if ( wp_rand( 1, 100 ) > 1 ) {
 			return false;
 		}
