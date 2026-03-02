@@ -114,7 +114,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 		// Use wp_remote_post with short timeout for non-blocking behavior.
 		// Note: timeout < 0.1 may be too aggressive; WordPress needs time to establish connection.
 		// Using 0.5 seconds allows async processing without blocking the calling request.
-		wp_remote_post(
+		$response = wp_remote_post(
 			$url,
 			array(
 				'blocking'  => false,
@@ -122,6 +122,13 @@ class EFS_Action_Scheduler_Loopback_Runner {
 				'sslverify' => apply_filters( 'https_local_over_ssl', false ),
 			)
 		);
+
+		// Log loopback request status for debugging.
+		if ( is_wp_error( $response ) ) {
+			error_log( '[EFS] Loopback request failed: ' . $response->get_error_message() . ' (URL: ' . $url . ')' );
+		} else {
+			error_log( '[EFS] Loopback request initiated successfully (URL: ' . $url . ')' );
+		}
 	}
 
 	/**
