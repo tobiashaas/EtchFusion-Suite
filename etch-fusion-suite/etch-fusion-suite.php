@@ -222,6 +222,10 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
+		// Initialize headless migration job hooks BEFORE Action Scheduler
+		// (so efs_run_headless_migration callback is registered when ActionScheduler::init() runs)
+		add_action( 'plugins_loaded', array( $this, 'init_headless_migration_job' ), 1 );
+
 		// Initialize Action Scheduler loopback runner (before plugins_loaded is too late)
 		add_action( 'plugins_loaded', array( $this, 'init_action_scheduler_runner' ), 5 );
 
@@ -317,16 +321,24 @@ class Etch_Fusion_Suite_Plugin {
 		// Initialize AJAX handlers (NEW - v0.5.1)
 		$this->ajax_handler = $container->get( 'ajax_handler' );
 
-		// Boot headless migration job and admin notice manager (register their hooks).
-		if ( $container->has( 'headless_migration_job' ) ) {
-			$container->get( 'headless_migration_job' );
-		}
+		// Boot admin notice manager (register its hooks)
 		if ( $container->has( 'admin_notice_manager' ) ) {
 			$container->get( 'admin_notice_manager' );
 		}
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $container->has( 'debug_ajax' ) ) {
 			$container->get( 'debug_ajax' );
+		}
+	}
+
+	/**
+	 * Initialize headless migration job (register Action Scheduler hooks)
+	 */
+	public function init_headless_migration_job() {
+		$container = etch_fusion_suite_container();
+		if ( $container->has( 'headless_migration_job' ) ) {
+			// Constructor calls register_hooks(), registering efs_run_headless_migration callback
+			$container->get( 'headless_migration_job' );
 		}
 	}
 
