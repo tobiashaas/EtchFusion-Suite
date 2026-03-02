@@ -263,6 +263,30 @@
 
 ⚠️ **NOTE (2026-02-27)**: Viele der folgenden Todos sehen bereits implementiert aus (Batch Processing, Progress Tracking, Error Logging, REST API, Admin Dashboard). Morgen systematisch überprüfen welche wirklich noch offen sind vs. welche schon erledigt sind aber nicht als [✅] markiert wurden.
 
+- [ ] **Dashboard: Breakdown progress by post type** - **IDENTIFIED: 2026-03-02 21:58**
+  - **Current State:** Dashboard shows only total count (470/1409 items)
+  - **Needed:** Per-post-type breakdown:
+    - Posts: X/Y (progress bar)
+    - Pages: X/Y (progress bar)
+    - bricks_template: X/Y (progress bar)
+    - [Custom Post Types]: X/Y (each with count)
+  - **Reason:** Better visibility into what's being migrated and where bottlenecks are
+  - **Implementation:** Query wp_efs_migration_logs grouped by detected post type, show per-type progress
+  - **Priority:** 🟡 HIGH (UX improvement for long migrations)
+
+- [ ] **Dashboard: Fix elapsed/remaining time calculation** - **IDENTIFIED: 2026-03-02 21:58**
+  - **Current State:** 
+    - Elapsed: 155:38 (starts at ~130 instead of 0, clearly wrong)
+    - Remaining: ~179m 22s (rough estimate, appears inaccurate)
+  - **Needed:**
+    - Store migration start timestamp (from first log entry)
+    - Calculate actual elapsed: NOW() - migration_start_time
+    - Calculate remaining: (elapsed / items_processed) * (total_items - items_processed)
+    - Format HH:MM:SS consistently
+  - **Reason:** Users need accurate time estimates for long migrations (3+ hours)
+  - **Implementation:** Migration repository/service calculate from actual log timestamps
+  - **Priority:** 🟡 HIGH (affects user experience)
+
 - [ ] **Migration Performance Optimization**
   - Implement batch processing for large datasets
   - Add database transaction optimization
