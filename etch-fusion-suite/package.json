@@ -87,7 +87,7 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "@wordpress/env": "^10.39.0",
+    "@wordpress/env": "^11.0.0",
     "concurrently": "^8.2.2",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
