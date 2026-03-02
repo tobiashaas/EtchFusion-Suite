@@ -111,12 +111,14 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			$url = etch_fusion_suite_convert_to_internal_url( $url );
 		}
 
-		// Use wp_remote_post with timeout=0.001 to make it non-blocking.
+		// Use wp_remote_post with short timeout for non-blocking behavior.
+		// Note: timeout < 0.1 may be too aggressive; WordPress needs time to establish connection.
+		// Using 0.5 seconds allows async processing without blocking the calling request.
 		wp_remote_post(
 			$url,
 			array(
 				'blocking'  => false,
-				'timeout'   => 0.001,
+				'timeout'   => 0.5,
 				'sslverify' => apply_filters( 'https_local_over_ssl', false ),
 			)
 		);
