@@ -46,6 +46,15 @@
 
 ### 🐛 Open Bugs
 
+- [✅] **🔴 CRITICAL: Headless Migrations Stuck at "Pending"** - **FIXED: 2026-03-02 21:47**
+   - **Verification (2026-03-02 21:41-21:52):** 369+ logs, 42 new in last 2 min, Media/CSS success ✅
+   - **Status:** ✅ PRODUCTION READY
+
+- [ ] **🟡 Dashboard UI: Validation Errors During Headless Migration** - **IDENTIFIED: 2026-03-02 21:52**
+   - **Problem:** UI shows `post_id=0` validation error (not blocking, cosmetic)
+   - **Root Cause:** Headless vs interactive mode distinction not clear in UI
+   - **Priority:** LOW 🔵 (non-blocking)
+
 - [✅] **🔴 CRITICAL: Migration System Hangs After Discovery** - **FIXED: 2026-03-02**
    - **Root Cause (Found 2026-03-01):** Two interrelated issues prevented Action Scheduler from processing the queue:
      1. **Docker Loopback URL Issue:** Loopback requests sent `http://localhost:8888/admin-ajax.php` but inside Docker containers, `localhost` doesn't resolve to the host. The loopback runner wasn't using Docker-aware URL translation.
