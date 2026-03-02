@@ -99,6 +99,6 @@
     "patch-package": "^8.0.1",
     "prettier": "^3.8.1",
     "typescript": "^5.5.4",
-    "wait-on": "^7.0.1"
+    "wait-on": "^9.0.4"
   }
 }
