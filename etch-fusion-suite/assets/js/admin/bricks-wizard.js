@@ -897,13 +897,13 @@ const createWizard = (root) => {
 		if (refs.progressItems) {
 			const currentItemTitle = payload?.current_item?.title || progress?.current_item_title || '';
 			if (itemsTotal > 0) {
-				let itemsText = `Items processed: ${itemsProcessed}/${itemsTotal}`;
+				let itemsText = `Items: ${itemsProcessed}/${itemsTotal}`;
 				if (currentItemTitle) {
 					itemsText += ` — ${currentItemTitle}`;
 				}
 				refs.progressItems.textContent = itemsText;
 			} else if (itemsProcessed > 0) {
-				refs.progressItems.textContent = `Items processed: ${itemsProcessed}`;
+				refs.progressItems.textContent = `Items: ${itemsProcessed}`;
 			} else if (currentItemTitle) {
 				refs.progressItems.textContent = currentItemTitle;
 			} else {
