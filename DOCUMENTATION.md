@@ -200,43 +200,69 @@ wp-env creates Docker containers with clear service names:
 
 These names resolve inside the Docker network via DNS but **not** to the host machine. Browser requests still use `http://localhost:8888` and `http://localhost:8889`.
 
-#### URL Conversion (docker-url-helper.php)
+#### URL Conversion (docker-url-helper.php) - Server-Side Only ⚠️
 
-The plugin automatically converts URLs for server-side requests:
+**CRITICAL:** Docker URL conversion only applies to **server-to-server requests** (PHP code running in containers), NOT to browser-side requests.
 
+**Browser Requests (from user's browser):**
 ```
-Browser URL               Internal URL (for container requests)
-──────────────────────   ──────────────────────────────────
-http://localhost:8888    →  http://bricks
-http://localhost:8889    →  http://etch
+http://localhost:8888  ← Browser requests use localhost (correct)
+http://localhost:8889  ← These resolve to host machine ports
 ```
 
-This conversion happens transparently in:
-- Loopback requests (Action Scheduler queue processing)
-- Cross-site API calls
-- REST API filters
+**Server-Side Requests (PHP code in containers):**
+```
+http://localhost:8888  ← Inside Docker, localhost doesn't resolve
+        ↓ (converted by docker-url-helper.php)
+http://bricks          ← Docker-internal hostname (works in containers)
+```
+
+**Where Conversion Happens:**
+- ✅ Loopback requests: `wp_remote_post()` in `class-action-scheduler-loopback-runner.php`
+- ✅ Cross-site API calls: `wp_remote_post()` in `class-api-client.php`
+- ❌ REST API filter: **DISABLED** — would break browser requests
 
 **Key Files:**
 - `includes/docker-url-helper.php` — Main URL conversion logic with DNS resolution fallbacks
-- `includes/hooks/rest-api-docker-compat.php` — REST API filter hook for transparent URL conversion
-- `services/class-action-scheduler-loopback-runner.php` — Action Scheduler loopback handler
+- `services/class-action-scheduler-loopback-runner.php` — Action Scheduler loopback handler (converts URL before `wp_remote_post()`)
+- `includes/hooks/rest-api-docker-compat.php` — Legacy REST API filter (DISABLED to prevent breaking browser requests)
+
+#### Why Not a Global REST API Filter?
+
+A global `rest_url` filter that converts all URLs to Docker-internal names breaks browser-side requests:
+
+```javascript
+// Browser JavaScript tries to fetch:
+fetch('/wp-json/wp/v2/posts')
+// WordPress returns:
+// http://etch/wp-json/wp/v2/posts  ← Browser can't resolve "etch"!
+// Error: ERR_NAME_NOT_RESOLVED
+```
+
+Instead, URL conversion only happens when WordPress makes **internal PHP requests**:
+
+```php
+// PHP code in loopback handler:
+$url = 'http://localhost:8888/wp-admin/admin-ajax.php';
+$url = etch_fusion_suite_convert_to_internal_url($url);  // → http://bricks/...
+wp_remote_post($url);  // Works in Docker!
+```
 
 #### Testing Docker Networking
 
-Verify internal service names resolve correctly from inside the Bricks container:
+Verify browser-friendly URLs work correctly:
 
 ```bash
-# From Bricks container (port 8888):
-npm run wp -- eval "echo gethostbyname('bricks');    // 172.18.x.x
-                     echo gethostbyname('etch');     // 172.18.x.x"
-
-# REST API URLs show internal names:
-npm run wp -- eval "echo rest_url('wp/v2/types/post');"
-# Output: http://bricks/wp-json/wp/v2/types/post
-
-# From Etch container (port 8889):
+# Browser-side REST API returns localhost (correct):
 npm run wp:tests -- eval "echo rest_url('wp/v2/types/post');"
-# Output: http://etch/wp-json/wp/v2/types/post
+# Output: http://localhost:8889/wp-json/wp/v2/types/post  ✅
+
+# Server-side loopback conversion works:
+npm run wp -- eval "
+  require WP_PLUGIN_DIR.'/etch-fusion-suite/includes/docker-url-helper.php';
+  echo etch_fusion_suite_convert_to_internal_url('http://localhost:8888/wp-admin/admin-ajax.php');
+"
+# Output: http://bricks/wp-admin/admin-ajax.php  ✅
 ```
 
 #### Development vs Production
