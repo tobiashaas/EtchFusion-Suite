@@ -412,6 +412,13 @@ class EFS_Migration_Starter {
 				$this->progress_manager->set_action_scheduler_id( $action_id );
 				$this->migration_logger->log( $migration_id, 'info', 'Headless migration queued, action_id: ' . $action_id );
 
+				// Trigger Action Scheduler loopback immediately so the queued task starts processing.
+				// Without this, the queued action sits idle because no subsequent request would trigger the queue.
+				if ( class_exists( 'Bricks2Etch\Services\EFS_Action_Scheduler_Loopback_Runner' ) ) {
+					EFS_Action_Scheduler_Loopback_Runner::maybe_trigger_queue();
+					$this->migration_logger->log( $migration_id, 'info', 'Loopback request triggered for Action Scheduler queue' );
+				}
+
 				return array(
 					'queued'      => true,
 					'migrationId' => $migration_id,
