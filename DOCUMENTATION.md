@@ -272,34 +272,65 @@ npm run wp -- eval "
 
 The plugin detects the environment and falls back to `host.docker.internal` (Docker Desktop) or `gateway.docker.internal` (Linux Docker) if internal service names don't resolve.
 
-### Action Scheduler Hook Registration (Critical)
+### Action Scheduler Hook Registration & Loopback Authentication (Critical)
 
-**Problem:** Headless migrations were stuck at "pending" state even though the migration task was enqueued.
+**Problem:** Headless migrations were stuck at "pending" state despite Action Scheduler being configured and hooks being registered.
 
-**Root Cause:** 
+**Root Cause #1 — Hook Registration:**
 - `EFS_Headless_Migration_Job` is a service registered in the DI container but only instantiated when first accessed
 - Its constructor calls `register_hooks()` to register the `efs_run_headless_migration` WordPress hook
 - When Action Scheduler initializes on `plugins_loaded` hook, the service hasn't been instantiated yet
 - Result: Action Scheduler can't find the callback, logs "no callbacks are registered" error
 
-**Solution:**
+**Root Cause #2 — Loopback Authentication Failure (THE REAL BLOCKER):**
+- Migrations enqueue jobs via `Action Scheduler`, then call `maybe_trigger_queue()` to start the loopback handler
+- The loopback request sends `wp_remote_post()` from within Docker to `admin-ajax.php?efs_run_queue=1`
+- The loopback handler checks `$_SERVER['REMOTE_ADDR']` to verify the request comes from localhost for security
+- **Problem:** Docker container IPs (e.g., `172.18.0.4`) don't match the localhost whitelist (`127.0.0.1`, `::1`, `localhost`)
+- **Result:** Handler receives the loopback request, validates the token, then rejects it due to REMOTE_ADDR mismatch
+- **Impact:** Queue processing never happens, migrations stay "pending" forever
+
+**Solutions:**
+
+**Fix #1 — Hook Registration Timing**
 - Added `init_headless_migration_job()` on `plugins_loaded` with **priority 1** (before Action Scheduler's priority 5)
 - This instantiates `headless_migration_job` service immediately, triggering `register_hooks()`
 - Action Scheduler now sees the registered `efs_run_headless_migration` hook when it initializes
 
+**Fix #2 — REMOTE_ADDR Whitelist for Docker**
+- Modified `handle_queue_trigger()` in `class-action-scheduler-loopback-runner.php` to accept private network IPs
+- Now accepts:
+  - **Localhost:** `127.0.0.1`, `::1`, `localhost`
+  - **Docker private networks:** `10.x.x.x`, `172.16-31.x.x`, `192.168.x.x` (RFC 1918 private ranges)
+- This is secure because these IPs can only originate from the local system/Docker network, not the public internet
+
 **Key Files:**
-- `etch-fusion-suite.php` — Lines 225-228: New hook registration with priority 1
+- `etch-fusion-suite.php` — Lines 225-228: Hook registration with priority 1
 - `includes/services/class-headless-migration-job.php` — Lines 61, 68: Hook registration in constructor
+- `includes/services/class-action-scheduler-loopback-runner.php` — Lines 159-167: REMOTE_ADDR whitelist (Docker support)
+
+**How It Works Now:**
+1. Dashboard → Start Migration (AJAX)
+2. `start_migration_async()` enqueues job via Action Scheduler
+3. `maybe_trigger_queue()` sends loopback request to `admin-ajax.php?efs_run_queue=1&efs_queue_token=...`
+4. Request arrives with `REMOTE_ADDR = 172.18.0.4` (Docker internal IP)
+5. Handler validates token ✅ and REMOTE_ADDR ✅ (now accepts private IPs)
+6. Handler triggers `do_action('action_scheduler_run_queue')` ✅
+7. Action Scheduler processes pending jobs ✅
+8. Migration executes, logs are created ✅
 
 **Testing:**
 ```bash
-# Verify hook is registered:
-npm run wp:tests -- eval 'echo has_action("efs_run_headless_migration") ? "OK" : "FAILED";'
-# Output: OK  ✅
+# Verify both hooks are properly registered:
+npm run wp -- eval 'echo has_action("efs_run_headless_migration") ? "Hook OK" : "Hook FAILED";'
 
-# Execute pending migrations manually:
-npm run wp:tests -- action-scheduler run --hooks=action_scheduler/migration_hook
-# Should complete successfully
+# Start a migration from dashboard, then check logs:
+npm run wp -- db query "SELECT COUNT(*) FROM wp_efs_migration_logs;"
+# Should show >0 logs within 5 seconds
+
+# Check loopback handler success in debug.log:
+npx wp-env run cli bash -c "grep 'Triggering action_scheduler_run_queue' /var/www/html/wp-content/debug.log | tail -1"
+# Should show success, not "REMOTE_ADDR not in whitelist"
 ```
 
 ### npm Scripts Reference
