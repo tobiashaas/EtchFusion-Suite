@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-01
-**Version:** 0.17.0 (Dashboard Real-Time Logging Release)
+**Last Updated:** 2026-03-02
+**Version:** 0.17.1 (Headless Migration Hook Registration Fix)
 
 ---
 
@@ -271,6 +271,36 @@ npm run wp -- eval "
 - **Production**: Uses environment variables or fallback mechanisms for cross-site communication
 
 The plugin detects the environment and falls back to `host.docker.internal` (Docker Desktop) or `gateway.docker.internal` (Linux Docker) if internal service names don't resolve.
+
+### Action Scheduler Hook Registration (Critical)
+
+**Problem:** Headless migrations were stuck at "pending" state even though the migration task was enqueued.
+
+**Root Cause:** 
+- `EFS_Headless_Migration_Job` is a service registered in the DI container but only instantiated when first accessed
+- Its constructor calls `register_hooks()` to register the `efs_run_headless_migration` WordPress hook
+- When Action Scheduler initializes on `plugins_loaded` hook, the service hasn't been instantiated yet
+- Result: Action Scheduler can't find the callback, logs "no callbacks are registered" error
+
+**Solution:**
+- Added `init_headless_migration_job()` on `plugins_loaded` with **priority 1** (before Action Scheduler's priority 5)
+- This instantiates `headless_migration_job` service immediately, triggering `register_hooks()`
+- Action Scheduler now sees the registered `efs_run_headless_migration` hook when it initializes
+
+**Key Files:**
+- `etch-fusion-suite.php` — Lines 225-228: New hook registration with priority 1
+- `includes/services/class-headless-migration-job.php` — Lines 61, 68: Hook registration in constructor
+
+**Testing:**
+```bash
+# Verify hook is registered:
+npm run wp:tests -- eval 'echo has_action("efs_run_headless_migration") ? "OK" : "FAILED";'
+# Output: OK  ✅
+
+# Execute pending migrations manually:
+npm run wp:tests -- action-scheduler run --hooks=action_scheduler/migration_hook
+# Should complete successfully
+```
 
 ### npm Scripts Reference
 
