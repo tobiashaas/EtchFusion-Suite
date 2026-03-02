@@ -141,20 +141,26 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			return;
 		}
 
+		error_log( '[EFS] Loopback handler triggered: efs_run_queue param found' );
+
 		// Verify token to ensure this is a legitimate loopback request from our own system.
 		if ( ! isset( $_GET['efs_queue_token'] ) ) {
+			error_log( '[EFS] Loopback handler: No queue token found' );
 			return;
 		}
 
 		$token_from_request = isset( $_GET['efs_queue_token'] ) ? sanitize_text_field( wp_unslash( $_GET['efs_queue_token'] ) ) : '';
 		$expected_token     = wp_hash( 'efs_queue_runner_' . wp_date( 'Y-m-d H:0' ) );
 		if ( ! hash_equals( (string) $expected_token, (string) $token_from_request ) ) {
+			error_log( '[EFS] Loopback handler: Token mismatch. Expected: ' . $expected_token . ', Got: ' . $token_from_request );
 			return;
 		}
 
 		// Verify request comes from localhost to prevent external triggering.
 		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		error_log( '[EFS] Loopback handler: REMOTE_ADDR = ' . $remote_addr );
 		if ( ! in_array( $remote_addr, array( '127.0.0.1', '::1', 'localhost' ), true ) ) {
+			error_log( '[EFS] Loopback handler: REMOTE_ADDR not in whitelist' );
 			return;
 		}
 
@@ -165,6 +171,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 
 		// Process the Action Scheduler queue.
 		if ( class_exists( 'ActionScheduler' ) ) {
+			error_log( '[EFS] Loopback handler: Triggering action_scheduler_run_queue' );
 			do_action( 'action_scheduler_run_queue' );
 		}
 
