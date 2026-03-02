@@ -156,11 +156,16 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			return;
 		}
 
-		// Verify request comes from localhost to prevent external triggering.
+		// Verify request comes from localhost or private network (for Docker containers).
 		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		error_log( '[EFS] Loopback handler: REMOTE_ADDR = ' . $remote_addr );
-		if ( ! in_array( $remote_addr, array( '127.0.0.1', '::1', 'localhost' ), true ) ) {
-			error_log( '[EFS] Loopback handler: REMOTE_ADDR not in whitelist' );
+		
+		// Allow localhost (127.0.0.1, ::1, localhost) and Docker private networks (10.x.x.x, 172.16.x.x-172.31.x.x, 192.168.x.x)
+		$is_localhost = in_array( $remote_addr, array( '127.0.0.1', '::1', 'localhost' ), true );
+		$is_private_ip = (bool) preg_match( '/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/', $remote_addr );
+		
+		if ( ! ( $is_localhost || $is_private_ip ) ) {
+			error_log( '[EFS] Loopback handler: REMOTE_ADDR not in whitelist (not localhost or private IP)' );
 			return;
 		}
 
