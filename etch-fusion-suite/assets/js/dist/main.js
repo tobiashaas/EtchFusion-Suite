@@ -2216,13 +2216,13 @@
       if (refs.progressItems) {
         const currentItemTitle = payload?.current_item?.title || progress?.current_item_title || "";
         if (itemsTotal > 0) {
-          let itemsText = `Items: ${itemsProcessed}/${itemsTotal}`;
+          let itemsText = `Items processed: ${itemsProcessed}/${itemsTotal}`;
           if (currentItemTitle) {
             itemsText += ` \u2014 ${currentItemTitle}`;
           }
           refs.progressItems.textContent = itemsText;
         } else if (itemsProcessed > 0) {
-          refs.progressItems.textContent = `Items: ${itemsProcessed}`;
+          refs.progressItems.textContent = `Items processed: ${itemsProcessed}`;
         } else if (currentItemTitle) {
           refs.progressItems.textContent = currentItemTitle;
         } else {
