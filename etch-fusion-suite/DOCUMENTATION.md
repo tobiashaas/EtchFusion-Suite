@@ -449,11 +449,25 @@ The plugin uses Action Scheduler for asynchronous task processing (video convers
 - Action Scheduler uses HTTP loopback requests instead (more reliable than site traffic-dependent WP-Cron)
 - Tasks are stored in `wp_actionscheduler_actions` database table
 
-**Cleanup Dashboard Warnings:**
-Past-due actions may appear in the WordPress admin dashboard. Clear them:
+#### Docker Loopback Request Handling (Fixed 2026-03-02)
 
+**Problem:** Action Scheduler loopback requests failed in Docker environments because:
+1. Loopback requests sent `http://localhost:8888/admin-ajax.php` from within a Docker container
+2. `localhost` inside a container doesn't resolve to the WordPress instance (container-to-container networking issue)
+3. Hook handler registered on `admin_init` which **does not fire for AJAX requests**
+
+**Solution (implemented):**
+1. **Docker URL Translation:** Loopback requests now use `etch_fusion_suite_convert_to_internal_url()` to translate `localhost` URLs to container-internal hostnames (e.g., `http://localhost:8888` → `http://wordpress`)
+2. **Hook Registration Fix:** Queue handler moved from `admin_init` to `init` hook, which fires for all request types including AJAX
+3. **Removed Duplicate Handlers:** Consolidated handler registration to single location (no more dual registration)
+
+**Files Modified:**
+- `includes/services/class-action-scheduler-loopback-runner.php` — Added Docker URL conversion + hook change
+- `action-scheduler-config.php` — Removed duplicate handler registration
+
+**Verification:** Run the verification script to confirm all fixes are in place:
 ```bash
-npm run wp -- db query "DELETE FROM wp_actionscheduler_actions WHERE status IN ('pending', 'canceled');"
+npm run wp -- eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/verify-loopback-fixes.php';"
 ```
 
 **Task Example:**
@@ -465,6 +479,13 @@ as_schedule_single_action( time(), 'efs_convert_video', [ 'video_id' => $id ] );
 add_action( 'efs_convert_video', function( $video_id ) {
     $converter->convert( $video_id, 'webm' );
 }, 10, 1 );
+```
+
+**Cleanup Dashboard Warnings:**
+Past-due actions may appear in the WordPress admin dashboard. Clear them:
+
+```bash
+npm run wp -- db query "DELETE FROM wp_actionscheduler_actions WHERE status IN ('pending', 'canceled');"
 ```
 
 ### SSL/TLS Requirements

@@ -36,7 +36,9 @@ class EFS_Action_Scheduler_Loopback_Runner {
 		add_action( 'shutdown', array( self::class, 'maybe_trigger_queue' ), 999 );
 
 		// Hook the queue handler to process legitimate loopback requests.
-		add_action( 'admin_init', array( self::class, 'handle_queue_trigger' ), 1 );
+		// Use 'init' instead of 'admin_init' because loopback requests go to admin-ajax.php,
+		// and admin_init does NOT fire for AJAX requests. The 'init' hook fires for all request types.
+		add_action( 'init', array( self::class, 'handle_queue_trigger' ), 1 );
 	}
 
 	/**
@@ -89,6 +91,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 	 * Trigger queue processing via loopback HTTP request.
 	 *
 	 * Sends a non-blocking request to a custom endpoint that processes the queue.
+	 * Uses Docker-aware URL conversion for container-to-container networking.
 	 */
 	private static function trigger_loopback_request(): void {
 		// Generate secure token to verify this is our loopback request.
@@ -100,6 +103,13 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			),
 			admin_url( 'admin-ajax.php' )
 		);
+
+		// Convert localhost URL to internal container hostname for Docker compatibility.
+		// In Docker, localhost:8888 from inside a container doesn't resolve to the host.
+		// This uses the docker-url-helper to translate to the correct container-internal address.
+		if ( function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
+			$url = etch_fusion_suite_convert_to_internal_url( $url );
+		}
 
 		// Use wp_remote_post with timeout=0.001 to make it non-blocking.
 		wp_remote_post(

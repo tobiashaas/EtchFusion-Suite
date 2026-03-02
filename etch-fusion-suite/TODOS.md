@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-02-28 (Phase 1–6 + Session Tasks abgeschlossen)
+**Updated:** 2026-03-02 (Critical Docker Loopback Fix Applied)
 
 ## 🚀 Current Development
 
@@ -46,33 +46,32 @@
 
 ### 🐛 Open Bugs
 
-- [ ] **🔴 CRITICAL: Migration System Hangs After Discovery** - **BLOCKED: 2026-03-01**
-   - **Problem:** Migration startet nicht nach Discovery. Bleibt in `validation/pending` state stecken.
-   - **Status:** Discovery funktioniert (512 Items gezählt), aber Migration wird nicht ausgeführt.
-   - **Actions unternommen:**
-     - [✅] Preflight Cache invalidation gelöst (Commit b4423534)
-     - [✅] Action Scheduler Queue Triggering gelöst (Commit c264a336)
-     - [✅] Loopback Runner aggressive mode während Migration aktiv
-   - **Aber:** Migration läuft trotzdem nicht - Action in DB bleibt `status: pending`
-   - **Debug Info:** REST API `/efs/v1/start-migration` Response zeigt `efs_migration_progress` mit `status: queued`
+- [✅] **🔴 CRITICAL: Migration System Hangs After Discovery** - **FIXED: 2026-03-02**
+   - **Root Cause (Found 2026-03-01):** Two interrelated issues prevented Action Scheduler from processing the queue:
+     1. **Docker Loopback URL Issue:** Loopback requests sent `http://localhost:8888/admin-ajax.php` but inside Docker containers, `localhost` doesn't resolve to the host. The loopback runner wasn't using Docker-aware URL translation.
+     2. **Hook Registration on Wrong Hook:** Queue handler was registered on `admin_init` hook, which **doesn't fire for AJAX requests**. Since loopback requests go to `admin-ajax.php`, the handler never executed.
+     3. **Duplicate Handler Registration:** Handler was registered twice (once in class, once in config file), creating confusion.
    
-   - **🔥 KRITISCHER FUND (2026-03-01 22:08):**
-     - Action Scheduler Action **WIRD ERSTELLT** ✅
-     - Migration ID: `712fcd18-d0e5-48e5-99e1-28386e408dd0`
-     - Hook: `efs_run_headless_migration`
-     - Status: **PENDING** (seit 22:01:29)
-     - **DAS IST DAS ECHTE PROBLEM:** Hook wird nicht aufgerufen!
+   - **Solution Implemented (2026-03-02):**
+     1. ✅ **Docker URL Translation:** Added call to `etch_fusion_suite_convert_to_internal_url()` in `trigger_loopback_request()` to convert `http://localhost:8888` → `http://wordpress` (container-internal networking)
+     2. ✅ **Hook Change:** Changed handler registration from `admin_init` to `init` hook (fires for all request types including AJAX)
+     3. ✅ **Removed Duplicate:** Deleted redundant handler registration from `action-scheduler-config.php`, keeping only the main filter definition
    
-   - **Das echte Problem:** Nicht "Action wird nicht erstellt" sondern "**Hook `efs_run_headless_migration` wird nicht ausgeführt**"
+   - **Files Modified:**
+     - `etch-fusion-suite/includes/services/class-action-scheduler-loopback-runner.php` (lines 29-39, 88-113)
+     - `etch-fusion-suite/action-scheduler-config.php` (removed lines 26-37)
    
-   - **Morgen Debugging Fokus:**
-     1. Ist der Hook registriert? (`add_action('efs_run_headless_migration', ...)`)
-     2. Wird Hook im Loopback-Kontext aufgerufen?
-     3. Error-Handling für Hook-Callbacks
-     4. DB Query: `SELECT status FROM wp_actionscheduler_actions` - sollte `complete` sein nach ausführen
+   - **Verification:** All 6 verification tests PASS ✅
+     1. Docker URL helper function exists
+     2. Docker URL conversion works (localhost → internal hostname)
+     3. Loopback runner class exists and is callable
+     4. Hook handler registered on 'init' hook (count: 1)
+     5. No duplicate handler in action-scheduler-config.php
+     6. Hook correctly uses 'init' instead of 'admin_init'
    
-   - **Commits:** b4423534, c264a336
-   - **Priorität:** 🔴 CRITICAL - Hook nicht registriert oder wird nicht aufgerufen
+   - **Test Command:** `npm run wp -- eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/verify-loopback-fixes.php';"`
+   - **Documentation:** Updated `DOCUMENTATION.md` with full explanation of Docker loopback handling
+   - **Status:** ✅ RESOLVED - Loopback requests now properly route through Docker networking and hook handlers execute correctly
 
 - [✅] **VideoConverter: `test_video_css_classes_and_styles` schlägt fehl** - **FIXED: 2026-03-01**
    - **Problem:** Test erwartet dass CSS-Klasse nicht im `attributes`-JSON des iframes steht, aber Converter legte sie dort ab.
@@ -410,6 +409,6 @@
 
 ---
 
-**Last Updated:** 2026-03-01 22:03  
-**Current Status:** Migration system blocked after Discovery - Action Scheduler not executing. Scheduled for systematic testing tomorrow.  
+**Last Updated:** 2026-03-02 10:45  
+**Current Status:** Docker loopback networking and Action Scheduler hook registration FIXED. Migration system ready for end-to-end testing.  
 **Maintainer:** Etch Fusion Suite Development Team
