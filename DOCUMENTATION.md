@@ -185,6 +185,67 @@ This file is gitignored and allows local overrides:
 
 Copy `.wp-env.override.json.example` to `.wp-env.override.json` and customize as needed.
 
+### Docker Networking & Container Communication
+
+The plugin runs in a Docker environment managed by wp-env. Container-to-container communication (loopback requests, inter-site API calls) requires special URL handling due to Docker networking constraints.
+
+#### Internal Service Names
+
+wp-env creates Docker containers with clear service names:
+
+| Service | Port | Purpose | Internal URL |
+| --- | --- | --- | --- |
+| `bricks` | 8888 | Bricks Builder source site | `http://bricks/` |
+| `etch` | 8889 | Etch target site | `http://etch/` |
+
+These names resolve inside the Docker network via DNS but **not** to the host machine. Browser requests still use `http://localhost:8888` and `http://localhost:8889`.
+
+#### URL Conversion (docker-url-helper.php)
+
+The plugin automatically converts URLs for server-side requests:
+
+```
+Browser URL               Internal URL (for container requests)
+──────────────────────   ──────────────────────────────────
+http://localhost:8888    →  http://bricks
+http://localhost:8889    →  http://etch
+```
+
+This conversion happens transparently in:
+- Loopback requests (Action Scheduler queue processing)
+- Cross-site API calls
+- REST API filters
+
+**Key Files:**
+- `includes/docker-url-helper.php` — Main URL conversion logic with DNS resolution fallbacks
+- `includes/hooks/rest-api-docker-compat.php` — REST API filter hook for transparent URL conversion
+- `services/class-action-scheduler-loopback-runner.php` — Action Scheduler loopback handler
+
+#### Testing Docker Networking
+
+Verify internal service names resolve correctly from inside the Bricks container:
+
+```bash
+# From Bricks container (port 8888):
+npm run wp -- eval "echo gethostbyname('bricks');    // 172.18.x.x
+                     echo gethostbyname('etch');     // 172.18.x.x"
+
+# REST API URLs show internal names:
+npm run wp -- eval "echo rest_url('wp/v2/types/post');"
+# Output: http://bricks/wp-json/wp/v2/types/post
+
+# From Etch container (port 8889):
+npm run wp:tests -- eval "echo rest_url('wp/v2/types/post');"
+# Output: http://etch/wp-json/wp/v2/types/post
+```
+
+#### Development vs Production
+
+- **Development (wp-env)**: Uses internal Docker service names (`bricks`, `etch`)
+- **Production**: Uses environment variables or fallback mechanisms for cross-site communication
+
+The plugin detects the environment and falls back to `host.docker.internal` (Docker Desktop) or `gateway.docker.internal` (Linux Docker) if internal service names don't resolve.
+
 ### npm Scripts Reference
 
 #### Environment Management
