@@ -27,6 +27,8 @@ if ( ! function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
 
 		$etch_internal = etch_fusion_suite_resolve_internal_service_host(
 			array(
+				'etch',
+				'etch-wordpress',
 				'efs-etch',
 				'etch-wordpress-etch-1',
 				'etchfusion-suite-wordpress-etch-1',
@@ -46,8 +48,8 @@ if ( ! function_exists( 'etch_fusion_suite_convert_to_internal_url' ) ) {
 			'http://localhost:8081'  => $default_internal,
 			'https://localhost:8888' => $bricks_8888,
 			'http://localhost:8888'  => $bricks_8888,
-			'https://localhost:8889' => 'http://tests-wordpress',
-			'http://localhost:8889'  => 'http://tests-wordpress',
+			'https://localhost:8889' => 'http://etch',
+			'http://localhost:8889'  => 'http://etch',
 		);
 
 		$normalized = strtr( $url, array_filter( $replacements ) );
@@ -122,7 +124,8 @@ if ( ! function_exists( 'etch_fusion_suite_resolve_bricks_internal_host' ) ) {
 	function etch_fusion_suite_resolve_bricks_internal_host() {
 		static $cache = array();
 
-		$candidates = array( 'wordpress', 'bricks' );
+		// Prefer the short, clear naming: bricks and etch
+		$candidates = array( 'bricks', 'bricks-wordpress', 'wordpress' );
 		$candidates = apply_filters( 'etch_fusion_suite_bricks_internal_host_candidates', $candidates );
 
 		$cache_key = 'efs_bricks_host_' . substr( md5( implode( ',', $candidates ) ), 0, 8 );
