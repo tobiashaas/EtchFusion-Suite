@@ -141,6 +141,10 @@ require_once ETCH_FUSION_SUITE_DIR . 'includes/autoloader.php';
 // Docker/internal URL conversion (used by API client and AJAX handlers)
 require_once ETCH_FUSION_SUITE_DIR . 'includes/docker-url-helper.php';
 
+// REST API & loopback URL compatibility for Docker containers
+// Must be loaded early to intercept REST URL construction before any REST requests
+require_once ETCH_FUSION_SUITE_DIR . 'includes/hooks/rest-api-docker-compat.php';
+
 // Manually load container classes (ensure they're available before bootstrap)
 require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-container.php';
 require_once ETCH_FUSION_SUITE_DIR . 'includes/container/class-service-provider.php';
