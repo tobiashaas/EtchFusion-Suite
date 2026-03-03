@@ -145,6 +145,23 @@ class EFS_Migration_Controller {
 		if ( ! empty( $migration_id ) && ! $this->is_valid_uuid( $migration_id ) ) {
 			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
 		}
+
+		// Check if migration is configured with target URL (required for API calls).
+		$settings    = get_option( 'efs_settings', array() );
+		$target_url  = isset( $settings['target_url'] ) ? esc_url_raw( $settings['target_url'] ) : '';
+		$migration_key = isset( $settings['migration_key'] ) ? sanitize_textarea_field( $settings['migration_key'] ) : '';
+
+		if ( empty( $target_url ) && empty( $migration_key ) ) {
+			return new \WP_Error(
+				'configuration_incomplete',
+				__( 'Migration is not configured. Please complete Step 2: Connect to Etch Site in the migration wizard.', 'etch-fusion-suite' ),
+				array(
+					'status'      => 'configuration_required',
+					'migrationId' => $migration_id,
+				)
+			);
+		}
+
 		$result = $this->manager->get_progress( $migration_id );
 		if ( is_wp_error( $result ) ) {
 			$result->add_data( array( 'migrationId' => $migration_id ) );

@@ -80,13 +80,20 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
         if (error?.name === 'AbortError') {
             return { aborted: true, migrationId };
         }
+        
+        // Extract error code from WordPress error response
+        const errorCode = error?.code || error?.data?.code || '';
+        const errorMessage = buildAjaxErrorMessage(error, 'Failed to retrieve migration progress.');
+        
         console.error('[EFS] Progress request failed:', error);
         return {
             progress: { percentage: 0, status: 'error', current_step: 'error' },
             steps: [],
             migrationId,
             completed: false,
-            error: buildAjaxErrorMessage(error, 'Failed to retrieve migration progress.'),
+            error: errorMessage,
+            code: errorCode,
+            data: error?.data || {},
             failed: true,
         };
     }
@@ -250,7 +257,14 @@ export const startProgressPolling = (params = {}, options = {}) => {
             );
 
             if (pollState.failureCount >= pollState.maxFailures) {
-                const message = result?.error || 'Migration progress polling failed repeatedly.';
+                // Check if error is configuration_incomplete - show helpful message
+                let message = result?.error || 'Migration progress polling failed repeatedly.';
+                const errorCode = result?.data?.status || result?.code;
+                
+                if (errorCode === 'configuration_incomplete' || result?.code === 'configuration_incomplete') {
+                    message = 'Migration setup incomplete. Please go back to Step 2: Connect to Etch Site to configure the connection.';
+                }
+                
                 stopProgressPolling();
                 showToast(message, 'error');
                 return;
