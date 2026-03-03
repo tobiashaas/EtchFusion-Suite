@@ -296,11 +296,7 @@ class EFS_Migration_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$payload = array(
-			'target_url' => $this->get_post( 'target_url', '', 'text' ),
-		);
-
-		$result = $this->settings_controller->generate_migration_key( $payload );
+		$result = $this->settings_controller->generate_migration_key();
 
 		$this->send_controller_response( $result, 'migration_key_failed', 'Migration key generated.' );
 	}
