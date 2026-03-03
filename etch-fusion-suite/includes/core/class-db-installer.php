@@ -34,6 +34,17 @@ class EFS_DB_Installer {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
+		// Create settings table (centralized configuration storage)
+		$settings_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_settings (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			setting_key VARCHAR(100) UNIQUE NOT NULL,
+			setting_value LONGTEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			KEY setting_key (setting_key)
+		) $charset_collate;";
+
 		// Create migrations table
 		$migrations_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migrations (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -73,9 +84,13 @@ class EFS_DB_Installer {
 
 		// Execute CREATE TABLE statements directly
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( $settings_table );
 		$wpdb->query( $migrations_table );
 		$wpdb->query( $logs_table );
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		// Migrate existing wp_options data to new settings table
+		self::migrate_settings_to_custom_table();
 
 		// Store version
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
@@ -92,6 +107,13 @@ class EFS_DB_Installer {
 	public static function is_installed() {
 		global $wpdb;
 
+		$settings_exists = $wpdb->query(
+			$wpdb->prepare(
+				'SHOW TABLES LIKE %s',
+				$wpdb->esc_like( $wpdb->prefix . 'efs_settings' )
+			)
+		) > 0;
+
 		$migrations_exists = $wpdb->query(
 			$wpdb->prepare(
 				'SHOW TABLES LIKE %s',
@@ -106,7 +128,49 @@ class EFS_DB_Installer {
 			)
 		) > 0;
 
-		return $migrations_exists && $logs_exists;
+		return $settings_exists && $migrations_exists && $logs_exists;
+	}
+
+	/**
+	 * Migrate settings from wp_options to custom efs_settings table.
+	 * Called during plugin installation/activation.
+	 * Only migrates if table is empty to prevent duplicate migrations.
+	 */
+	private static function migrate_settings_to_custom_table() {
+		global $wpdb;
+
+		$settings_table = $wpdb->prefix . 'efs_settings';
+
+		// Check if already migrated (table has data)
+		$count = $wpdb->get_var( "SELECT COUNT(*) FROM $settings_table" );
+		if ( $count > 0 ) {
+			return; // Already migrated
+		}
+
+		// List of settings to migrate from wp_options
+		$options_to_migrate = array(
+			'efs_settings',
+			'efs_migration_settings',
+			'efs_feature_flags',
+			'efs_cors_allowed_origins',
+			'efs_security_settings',
+		);
+
+		foreach ( $options_to_migrate as $option_name ) {
+			$option_value = get_option( $option_name );
+			if ( false !== $option_value ) {
+				$wpdb->insert(
+					$settings_table,
+					array(
+						'setting_key'   => $option_name,
+						'setting_value' => wp_json_encode( $option_value ),
+					),
+					array( '%s', '%s' )
+				);
+			}
+		}
+
+		error_log( '[EFS] Settings migrated from wp_options to custom table at ' . current_time( 'mysql' ) );
 	}
 
 	/**
@@ -118,11 +182,12 @@ class EFS_DB_Installer {
 	public static function uninstall() {
 		global $wpdb;
 
-		// Drop tables
+		// Drop custom tables
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_migration_logs" );
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_migrations" );
+		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_settings" );
 
-		// Delete all plugin options
+		// Delete all plugin options (legacy, kept for backward compatibility)
 		$efs_options = array(
 			'efs_settings',
 			'efs_db_version',

@@ -42,19 +42,26 @@ class EFS_Migration_Controller {
 		$batch         = isset( $data['batch_size'] ) ? intval( $data['batch_size'] ) : 50;
 
 		if ( empty( $migration_key ) ) {
-			$settings      = get_option( 'efs_settings', array() );
-			$migration_key = isset( $settings['migration_key'] ) ? sanitize_textarea_field( $settings['migration_key'] ) : '';
+			// Try to get from saved settings via repository
+			$settings_repo = etch_fusion_suite_container()->get( 'settings_repository' );
+			if ( $settings_repo ) {
+				$saved_settings = $settings_repo->get_migration_settings();
+				$migration_key  = isset( $saved_settings['migration_key'] ) ? sanitize_textarea_field( $saved_settings['migration_key'] ) : '';
+			}
 		}
 
 		if ( empty( $migration_key ) ) {
 			return new \WP_Error( 'missing_migration_key', __( 'Migration key is required to start the migration.', 'etch-fusion-suite' ) );
 		}
 
-		// Save migration_key to Settings for later retrieval by get_progress().
+		// Save migration_key to Settings via repository for later retrieval by get_progress().
 		// This ensures the key is available for all subsequent API calls without re-sending it in every request.
-		$settings                  = get_option( 'efs_settings', array() );
-		$settings['migration_key'] = $migration_key;
-		update_option( 'efs_settings', $settings );
+		$settings_repo = etch_fusion_suite_container()->get( 'settings_repository' );
+		if ( $settings_repo ) {
+			$current_settings             = $settings_repo->get_migration_settings();
+			$current_settings['migration_key'] = $migration_key;
+			$settings_repo->save_migration_settings( $current_settings );
+		}
 
 		// Extract target_url from JWT token (ONLY source of truth).
 		$target_url = isset( $data['target_url'] ) ? esc_url_raw( $data['target_url'] ) : '';
@@ -150,8 +157,11 @@ class EFS_Migration_Controller {
 		// Get migration_key from request or settings (only source of target_url).
 		$migration_key = isset( $data['migration_key'] ) ? sanitize_textarea_field( $data['migration_key'] ) : '';
 		if ( empty( $migration_key ) ) {
-			$settings      = get_option( 'efs_settings', array() );
-			$migration_key = isset( $settings['migration_key'] ) ? sanitize_textarea_field( $settings['migration_key'] ) : '';
+			$settings_repo = etch_fusion_suite_container()->get( 'settings_repository' );
+			if ( $settings_repo ) {
+				$saved_settings = $settings_repo->get_migration_settings();
+				$migration_key  = isset( $saved_settings['migration_key'] ) ? sanitize_textarea_field( $saved_settings['migration_key'] ) : '';
+			}
 		}
 
 		// Extract target_url from JWT token (ONLY source of truth).

@@ -42,7 +42,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 			return $cached;
 		}
 
-		$settings = get_option( 'efs_settings', array() );
+		$settings = $this->get_setting( 'efs_settings' );
 		$settings = is_array( $settings ) ? $settings : array();
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
 
@@ -57,7 +57,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	 */
 	public function save_plugin_settings( array $settings ): bool {
 		$this->invalidate_cache( 'efs_cache_settings_plugin' );
-		return update_option( 'efs_settings', $settings );
+		return $this->save_setting( 'efs_settings', $settings );
 	}
 
 	/**
@@ -73,7 +73,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 			return $cached;
 		}
 
-		$settings = get_option( 'efs_migration_settings', array() );
+		$settings = $this->get_setting( 'efs_migration_settings' );
 		$settings = is_array( $settings ) ? $settings : array();
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
 
@@ -88,7 +88,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	 */
 	public function save_migration_settings( array $settings ): bool {
 		$this->invalidate_cache( 'efs_cache_settings_migration' );
-		return update_option( 'efs_migration_settings', $settings );
+		return $this->save_setting( 'efs_migration_settings', $settings );
 	}
 
 	/**
@@ -97,12 +97,18 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	 * @return bool True on success, false on failure.
 	 */
 	public function clear_all_settings(): bool {
+		global $wpdb;
+
 		$this->invalidate_cache( 'efs_cache_settings_plugin' );
 		$this->invalidate_cache( 'efs_cache_settings_migration' );
 		$this->invalidate_cache( 'efs_cache_cors_origins' );
 		$this->invalidate_cache( 'efs_cache_security_settings' );
 		$this->invalidate_cache( self::FEATURE_FLAGS_CACHE_KEY );
 
+		// Clear custom settings table
+		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}efs_settings" );
+
+		// Also clear from wp_options for backward compatibility
 		$result = true;
 		$result = delete_option( 'efs_settings' ) && $result;
 		$result = delete_option( 'efs_migration_settings' ) && $result;
@@ -125,7 +131,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 			return $cached;
 		}
 
-		$flags = get_option( 'efs_feature_flags', array() );
+		$flags = $this->get_setting( 'efs_feature_flags' );
 		$flags = is_array( $flags ) ? $flags : array();
 
 		set_transient( self::FEATURE_FLAGS_CACHE_KEY, $flags, self::CACHE_EXPIRATION );
@@ -153,7 +159,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 
 		$this->invalidate_cache( self::FEATURE_FLAGS_CACHE_KEY );
 
-		return update_option( 'efs_feature_flags', $sanitized_flags );
+		return $this->save_setting( 'efs_feature_flags', $sanitized_flags );
 	}
 
 	/**
@@ -196,7 +202,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 			return $cached;
 		}
 
-		$origins = get_option( 'efs_cors_allowed_origins', array() );
+		$origins = $this->get_setting( 'efs_cors_allowed_origins' );
 		$origins = is_array( $origins ) ? $origins : array();
 		set_transient( $cache_key, $origins, self::CACHE_EXPIRATION );
 
@@ -216,7 +222,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		}
 
 		$this->invalidate_cache( 'efs_cache_cors_origins' );
-		return update_option( 'efs_cors_allowed_origins', $origins );
+		return $this->save_setting( 'efs_cors_allowed_origins', $origins );
 	}
 
 	/**
@@ -242,7 +248,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 			'require_https'         => false,
 		);
 
-		$settings = get_option( 'efs_security_settings', $defaults );
+		$settings = $this->get_setting( 'efs_security_settings' );
 		$settings = is_array( $settings ) ? wp_parse_args( $settings, $defaults ) : $defaults;
 
 		set_transient( $cache_key, $settings, self::CACHE_EXPIRATION );
@@ -263,7 +269,7 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 		}
 
 		$this->invalidate_cache( 'efs_cache_security_settings' );
-		return update_option( 'efs_security_settings', $settings );
+		return $this->save_setting( 'efs_security_settings', $settings );
 	}
 
 	/**
@@ -273,5 +279,75 @@ class EFS_WordPress_Settings_Repository implements Settings_Repository_Interface
 	 */
 	private function invalidate_cache( string $cache_key ): void {
 		delete_transient( $cache_key );
+	}
+
+	/**
+	 * Get a setting from the custom efs_settings table.
+	 *
+	 * @param string $setting_key The setting key to retrieve.
+	 * @param mixed  $default_value Default value if setting not found.
+	 * @return mixed The setting value, or default value if not found.
+	 */
+	private function get_setting( string $setting_key, $default_value = null ) {
+		global $wpdb;
+
+		$result = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT setting_value FROM {$wpdb->prefix}efs_settings WHERE setting_key = %s",
+				$setting_key
+			)
+		);
+
+		if ( null === $result ) {
+			return $default_value;
+		}
+
+		// Decode JSON if present, otherwise return as-is
+		$decoded = json_decode( $result, true );
+		return ( json_last_error() === JSON_ERROR_NONE ) ? $decoded : $result;
+	}
+
+	/**
+	 * Save a setting to the custom efs_settings table.
+	 *
+	 * @param string $setting_key The setting key.
+	 * @param mixed  $setting_value The value to save.
+	 * @return bool True on success, false on failure.
+	 */
+	private function save_setting( string $setting_key, $setting_value ): bool {
+		global $wpdb;
+
+		$encoded_value = wp_json_encode( $setting_value );
+
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->prefix}efs_settings (setting_key, setting_value) 
+				 VALUES (%s, %s)
+				 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = CURRENT_TIMESTAMP",
+				$setting_key,
+				$encoded_value
+			)
+		);
+
+		return false !== $result;
+	}
+
+	/**
+	 * Delete a setting from the custom efs_settings table.
+	 *
+	 * @param string $setting_key The setting key to delete.
+	 * @return bool True on success, false on failure.
+	 */
+	private function delete_setting( string $setting_key ): bool {
+		global $wpdb;
+
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->prefix}efs_settings WHERE setting_key = %s",
+				$setting_key
+			)
+		);
+
+		return false !== $result;
 	}
 }
