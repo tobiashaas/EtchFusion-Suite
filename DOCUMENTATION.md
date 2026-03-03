@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-02
-**Version:** 0.17.1 (Headless Migration Hook Registration Fix)
+**Last Updated:** 2026-03-03
+**Version:** 0.17.2 (JWT-Only URL Extraction + Dead Code Cleanup)
 
 ---
 
@@ -946,6 +946,42 @@ The logger now sanitizes event metadata, masks sensitive keys (API keys, tokens,
 ---
 
 ## Admin Settings UI
+
+### Migration Settings Storage Architecture
+
+**CRITICAL ARCHITECTURE DECISION**: `target_url` is **NEVER** persisted to WordPress settings.
+
+Only the `migration_key` (JWT token) is stored in `efs_settings` because:
+1. The JWT payload already contains the `target_url`
+2. URL extraction must be dynamic to handle Docker host translations
+3. Static URL storage leads to stale data and sync issues
+
+**Settings Storage Rules**:
+- ✅ **STORED**: `efs_settings['migration_key']` — JWT token (contains URL in payload)
+- ❌ **NOT STORED**: `efs_settings['target_url']` — Extracted dynamically from JWT only
+- ❌ **NOT STORED**: `efs_settings['api_key']` — Deprecated, not used in current flow
+
+**URL Extraction Pattern**:
+```php
+// CORRECT: Extract from JWT token
+$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
+$target_url = $decoded['payload']['target_url'] ?? '';
+
+// WRONG: Never do this
+$target_url = $settings['target_url'] ?? ''; // This key doesn't exist!
+```
+
+**Implementation Locations**:
+- `class-migration-controller.php::get_target_url_from_migration_key()` — The authoritative method
+- `class-migration-controller.php::start_migration()` — Uses JWT decoding
+- `class-migration-controller.php::get_progress()` — Uses JWT decoding
+- All migration services use the controller's methods, not direct settings lookups
+
+**Dead Code Removed** (v0.17.2):
+- `connection-ajax.php::save_settings()` — No longer validates `target_url` from request
+- `settings-controller.php::sanitize_settings()` — Only handles `migration_key`
+- `gutenberg_generator.php::convert_bricks_to_gutenberg()` — Marked deprecated (unused)
+- All fallback patterns trying to read `efs_settings['target_url']`
 
 ### Migration key & token alignment
 
