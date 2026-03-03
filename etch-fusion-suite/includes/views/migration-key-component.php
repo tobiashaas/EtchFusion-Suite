@@ -5,10 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $etch_fusion_suite_component_nonce    = isset( $nonce ) ? $nonce : '';
 $etch_fusion_suite_component_context  = isset( $context ) ? sanitize_key( $context ) : '';
-$etch_fusion_suite_component_settings = isset( $settings ) && is_array( $settings ) ? $settings : array();
-
-$etch_fusion_suite_component_target_url = isset( $etch_fusion_suite_component_settings['target_url'] ) ? $etch_fusion_suite_component_settings['target_url'] : '';
-$etch_fusion_suite_component_api_key    = isset( $etch_fusion_suite_component_settings['api_key'] ) ? $etch_fusion_suite_component_settings['api_key'] : '';
+$etch_fusion_suite_component_api_key  = isset( $settings ) && is_array( $settings ) && isset( $settings['api_key'] ) ? $settings['api_key'] : '';
 
 $etch_fusion_suite_component_heading = 'bricks' === $etch_fusion_suite_component_context
 	? __( 'Generate migration key from Etch site', 'etch-fusion-suite' )
@@ -26,7 +23,6 @@ $etch_fusion_suite_component_description = 'bricks' === $etch_fusion_suite_compo
 	<form method="post" class="efs-inline-form" data-efs-generate-key>
 		<input type="hidden" name="nonce" value="<?php echo esc_attr( $etch_fusion_suite_component_nonce ); ?>" />
 		<input type="hidden" name="context" value="<?php echo esc_attr( $etch_fusion_suite_component_context ); ?>" />
-		<input type="hidden" name="target_url" value="<?php echo esc_attr( $etch_fusion_suite_component_target_url ); ?>" />
 		<?php if ( 'bricks' === $etch_fusion_suite_component_context ) : ?>
 			<input type="hidden" name="api_key" value="<?php echo esc_attr( $etch_fusion_suite_component_api_key ); ?>" />
 		<?php endif; ?>
