@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### 🐛 Bug Fixes (Critical)
+
+- **Migration key persistence fix (v0.17.5+):** `start_migration()` controller method now saves the received migration_key to `wp_options['efs_settings']` after validation. This fixes the "configuration_incomplete" error that occurred when `get_progress()` tried to retrieve the key from Settings but found none. Root cause: Frontend only sent migration_key on initial start call; backend never persisted it. Now all subsequent progress polls can extract target_url from the saved JWT token. Minimal change (3 lines added to class-migration-controller.php lines 53-57).
+
 ## [0.15.0] — 2026-03-01
 
 ### 🚀 Features & Refactoring

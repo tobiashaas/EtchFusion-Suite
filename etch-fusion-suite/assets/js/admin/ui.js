@@ -148,13 +148,14 @@ export const setLoading = (element, isLoading) => {
     element.disabled = Boolean(isLoading);
 };
 
-export const updateProgress = ({ percentage = 0, status = '', steps = [], items_processed = 0, items_total = 0, items_skipped = 0, elapsed_seconds = 0, estimated_time_remaining = null }) => {
+export const updateProgress = ({ percentage = 0, status = '', steps = [], items_processed = 0, items_total = 0, items_skipped = 0, elapsed_seconds = 0, estimated_time_remaining = null, breakdown = {} }) => {
     const progressRoot = document.querySelector('[data-efs-progress]');
     const progressFill = progressRoot?.querySelector('.efs-progress-fill');
     const currentStep = document.querySelector('[data-efs-current-step]');
     const stepsList = document.querySelector('[data-efs-steps]');
     const itemsCount = document.querySelector('[data-efs-items-count]');
     const timeDisplay = document.querySelector('[data-efs-progress-time]');
+    const breakdownContainer = document.querySelector('[data-efs-breakdown]');
 
     let displayPercentage;
     if (items_total > 0) {
@@ -194,6 +195,39 @@ export const updateProgress = ({ percentage = 0, status = '', steps = [], items_
             itemsCount.textContent = '';
             itemsCount.hidden = true;
         }
+    }
+
+    // Render per-post-type breakdown if data available
+    if (breakdownContainer && typeof breakdown === 'object' && Object.keys(breakdown).length > 0) {
+        breakdownContainer.innerHTML = '';
+        const breakdownList = document.createElement('ul');
+        breakdownList.className = 'efs-breakdown-list';
+        
+        Object.entries(breakdown).forEach(([postType, stats]) => {
+            const li = document.createElement('li');
+            li.className = 'efs-breakdown-item';
+            
+            const total = stats.total || 0;
+            const processed = stats.processed || 0;
+            const skipped = stats.skipped || 0;
+            
+            const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+            const postTypeLabel = postType.charAt(0).toUpperCase() + postType.slice(1);
+            
+            li.innerHTML = `
+                <span class="efs-breakdown-label">${postTypeLabel}</span>
+                <span class="efs-breakdown-progress">
+                    <span class="efs-breakdown-bar" style="width: ${percent}%"></span>
+                </span>
+                <span class="efs-breakdown-count">${processed}/${total}${skipped > 0 ? ` (-${skipped})` : ''}</span>
+            `;
+            breakdownList.appendChild(li);
+        });
+        
+        breakdownContainer.appendChild(breakdownList);
+        breakdownContainer.hidden = false;
+    } else if (breakdownContainer) {
+        breakdownContainer.hidden = true;
     }
 
     if (timeDisplay) {

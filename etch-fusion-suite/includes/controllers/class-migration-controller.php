@@ -50,6 +50,12 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'missing_migration_key', __( 'Migration key is required to start the migration.', 'etch-fusion-suite' ) );
 		}
 
+		// Save migration_key to Settings for later retrieval by get_progress().
+		// This ensures the key is available for all subsequent API calls without re-sending it in every request.
+		$settings                  = get_option( 'efs_settings', array() );
+		$settings['migration_key'] = $migration_key;
+		update_option( 'efs_settings', $settings );
+
 		// Extract target_url from JWT token (ONLY source of truth).
 		$target_url = isset( $data['target_url'] ) ? esc_url_raw( $data['target_url'] ) : '';
 		if ( empty( $target_url ) ) {
@@ -173,9 +179,16 @@ class EFS_Migration_Controller {
 		$steps             = isset( $result['steps'] ) && is_array( $result['steps'] ) ? $result['steps'] : array();
 		$progress['steps'] = $steps;
 
+		// Get items breakdown by post type.
+		$breakdown = array();
+		if ( ! empty( $migration_id ) && isset( $this->manager ) && method_exists( $this->manager, 'get_items_breakdown_by_post_type' ) ) {
+			$breakdown = $this->manager->get_items_breakdown_by_post_type( $migration_id );
+		}
+
 		return array(
 			'progress'                 => $progress,
 			'steps'                    => $steps,
+			'breakdown'                => $breakdown,
 			'migrationId'              => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'last_updated'             => isset( $progress['last_updated'] ) ? $progress['last_updated'] : '',
 			'is_stale'                 => ! empty( $progress['is_stale'] ),

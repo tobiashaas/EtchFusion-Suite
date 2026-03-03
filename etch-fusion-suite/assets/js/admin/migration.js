@@ -67,6 +67,7 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
             items_skipped: progress.items_skipped || 0,
             elapsed_seconds: data?.elapsed_seconds || 0,
             estimated_time_remaining: data?.estimated_time_remaining || null,
+            breakdown: data?.breakdown || {},
         });
 
         if (data?.completed) {
@@ -135,6 +136,7 @@ export const startMigration = async (payload) => {
         items_processed: data?.progress?.items_processed || 0,
         items_total: data?.progress?.items_total || 0,
         items_skipped: data?.progress?.items_skipped || 0,
+        breakdown: data?.breakdown || {},
     });
     startProgressPolling({ migrationId: getActiveMigrationId() });
     return data;

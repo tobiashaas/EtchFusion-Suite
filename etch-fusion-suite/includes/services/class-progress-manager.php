@@ -325,8 +325,20 @@ class EFS_Progress_Manager {
 	 */
 	public function enrich_progress_with_times( array $progress ): array {
 		$started_at_str = isset( $progress['started_at'] ) ? (string) $progress['started_at'] : '';
-		$started_ts     = '' !== $started_at_str ? strtotime( $started_at_str ) : 0;
-		$elapsed        = $started_ts > 0 ? max( 0, time() - $started_ts ) : 0;
+		// CRITICAL: started_at is stored as UTC (via current_time('mysql', true)).
+		// strtotime() without explicit timezone treats it as local time, causing offset errors.
+		// Solution: Parse as UTC explicitly using DateTime.
+		$started_ts = 0;
+		if ( '' !== $started_at_str ) {
+			try {
+				$dt         = new \DateTime( $started_at_str, new \DateTimeZone( 'UTC' ) );
+				$started_ts = $dt->getTimestamp();
+			} catch ( \Exception $e ) {
+				// Fallback if DateTime parsing fails (shouldn't happen with valid MySQL datetime).
+				$started_ts = 0;
+			}
+		}
+		$elapsed = $started_ts > 0 ? max( 0, time() - $started_ts ) : 0;
 
 		$progress['elapsed_seconds'] = $elapsed;
 
@@ -342,5 +354,60 @@ class EFS_Progress_Manager {
 		$progress['estimated_time_remaining'] = $eta;
 
 		return $progress;
+	}
+
+	/**
+	 * Get items breakdown by post type from migration logs.
+	 *
+	 * Queries migration logs for current migration and groups items by post_type.
+	 * Returns structured data showing total, processed, and skipped counts per post type.
+	 *
+	 * @param string $migration_uid The migration UUID.
+	 * @return array Breakdown data: ['post' => ['total' => 100, 'processed' => 50, 'skipped' => 5], ...]
+	 */
+	public function get_items_breakdown_by_post_type( string $migration_uid ): array {
+		global $wpdb;
+
+		if ( empty( $migration_uid ) ) {
+			return array();
+		}
+
+		// Query migration logs table to extract post_type from context JSON.
+		// Groups by post_type and counts total, processed (success), and skipped entries.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$query = $wpdb->prepare(
+			"SELECT 
+			  JSON_UNQUOTE(JSON_EXTRACT(context, '$.post_type')) as post_type,
+			  SUM(CASE WHEN category = %s THEN 1 ELSE 0 END) as processed,
+			  SUM(CASE WHEN category = %s THEN 1 ELSE 0 END) as skipped,
+			  COUNT(*) as total
+			FROM " . $wpdb->prefix . 'efs_migration_logs
+			WHERE migration_uid = %s
+			AND category IN (%s, %s)
+			GROUP BY post_type
+			ORDER BY total DESC',
+			'post_migrated',
+			'post_skipped',
+			$migration_uid,
+			'post_migrated',
+			'post_skipped'
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$results   = $wpdb->get_results( $query, ARRAY_A );
+		$breakdown = array();
+
+		if ( is_array( $results ) ) {
+			foreach ( $results as $row ) {
+				$post_type               = isset( $row['post_type'] ) ? (string) $row['post_type'] : 'unknown';
+				$breakdown[ $post_type ] = array(
+					'total'     => isset( $row['total'] ) ? (int) $row['total'] : 0,
+					'processed' => isset( $row['processed'] ) ? (int) $row['processed'] : 0,
+					'skipped'   => isset( $row['skipped'] ) ? (int) $row['skipped'] : 0,
+				);
+			}
+		}
+
+		return $breakdown;
 	}
 }

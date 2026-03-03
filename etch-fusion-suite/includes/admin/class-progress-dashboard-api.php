@@ -95,7 +95,7 @@ class EFS_Progress_Dashboard_API {
 	 */
 	public static function handle_progress_request( \WP_REST_Request $request ) {
 		$migration_id = $request->get_param( 'migration_id' );
-		$result = EFS_Migration_Progress_Logger::get_migration_progress( $migration_id );
+		$result       = EFS_Migration_Progress_Logger::get_migration_progress( $migration_id );
 
 		if ( is_wp_error( $result ) ) {
 			return rest_ensure_response(
@@ -117,7 +117,7 @@ class EFS_Progress_Dashboard_API {
 	 */
 	public static function handle_errors_request( \WP_REST_Request $request ) {
 		$migration_id = $request->get_param( 'migration_id' );
-		$errors = EFS_Migration_Progress_Logger::get_migration_errors( $migration_id );
+		$errors       = EFS_Migration_Progress_Logger::get_migration_errors( $migration_id );
 
 		return rest_ensure_response(
 			array(
@@ -136,8 +136,8 @@ class EFS_Progress_Dashboard_API {
 	 */
 	public static function handle_category_request( \WP_REST_Request $request ) {
 		$migration_id = $request->get_param( 'migration_id' );
-		$category = $request->get_param( 'category' );
-		$logs = EFS_Migration_Progress_Logger::get_migration_logs_by_category( $migration_id, $category );
+		$category     = $request->get_param( 'category' );
+		$logs         = EFS_Migration_Progress_Logger::get_migration_logs_by_category( $migration_id, $category );
 
 		return rest_ensure_response(
 			array(

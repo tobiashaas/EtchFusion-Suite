@@ -70,9 +70,9 @@ class EFS_Detailed_Progress_Tracker {
 			: sprintf( __( 'Post failed: "%s"', 'etch-fusion-suite' ), $post_title );
 
 		$context = array(
-			'post_id'   => $post_id,
-			'title'     => $post_title,
-			'status'    => $status,
+			'post_id' => $post_id,
+			'title'   => $post_title,
+			'status'  => $status,
 		);
 
 		// Merge in metadata (blocks_converted, fields_migrated, duration_ms, error, etc)
@@ -106,7 +106,7 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level    = 'success' === $status ? 'info' : ( 'skipped' === $status ? 'warning' : 'error' );
 		$category = 'media_' . $status;
-		$message  = sprintf( __( 'Media %s: %s', 'etch-fusion-suite' ), $status, $filename );
+		$message  = sprintf( __( 'Media %1$s: %2$s', 'etch-fusion-suite' ), $status, $filename );
 
 		$context = array(
 			'url'      => $url,
@@ -142,7 +142,7 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level    = 'converted' === $status ? 'info' : 'warning';
 		$category = 'css_' . $status;
-		$message  = sprintf( __( 'CSS class %s: %s', 'etch-fusion-suite' ), $status, $class_name );
+		$message  = sprintf( __( 'CSS class %1$s: %2$s', 'etch-fusion-suite' ), $status, $class_name );
 
 		$context = array(
 			'class_name' => $class_name,
@@ -179,7 +179,7 @@ class EFS_Detailed_Progress_Tracker {
 		$level    = 'success' === $status ? 'info' : 'warning';
 		$category = 'custom_fields_' . $field_type;
 		$message  = sprintf(
-			__( '%s: %d fields migrated (%s)', 'etch-fusion-suite' ),
+			__( '%1$s: %2$d fields migrated (%3$s)', 'etch-fusion-suite' ),
 			ucfirst( $field_type ),
 			$count,
 			$status
@@ -221,7 +221,7 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level   = 0 === $errors ? 'info' : 'warning';
 		$message = sprintf(
-			__( '%s batch completed: %d/%d (%d errors)', 'etch-fusion-suite' ),
+			__( '%1$s batch completed: %2$d/%3$d (%4$d errors)', 'etch-fusion-suite' ),
 			ucfirst( str_replace( '_', ' ', $batch_type ) ),
 			$completed,
 			$total,

@@ -2049,6 +2049,256 @@ Prior to release, complete the checklist in `docs/security-verification-checklis
 
 ---
 
+## Developer Guide: JWT Migration Key Lifecycle (v0.17.5)
+
+### Overview
+
+The migration key (JWT token) is the **single source of truth** for cross-site communication. It contains the target URL, source site metadata, and cryptographic signatures. This guide documents the complete lifecycle for developers extending the migration system.
+
+### JWT Token Structure
+
+**Format:** JSON Web Token (HS256 algorithm)
+
+**Payload Structure:**
+```json
+{
+  "target_url": "http://localhost:8889",
+  "source_name": "Bricks Site",
+  "api_version": 1,
+  "created_at": 1677000000,
+  "expires_in": 3600,
+  "iat": 1677000000,
+  "exp": 1677003600
+}
+```
+
+**Key Fields:**
+- `target_url`: The Etch site URL (extracted for Docker translations)
+- `source_name`: Friendly name of the migration source
+- `api_version`: Token format version (for backwards compatibility)
+- `iat` / `exp`: Token creation and expiration timestamps
+
+### Generation Workflow (Etch Admin)
+
+**User Action:** Click "Generate Migration Key"
+
+**Execution Flow:**
+
+```
+User clicks "Generate Migration Key"
+    ↓
+migration-key-component.php renders form
+    ↓
+User fills optional "Custom Etch URL" (or leaves empty for auto-detect)
+    ↓
+JavaScript POST to AJAX: efs_generate_migration_key
+    ↓
+class-migration-ajax.php::generate_migration_key()
+    ↓
+class-settings-controller.php::generate_migration_key($target_url)
+    ↓
+EFS_Migration_Token_Manager::generate_jwt($target_url || home_url())
+    ↓
+Token stored in WordPress options: efs_settings['migration_key']
+    ↓
+JavaScript displays token for copy-paste
+```
+
+**Code Locations:**
+
+1. **View** (`includes/views/migration-key-component.php`):
+   - Renders optional URL input field (only on Etch admin)
+   - Label: "Etch Site URL (for Docker/custom hosts)"
+   - Help text: "Leave empty to use auto-detected URL"
+
+2. **AJAX Handler** (`includes/ajax/handlers/class-migration-ajax.php`):
+   ```php
+   public function generate_migration_key() {
+       $target_url = isset( $_POST['target_url'] ) ? $_POST['target_url'] : null;
+       $key = $this->settings_controller->generate_migration_key( $target_url );
+       wp_send_json_success( ['migration_key' => $key] );
+   }
+   ```
+
+3. **Controller** (`includes/controllers/class-settings-controller.php`):
+   ```php
+   public function generate_migration_key( $target_url = null ) {
+       $target_url = $target_url ?: home_url();
+       return $this->token_manager->generate_jwt( $target_url );
+   }
+   ```
+
+4. **Token Manager** (`includes/class-migration-token-manager.php`):
+   ```php
+   public function generate_jwt( $target_url ) {
+       $payload = [
+           'target_url' => $target_url,
+           'source_name' => get_bloginfo( 'name' ),
+           'api_version' => 1,
+           'created_at' => time(),
+       ];
+       return JWT::encode( $payload, $this->get_secret_key(), 'HS256' );
+   }
+   ```
+
+### Validation Workflow (Bricks Admin)
+
+**User Action:** Paste migration key, start migration
+
+**Execution Flow:**
+
+```
+User pastes migration key in Bricks settings
+    ↓
+JavaScript POST to AJAX: efs_start_migration
+    ↓
+class-migration-ajax.php::start_migration()
+    ↓
+class-migration-controller.php::start_migration()
+    ↓
+get_target_url_from_migration_key() — CRITICAL METHOD
+    ↓
+JWT decoded locally: JWT::decode($token, $secret, 'HS256')
+    ↓
+Extract target_url from $decoded->payload
+    ↓
+Fallback to home_url() if target_url missing
+    ↓
+Make API call to extracted URL
+```
+
+**The Critical Method** (`class-migration-controller.php`):
+```php
+private function get_target_url_from_migration_key() {
+    $token = $this->get_setting( 'migration_key' );
+    if ( ! $token ) {
+        return ''; // Will trigger configuration_incomplete error
+    }
+    
+    try {
+        $decoded = $this->token_manager->decode_migration_key_locally( $token );
+        $target_url = $decoded['payload']['target_url'] ?? '';
+        
+        // Fallback only if JWT has no explicit URL
+        if ( empty( $target_url ) ) {
+            $target_url = home_url();
+        }
+        
+        return $target_url;
+    } catch ( \Exception $e ) {
+        // Malformed token
+        return '';
+    }
+}
+```
+
+**CRITICAL RULES:**
+
+1. ✅ **ALWAYS** extract target_url from JWT payload
+2. ✅ **ONLY** fallback to `home_url()` if JWT has no explicit URL
+3. ❌ **NEVER** read from Settings: `$settings['target_url']` (this key doesn't exist)
+4. ❌ **NEVER** hardcode URLs or use $_GET parameters
+5. ✅ **ALWAYS** validate JWT signature before extracting fields
+
+### Error Code Reference
+
+**Frontend Error Detection** (`assets/js/admin/migration.js`):
+
+The JavaScript polling loop monitors for specific error codes. When an error code is detected, user-friendly messages are shown:
+
+```javascript
+if (response.code === 'configuration_incomplete') {
+    showError('Configuration incomplete. Please verify migration key.');
+}
+```
+
+**Backend Error Codes** (from controllers):
+
+| Code | HTTP | Meaning | User Action |
+|---|---|---|---|
+| `configuration_incomplete` | 400 | No migration_key in Settings OR JWT malformed | Regenerate migration key on Etch, paste in Bricks |
+| `invalid_migration_key` | 400 | JWT decode failed OR signature invalid | Verify key wasn't modified, regenerate on Etch |
+| `target_unreachable` | 400 | Can't reach target URL from this server | Verify Etch URL in migration key, check Docker networking |
+| `invalid_api_version` | 400 | JWT payload has unknown api_version | Ensure Etch and Bricks versions match |
+
+**Location for Error Codes**:
+- `includes/controllers/class-migration-controller.php` → `get_progress()` method (lines 143-177)
+- `includes/controllers/class-migration-controller.php` → `start_migration()` method (lines 40-62)
+  - **CRITICAL (v0.17.5+):** Lines 53-57 MUST save migration_key to Settings after validation!
+    ```php
+    // Save migration_key to Settings for later retrieval by get_progress().
+    $settings                  = get_option( 'efs_settings', array() );
+    $settings['migration_key'] = $migration_key;
+    update_option( 'efs_settings', $settings );
+    ```
+    Without this, subsequent `get_progress()` calls find empty Settings and return `configuration_incomplete` error.
+- `assets/js/admin/migration.js` → `requestProgress()` method (lines 243-264)
+
+### Docker URL Translation
+
+**Problem:** In Docker, Etch is reachable at multiple URLs:
+- `localhost:8889` (from host browser)
+- `etch:3306` (from container network)
+- `host.docker.internal` (cross-container)
+
+**Solution:** Optional visible input field + docker-url-helper translation
+
+**Implementation** (`includes/hooks/docker-url-helper.php`):
+```php
+public function translate_url_to_docker_host( $url ) {
+    if ( $this->is_docker_environment() ) {
+        // Replace localhost with host.docker.internal for inter-container calls
+        return str_replace( 'localhost', 'host.docker.internal', $url );
+    }
+    return $url;
+}
+```
+
+**When JWT Contains Custom URL:**
+1. User enters custom URL in migration-key-component.php (e.g., `http://host.docker.internal:8889`)
+2. JWT is generated with this exact URL
+3. Bricks extracts this URL from JWT
+4. docker-url-helper may further translate it (e.g., if called from a container)
+5. API calls use the final translated URL
+
+### Debugging & Troubleshooting
+
+**To Debug Migration Key Issues:**
+
+```bash
+# 1. Check Settings contains migration_key
+wp option get efs_settings --format=json | grep migration_key
+
+# 2. Decode JWT locally (get the token first)
+php -r "
+    \$token = 'eyJhbGc...'; // Paste the token
+    \$decoded = json_decode( base64_decode( explode( '.', \$token )[1] ), true );
+    print_r( \$decoded );
+"
+
+# 3. Check API can decode it
+curl -X POST http://etch-url/wp-json/efs/v1/validate \
+    -H 'Authorization: Bearer <token>' \
+    -d '{}'
+
+# 4. Check Docker URL translation
+wp hook add test_docker_url 'plugins_loaded' 'function() {
+    $helper = etch_fusion_suite_container()->get("docker_url_helper");
+    echo $helper->translate_url_to_docker_host("http://localhost:8889");
+}'
+```
+
+**Common Issues:**
+
+| Problem | Diagnosis | Fix |
+|---------|-----------|-----|
+| "configuration_incomplete" error | `wp option get efs_settings` shows no `migration_key` | Regenerate key on Etch, paste in Bricks |
+| Key works on one site, not other | Check `home_url()` on both sites | Ensure both sites are accessible via their configured URLs |
+| Docker cross-container fails | Check `docker network ls` and container networking | Use `host.docker.internal` in optional URL field |
+| Token expired | Check JWT `exp` timestamp | Regenerate migration key |
+
+---
+
 ## Admin Settings UI
 
 The admin settings UI provides a centralized interface for configuring Etch Fusion Suite.

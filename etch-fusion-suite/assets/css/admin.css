@@ -445,6 +445,58 @@ h1 {
 	text-align: right;
 }
 
+.efs-breakdown {
+	margin: var(--efs-space-l) 0 0 0;
+	padding: var(--efs-space-m) 0;
+	border-top: 1px solid color-mix(in oklch, var(--efs-white) 10%, transparent);
+}
+
+.efs-breakdown-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--efs-space-m);
+}
+
+.efs-breakdown-item {
+	display: grid;
+	grid-template-columns: 100px 1fr 80px;
+	gap: var(--efs-space-m);
+	align-items: center;
+	font-size: 13px;
+}
+
+.efs-breakdown-label {
+	font-weight: 500;
+	color: var(--efs-white);
+	min-width: 100px;
+}
+
+.efs-breakdown-progress {
+	display: block;
+	height: 6px;
+	background: var(--efs-base-dark);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.efs-breakdown-bar {
+	display: block;
+	height: 100%;
+	background: var(--efs-primary);
+	border-radius: 3px;
+	transition: width 0.3s ease;
+}
+
+.efs-breakdown-count {
+	text-align: right;
+	color: var(--efs-text-muted, #6b7280);
+	font-size: 12px;
+	min-width: 80px;
+}
+
 .efs-card__header:has(.efs-card__actions) {
 	flex-direction: row;
 	flex-wrap: wrap;

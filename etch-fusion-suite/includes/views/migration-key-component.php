@@ -3,9 +3,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$etch_fusion_suite_component_nonce    = isset( $nonce ) ? $nonce : '';
-$etch_fusion_suite_component_context  = isset( $context ) ? sanitize_key( $context ) : '';
-$etch_fusion_suite_component_api_key  = isset( $settings ) && is_array( $settings ) && isset( $settings['api_key'] ) ? $settings['api_key'] : '';
+$etch_fusion_suite_component_nonce   = isset( $nonce ) ? $nonce : '';
+$etch_fusion_suite_component_context = isset( $context ) ? sanitize_key( $context ) : '';
+$etch_fusion_suite_component_api_key = isset( $settings ) && is_array( $settings ) && isset( $settings['api_key'] ) ? $settings['api_key'] : '';
 
 $etch_fusion_suite_component_heading = 'bricks' === $etch_fusion_suite_component_context
 	? __( 'Generate migration key from Etch site', 'etch-fusion-suite' )
@@ -23,6 +23,22 @@ $etch_fusion_suite_component_description = 'bricks' === $etch_fusion_suite_compo
 	<form method="post" class="efs-inline-form" data-efs-generate-key>
 		<input type="hidden" name="nonce" value="<?php echo esc_attr( $etch_fusion_suite_component_nonce ); ?>" />
 		<input type="hidden" name="context" value="<?php echo esc_attr( $etch_fusion_suite_component_context ); ?>" />
+		<?php
+		/**
+		 * DOCKER SUPPORT:
+		 * context="bricks" means "on Etch admin, generating key FOR Bricks"
+		 * This field allows overriding the target URL for Docker/custom host setups where
+		 * the Etch site may be reachable at multiple URLs (localhost, host.docker.internal, etc.)
+		 *
+		 * Field is OPTIONAL and VISIBLE (not a hidden workaround):
+		 * - Empty = auto-detects using home_url()
+		 * - Provided = uses that URL in JWT payload
+		 * - Only shows on Etch admin (context="bricks"), not on Bricks admin
+		 *
+		 * The URL is embedded in the JWT token during key generation and extracted
+		 * by Bricks when validating/starting migration.
+		 */
+		?>
 		<?php if ( 'bricks' === $etch_fusion_suite_component_context ) : ?>
 			<div class="efs-form-group">
 				<label for="efs-etch-url" class="efs-label"><?php esc_html_e( 'Etch Site URL (for Docker/custom hosts)', 'etch-fusion-suite' ); ?></label>

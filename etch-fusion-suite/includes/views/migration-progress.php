@@ -48,6 +48,7 @@ $etch_fusion_suite_progress_context = array(
 			<span class="efs-progress-fill" style="width: <?php echo esc_attr( $percentage ); ?>%;"></span>
 		</div>
 		<p class="efs-progress-items" data-efs-items-count hidden></p>
+		<div class="efs-breakdown" data-efs-breakdown hidden></div>
 
 		<?php if ( ! empty( $steps ) ) : ?>
 			<ol class="efs-steps" data-efs-steps>

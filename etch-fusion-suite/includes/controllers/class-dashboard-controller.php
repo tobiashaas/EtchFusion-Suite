@@ -288,9 +288,9 @@ class EFS_Dashboard_Controller {
 		$settings = isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array();
 
 		return array(
-			'settings'           => $settings,
-			'nonce'              => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
-			'key_context'        => 'bricks',
+			'settings'    => $settings,
+			'nonce'       => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
+			'key_context' => 'bricks',
 		);
 	}
 

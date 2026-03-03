@@ -121,9 +121,9 @@ class EFS_Media_Service {
 						$filename,
 						'failed',
 						array(
-							'error'        => $result->get_error_message(),
-							'media_id'     => $media_id,
-							'duration_ms'  => $duration_ms,
+							'error'       => $result->get_error_message(),
+							'media_id'    => $media_id,
+							'duration_ms' => $duration_ms,
 						)
 					);
 				} else {
@@ -136,10 +136,10 @@ class EFS_Media_Service {
 							$filename,
 							'success',
 							array(
-								'media_id'      => $media_id,
-								'size_bytes'    => $file_size ? (int) $file_size : 0,
-								'mime_type'     => $mime_type,
-								'duration_ms'   => $duration_ms,
+								'media_id'    => $media_id,
+								'size_bytes'  => $file_size ? (int) $file_size : 0,
+								'mime_type'   => $mime_type,
+								'duration_ms' => $duration_ms,
 							)
 						);
 					} elseif ( isset( $result['skipped'] ) && $result['skipped'] ) {
@@ -148,9 +148,9 @@ class EFS_Media_Service {
 							$filename,
 							'skipped',
 							array(
-								'media_id'     => $media_id,
-								'reason'       => 'Already migrated',
-								'duration_ms'  => $duration_ms,
+								'media_id'    => $media_id,
+								'reason'      => 'Already migrated',
+								'duration_ms' => $duration_ms,
 							)
 						);
 					}

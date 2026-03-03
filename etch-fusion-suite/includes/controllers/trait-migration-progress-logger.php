@@ -81,11 +81,11 @@ class EFS_Migration_Progress_Logger {
 			// Keep last 10 logs for display.
 			if ( count( $recent_logs ) < 10 ) {
 				$recent_logs[] = array(
-					'timestamp'  => $log['timestamp'],
-					'level'      => $log['level'],
-					'category'   => $category,
-					'message'    => $log['message'],
-					'context'    => $ctx,
+					'timestamp' => $log['timestamp'],
+					'level'     => $log['level'],
+					'category'  => $category,
+					'message'   => $log['message'],
+					'context'   => $ctx,
 				);
 			}
 
@@ -99,10 +99,10 @@ class EFS_Migration_Progress_Logger {
 		}
 
 		return array(
-			'migration_id'  => $migration_id,
-			'current_item'  => $current_item,
-			'recent_logs'   => array_reverse( $recent_logs ), // Newest first
-			'statistics'    => $stats,
+			'migration_id' => $migration_id,
+			'current_item' => $current_item,
+			'recent_logs'  => array_reverse( $recent_logs ), // Newest first
+			'statistics'   => $stats,
 		);
 	}
 
@@ -132,7 +132,7 @@ class EFS_Migration_Progress_Logger {
 		$errors = array();
 		foreach ( $trail as $log ) {
 			if ( 'error' === $log['level'] ) {
-				$ctx = json_decode( $log['context'], true );
+				$ctx      = json_decode( $log['context'], true );
 				$errors[] = array(
 					'timestamp' => $log['timestamp'],
 					'message'   => $log['message'],
@@ -172,7 +172,7 @@ class EFS_Migration_Progress_Logger {
 		$filtered = array();
 		foreach ( $trail as $log ) {
 			if ( $category === ( $log['category'] ?? '' ) ) {
-				$ctx       = json_decode( $log['context'], true );
+				$ctx        = json_decode( $log['context'], true );
 				$filtered[] = array(
 					'timestamp' => $log['timestamp'],
 					'level'     => $log['level'],
