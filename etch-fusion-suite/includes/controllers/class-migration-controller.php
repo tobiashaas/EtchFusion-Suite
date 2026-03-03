@@ -147,11 +147,27 @@ class EFS_Migration_Controller {
 		}
 
 		// Check if migration is configured with target URL (required for API calls).
-		$settings    = get_option( 'efs_settings', array() );
-		$target_url  = isset( $settings['target_url'] ) ? esc_url_raw( $settings['target_url'] ) : '';
+		// Follow same pattern as start_migration(): Try to get target_url from settings,
+		// then try to decode it from migration_key (dynamically).
+		$settings      = get_option( 'efs_settings', array() );
+		$target_url    = isset( $settings['target_url'] ) ? esc_url_raw( $settings['target_url'] ) : '';
 		$migration_key = isset( $settings['migration_key'] ) ? sanitize_textarea_field( $settings['migration_key'] ) : '';
 
-		if ( empty( $target_url ) && empty( $migration_key ) ) {
+		// If target_url is empty, try to decode it from the migration_key (dynamically).
+		if ( empty( $target_url ) && ! empty( $migration_key ) && $this->token_manager ) {
+			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
+			if ( ! is_wp_error( $decoded ) && isset( $decoded['payload']['target_url'] ) ) {
+				$target_url = esc_url_raw( $decoded['payload']['target_url'] );
+			}
+		}
+
+		// Fallback: Try to extract from settings if not yet decoded.
+		if ( empty( $target_url ) && ! empty( $migration_key ) ) {
+			$target_url = $this->extract_target_url_from_settings( $migration_key );
+		}
+
+		// If still no target_url, migration is not configured.
+		if ( empty( $target_url ) ) {
 			return new \WP_Error(
 				'configuration_incomplete',
 				__( 'Migration is not configured. Please complete Step 2: Connect to Etch Site in the migration wizard.', 'etch-fusion-suite' ),
