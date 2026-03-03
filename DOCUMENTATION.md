@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-03
-**Version:** 0.17.3 (Complete Dead Code Removal)
+**Version:** 0.17.4 (Final Cleanup - No Workarounds)
 
 ---
 
@@ -976,7 +976,7 @@ $target_url = $settings['target_url'] ?? ''; // This key doesn't exist!
 - `class-migration-controller.php::get_progress()` — Uses JWT decoding
 - All migration services use the controller's methods, not direct settings lookups
 
-**Dead Code Removed** (v0.17.3 - Complete Cleanup):
+**Dead Code Removed** (v0.17.4 - Final Cleanup):
 
 1. **gutenberg_generator.php**
    - ❌ Deleted: `convert_bricks_to_gutenberg()` method (194 lines)
@@ -987,25 +987,32 @@ $target_url = $settings['target_url'] ?? ''; // This key doesn't exist!
    - ❌ Removed: `$etch_fusion_suite_component_target_url` variable
    - ❌ Removed: Hidden form field `<input name="target_url">`
    - Reason: Was reading from non-existent Settings['target_url']
-   - Fix: Migration key generation accepts `target_url` via direct AJAX POST
 
-3. **connection-ajax.php** (earlier)
+3. **class-migration-ajax.php::generate_migration_key()**
+   - ❌ Removed: target_url parameter from POST request handling
+   - Reason: Hidden field was deleted, so no more form data available
+   - Now: Calls controller directly without payload
+
+4. **class-settings-controller.php::generate_migration_key()**
+   - ❌ Removed: array `$data` parameter (was unused)
+   - ❌ Removed: Fallback chain to request parameter
+   - Now: Always uses `home_url()` for JWT generation
+   - Reason: No form data to pass, uses current site URL automatically
+
+5. **connection-ajax.php** (earlier)
    - ❌ Removed: `target_url` validation from `save_settings()`
 
-4. **settings-controller.php** (earlier)
-   - ❌ Removed: `target_url` from `sanitize_settings()`
-
-5. **bricks-setup.php** (earlier)
-   - ❌ Removed: `target_url` variable from Settings lookup
-
-6. **dashboard-controller.php** (earlier)
-   - ❌ Removed: `migration_key_defaults` array with target_url
+6. **Other removals** (earlier)
+   - settings-controller.php: `target_url` from sanitize_settings()
+   - bricks-setup.php: Settings lookup for target_url
+   - dashboard-controller.php: migration_key_defaults array
 
 **Final Status**:
-- ✅ **ZERO** Settings['target_url'] references in codebase (verified)
-- ✅ **ZERO** dead code paths remaining
-- ✅ **100%** clean JWT-only pattern
-- ✅ **NO** technical debt introduced
+- ✅ **ZERO** Settings['target_url'] references
+- ✅ **ZERO** dangling/unused parameters
+- ✅ **ZERO** workarounds or fallback patterns
+- ✅ **100%** clean - only necessary code remains
+- ✅ **NO** technical debt before go-live
 
 ### Migration key & token alignment
 
