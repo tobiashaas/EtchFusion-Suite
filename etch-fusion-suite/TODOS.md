@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-03 16:57 (Dashboard UI: Elapsed/Remaining Time Calculation + Repository Cleanup COMPLETED)
+**Updated:** 2026-03-03 17:17 (Bricks Migration UX: Configuration Error Handling - Improved Error Messages)
 
 ## 🚀 Current Development
 
@@ -45,6 +45,32 @@
 **Dependency Chain:** Phase 1 → Phase 2 → Phases 3,4 → Phase 5 → Phase 6
 
 ### 🐛 Open Bugs
+
+- [✅] **🟡 Bricks Migration Shows "Failed" With No Configuration** - **FIXED: 2026-03-03 17:17**
+   - **Problem:** When user starts migration without completing Step 2 (Connect to Etch Site), the UI shows "Migration Failed" with no context
+   - **Root Cause:** 
+     - API was making requests with empty/NULL target_url and migration_key
+     - Backend didn't validate configuration before attempting API calls
+     - Frontend received blank responses, interpreted as "failed"
+     - Error message was vague and not actionable
+   
+   - **Solution Implemented:**
+     - ✅ **Backend validation:** Added configuration check in `get_progress()` method of `EFS_Migration_Controller`
+     - ✅ **Error code:** Return `configuration_incomplete` WP_Error with helpful message
+     - ✅ **Frontend enhancement:** Detect `configuration_incomplete` error code in `migration.js`
+     - ✅ **User messaging:** Show actionable message: "Migration setup incomplete. Please go back to Step 2: Connect to Etch Site"
+     - ✅ **Error propagation:** Enhanced error handling to forward error codes and data through API response
+   
+   - **Files Modified:**
+     - `includes/controllers/class-migration-controller.php` (added pre-flight config check)
+     - `assets/js/admin/migration.js` (enhanced error code detection and messaging)
+   
+   - **Tests Passed:**
+     - Without configuration: Returns `configuration_incomplete` error ✅
+     - With configuration: Migration proceeds normally ✅
+     - Error message is actionable and clear ✅
+   
+   - **Status:** ✅ RESOLVED - Users now see helpful error when setup is incomplete
 
 - [✅] **🔴 CRITICAL: Headless Migrations Stuck at "Pending"** - **FIXED: 2026-03-02 21:47**
    - **Verification (2026-03-02 21:41-21:52):** 369+ logs, 42 new in last 2 min, Media/CSS success ✅
