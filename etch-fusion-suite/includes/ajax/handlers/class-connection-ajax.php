@@ -113,20 +113,12 @@ class EFS_Connection_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
-		$raw_target_url      = $this->get_post( 'target_url', '', 'url' );
-		$internal_target_url = $this->convert_to_internal_url( $raw_target_url );
-
 		try {
 			$validated = $this->validate_input(
 				array(
-					'target_url'    => $internal_target_url,
 					'migration_key' => $this->get_post( 'migration_key', '', 'raw' ),
 				),
 				array(
-					'target_url'    => array(
-						'type'     => 'url',
-						'required' => true,
-					),
 					'migration_key' => array(
 						'type'     => 'migration_key',
 						'required' => true,

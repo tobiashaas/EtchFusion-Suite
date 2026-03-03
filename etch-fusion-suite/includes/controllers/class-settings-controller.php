@@ -68,7 +68,6 @@ class EFS_Settings_Controller {
 
 	private function sanitize_settings( array $data ) {
 		return array(
-			'target_url'    => isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '',
 			'migration_key' => isset( $data['migration_key'] ) ? $this->sanitize_textarea( $data['migration_key'] ) : '',
 		);
 	}

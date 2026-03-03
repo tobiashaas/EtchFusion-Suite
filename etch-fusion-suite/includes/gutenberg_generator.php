@@ -853,7 +853,15 @@ class EFS_Gutenberg_Generator {
 	}
 
 	/**
-	 * Convert Bricks to Gutenberg and save to database (FOR ECH PROCESSING!)
+	 * DEPRECATED: Convert Bricks to Gutenberg and save to database (FOR ECH PROCESSING!)
+	 *
+	 * @deprecated This method is NO LONGER USED in the current migration flow.
+	 * The migration system uses REST API endpoints (via migration controller) instead.
+	 *
+	 * NOTE: This method contains legacy code patterns that depend on Settings ['target_url'],
+	 * which no longer exists. Target URLs are now ONLY extracted from JWT tokens.
+	 * If this method is needed in the future, it MUST be refactored to use
+	 * the token_manager to extract target_url from migration_key.
 	 */
 	public function convert_bricks_to_gutenberg( $post, $target_post_type = null ) {
 		$this->error_handler->log_info( 'Gutenberg Generator: convert_bricks_to_gutenberg called for post ' . $post->ID );
