@@ -285,22 +285,12 @@ class EFS_Dashboard_Controller {
 	 * @return array
 	 */
 	private function prepare_bricks_setup_view_args( array $data ) {
-		$settings               = isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array();
-		$migration_key_defaults = array(
-			'context'  => 'bricks',
-			'settings' => array(
-				'target_url' => isset( $settings['target_url'] ) ? $settings['target_url'] : '',
-				'api_key'    => isset( $settings['api_key'] ) ? $settings['api_key'] : '',
-			),
-		);
+		$settings = isset( $data['settings'] ) && is_array( $data['settings'] ) ? $data['settings'] : array();
 
 		return array(
 			'settings'           => $settings,
 			'nonce'              => isset( $data['nonce'] ) ? sanitize_text_field( $data['nonce'] ) : wp_create_nonce( 'efs_nonce' ),
 			'key_context'        => 'bricks',
-			'migration_key_args' => isset( $data['migration_key_args'] ) && is_array( $data['migration_key_args'] )
-				? wp_parse_args( $data['migration_key_args'], $migration_key_defaults )
-				: $migration_key_defaults,
 		);
 	}
 
