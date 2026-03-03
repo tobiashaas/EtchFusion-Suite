@@ -50,16 +50,11 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'missing_migration_key', __( 'Migration key is required to start the migration.', 'etch-fusion-suite' ) );
 		}
 
+		// Extract target_url from JWT token (ONLY source of truth).
 		$target_url = isset( $data['target_url'] ) ? esc_url_raw( $data['target_url'] ) : '';
-
-		if ( empty( $target_url ) && $this->token_manager ) {
-			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
-			if ( ! is_wp_error( $decoded ) && isset( $decoded['payload']['target_url'] ) ) {
-				$target_url = esc_url_raw( $decoded['payload']['target_url'] );
-			}
+		if ( empty( $target_url ) ) {
+			$target_url = $this->get_target_url_from_migration_key( $migration_key );
 		}
-
-		$target_url = ! empty( $target_url ) ? $target_url : $this->extract_target_url_from_settings( $migration_key );
 
 		if ( empty( $target_url ) ) {
 			return new \WP_Error( 'missing_target_url', __( 'Target URL could not be determined from the migration key.', 'etch-fusion-suite' ) );
@@ -146,23 +141,17 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
 		}
 
-		// Get migration_key from request or settings (should come from current migration or stored key).
+		// Get migration_key from request or settings (only source of target_url).
 		$migration_key = isset( $data['migration_key'] ) ? sanitize_textarea_field( $data['migration_key'] ) : '';
 		if ( empty( $migration_key ) ) {
 			$settings      = get_option( 'efs_settings', array() );
 			$migration_key = isset( $settings['migration_key'] ) ? sanitize_textarea_field( $settings['migration_key'] ) : '';
 		}
 
-		// Try to decode target_url from migration_key JWT.
-		$target_url = '';
-		if ( ! empty( $migration_key ) && $this->token_manager ) {
-			$decoded = $this->token_manager->decode_migration_key_locally( $migration_key );
-			if ( ! is_wp_error( $decoded ) && isset( $decoded['payload']['target_url'] ) ) {
-				$target_url = esc_url_raw( $decoded['payload']['target_url'] );
-			}
-		}
+		// Extract target_url from JWT token (ONLY source of truth).
+		$target_url = $this->get_target_url_from_migration_key( $migration_key );
 
-		// If still no target_url, migration is not properly configured.
+		// If no target_url, migration is not properly configured.
 		if ( empty( $target_url ) ) {
 			return new \WP_Error(
 				'configuration_incomplete',
@@ -304,15 +293,15 @@ class EFS_Migration_Controller {
 		return $this->settings_controller()->generate_migration_key( $data );
 	}
 
-	private function extract_target_url_from_settings( $migration_key ) {
-		$settings = get_option( 'efs_settings', array() );
-		$target   = isset( $settings['target_url'] ) ? esc_url_raw( $settings['target_url'] ) : '';
-
-		if ( $target ) {
-			return $target;
-		}
-
-		if ( ! $this->token_manager ) {
+	/**
+	 * Decode and extract target_url from migration_key JWT token.
+	 * This is the ONLY source of truth for target_url - it's embedded in the JWT payload.
+	 *
+	 * @param string $migration_key The migration key URL with embedded JWT token.
+	 * @return string The target URL if successfully decoded, empty string otherwise.
+	 */
+	private function get_target_url_from_migration_key( $migration_key ) {
+		if ( empty( $migration_key ) || ! $this->token_manager ) {
 			return '';
 		}
 
