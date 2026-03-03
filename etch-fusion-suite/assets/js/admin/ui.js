@@ -1,4 +1,5 @@
 import { getInitialData } from './api.js';
+import { formatElapsed, formatEta } from './utilities/time-format.js';
 
 const TOAST_VISIBLE_CLASS = 'show';
 const TOAST_CONTAINER_CLASS = 'efs-toast-container';
@@ -147,12 +148,13 @@ export const setLoading = (element, isLoading) => {
     element.disabled = Boolean(isLoading);
 };
 
-export const updateProgress = ({ percentage = 0, status = '', steps = [], items_processed = 0, items_total = 0, items_skipped = 0 }) => {
+export const updateProgress = ({ percentage = 0, status = '', steps = [], items_processed = 0, items_total = 0, items_skipped = 0, elapsed_seconds = 0, estimated_time_remaining = null }) => {
     const progressRoot = document.querySelector('[data-efs-progress]');
     const progressFill = progressRoot?.querySelector('.efs-progress-fill');
     const currentStep = document.querySelector('[data-efs-current-step]');
     const stepsList = document.querySelector('[data-efs-steps]');
     const itemsCount = document.querySelector('[data-efs-items-count]');
+    const timeDisplay = document.querySelector('[data-efs-progress-time]');
 
     let displayPercentage;
     if (items_total > 0) {
@@ -192,6 +194,19 @@ export const updateProgress = ({ percentage = 0, status = '', steps = [], items_
             itemsCount.textContent = '';
             itemsCount.hidden = true;
         }
+    }
+
+    if (timeDisplay) {
+        let timeText = '';
+        if (elapsed_seconds > 0) {
+            timeText = `Elapsed: ${formatElapsed(elapsed_seconds)}`;
+            const etaText = formatEta(estimated_time_remaining);
+            if (etaText) {
+                timeText += ` • ${etaText}`;
+            }
+        }
+        timeDisplay.textContent = timeText;
+        timeDisplay.hidden = !timeText;
     }
 
     if (currentStep) {

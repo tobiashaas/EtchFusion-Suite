@@ -161,7 +161,8 @@ class EFS_Migration_Controller {
 			'migrationId'              => isset( $result['migrationId'] ) ? $result['migrationId'] : '',
 			'last_updated'             => isset( $progress['last_updated'] ) ? $progress['last_updated'] : '',
 			'is_stale'                 => ! empty( $progress['is_stale'] ),
-			'estimated_time_remaining' => isset( $progress['estimated_time_remaining'] ) ? $progress['estimated_time_remaining'] : null,
+			'elapsed_seconds'          => isset( $result['elapsed_seconds'] ) ? $result['elapsed_seconds'] : 0,
+			'estimated_time_remaining' => isset( $result['estimated_time_remaining'] ) ? $result['estimated_time_remaining'] : null,
 			'completed'                => ! empty( $result['completed'] ),
 		);
 	}

@@ -195,12 +195,16 @@ class EFS_Migration_Orchestrator {
 		$progress_data['steps']    = $steps;
 		$progress_data['is_stale'] = ! empty( $progress_data['is_stale'] );
 
+		// Enrich with elapsed and ETA calculations.
+		$progress_data = $this->progress_manager->enrich_progress_with_times( $progress_data );
+
 		return array(
 			'progress'                 => $progress_data,
 			'steps'                    => $steps,
 			'migrationId'              => $migration_id,
 			'last_updated'             => isset( $progress_data['last_updated'] ) ? $progress_data['last_updated'] : '',
 			'is_stale'                 => ! empty( $progress_data['is_stale'] ),
+			'elapsed_seconds'          => isset( $progress_data['elapsed_seconds'] ) ? $progress_data['elapsed_seconds'] : 0,
 			'estimated_time_remaining' => isset( $progress_data['estimated_time_remaining'] ) ? $progress_data['estimated_time_remaining'] : null,
 			'completed'                => $this->progress_manager->is_migration_complete(),
 		);

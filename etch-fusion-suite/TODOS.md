@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-02 21:47 (CRITICAL: Migrations 'Pending' Bug FIXED + Loopback Handler REMOTE_ADDR Fix)
+**Updated:** 2026-03-03 16:57 (Dashboard UI: Elapsed/Remaining Time Calculation + Repository Cleanup COMPLETED)
 
 ## 🚀 Current Development
 
@@ -179,85 +179,82 @@
   - Added troubleshooting guides and API reference
   - Documented all new scripts and configuration options
 
-## 🧹 Repository Cleanup (TODO: 2026-03-01)
+## 🧹 Repository Cleanup (COMPLETED: 2026-03-03)
 
-### 🗑️ TO DELETE IMMEDIATELY
+### ✅ COMPLETED CLEANUP TASKS
 
-**Temp/Debug Files (keine Abhängigkeiten):**
-- `test.txt` (leere Test-Datei)
-- `etch-page-929.html` (Debugging-Dump)
-- `phase2-security.json` (alte Sicherheits-Analyse)
-- `tmp_efs_posts/` (Verzeichnis - temporäre Daten)
-- `tmp_efs_styles.json` (temporäre Stile)
-- `test-environment/` (Verzeichnis - alte Test-Setup)
+**Temp/Debug Files (DELETED - 6 files):**
+- ✅ `test.txt` (leere Test-Datei)
+- ✅ `etch-page-929.html` (Debugging-Dump)
+- ✅ `phase2-security.json` (alte Sicherheits-Analyse)
+- ✅ `tmp_efs_posts/` (Verzeichnis - temporäre Daten)
+- ✅ `tmp_efs_styles.json` (temporäre Stile)
+- ✅ `test-environment/` (Verzeichnis - alte Test-Setup)
 
-**Legacy Scripts (nicht in use, npm scripts preferred):**
-- `cleanup-etch.sh`
-- `commit-and-push.py`
-- `commit-fix.sh`
-- `do-commit.cmd`
-- `fix-class-aliases.ps1`
-- `fix-double-backslash.ps1`
-- `fix-service-provider.ps1`
-- `fix-symlinks.cmd`
-- `fix-symlinks.ps1`
-- `migrate-post.ps1`
-- `remove-large-files.sh`
-- `run-phpcs.ps1`
-- `run_git_commands.py`
-- `update-references.ps1`
-- `update-scripts.ps1`
+**Legacy Scripts (DELETED - 16 files):**
+- ✅ `cleanup-etch.sh`
+- ✅ `commit-and-push.py`
+- ✅ `commit-fix.sh`
+- ✅ `do-commit.cmd`
+- ✅ `fix-class-aliases.ps1`
+- ✅ `fix-double-backslash.ps1`
+- ✅ `fix-service-provider.ps1`
+- ✅ `fix-symlinks.cmd`
+- ✅ `fix-symlinks.ps1`
+- ✅ `migrate-post.ps1`
+- ✅ `monitor-migration.ps1`
+- ✅ `remove-large-files.sh`
+- ✅ `run-phpcs.ps1`
+- ✅ `run_git_commands.py`
+- ✅ `update-references.ps1`
+- ✅ `update-scripts.ps1`
 
-### 📄 DOKUMENTATION REVIEW NÖTIG
+**Documentation Review (DELETED - 3 files):**
+- ✅ `DOCUMENTATION_DASHBOARD_LOGGING.md` - Outdated/redundant (content covered in DOCUMENTATION.md)
+- ✅ `IMPLEMENTATION_DASHBOARD_LOGGING.md` - Outdated
+- ✅ `TEST_RESULTS_DASHBOARD_LOGGING.md` - Outdated
 
-- `DOCUMENTATION_DASHBOARD_LOGGING.md` - ist das noch relevant? In DOCUMENTATION.md schon abgedeckt?
-- `IMPLEMENTATION_DASHBOARD_LOGGING.md` - alt?
-- `TEST_RESULTS_DASHBOARD_LOGGING.md` - alt?
+### ✅ .gitignore Updates
 
-→ **Action:** Checken und entweder konsolidieren oder löschen
+- ✅ Added build artifacts: `build/`, `node_modules/`, `vendor/`, `.phpunit.result.cache`
+- ✅ Verified IDE configs in .gitignore (kept for developers)
+- ✅ Total cleanup: 22 items + 3 documentation files deleted
 
-### 📦 BUILD ARTIFACTS (in .gitignore)
-
-- `build/` - Kompilierte Assets (regenerierbar via `npm run build`)
-- `.phpunit.result.cache` - PHPUnit Cache (regenerierbar)
-- `node_modules/` - npm dependencies (regenerierbar via `npm install`)
-- `vendor/` - Composer dependencies (regenerierbar via `composer install`)
-
-**Action:** Sicherstellen dass in `.gitignore` sind, sonst hinzufügen
-
-### ⚙️ IDE CONFIGS (in .gitignore, Keep)
-
-- `.claude/` - Claude.ai AI config
-- `.cursor/` - Cursor IDE config
-- `.windsurf/` - Windsurf IDE config
-- `.vscode/` - VS Code config
-
-**Action:** Keep in `.gitignore` (developer machines können unterschiedliche IDEs haben)
-
-### ✅ KEEP (Wichtig!)
-
-- `.github/` - GitHub Actions CI/CD workflows
-- `.git/`, `.gitignore`, `.gitattributes`
-- `etch-fusion-suite/` - Haupt Plugin-Code
-- `composer.json`/lock, `package.json`/lock
-- `phpunit.xml.dist`
-- `README.md`, `CLAUDE.md`, `AGENTS.md`, `CHANGELOG.md`, `DOCUMENTATION.md`
-- `docs/`, `scripts/`, `tests/`
+**Cleanup Summary:** Repository cleaned successfully on 2026-03-03. Removed 25 legacy/temp files and updated .gitignore.
 
 ---
 
-## 🧹 Cleanup Plan für MORGEN:
+## 🎯 Dashboard Progress UI Improvements (COMPLETED: 2026-03-03)
 
-1. **Temp Files löschen** (6 Dateien)
-2. **Legacy Scripts löschen** (15 Dateien)
-3. **Dokumentation Review** (3 Dateien - entscheiden)
-4. **.gitignore überprüfen** (Build artifacts richtig excluded?)
-5. **git status checken** - keine versehentlichen tracked artifacts
-6. **Final Commit:** "cleanup: remove legacy scripts and temp files"
+### ✅ COMPLETED DASHBOARD IMPROVEMENTS
 
-**Estimated Time:** 10 Minuten
-**Risk:** Sehr niedrig (nur temp/legacy, keine aktiven Features)
-**Benefit:** Repo viel übersichtlicher, weniger Verwirrrung für neue Entwickler
+**Phase 1: Time Calculation System**
+- ✅ Added `enrich_progress_with_times()` method to `EFS_Progress_Manager` 
+  - Calculates `elapsed_seconds` from `started_at` timestamp
+  - Calculates `estimated_time_remaining` based on items_processed / total_items rate
+- ✅ Updated `EFS_Migration_Orchestrator::get_progress()` to call enrichment
+- ✅ Updated `EFS_Migration_Controller::get_progress()` to pass new fields to response
+- ✅ Updated JavaScript `migration.js` to send `elapsed_seconds` and `estimated_time_remaining` to UI
+- ✅ Updated JavaScript `ui.js` to import and use `formatElapsed()` and `formatEta()`
+- ✅ Updated `updateProgress()` function to display "Elapsed: HH:MM:SS • ~Xm Ys remaining"
+- ✅ Added `[data-efs-progress-time]` element to migration-progress.php view
+- ✅ Added CSS styling for `.efs-progress-time` in admin.css
+
+**Phase 2: Time Display on Dashboard**
+- Implementation ready for immediate display of elapsed/remaining times during migration
+- Formatting functions already available: `formatElapsed()` and `formatEta()` in time-format.js
+
+**Files Modified:**
+1. `includes/services/class-progress-manager.php` - Added time enrichment logic
+2. `includes/services/class-migration-orchestrator.php` - Call time enrichment
+3. `includes/controllers/class-migration-controller.php` - Pass elapsed/ETA to response
+4. `assets/js/admin/migration.js` - Forward elapsed/ETA data from API
+5. `assets/js/admin/ui.js` - Display elapsed/remaining times with formatters
+6. `includes/views/migration-progress.php` - Add time display element
+7. `assets/css/admin.css` - Style time display
+8. `.gitignore` - Updated build artifacts entries
+
+---
 
 ### 🎯 High Priority
 

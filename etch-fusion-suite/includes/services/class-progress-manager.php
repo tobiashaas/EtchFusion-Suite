@@ -313,4 +313,34 @@ class EFS_Progress_Manager {
 		$stats['status']         = 'completed';
 		$this->progress_repository->save_stats( $stats );
 	}
+
+	/**
+	 * Enrich progress data with elapsed time and ETA.
+	 *
+	 * Calculates elapsed seconds from started_at and estimates remaining time
+	 * based on items processed and total items.
+	 *
+	 * @param array $progress Progress data array.
+	 * @return array Progress data with added 'elapsed_seconds' and 'estimated_time_remaining' keys.
+	 */
+	public function enrich_progress_with_times( array $progress ): array {
+		$started_at_str = isset( $progress['started_at'] ) ? (string) $progress['started_at'] : '';
+		$started_ts     = '' !== $started_at_str ? strtotime( $started_at_str ) : 0;
+		$elapsed        = $started_ts > 0 ? max( 0, time() - $started_ts ) : 0;
+
+		$progress['elapsed_seconds'] = $elapsed;
+
+		$items_processed = isset( $progress['items_processed'] ) ? (int) $progress['items_processed'] : 0;
+		$items_total     = isset( $progress['items_total'] ) ? (int) $progress['items_total'] : 0;
+
+		$eta = null;
+		if ( $items_total > 0 && $items_processed > 0 && $elapsed > 0 && $items_processed < $items_total ) {
+			$rate = $items_processed / $elapsed;
+			$eta  = (int) round( ( $items_total - $items_processed ) / $rate );
+		}
+
+		$progress['estimated_time_remaining'] = $eta;
+
+		return $progress;
+	}
 }

@@ -24,6 +24,12 @@ debug-*.log
 # Strauss prefixed vendor (generated)
 etch-fusion-suite/vendor-prefixed/
 
+# Build artifacts (regenerable)
+etch-fusion-suite/build/
+etch-fusion-suite/node_modules/
+etch-fusion-suite/vendor/
+.phpunit.result.cache
+
 # OS files
 .DS_Store
 Thumbs.db

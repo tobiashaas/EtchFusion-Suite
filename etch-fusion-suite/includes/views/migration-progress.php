@@ -41,6 +41,7 @@ $etch_fusion_suite_progress_context = array(
 		<header class="efs-card__header">
 			<h2><?php esc_html_e( 'Migration Progress', 'etch-fusion-suite' ); ?></h2>
 			<p data-efs-current-step><?php echo esc_html( $status ); ?></p>
+			<p class="efs-progress-time" data-efs-progress-time hidden></p>
 		</header>
 
 		<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr( $percentage ); ?>" data-efs-progress data-efs-progress-value="<?php echo esc_attr( $percentage ); ?>">

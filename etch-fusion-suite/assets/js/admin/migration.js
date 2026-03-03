@@ -65,6 +65,8 @@ const requestProgress = async (params = {}, requestOptions = {}) => {
             items_processed: progress.items_processed || 0,
             items_total: progress.items_total || 0,
             items_skipped: progress.items_skipped || 0,
+            elapsed_seconds: data?.elapsed_seconds || 0,
+            estimated_time_remaining: data?.estimated_time_remaining || null,
         });
 
         if (data?.completed) {

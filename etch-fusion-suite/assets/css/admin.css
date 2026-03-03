@@ -438,6 +438,13 @@ h1 {
 	text-align: right;
 }
 
+.efs-progress-time {
+	margin: 4px 0 0;
+	font-size: 12px;
+	color: var(--efs-text-muted, #6b7280);
+	text-align: right;
+}
+
 .efs-card__header:has(.efs-card__actions) {
 	flex-direction: row;
 	flex-wrap: wrap;
