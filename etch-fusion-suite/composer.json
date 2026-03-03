@@ -55,8 +55,7 @@
             "classmap_prefix": "EFS_Vendor_",
             "packages": [
                 "firebase/php-jwt",
-                "woocommerce/action-scheduler",
-                "psr/container"
+                "woocommerce/action-scheduler"
             ],
             "delete_vendor_files": false
         }

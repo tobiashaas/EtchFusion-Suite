@@ -2563,8 +2563,7 @@ CREATE TABLE wp_efs_settings (
   setting_value LONGTEXT,                        -- JSON-serialized setting value
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY setting_key (setting_key)                  -- Index for fast lookups
+  PRIMARY KEY (id)
 )
 ```
 
