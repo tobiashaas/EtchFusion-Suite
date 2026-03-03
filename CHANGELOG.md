@@ -4,9 +4,18 @@
 
 ## [Unreleased]
 
+### 🏗️ Architecture & Infrastructure
+
+- **Custom settings table (`wp_efs_settings`):** Implemented dedicated database table for all plugin configuration settings, replacing WordPress Options API. Completes the custom-table architecture pattern already established by `wp_efs_migrations` and `wp_efs_migration_logs`. Migration from wp_options is automatic during plugin installation (one-time operation).
+  - **Data stored:** `efs_settings`, `efs_migration_settings`, `efs_feature_flags`, `efs_cors_allowed_origins`, `efs_security_settings`
+  - **Helper methods in Repository:** `get_setting($key)`, `save_setting($key, $value)`, `delete_setting($key)`
+  - **Performance:** Transient caching (5 minutes) reduces database queries
+  - **Benefits:** Unified architecture, better schema control, cleaner audit trail
+
 ### 🐛 Bug Fixes (Critical)
 
-- **Migration key persistence fix (v0.17.5+):** `start_migration()` controller method now saves the received migration_key to `wp_options['efs_settings']` after validation. This fixes the "configuration_incomplete" error that occurred when `get_progress()` tried to retrieve the key from Settings but found none. Root cause: Frontend only sent migration_key on initial start call; backend never persisted it. Now all subsequent progress polls can extract target_url from the saved JWT token. Minimal change (3 lines added to class-migration-controller.php lines 53-57).
+- **Migration key persistence fix (v0.17.5+):** `start_migration()` controller method now saves the received migration_key via Settings Repository. This fixes the "configuration_incomplete" error that occurred when `get_progress()` tried to retrieve the key from Settings but found none. Root cause: Frontend only sent migration_key on initial start call; backend never persisted it. Now all subsequent progress polls can extract target_url from the saved JWT token. Also updated `get_progress()` to use Settings Repository for retrieval.
+- **Migration Controller now uses Settings Repository:** Replaced direct `get_option()`/`update_option()` calls with `settings_repository->get_migration_settings()` and `settings_repository->save_migration_settings()` for consistency and future flexibility.
 
 ## [0.15.0] — 2026-03-01
 

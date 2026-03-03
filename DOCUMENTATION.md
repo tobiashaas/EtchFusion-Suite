@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-03
-**Version:** 0.17.5 (Docker Support + Proper Architecture)
+**Version:** 0.17.6 (Custom Settings Table Architecture)
 
 ---
 
@@ -2498,13 +2498,14 @@ npm run logs:bricks:errors
 
 ### Overview
 
-The plugin uses a **database-first persistence architecture** for migration state management. All migration data is stored in custom WordPress database tables (`wp_efs_migrations` and `wp_efs_migration_logs`) with WordPress Options API as a fallback for backward compatibility.
+The plugin uses a **database-first persistence architecture** for all structured data. Custom WordPress database tables (`wp_efs_settings`, `wp_efs_migrations`, and `wp_efs_migration_logs`) are the authoritative source of truth. WordPress Options API is used only for WordPress native settings and is deprecated for plugin-specific data.
 
 **Key Principles:**
 - Primary source of truth: Custom database tables
-- Fallback: WordPress Options (for legacy data and compatibility)
-- Dual-write on all updates (DB + Options for safety)
-- Audit trail of all migration events
+- Settings: `wp_efs_settings` table (structured configuration)
+- Migrations: `wp_efs_migrations` and `wp_efs_migration_logs` tables (audit trail)
+- No fallback to Options API (clean architecture)
+- Transient caching for performance (5 minutes)
 - Crash detection via stale migration queries
 - Resume capability for interrupted migrations
 
@@ -2552,6 +2553,41 @@ CREATE TABLE wp_efs_migration_logs (
   KEY created_at (created_at)                    -- Index for recent logs
 )
 ```
+
+#### Settings Table (`wp_efs_settings`)
+
+```sql
+CREATE TABLE wp_efs_settings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  setting_key VARCHAR(100) UNIQUE NOT NULL,      -- Unique setting identifier
+  setting_value LONGTEXT,                        -- JSON-serialized setting value
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Creation timestamp
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY setting_key (setting_key)                  -- Index for fast lookups
+)
+```
+
+**Purpose:** Centralized storage for plugin configuration, replacing WordPress Options API usage.
+
+**What is stored:**
+- `efs_settings` — General plugin configuration (e.g., license, feature toggles)
+- `efs_migration_settings` — Current migration configuration (e.g., migration_key JWT token)
+- `efs_feature_flags` — Feature toggle states (e.g., beta features)
+- `efs_cors_allowed_origins` — CORS whitelist for cross-site API calls
+- `efs_security_settings` — Security configuration (rate limits, audit logging, HTTPS requirement)
+
+**Data Flow:**
+1. Settings are read/written via `EFS_WordPress_Settings_Repository`
+2. Helper methods: `get_setting($key)`, `save_setting($key, $value)`, `delete_setting($key)`
+3. Values are JSON-encoded on write, automatically decoded on read
+4. Transient caching (5 minutes) reduces database queries
+5. No fallback to wp_options after migration (clean break)
+
+**Migration from wp_options:**
+- During plugin installation, `EFS_DB_Installer::migrate_settings_to_custom_table()` migrates legacy data
+- Only runs once (checks table for existing data)
+- During uninstall, both custom table and legacy wp_options are deleted
 
 ### Migration Lifecycle
 
