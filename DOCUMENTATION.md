@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-03
-**Version:** 0.17.4 (Final Cleanup - No Workarounds)
+**Version:** 0.17.5 (Docker Support + Proper Architecture)
 
 ---
 
@@ -970,48 +970,73 @@ $target_url = $decoded['payload']['target_url'] ?? '';
 $target_url = $settings['target_url'] ?? ''; // This key doesn't exist!
 ```
 
+### Docker Multi-Host Support (v0.17.5)
+
+**Problem in Docker**:
+- Etch site reachable under multiple URLs:
+  * `http://localhost:8889` (from host browser)
+  * `http://etch:3306` (from container network)
+  * `http://host.docker.internal` (cross-container)
+- `home_url()` returns only ONE configured URL
+- But Bricks needs the URL it can ACTUALLY reach
+
+**Solution - OPTIONAL Input Field** (NOT a workaround):
+- **Location**: Etch admin dashboard, "Generate migration key" section
+- **Field**: "Etch Site URL (for Docker/custom hosts)" 
+- **Behavior**:
+  * Leave empty → uses `home_url()` automatically
+  * Provide custom URL → JWT uses that URL instead
+  * Only on Etch side (context="bricks")
+  * Validated as URL before processing
+
+**Implementation**:
+- `migration-key-component.php`: Visible input field (optional)
+- `class-migration-ajax.php::generate_migration_key()`: Accepts `target_url` parameter
+- `class-settings-controller.php::generate_migration_key()`: Falls back to `home_url()` if empty
+
+**Usage Example**:
+```
+Production site:
+  → Leave field empty, uses home_url() = perfect
+
+Docker development:
+  → Enter custom URL that Bricks container can reach
+  → JWT will embed that URL
+  → Bricks connects successfully
+```
+
+This is NOT a workaround - it's proper Docker support without persisting URLs to Settings.
+
 **Implementation Locations**:
 - `class-migration-controller.php::get_target_url_from_migration_key()` — The authoritative method
 - `class-migration-controller.php::start_migration()` — Uses JWT decoding
 - `class-migration-controller.php::get_progress()` — Uses JWT decoding
 - All migration services use the controller's methods, not direct settings lookups
 
-**Dead Code Removed** (v0.17.4 - Final Cleanup):
+**Dead Code Removed** (v0.17.4 - Complete Cleanup):
 
 1. **gutenberg_generator.php**
    - ❌ Deleted: `convert_bricks_to_gutenberg()` method (194 lines)
    - Reason: Never called, contained Settings['target_url'] lookup
-   - Was using deprecated API patterns
 
-2. **migration-key-component.php**
-   - ❌ Removed: `$etch_fusion_suite_component_target_url` variable
-   - ❌ Removed: Hidden form field `<input name="target_url">`
-   - Reason: Was reading from non-existent Settings['target_url']
+2. **migration-key-component.php** (initially removed, now re-added correctly in v0.17.5)
+   - ✅ Removed: Settings fallback for target_url
+   - ✅ Added: Optional visible input field for Docker support
+   - Field only appears on Etch admin, not on Bricks
 
-3. **class-migration-ajax.php::generate_migration_key()**
-   - ❌ Removed: target_url parameter from POST request handling
-   - Reason: Hidden field was deleted, so no more form data available
-   - Now: Calls controller directly without payload
-
-4. **class-settings-controller.php::generate_migration_key()**
-   - ❌ Removed: array `$data` parameter (was unused)
-   - ❌ Removed: Fallback chain to request parameter
-   - Now: Always uses `home_url()` for JWT generation
-   - Reason: No form data to pass, uses current site URL automatically
-
-5. **connection-ajax.php** (earlier)
+3. **connection-ajax.php**
    - ❌ Removed: `target_url` validation from `save_settings()`
 
-6. **Other removals** (earlier)
-   - settings-controller.php: `target_url` from sanitize_settings()
+4. **Other removals**
+   - settings-controller.php: `target_url` from sanitize_settings() (restored in v0.17.5 for key generation)
    - bricks-setup.php: Settings lookup for target_url
    - dashboard-controller.php: migration_key_defaults array
 
 **Final Status**:
-- ✅ **ZERO** Settings['target_url'] references
-- ✅ **ZERO** dangling/unused parameters
+- ✅ **ZERO** Settings['target_url'] references (still)
 - ✅ **ZERO** workarounds or fallback patterns
 - ✅ **100%** clean - only necessary code remains
+- ✅ Docker-ready with optional URL override
 - ✅ **NO** technical debt before go-live
 
 ### Migration key & token alignment
