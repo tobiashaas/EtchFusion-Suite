@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-03
-**Version:** 0.17.2 (JWT-Only URL Extraction + Dead Code Cleanup)
+**Version:** 0.17.3 (Complete Dead Code Removal)
 
 ---
 
@@ -959,7 +959,6 @@ Only the `migration_key` (JWT token) is stored in `efs_settings` because:
 **Settings Storage Rules**:
 - ✅ **STORED**: `efs_settings['migration_key']` — JWT token (contains URL in payload)
 - ❌ **NOT STORED**: `efs_settings['target_url']` — Extracted dynamically from JWT only
-- ❌ **NOT STORED**: `efs_settings['api_key']` — Deprecated, not used in current flow
 
 **URL Extraction Pattern**:
 ```php
@@ -977,11 +976,36 @@ $target_url = $settings['target_url'] ?? ''; // This key doesn't exist!
 - `class-migration-controller.php::get_progress()` — Uses JWT decoding
 - All migration services use the controller's methods, not direct settings lookups
 
-**Dead Code Removed** (v0.17.2):
-- `connection-ajax.php::save_settings()` — No longer validates `target_url` from request
-- `settings-controller.php::sanitize_settings()` — Only handles `migration_key`
-- `gutenberg_generator.php::convert_bricks_to_gutenberg()` — Marked deprecated (unused)
-- All fallback patterns trying to read `efs_settings['target_url']`
+**Dead Code Removed** (v0.17.3 - Complete Cleanup):
+
+1. **gutenberg_generator.php**
+   - ❌ Deleted: `convert_bricks_to_gutenberg()` method (194 lines)
+   - Reason: Never called, contained Settings['target_url'] lookup
+   - Was using deprecated API patterns
+
+2. **migration-key-component.php**
+   - ❌ Removed: `$etch_fusion_suite_component_target_url` variable
+   - ❌ Removed: Hidden form field `<input name="target_url">`
+   - Reason: Was reading from non-existent Settings['target_url']
+   - Fix: Migration key generation accepts `target_url` via direct AJAX POST
+
+3. **connection-ajax.php** (earlier)
+   - ❌ Removed: `target_url` validation from `save_settings()`
+
+4. **settings-controller.php** (earlier)
+   - ❌ Removed: `target_url` from `sanitize_settings()`
+
+5. **bricks-setup.php** (earlier)
+   - ❌ Removed: `target_url` variable from Settings lookup
+
+6. **dashboard-controller.php** (earlier)
+   - ❌ Removed: `migration_key_defaults` array with target_url
+
+**Final Status**:
+- ✅ **ZERO** Settings['target_url'] references in codebase (verified)
+- ✅ **ZERO** dead code paths remaining
+- ✅ **100%** clean JWT-only pattern
+- ✅ **NO** technical debt introduced
 
 ### Migration key & token alignment
 
