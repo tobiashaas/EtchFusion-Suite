@@ -41,10 +41,11 @@ class EFS_Settings_Controller {
 		return is_array( $settings ) ? $settings : array();
 	}
 
-	public function generate_migration_key() {
-		// Use current site URL for token generation
-		// (target_url is embedded in JWT payload automatically)
-		$target_url = home_url();
+	public function generate_migration_key( array $data ) {
+		// Get target_url from parameter (for Docker/custom host support)
+		// Or fall back to home_url() if not provided
+		$target_url = isset( $data['target_url'] ) ? $this->sanitize_url( $data['target_url'] ) : '';
+		$target_url = ! empty( $target_url ) ? $target_url : home_url();
 
 		if ( ! $this->token_manager ) {
 			return new \WP_Error( 'token_manager_unavailable', __( 'Token manager is unavailable.', 'etch-fusion-suite' ) );
