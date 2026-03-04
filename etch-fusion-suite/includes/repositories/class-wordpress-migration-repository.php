@@ -12,6 +12,7 @@
 
 namespace Bricks2Etch\Repositories;
 
+use Bricks2Etch\Core\EFS_DB_Installer;
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
 use Bricks2Etch\Repositories\EFS_DB_Migration_Persistence;
 
@@ -561,6 +562,62 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 
 		// Conflict or DB error - fallback to options
 		return update_option( self::OPTION_CHECKPOINT, $checkpoint );
+	}
+
+	/**
+	 * Atomically save checkpoint and progress state in a single DB transaction.
+	 *
+	 * Combines the checkpoint write (checkpoint_data + checkpoint_version) and the
+	 * progress write (processed_items, total_items, status) into one transactional
+	 * UPDATE pair on wp_efs_migrations, so neither write can be observed in isolation.
+	 *
+	 * Falls back to the individual save_checkpoint() call when:
+	 *   - No current migration ID exists (legacy / test context)
+	 *   - Optimistic locking reports a version conflict (another process wrote first)
+	 *   - Any DB error occurs
+	 *
+	 * wp_options is always written for backward compatibility, regardless of whether
+	 * the DB transaction succeeded.
+	 *
+	 * @param array  $checkpoint      Full checkpoint array.
+	 * @param int    $processed_items Items processed so far.
+	 * @param int    $total_items     Total items to process.
+	 * @param string $status          Migration status (default 'in_progress').
+	 * @return bool True when the transactional DB write succeeded, false on conflict/fallback.
+	 */
+	public function save_batch_state( array $checkpoint, int $processed_items, int $total_items, string $status = 'in_progress' ): bool {
+		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+
+		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
+
+		// Always persist to wp_options for backward compatibility.
+		update_option( self::OPTION_CHECKPOINT, $checkpoint );
+
+		if ( ! $current_id ) {
+			return false;
+		}
+
+		// Fetch the current checkpoint_version for optimistic locking.
+		$db_checkpoint = EFS_DB_Migration_Persistence::get_checkpoint_with_version( $current_id );
+		$version       = $db_checkpoint ? (int) $db_checkpoint['version'] : 0;
+
+		// Attempt the transactional combined write.
+		$saved = EFS_DB_Installer::save_checkpoint_and_progress(
+			$current_id,
+			$checkpoint,
+			$version,
+			$processed_items,
+			$total_items,
+			$status
+		);
+
+		if ( ! $saved ) {
+			// Conflict or no row yet — fall back to the standard atomic checkpoint save.
+			// Progress items will still be written by the caller's update_progress() call.
+			EFS_DB_Migration_Persistence::save_checkpoint_atomic( $current_id, $checkpoint, $version );
+		}
+
+		return $saved;
 	}
 
 	/**

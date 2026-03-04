@@ -235,6 +235,89 @@ class EFS_DB_Installer {
 	}
 
 	/**
+	 * Atomically save checkpoint data and progress state in a single DB transaction.
+	 *
+	 * Combines what would otherwise be two separate UPDATEs on wp_efs_migrations into
+	 * one transaction so that checkpoint_data and processed_items/status are always
+	 * consistent — even if the PHP process crashes between the two writes.
+	 *
+	 * The checkpoint UPDATE uses optimistic locking (expected_version must match the
+	 * current checkpoint_version). If it matches zero rows (version conflict or no
+	 * row), the transaction is rolled back and false is returned; the caller should
+	 * fall back to the individual wp_options-based writes.
+	 *
+	 * @param string $migration_id      Migration UID.
+	 * @param array  $checkpoint_data   Full checkpoint array to persist as JSON.
+	 * @param int    $expected_version  checkpoint_version that must match for the save to proceed.
+	 * @param int    $processed_items   Items processed so far (for progress_percent calculation).
+	 * @param int    $total_items       Total items in this migration.
+	 * @param string $status            Migration status string (e.g. 'in_progress').
+	 * @return bool True if both UPDATEs committed, false on conflict or DB error.
+	 */
+	public static function save_checkpoint_and_progress(
+		string $migration_id,
+		array $checkpoint_data,
+		int $expected_version,
+		int $processed_items,
+		int $total_items,
+		string $status = 'in_progress'
+	): bool {
+		global $wpdb;
+
+		$progress_percent = $total_items > 0
+			? min( 100, (int) round( ( $processed_items / $total_items ) * 100 ) )
+			: 0;
+		$now              = current_time( 'mysql' );
+
+		$wpdb->query( 'START TRANSACTION' );
+
+		// Write 1: checkpoint with optimistic locking (checkpoint_version must match).
+		$cp_rows = (int) $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}efs_migrations
+				 SET checkpoint_data    = %s,
+				     checkpoint_version = checkpoint_version + 1,
+				     updated_at         = %s
+				 WHERE migration_uid      = %s
+				   AND checkpoint_version = %d",
+				wp_json_encode( $checkpoint_data ),
+				$now,
+				$migration_id,
+				$expected_version
+			)
+		);
+
+		if ( $cp_rows < 1 ) {
+			// Version conflict or row missing — roll back (nothing changed) and signal caller.
+			$wpdb->query( 'ROLLBACK' );
+			return false;
+		}
+
+		// Write 2: progress counters and status (no version guard — row is guaranteed to exist).
+		$prog_rows = (int) $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}efs_migrations
+				 SET processed_items = %d,
+				     total_items     = %d,
+				     progress_percent = %d,
+				     status          = %s,
+				     updated_at      = %s
+				 WHERE migration_uid = %s",
+				$processed_items,
+				$total_items,
+				$progress_percent,
+				$status,
+				$now,
+				$migration_id
+			)
+		);
+
+		$wpdb->query( 'COMMIT' );
+
+		return $prog_rows > 0;
+	}
+
+	/**
 	 * Check if database is properly installed
 	 *
 	 * @return bool True if all required tables exist

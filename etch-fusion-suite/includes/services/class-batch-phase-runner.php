@@ -378,7 +378,16 @@ class EFS_Batch_Phase_Runner {
 		if ( isset( $checkpoint['_http_pending'] ) ) {
 			unset( $checkpoint['_http_pending'] );
 		}
-		$this->checkpoint_repository->save_checkpoint( $checkpoint );
+
+		// Persist checkpoint + progress atomically (10j: DB transaction for wp_efs_* tables).
+		// save_batch_state() wraps the checkpoint write and the processed_items/status UPDATE in a
+		// single START TRANSACTION / COMMIT, ensuring both columns are always consistent.
+		// Falls back to a standard save_checkpoint() when a version conflict or DB error occurs.
+		if ( method_exists( $this->checkpoint_repository, 'save_batch_state' ) ) {
+			$this->checkpoint_repository->save_batch_state( $checkpoint, $processed_count, $total );
+		} else {
+			$this->checkpoint_repository->save_checkpoint( $checkpoint );
+		}
 		$this->migration_logger->log( $migration_id, 'info', 'Batch completed: ' . count( $current_batch ) . ' items processed' );
 
 		// Calculate percentage within this phase's range.

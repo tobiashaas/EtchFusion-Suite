@@ -534,7 +534,7 @@ foreach ( $stale as $migration ) {
 | 10g | Checkpoint-Validierung | ✅ BEREITS IMPLEMENTIERT (validate_checkpoint) | Hoch | — |
 | 10h | Progress-Heartbeat Race Condition | ✅ FIXED (2026-03-05, touch_progress_heartbeat im DB-Installer) | Hoch | 2026-03-05 |
 | 10i | Idempotenz-Duplikate | ✅ FIXED (2026-03-05, processed_ids_set nach Erfolg befüllt) | **KRITISCH** | 2026-03-05 |
-| 10j | DB-Transaktionen | ⚠️ PARTIAL SCOPE | Hoch | — |
+| 10j | DB-Transaktionen | ✅ FIXED (2026-03-05, save_checkpoint_and_progress) | Hoch | 2026-03-05 |
 | 10k | `get_stale_migrations()` nicht verdrahtet | ✅ WIRED (detect_and_mark_stale_migrations in progress-ajax) | Hoch | 2026-03-05 |
 
 ---
@@ -550,7 +550,7 @@ foreach ( $stale as $migration ) {
 | **5** | 10g: Checkpoint-Validator | ✅ DONE (bereits impl.) | Einfach, schützt vor Silent Failures | Stabilität |
 | **6** | 10i: Idempotenz via processed_set | ✅ DONE (2026-03-05) | Setzt stabilen Checkpoint voraus (10a ✅) | Keine Duplikate |
 | **7** | 10h: Atomarer Heartbeat | ✅ DONE (2026-03-05) | Direktes `UPDATE` auf DB-Row | Stale Detection |
-| **8** | 10j: Transaktionen für EFS-Tabellen | ❌ TODO | Nur für `wp_efs_*`-Tabellen sinnvoll | Konsistenz |
+| **8** | 10j: Transaktionen für EFS-Tabellen | ✅ DONE (2026-03-05) | Nur für `wp_efs_*`-Tabellen sinnvoll | Konsistenz |
 
 ---
 
