@@ -17,9 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EFS_DB_Installer {
 
 	/**
-	 * Current database schema version
+	 * Current database schema version.
+	 * Bump this whenever schema changes so the upgrade hook reruns dbDelta.
 	 */
-	const DB_VERSION = '1.0.0';
+	const DB_VERSION = '1.1.0';
 
 	/**
 	 * Option key for stored DB version
@@ -71,10 +72,23 @@ class EFS_DB_Installer {
 			KEY created_at (created_at)
 		) $charset_collate;";
 
+		// Settings table for plugin configuration (target_url, migration_key, etc.)
+		// Uses ON DUPLICATE KEY UPDATE via UNIQUE(setting_key), so dbDelta is safe to re-run.
+		$settings_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_settings (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			setting_key VARCHAR(191) NOT NULL,
+			setting_value LONGTEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY setting_key (setting_key)
+		) $charset_collate;";
+
 		// Execute CREATE TABLE statements directly
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared
 		$wpdb->query( $migrations_table );
 		$wpdb->query( $logs_table );
+		$wpdb->query( $settings_table );
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		// Store version

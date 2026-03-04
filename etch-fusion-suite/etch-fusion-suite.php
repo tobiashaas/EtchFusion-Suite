@@ -222,6 +222,9 @@ class Etch_Fusion_Suite_Plugin {
 	private function init_hooks() {
 		add_action( 'init', array( $this, 'init' ) );
 
+		// Run DB schema upgrade check on every load (handles updates without deactivation).
+		add_action( 'plugins_loaded', array( self::class, 'maybe_upgrade_db' ), 0 );
+
 		// Initialize headless migration job hooks BEFORE Action Scheduler
 		// (so efs_run_headless_migration callback is registered when ActionScheduler::init() runs)
 		add_action( 'plugins_loaded', array( $this, 'init_headless_migration_job' ), 1 );
@@ -390,15 +393,32 @@ class Etch_Fusion_Suite_Plugin {
 	 * Plugin activation
 	 */
 	public static function activate() {
-		// Load and execute database installer
-		$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/core/class-db-installer.php';
+		self::run_db_installer();
+
+		// Flush rewrite rules
+		flush_rewrite_rules();
+	}
+
+	/**
+	 * Run the DB installer. Called on activation and on version mismatch after updates.
+	 */
+	public static function run_db_installer() {
+		$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/db-installer.php';
 		if ( file_exists( $db_installer_file ) ) {
 			require_once $db_installer_file;
 			\Bricks2Etch\Core\EFS_DB_Installer::install();
 		}
+	}
 
-		// Flush rewrite rules
-		flush_rewrite_rules();
+	/**
+	 * Check DB schema version on every load and upgrade if needed.
+	 * Handles plugin updates that bypass the activation hook (most update mechanisms).
+	 */
+	public static function maybe_upgrade_db() {
+		$installed_version = get_option( \Bricks2Etch\Core\EFS_DB_Installer::DB_VERSION_OPTION, '' );
+		if ( version_compare( $installed_version, \Bricks2Etch\Core\EFS_DB_Installer::DB_VERSION, '<' ) ) {
+			self::run_db_installer();
+		}
 	}
 
 	/**
@@ -574,7 +594,7 @@ function etch_fusion_suite_uninstall() {
 		return;
 	}
 
-	$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/core/class-db-installer.php';
+	$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/db-installer.php';
 	if ( file_exists( $db_installer_file ) ) {
 		require_once $db_installer_file;
 		\Bricks2Etch\Core\EFS_DB_Installer::uninstall();
