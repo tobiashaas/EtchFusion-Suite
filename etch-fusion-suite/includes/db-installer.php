@@ -19,8 +19,10 @@ class EFS_DB_Installer {
 	/**
 	 * Current database schema version.
 	 * Bump this whenever schema changes so the upgrade hook reruns dbDelta.
+	 * 1.1.0 – added wp_efs_settings table + fixed activation hook path
+	 * 1.2.0 – added checkpoint_data / checkpoint_version columns for optimistic locking
 	 */
-	const DB_VERSION = '1.1.0';
+	const DB_VERSION = '1.2.0';
 
 	/**
 	 * Option key for stored DB version
@@ -35,7 +37,8 @@ class EFS_DB_Installer {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
-		// Create migrations table
+		// Create migrations table.
+		// checkpoint_data / checkpoint_version added in DB_VERSION 1.2.0 for optimistic locking.
 		$migrations_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migrations (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			migration_uid VARCHAR(50) UNIQUE NOT NULL,
@@ -48,6 +51,10 @@ class EFS_DB_Installer {
 			current_batch INT UNSIGNED DEFAULT 0,
 			error_count INT UNSIGNED DEFAULT 0,
 			error_message LONGTEXT,
+			checkpoint_data LONGTEXT DEFAULT NULL,
+			checkpoint_version INT UNSIGNED DEFAULT 0,
+			lock_uuid VARCHAR(36) DEFAULT NULL,
+			locked_at DATETIME DEFAULT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			started_at DATETIME,
 			completed_at DATETIME,
@@ -91,11 +98,140 @@ class EFS_DB_Installer {
 		$wpdb->query( $settings_table );
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
+		// Add new columns to existing tables for upgrades (idempotent via SHOW COLUMNS check).
+		self::maybe_add_columns();
+
 		// Store version
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
 
 		// Log installation
 		error_log( '[EFS] Database tables created/updated at ' . current_time( 'mysql' ) );
+	}
+
+	/**
+	 * Add columns introduced in later schema versions to existing tables.
+	 *
+	 * Uses SHOW COLUMNS to check before each ALTER TABLE, making every
+	 * operation safe to call repeatedly without errors.
+	 */
+	private static function maybe_add_columns() {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$existing_columns = $wpdb->get_col( "SHOW COLUMNS FROM {$wpdb->prefix}efs_migrations" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( false === $existing_columns || 0 === count( $existing_columns ) ) {
+			// Table not created yet — no ALTER needed, CREATE TABLE already has all columns.
+			return;
+		}
+
+		// Columns added in 1.2.0 — checkpoint_data, checkpoint_version, lock_uuid, locked_at.
+		$additions = array(
+			'checkpoint_data'    => 'ALTER TABLE ' . $wpdb->prefix . 'efs_migrations ADD COLUMN checkpoint_data LONGTEXT DEFAULT NULL',
+			'checkpoint_version' => 'ALTER TABLE ' . $wpdb->prefix . 'efs_migrations ADD COLUMN checkpoint_version INT UNSIGNED DEFAULT 0',
+			'lock_uuid'          => 'ALTER TABLE ' . $wpdb->prefix . 'efs_migrations ADD COLUMN lock_uuid VARCHAR(36) DEFAULT NULL',
+			'locked_at'          => 'ALTER TABLE ' . $wpdb->prefix . 'efs_migrations ADD COLUMN locked_at DATETIME DEFAULT NULL',
+		);
+
+		foreach ( $additions as $column => $sql ) {
+			if ( ! in_array( $column, $existing_columns, true ) ) {
+				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->query( $sql );
+			}
+		}
+	}
+
+	/**
+	 * Atomically refresh the migration's updated_at timestamp.
+	 *
+	 * Performs a single direct UPDATE without read-modify-write to avoid race conditions.
+	 * Only touches rows that are currently in_progress.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @return bool True if at least one row was updated.
+	 */
+	public static function touch_progress_heartbeat( string $migration_id ): bool {
+		global $wpdb;
+
+		return (bool) $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}efs_migrations
+				 SET updated_at = %s
+				 WHERE migration_uid = %s
+				   AND status = 'in_progress'",
+				current_time( 'mysql' ),
+				$migration_id
+			)
+		);
+	}
+
+	/**
+	 * Atomically save checkpoint data with optimistic locking.
+	 *
+	 * The UPDATE only succeeds when checkpoint_version matches $expected_version,
+	 * preventing two concurrent requests from overwriting each other.
+	 *
+	 * @param string $migration_id      Migration UID.
+	 * @param array  $checkpoint_data   Checkpoint array to persist as JSON.
+	 * @param int    $expected_version  Version that must match for the UPDATE to proceed.
+	 * @return int Number of rows updated (1 = success, 0 = version conflict or not found).
+	 */
+	public static function save_checkpoint_atomic( string $migration_id, array $checkpoint_data, int $expected_version = 0 ): int {
+		global $wpdb;
+
+		$rows = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}efs_migrations
+				 SET checkpoint_data    = %s,
+				     checkpoint_version = checkpoint_version + 1,
+				     updated_at         = %s
+				 WHERE migration_uid       = %s
+				   AND checkpoint_version  = %d",
+				wp_json_encode( $checkpoint_data ),
+				current_time( 'mysql' ),
+				$migration_id,
+				$expected_version
+			)
+		);
+
+		return (int) $rows;
+	}
+
+	/**
+	 * Get checkpoint data together with its version for optimistic locking.
+	 *
+	 * Returns null when no migration row exists. Returns an array with keys:
+	 *   'data'    (array)  — decoded checkpoint, or empty array when column is NULL
+	 *   'version' (int)    — current checkpoint_version value
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @return array{data: array, version: int}|null
+	 */
+	public static function get_checkpoint_with_version( string $migration_id ): ?array {
+		global $wpdb;
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT checkpoint_data, checkpoint_version FROM {$wpdb->prefix}efs_migrations WHERE migration_uid = %s",
+				$migration_id
+			),
+			ARRAY_A
+		);
+
+		if ( null === $row ) {
+			return null;
+		}
+
+		$decoded = null;
+		if ( ! empty( $row['checkpoint_data'] ) ) {
+			$decoded = json_decode( $row['checkpoint_data'], true );
+		}
+
+		return array(
+			'data'    => is_array( $decoded ) ? $decoded : array(),
+			'version' => (int) ( $row['checkpoint_version'] ?? 0 ),
+		);
 	}
 
 	/**

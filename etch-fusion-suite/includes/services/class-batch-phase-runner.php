@@ -242,9 +242,12 @@ class EFS_Batch_Phase_Runner {
 				}
 
 				++$processed_count;
-				$checkpoint['current_item_id']    = $id;
-				$wp_post                          = get_post( $id );
-				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+				// Idempotency: record this ID as successfully processed so it is skipped if it
+				// reappears in remaining_post_ids due to a lost HTTP response on retry.
+				$processed_ids_set[ (string) $id ] = true;
+				$checkpoint['current_item_id']     = $id;
+				$wp_post                           = get_post( $id );
+				$checkpoint['current_item_title']  = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
 				// Clear post cache after processing to prevent stale data.
 				clean_post_cache( $id );
 			}
@@ -348,9 +351,12 @@ class EFS_Batch_Phase_Runner {
 				}
 
 				++$processed_count;
-				$checkpoint['current_item_id']    = $id;
-				$wp_post                          = get_post( $id );
-				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+				// Idempotency: record this ID as successfully processed so it is skipped if it
+				// reappears in remaining_media_ids due to a lost HTTP response on retry.
+				$processed_ids_set[ (string) $id ] = true;
+				$checkpoint['current_item_id']     = $id;
+				$wp_post                           = get_post( $id );
+				$checkpoint['current_item_title']  = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
 				// Clear post cache after processing to prevent stale data.
 				clean_post_cache( $id );
 

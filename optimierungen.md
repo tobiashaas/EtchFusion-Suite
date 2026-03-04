@@ -526,16 +526,16 @@ foreach ( $stale as $migration ) {
 | 8 | Database Indexes | ✅ PARTIAL | Medium | — |
 | 9 | Migrations-Logging erweitern | ⚠️ PARTIAL | Mittel | — |
 | 10a | Race Condition Checkpoint | ✅ FIXED (Commit f3c40d69) | **KRITISCH** | 2026-03-04 |
-| 10b | Lock-Handling | ⚠️ FUNCTIONAL BUT FRAGILE | Hoch | — |
-| 10c | Nicht-atomare Checkpoint-Aktualisierung | ❌ NOT FIXED (via 10a lösbar) | Hoch | — |
+| 10b | Lock-Handling | ✅ FIXED (2026-03-05, DB_VERSION 1.2.0) | Hoch | 2026-03-05 |
+| 10c | Nicht-atomare Checkpoint-Aktualisierung | ✅ FIXED (via 10a + 10h) | Hoch | 2026-03-05 |
 | 10d | Item-Level Retry bei HTTP-Timeout | ✅ BEREITS IMPLEMENTIERT | — | — |
-| 10e | Memory Leak Cache | ❌ NOT FIXED | Mittel | — |
-| 10f | Shutdown-Handler | ⚠️ MOSTLY FIXED (Restrisiko) | Niedrig | — |
-| 10g | Checkpoint-Validierung | ❌ NOT FIXED | Hoch | — |
-| 10h | Progress-Heartbeat Race Condition | ❌ NOT FIXED | Hoch | — |
-| 10i | Idempotenz-Duplikate | ❌ NOT FIXED | **KRITISCH** | — |
+| 10e | Memory Leak Cache | ✅ BEREITS IMPLEMENTIERT (clean_post_cache) | Mittel | — |
+| 10f | Shutdown-Handler | ⚠️ MOSTLY FIXED (Restrisiko, wenn 10b DB-Lock frei) | Niedrig | — |
+| 10g | Checkpoint-Validierung | ✅ BEREITS IMPLEMENTIERT (validate_checkpoint) | Hoch | — |
+| 10h | Progress-Heartbeat Race Condition | ✅ FIXED (2026-03-05, touch_progress_heartbeat im DB-Installer) | Hoch | 2026-03-05 |
+| 10i | Idempotenz-Duplikate | ✅ FIXED (2026-03-05, processed_ids_set nach Erfolg befüllt) | **KRITISCH** | 2026-03-05 |
 | 10j | DB-Transaktionen | ⚠️ PARTIAL SCOPE | Hoch | — |
-| 10k | `get_stale_migrations()` nicht verdrahtet | ❌ NOT WIRED | Hoch | — |
+| 10k | `get_stale_migrations()` nicht verdrahtet | ✅ WIRED (detect_and_mark_stale_migrations in progress-ajax) | Hoch | 2026-03-05 |
 
 ---
 
@@ -544,12 +544,12 @@ foreach ( $stale as $migration ) {
 | Schritt | Items | Status | Warum zuerst | Unlock |
 |---------|-------|--------|--------------|--------|
 | **1** | 10a: Checkpoint Optimistic Locking | ✅ DONE (f3c40d69) | Fundament für Checkpoint-Konsistenz | 10c, 10h, 10i |
-| **2** | 10b: DB-Lock in Migration-Row | ❌ TODO | Ersetzt fragiles wp_options-Lock atomar | 10f Rest |
-| **3** | 10k: `get_stale_migrations()` verdrahten | ❌ TODO | Kostenlos — Methode existiert bereits | Auto-Resume |
-| **4** | 10e: `clean_post_cache()` nach Batch | ❌ TODO | 1-Zeiler, sofortiger Memory-Gewinn | Memory |
-| **5** | 10g: Checkpoint-Validator | ❌ TODO | Einfach, schützt vor Silent Failures | Stabilität |
-| **6** | 10i: Idempotenz via processed_set | ❌ TODO | Setzt stabilen Checkpoint voraus (10a ✅) | Keine Duplikate |
-| **7** | 10h: Atomarer Heartbeat | ❌ TODO | Direktes `UPDATE` auf DB-Row | Stale Detection |
+| **2** | 10b: DB-Lock in Migration-Row | ✅ DONE (2026-03-05) | Ersetzt fragiles wp_options-Lock atomar | 10f Rest |
+| **3** | 10k: `get_stale_migrations()` verdrahten | ✅ DONE (2026-03-05) | Kostenlos — Methode existiert bereits | Auto-Resume |
+| **4** | 10e: `clean_post_cache()` nach Batch | ✅ DONE (bereits impl.) | 1-Zeiler, sofortiger Memory-Gewinn | Memory |
+| **5** | 10g: Checkpoint-Validator | ✅ DONE (bereits impl.) | Einfach, schützt vor Silent Failures | Stabilität |
+| **6** | 10i: Idempotenz via processed_set | ✅ DONE (2026-03-05) | Setzt stabilen Checkpoint voraus (10a ✅) | Keine Duplikate |
+| **7** | 10h: Atomarer Heartbeat | ✅ DONE (2026-03-05) | Direktes `UPDATE` auf DB-Row | Stale Detection |
 | **8** | 10j: Transaktionen für EFS-Tabellen | ❌ TODO | Nur für `wp_efs_*`-Tabellen sinnvoll | Konsistenz |
 
 ---
@@ -559,8 +559,8 @@ foreach ( $stale as $migration ) {
 1. **✅ N+1 Queries beheben** (media_migrator.php, css_converter.php) - **DONE (2026-03-04)** - Höchster Performance-Impact
 2. **✅ Transient Caching implementieren** (plugin_detector, content_parser) - **DONE (2026-03-04)** - Eliminiert wiederholte teure Queries
 3. **✅ Checkpoint Locking implementieren** (10a Optimistic Locking Pattern) - **DONE (2026-03-04)** - Verhindert Migration-Restart bei HTTP-Timeout
-4. **❌ Idempotenz-Schutz** (10i) - **TODO** - Verhindert Duplikate bei verlorener HTTP-Response
-5. **❌ DB-Lock in Migration-Row** (10b) - **TODO** - Ersetzt fragiles wp_options-Lock durch atomares SQL-UPDATE
+4. **✅ Idempotenz-Schutz** (10i) - **DONE (2026-03-05)** - Verhindert Duplikate bei verlorener HTTP-Response
+5. **✅ DB-Lock in Migration-Row** (10b) - **DONE (2026-03-05)** - Ersetzt fragiles wp_options-Lock durch atomares SQL-UPDATE
 
 ---
 
