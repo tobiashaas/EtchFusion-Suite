@@ -66,7 +66,9 @@ class EFS_Detailed_Progress_Tracker {
 		$level    = 'success' === $status ? 'info' : 'error';
 		$category = 'success' === $status ? 'content_post_migrated' : 'content_post_failed';
 		$message  = 'success' === $status
+			/* translators: %s is the post title */
 			? sprintf( __( 'Post migrated: "%s"', 'etch-fusion-suite' ), $post_title )
+			/* translators: %s is the post title */
 			: sprintf( __( 'Post failed: "%s"', 'etch-fusion-suite' ), $post_title );
 
 		$context = array(
@@ -106,7 +108,8 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level    = 'success' === $status ? 'info' : ( 'skipped' === $status ? 'warning' : 'error' );
 		$category = 'media_' . $status;
-		$message  = sprintf( __( 'Media %1$s: %2$s', 'etch-fusion-suite' ), $status, $filename );
+		/* translators: %1$s is the migration status (success/failed/skipped), %2$s is the filename */
+		$message = sprintf( __( 'Media %1$s: %2$s', 'etch-fusion-suite' ), $status, $filename );
 
 		$context = array(
 			'url'      => $url,
@@ -142,7 +145,8 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level    = 'converted' === $status ? 'info' : 'warning';
 		$category = 'css_' . $status;
-		$message  = sprintf( __( 'CSS class %1$s: %2$s', 'etch-fusion-suite' ), $status, $class_name );
+		/* translators: %1$s is the conversion status, %2$s is the CSS class name */
+		$message = sprintf( __( 'CSS class %1$s: %2$s', 'etch-fusion-suite' ), $status, $class_name );
 
 		$context = array(
 			'class_name' => $class_name,
@@ -179,6 +183,7 @@ class EFS_Detailed_Progress_Tracker {
 		$level    = 'success' === $status ? 'info' : 'warning';
 		$category = 'custom_fields_' . $field_type;
 		$message  = sprintf(
+			/* translators: %1$s is the field type (ACF, metabox, etc.), %2$d is the count of fields migrated, %3$s is the status */
 			__( '%1$s: %2$d fields migrated (%3$s)', 'etch-fusion-suite' ),
 			ucfirst( $field_type ),
 			$count,
@@ -221,6 +226,7 @@ class EFS_Detailed_Progress_Tracker {
 
 		$level   = 0 === $errors ? 'info' : 'warning';
 		$message = sprintf(
+			/* translators: %1$s is the batch type name (posts, media, css), %2$d is completed items, %3$d is total items, %4$d is error count */
 			__( '%1$s batch completed: %2$d/%3$d (%4$d errors)', 'etch-fusion-suite' ),
 			ucfirst( str_replace( '_', ' ', $batch_type ) ),
 			$completed,

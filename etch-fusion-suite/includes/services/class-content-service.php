@@ -177,6 +177,7 @@ class EFS_Content_Service {
 		}
 
 		if ( ! $post ) {
+			/* translators: %d is the post ID that was not found */
 			$error_msg = sprintf( __( 'Post with ID %d not found.', 'etch-fusion-suite' ), $post_id );
 
 			// Log failed post.
