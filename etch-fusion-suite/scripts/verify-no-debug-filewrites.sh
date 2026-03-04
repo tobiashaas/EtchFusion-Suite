@@ -35,8 +35,8 @@ FORBIDDEN_PATTERNS=(
   "cd448e"
 )
 
-# Patterns that must not match in error_handler.php (uses file_put_contents for WP debug.log).
-# Scanned with --exclude=error_handler.php.
+# Patterns that must not match in EFS_Error_Handler.php (uses file_put_contents for WP debug.log).
+# Scanned with --exclude=EFS_Error_Handler.php.
 FORBIDDEN_PATTERNS_EXCLUDE_ERROR_HANDLER=(
   "fopen\\s*\\(.*\\.log"
   "file_put_contents\\s*\\(.*\\.log"
@@ -77,7 +77,7 @@ run_grep_check() {
   done
 
   for pattern in "${FORBIDDEN_PATTERNS_EXCLUDE_ERROR_HANDLER[@]}"; do
-    match=$(grep -rn --include="*.php" --exclude=error_handler.php "${exclude_dirs[@]}" -E "${pattern}" "${SCAN_PATHS[@]}" 2>/dev/null || true)
+    match=$(grep -rn --include="*.php" --exclude=EFS_Error_Handler.php "${exclude_dirs[@]}" -E "${pattern}" "${SCAN_PATHS[@]}" 2>/dev/null || true)
     if [[ -n "${match}" ]]; then
       all_matches="${all_matches}${match}"$'\n'
     fi

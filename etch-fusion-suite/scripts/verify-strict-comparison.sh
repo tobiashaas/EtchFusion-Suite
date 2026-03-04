@@ -26,7 +26,7 @@ PHPCS_STANDARD="${PROJECT_ROOT}/phpcs.xml.dist"
 TARGET_PATHS=(
   "${PROJECT_ROOT}/includes/security/"
   "${PROJECT_ROOT}/includes/repositories/"
-  "${PROJECT_ROOT}/includes/error_handler.php"
+  "${PROJECT_ROOT}/includes/EFS_Error_Handler.php"
 )
 REPORT_DIR="${PROJECT_ROOT}/docs"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -152,7 +152,7 @@ count_in_array_calls() {
 }
 
 count_files_scanned() {
-  find "${TARGET_PATHS[@]}" -type f \( -name "*.php" -o -path "*/error_handler.php" \) | wc -l | tr -d ' '
+  find "${TARGET_PATHS[@]}" -type f -name "*.php" | wc -l | tr -d ' '
 }
 
 generate_report() {

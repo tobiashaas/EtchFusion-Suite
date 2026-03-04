@@ -529,8 +529,8 @@ $focusAreas = [
     ],
     [
         'title' => 'Error Handler',
-        'scope' => '`includes/error_handler.php`',
-        'matcher' => static fn (string $file): bool => $file === 'includes/error_handler.php',
+        'scope' => '`includes/EFS_Error_Handler.php`',
+        'matcher' => static fn (string $file): bool => $file === 'includes/EFS_Error_Handler.php',
     ],
     [
         'title' => 'API Endpoints',
