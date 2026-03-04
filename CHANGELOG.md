@@ -2,6 +2,31 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
+## [0.16.0] — 2026-03-04
+
+### 🚨 Critical Bug Fixes
+
+- **EFS_Error_Handler namespace conflict resolution:** Phase 7 consolidation created critical issues where 42+ files were importing wrong namespace, causing fatal errors on both WordPress instances. Systematically fixed all namespace imports, removed UTF-8 BOM from 34+ files, and updated Service Provider registration. Website fatal error (`Call to undefined method get_recent_logs()`) fully resolved.
+- **Missing EFS_Error_Handler methods:** Added two critical methods to consolidated Error Handler class:
+  - `get_recent_logs()` - Retrieves migration logs from `efs_migration_log` WP option (required by Dashboard Controller)
+  - `clear_log()` - Deletes migration logs (required by Logs AJAX Handler)
+- **PHP file encoding issues:** UTF-8 Byte Order Marks (BOM) in 34 PHP files prevented proper namespace declaration parsing. Systematically removed BOM from all affected files.
+- **PSR-4 compliance:** Renamed consolidated error handler file to `EFS_Error_Handler.php` (PSR-4 compliant) for proper Composer autoloading.
+
+### ✅ Verification & Testing
+
+- **Unit Tests:** 165/165 PASS (162 original + 3 CSS tests from Phase 4a)
+- **Health Check:** 14/15 PASS (Bricks theme optional)
+- **Website Status:** Both WordPress instances (8888, 8889) fully operational
+- **No Regressions:** All previous Phase 1-6 fixes remain stable and functional
+
+### 📝 Architecture Notes
+
+- Error Handler consolidated to single `Bricks2Etch\Core` namespace location
+- All Core classes (Error Handler, Plugin Detector, Migration Token Manager) properly namespaced in root `/includes` directory
+- Autoloader configuration verified and validated with 129 live tests
+- Database schema v1.0.2 stable with no upgrade needed
+
 ## [Unreleased]
 
 ### ⚡ Performance Optimizations
