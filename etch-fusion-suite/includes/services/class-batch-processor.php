@@ -29,9 +29,6 @@ class EFS_Batch_Processor {
 
 	const LOCK_EXPIRY_TTL = 300;
 
-	/** @var array|null Lock metadata (migration_id, lock_uuid) */
-	private static $shutdown_lock_key = null;
-
 	/** @var Phase_Handler_Interface[] */
 	private $phase_handlers;
 
@@ -117,12 +114,30 @@ class EFS_Batch_Processor {
 			return new \WP_Error( 'batch_locked', __( 'Another batch process is running for this migration.', 'etch-fusion-suite' ) );
 		}
 
-		// Store lock UUID so we can release it on shutdown.
-		self::$shutdown_lock_key = array(
-			'migration_id' => $migration_id,
-			'lock_uuid'    => $lock_uuid,
+		// Register shutdown closure that releases the DB lock on fatal error.
+		// A closure is used instead of a static class method so there is no class-reference
+		// dependency: the values are captured by value, making the release safe even when a
+		// fatal error unloads the class during shutdown.
+		$lock_uuid_capture    = $lock_uuid;
+		$migration_id_capture = $migration_id;
+		register_shutdown_function(
+			static function () use ( $lock_uuid_capture, $migration_id_capture ) {
+				global $wpdb;
+				if ( $migration_id_capture && $lock_uuid_capture ) {
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					$wpdb->query(
+						$wpdb->prepare(
+							"UPDATE {$wpdb->prefix}efs_migrations
+							SET lock_uuid = NULL, locked_at = NULL
+							WHERE migration_uid = %s
+							AND lock_uuid = %s",
+							$migration_id_capture,
+							$lock_uuid_capture
+						)
+					);
+				}
+			}
 		);
-		register_shutdown_function( array( self::class, 'release_lock_on_shutdown' ) );
 
 		try {
 			$checkpoint = $this->checkpoint_repository->get_checkpoint();
@@ -169,6 +184,8 @@ class EFS_Batch_Processor {
 			);
 		} finally {
 			// Release the database lock by clearing the lock_uuid.
+			// The shutdown closure registered above becomes a no-op because locked_at is already
+			// NULL when it runs (the row no longer matches the WHERE lock_uuid = %s condition).
 			$wpdb->query(
 				$wpdb->prepare(
 					"UPDATE {$wpdb->prefix}efs_migrations
@@ -177,34 +194,6 @@ class EFS_Batch_Processor {
 					$migration_id
 				)
 			);
-			self::$shutdown_lock_key = null;
-		}
-	}
-
-	/**
-	 * Release batch lock on shutdown (e.g. fatal error).
-	 */
-	public static function release_lock_on_shutdown(): void {
-		if ( null !== self::$shutdown_lock_key && is_array( self::$shutdown_lock_key ) ) {
-			global $wpdb;
-			$migration_id = self::$shutdown_lock_key['migration_id'] ?? null;
-			$lock_uuid    = self::$shutdown_lock_key['lock_uuid'] ?? null;
-
-			if ( $migration_id && $lock_uuid ) {
-				// Only clear lock if it still matches our UUID (prevents clearing locks from other processes).
-				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->query(
-					$wpdb->prepare(
-						"UPDATE {$wpdb->prefix}efs_migrations
-						SET lock_uuid = NULL, locked_at = NULL
-						WHERE migration_uid = %s
-						AND lock_uuid = %s",
-						$migration_id,
-						$lock_uuid
-					)
-				);
-			}
-			self::$shutdown_lock_key = null;
 		}
 	}
 

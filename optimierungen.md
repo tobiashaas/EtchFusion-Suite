@@ -64,14 +64,13 @@
 
 **Status: ⚠️ TEILWEISE IMPLEMENTIERT - LÜCKEN VORHANDEN**
 
-**Aktuelle Abdeckung:**
-- ✅ 3 AJAX-Handler haben `check_ajax_referer('efs_nonce')` (Lines 106, 142, 162 in api_endpoints.php)
-- ❌ 22+ REST API-Endpunkte verwenden nur Permission-Callbacks, keine expliziten Nonce-Checks
-- ❌ AJAX-Handler-Basis-Klasse hat zwar `verify_request()`, aber Coverage ist lückenhaft
+**Status verifiziert 2026-03-05 — vollständig abgedeckt:**
+- ✅ Alle AJAX-Handler in `includes/ajax/handlers/` rufen `$this->verify_request('manage_options')` auf, das `check_ajax_referer()` enthält
+- ✅ 3 Legacy-AJAX-Handler in `api_endpoints.php` (dismiss_migration_run, get_dismissed_migration_runs, revoke_migration_key) rufen `check_ajax_referer()` direkt auf
+- ✅ REST-Endpunkte verwenden WP-Native Permission-Callbacks — das ist der korrekte WP-Pattern für REST (kein expliziter Nonce-Check nötig)
+- Die ursprüngliche Einschätzung „lückenhaft" war outdated — Coverage war bereits vollständig
 
-**Grund nicht vollständig implementiert:** REST API-Endpunkte verwenden korrekterweise die WordPress Native Permission-Callback-Struktur. AJAX-Handler sind konsistent aber nicht alle Endpunkte durchlaufen die Basis-Klasse.
-
-**Empfehlung:** Konsistente Nonce-Prüfung in allen AJAX-Handlers via Basis-Klasse erzwingen.
+**Keine Code-Änderungen nötig.**
 
 ---
 
@@ -520,7 +519,7 @@ foreach ( $stale as $migration ) {
 | 2 | Unbegrenzte Queries (Pagination) | ⚠️ NOT DONE | Niedrig | — |
 | 3 | Code-Refactoring (große Dateien) | ❌ NOT DONE | Niedrig | — |
 | 4 | Transient Caching | ✅ DONE | Medium | 2026-03-04 |
-| 5 | Nonce Verification | ⚠️ PARTIAL | Mittel | — |
+| 5 | Nonce Verification | ✅ VOLLSTÄNDIG (2026-03-05 verifiziert) | Mittel | — |
 | 6 | JSON Logging Optimization | ❌ NOT DONE | Niedrig | — |
 | 7 | Memory Optimization | ✅ SOLVED | Niedrig | 2026-03-04 |
 | 8 | Database Indexes | ✅ PARTIAL | Medium | — |
@@ -530,7 +529,7 @@ foreach ( $stale as $migration ) {
 | 10c | Nicht-atomare Checkpoint-Aktualisierung | ✅ FIXED (via 10a + 10h) | Hoch | 2026-03-05 |
 | 10d | Item-Level Retry bei HTTP-Timeout | ✅ BEREITS IMPLEMENTIERT | — | — |
 | 10e | Memory Leak Cache | ✅ BEREITS IMPLEMENTIERT (clean_post_cache) | Mittel | — |
-| 10f | Shutdown-Handler | ⚠️ MOSTLY FIXED (Restrisiko, wenn 10b DB-Lock frei) | Niedrig | — |
+| 10f | Shutdown-Handler | ✅ FIXED (2026-03-05, Closure statt statische Methode) | Niedrig | 2026-03-05 |
 | 10g | Checkpoint-Validierung | ✅ BEREITS IMPLEMENTIERT (validate_checkpoint) | Hoch | — |
 | 10h | Progress-Heartbeat Race Condition | ✅ FIXED (2026-03-05, touch_progress_heartbeat im DB-Installer) | Hoch | 2026-03-05 |
 | 10i | Idempotenz-Duplikate | ✅ FIXED (2026-03-05, processed_ids_set nach Erfolg befüllt) | **KRITISCH** | 2026-03-05 |
