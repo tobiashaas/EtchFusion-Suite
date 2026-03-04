@@ -144,6 +144,12 @@ class EFS_Batch_Phase_Runner {
 			? (int) ( $checkpoint['total_count'] ?? 0 )
 			: (int) ( $checkpoint['total_media_count'] ?? 0 );
 		$this->api_client->set_items_total( $total + $other_total );
+		// Send phase-only total so the receiving side can display per-phase breakdown.
+		$this->api_client->set_phase_total( $total );
+		// For the posts phase, send per-post-type counts so Etch can show a type-level breakdown.
+		if ( 'posts' === $phase && ! empty( $checkpoint['counts_by_post_type_totals'] ) && is_array( $checkpoint['counts_by_post_type_totals'] ) ) {
+			$this->api_client->set_post_type_totals( $checkpoint['counts_by_post_type_totals'] );
+		}
 
 		// Build context for process_item().
 		$context = array(
@@ -157,6 +163,12 @@ class EFS_Batch_Phase_Runner {
 
 		// Process each item in the batch.
 		if ( 'posts' === $phase && method_exists( $active_handler, 'process_items_batch' ) ) {
+			// Save checkpoint BEFORE making HTTP request (Optimistic Locking).
+			// This ensures that even if HTTP times out or fails, we have saved state locally.
+			$pre_http_checkpoint                = $checkpoint;
+			$pre_http_checkpoint['_http_pending'] = true;
+			$this->checkpoint_repository->save_checkpoint_before_http( $pre_http_checkpoint );
+
 			// Batch path: convert all posts locally, then send in one HTTP request.
 			$batch_item_results = $active_handler->process_items_batch( $current_batch, $context );
 
@@ -242,7 +254,19 @@ class EFS_Batch_Phase_Runner {
 				$id_key = (string) $id;
 
 				$attempts[ $id_key ] = isset( $attempts[ $id_key ] ) ? (int) $attempts[ $id_key ] + 1 : 1;
-				$result              = $active_handler->process_item( $id, $context );
+
+				// Save checkpoint BEFORE processing item (for each media file HTTP request).
+				// This marks the current item as being processed, so recovery is aware of state.
+				$checkpoint['current_processing_id'] = $id;
+				$checkpoint['_http_pending']         = true;
+				$this->checkpoint_repository->save_checkpoint_before_http( $checkpoint );
+
+				$result = $active_handler->process_item( $id, $context );
+
+				// Clear the HTTP pending flag after item completes.
+				if ( isset( $checkpoint['_http_pending'] ) ) {
+					unset( $checkpoint['_http_pending'] );
+				}
 
 				// Treat a boolean false return as a generic item-processing failure.
 				if ( false === $result ) {
@@ -335,6 +359,10 @@ class EFS_Batch_Phase_Runner {
 		$active_handler->save_progress( $checkpoint, $remaining, $processed_count );
 		$checkpoint[ $attempts_key ]   = $attempts;
 		$checkpoint[ $failed_ids_key ] = $failed_ids;
+		// Clear the HTTP pending flag since we've completed the batch processing.
+		if ( isset( $checkpoint['_http_pending'] ) ) {
+			unset( $checkpoint['_http_pending'] );
+		}
 		$this->checkpoint_repository->save_checkpoint( $checkpoint );
 		$this->migration_logger->log( $migration_id, 'info', 'Batch completed: ' . count( $current_batch ) . ' items processed' );
 

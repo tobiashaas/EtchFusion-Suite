@@ -506,6 +506,23 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	}
 
 	/**
+	 * Save migration checkpoint with version for optimistic locking.
+	 *
+	 * Call this BEFORE making HTTP requests to save checkpoint state atomically.
+	 * This prevents migration restart on HTTP timeout by persisting the state
+	 * before the remote call, not after.
+	 *
+	 * @param array $checkpoint Checkpoint data to save.
+	 * @return bool True on success, false on failure.
+	 */
+	public function save_checkpoint_before_http( array $checkpoint ): bool {
+		// Increment version for conflict detection.
+		$checkpoint['_checkpoint_version'] = ( isset( $checkpoint['_checkpoint_version'] ) ? (int) $checkpoint['_checkpoint_version'] : 0 ) + 1;
+		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+		return update_option( self::OPTION_CHECKPOINT, $checkpoint );
+	}
+
+	/**
 	 * Get migration checkpoint.
 	 *
 	 * @return array Checkpoint data, or empty array if none exists.
@@ -588,7 +605,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 * @return array
 	 */
 	private function normalize_receiving_state( array $state ): array {
-		$now          = current_time( 'mysql' );
+		$now          = current_time( 'mysql', true ); // UTC — consistent with EFS_Progress_Manager convention.
 		$defaults     = $this->idle_receiving_state();
 		$normalized   = array_merge( $defaults, $state );
 		$status       = sanitize_key( (string) ( $normalized['status'] ?? 'idle' ) );
@@ -608,6 +625,19 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$normalized['started_at']     = sanitize_text_field( (string) ( $normalized['started_at'] ?? '' ) );
 		$normalized['last_activity']  = sanitize_text_field( (string) ( $normalized['last_activity'] ?? '' ) );
 		$normalized['last_updated']   = sanitize_text_field( (string) ( $normalized['last_updated'] ?? '' ) );
+		// Per-type breakdown: array of ['received' => int, 'total' => int] keyed by post_type / 'media'.
+		$raw_by_type                  = isset( $normalized['items_by_type'] ) && is_array( $normalized['items_by_type'] )
+			? $normalized['items_by_type']
+			: array();
+		$normalized['items_by_type']  = array_map(
+			function ( $entry ) {
+				return array(
+					'received' => max( 0, absint( $entry['received'] ?? 0 ) ),
+					'total'    => max( 0, absint( $entry['total'] ?? 0 ) ),
+				);
+			},
+			$raw_by_type
+		);
 
 		if ( '' === $normalized['started_at'] && $is_receiving ) {
 			$normalized['started_at'] = $now;
@@ -644,6 +674,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			'current_phase'  => '',
 			'items_received' => 0,
 			'items_total'    => 0,
+			'items_by_type'  => array(),
 			'is_stale'       => false,
 		);
 	}
