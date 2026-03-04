@@ -379,4 +379,22 @@ class EFS_Error_Handler {
 			}
 		}
 	}
+
+	/**
+	 * Get recent migration logs from WP option
+	 *
+	 * @return array Array of recent log entries.
+	 */
+	public function get_recent_logs() {
+		return get_option( 'efs_migration_log', array() );
+	}
+
+	/**
+	 * Clear migration logs from WP option
+	 *
+	 * @return bool True if successful.
+	 */
+	public function clear_log() {
+		return delete_option( 'efs_migration_log' );
+	}
 }
