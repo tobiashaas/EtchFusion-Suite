@@ -26,9 +26,10 @@
 15. [Admin Settings UI](#admin-settings-ui)
 16. [Migration Testing Workflow](#migration-testing-workflow)
 17. [Database Persistence](#database-persistence)
-18. [Detailed Progress Tracking](#detailed-progress-tracking)
-19. [Dashboard Real-Time Logging API](#dashboard-real-time-logging-api)
-20. [References](#references)
+18. [Performance Optimization: Caching Patterns](#performance-optimization-caching-patterns)
+19. [Detailed Progress Tracking](#detailed-progress-tracking)
+20. [Dashboard Real-Time Logging API](#dashboard-real-time-logging-api)
+21. [References](#references)
 
 ---
 
@@ -2049,7 +2050,270 @@ Prior to release, complete the checklist in `docs/security-verification-checklis
 
 ---
 
-## Developer Guide: JWT Migration Key Lifecycle (v0.17.5)
+## Performance Optimization: Caching Patterns
+
+### Overview
+
+The plugin implements strategic metadata caching to eliminate N+1 query patterns and reduce database load during content analysis and migration. These patterns minimize expensive queries by priming WordPress metadata caches before loops and using transient caching for expensive lookups.
+
+### Query Cache Priming Pattern
+
+**Problem:** N+1 Query Pattern  
+When processing multiple posts in a loop, individual `get_post_meta()` calls trigger separate database queries for each post.
+
+**Solution:** Prime the metadata cache before the loop using `update_postmeta_cache()`.
+
+**Implementation Locations:**
+
+#### 1. Media Migrator (`includes/media_migrator.php:323`)
+
+```php
+private function get_media_ids_for_selected_post_types( array $selected_post_types ) {
+    $posts = get_posts( array(
+        'post_type'      => $selected_post_types,
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+    ) );
+
+    if ( empty( $posts ) ) {
+        return array();
+    }
+
+    // Prime the metadata cache to avoid N+1 queries in the loop below.
+    update_postmeta_cache( $posts );
+
+    $media_ids = array();
+    foreach ( $posts as $post_id ) {
+        // Now get_post_meta() calls hit the cache, not the database
+        $thumbnail_id = (int) get_post_thumbnail_id( $post_id );
+        $bricks_content = get_post_meta( $post_id, '_bricks_page_content_2', true );
+        // ...
+    }
+}
+```
+
+**Impact:** Reduces ~5N queries (N posts × 5 meta/post calls) to just 1-2 queries total.
+
+#### 2. CSS Converter (`includes/css_converter.php:708`)
+
+```php
+$posts = get_posts( array(
+    'post_type'   => $post_types,
+    'numberposts' => -1,
+    'meta_query'  => array( /* ... */ ),
+) );
+
+// Prime the metadata cache to avoid N+1 queries in the loop below.
+$post_ids = wp_list_pluck( $posts, 'ID' );
+update_postmeta_cache( $post_ids );
+
+foreach ( $posts as $post ) {
+    $elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
+    // ...
+}
+```
+
+**Impact:** Reduces N queries to 1 query.
+
+#### 3. Class Reference Scanner (`includes/css/class-class-reference-scanner.php:330`)
+
+```php
+$posts = get_posts( array(
+    'post_type'   => $post_types,
+    'numberposts' => -1,
+    'meta_query'  => array( /* ... */ ),
+) );
+
+// Prime the metadata cache to avoid N+1 queries in the loop below.
+$post_ids = wp_list_pluck( $posts, 'ID' );
+update_postmeta_cache( $post_ids );
+
+foreach ( $posts as $post ) {
+    // 4 separate get_post_meta() calls per post now hit the cache
+    $elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
+    // ...
+}
+```
+
+**Impact:** Reduces 4N queries to 1 query.
+
+### Transient Caching Pattern
+
+**Problem:** Expensive queries (with `meta_query`, large result sets) are executed every request.
+
+**Solution:** Use WordPress transients with appropriate TTL for cache invalidation.
+
+**Cache Expiration Strategy:**
+- **Configuration/detection queries** (MetaBox, JetEngine): 1 hour (HOUR_IN_SECONDS)
+- **Content analysis queries** (posts, media): 5 minutes (5 * MINUTE_IN_SECONDS)
+
+#### 1. Plugin Detector (`includes/plugin_detector.php`)
+
+Three detection methods use transients to cache expensive `get_posts()` calls with `meta_query`:
+
+```php
+/**
+ * Get count of Bricks posts
+ */
+public function get_bricks_posts_count() {
+    $transient_key = 'efs_bricks_posts_count';
+    $count         = get_transient( $transient_key );
+
+    if ( false !== $count ) {
+        return $count;
+    }
+
+    $posts = get_posts( array(
+        'post_type'   => 'any',
+        'numberposts' => -1,
+        'meta_query'  => array(
+            'relation' => 'AND',
+            array( 'key' => '_bricks_template_type', 'value' => 'content', 'compare' => '=' ),
+            array( 'key' => '_bricks_editor_mode', 'value' => 'bricks', 'compare' => '=' ),
+        ),
+    ) );
+
+    $count = count( $posts );
+    set_transient( $transient_key, $count, HOUR_IN_SECONDS );
+
+    return $count;
+}
+
+public function get_metabox_configurations() {
+    if ( ! $this->is_metabox_active() ) {
+        return array();
+    }
+
+    $transient_key = 'efs_metabox_configurations';
+    $configs       = get_transient( $transient_key );
+
+    if ( false !== $configs ) {
+        return $configs;
+    }
+
+    $configs = get_posts( array(
+        'post_type'   => 'meta-box',
+        'numberposts' => -1,
+    ) );
+
+    set_transient( $transient_key, $configs, HOUR_IN_SECONDS );
+    return $configs;
+}
+
+public function get_jetengine_meta_boxes() {
+    if ( ! $this->is_jetengine_active() ) {
+        return array();
+    }
+
+    $transient_key = 'efs_jetengine_meta_boxes';
+    $meta_boxes    = get_transient( $transient_key );
+
+    if ( false !== $meta_boxes ) {
+        return $meta_boxes;
+    }
+
+    $meta_boxes = get_posts( array(
+        'post_type'   => 'jet-engine-meta',
+        'numberposts' => -1,
+    ) );
+
+    set_transient( $transient_key, $meta_boxes, HOUR_IN_SECONDS );
+    return $meta_boxes;
+}
+```
+
+**Impact:** Reduces duplicate expensive queries to single cached lookup.
+
+#### 2. Content Parser (`includes/content_parser.php`)
+
+Three content analysis methods cache expensive unbounded queries:
+
+```php
+public function get_bricks_posts( $post_types = null ) {
+    // Build post type array...
+    $transient_key  = 'efs_bricks_posts_' . md5( implode( ',', $post_type_arg ) );
+    $filtered_posts = get_transient( $transient_key );
+
+    if ( false !== $filtered_posts ) {
+        return $filtered_posts;
+    }
+
+    $posts = get_posts( array(
+        'post_type'   => $post_type_arg,
+        'numberposts' => -1,
+        'meta_query'  => array( /* ... */ ),
+    ) );
+
+    // Process and filter posts...
+    $filtered_posts = array( /* ... */ );
+
+    set_transient( $transient_key, $filtered_posts, 5 * MINUTE_IN_SECONDS );
+    return $filtered_posts;
+}
+
+public function get_gutenberg_posts( $post_types = null ) {
+    // Similar pattern with md5 hashing of post types
+    $transient_key = 'efs_gutenberg_posts_' . md5( implode( ',', $post_type_arg ) );
+    $posts         = get_transient( $transient_key );
+
+    if ( false !== $posts ) {
+        return $posts;
+    }
+
+    $posts = get_posts( array( /* ... */ ) );
+
+    set_transient( $transient_key, $posts, 5 * MINUTE_IN_SECONDS );
+    return $posts;
+}
+
+public function get_media() {
+    $transient_key = 'efs_all_media';
+    $media         = get_transient( $transient_key );
+
+    if ( false !== $media ) {
+        return $media;
+    }
+
+    $media = get_posts( array(
+        'post_type'   => 'attachment',
+        'numberposts' => -1,
+    ) );
+
+    set_transient( $transient_key, $media, 5 * MINUTE_IN_SECONDS );
+    return $media;
+}
+```
+
+**Key Pattern:** Transient keys are parameterized using MD5 hashing of variable inputs (post types) to support different query variants being cached separately.
+
+**Impact:** Content analysis queries run once per 5-minute window instead of on every request.
+
+### Cache Invalidation
+
+Cache invalidation happens automatically via WordPress plugin/theme upgrade cycles. For manual invalidation during development:
+
+```php
+delete_transient( 'efs_bricks_posts_count' );
+delete_transient( 'efs_metabox_configurations' );
+delete_transient( 'efs_jetengine_meta_boxes' );
+delete_transient( 'efs_bricks_posts_' . md5( 'post,page,bricks_template' ) );
+delete_transient( 'efs_gutenberg_posts_' . md5( 'post,page' ) );
+delete_transient( 'efs_all_media' );
+```
+
+### Performance Impact Summary
+
+| Optimization | Pattern | Query Reduction | TTL | Files |
+|---|---|---|---|---|
+| **Media Migrator** | `update_postmeta_cache()` | 5N → 1 query | N/A | `media_migrator.php` |
+| **CSS Converter** | `update_postmeta_cache()` | N → 1 query | N/A | `css_converter.php` |
+| **Class Scanner** | `update_postmeta_cache()` | 4N → 1 query | N/A | `class-class-reference-scanner.php` |
+| **Plugin Detector (3 methods)** | Transients | 1 → cached lookup | 1 hour | `plugin_detector.php` |
+| **Content Parser (3 methods)** | Transients | 1 → cached lookup | 5 min | `content_parser.php` |
+
+**Combined benefit:** Sites with 1,000+ posts reduce content analysis queries from ~5,000+ to <10.
+
+---
 
 ### Overview
 

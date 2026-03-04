@@ -474,6 +474,14 @@ class EFS_Content_Parser {
 			$post_type_arg = array( 'post', 'page', 'bricks_template' );
 		}
 
+		// Use transient key that includes post types to cache different variants separately.
+		$transient_key  = 'efs_bricks_posts_' . md5( implode( ',', $post_type_arg ) );
+		$filtered_posts = get_transient( $transient_key );
+
+		if ( false !== $filtered_posts ) {
+			return $filtered_posts;
+		}
+
 		// Query for posts with Bricks meta data
 		// Only check for _bricks_page_content_2 (templates don't have _bricks_editor_mode)
 		// Note: 'any' doesn't include all CPTs, so we explicitly list post types
@@ -510,6 +518,8 @@ class EFS_Content_Parser {
 			}
 		}
 
+		set_transient( $transient_key, $filtered_posts, 5 * MINUTE_IN_SECONDS );
+
 		return $filtered_posts;
 	}
 
@@ -531,6 +541,14 @@ class EFS_Content_Parser {
 			$post_type_arg = array( 'post', 'page' );
 		}
 
+		// Use transient key that includes post types to cache different variants separately.
+		$transient_key = 'efs_gutenberg_posts_' . md5( implode( ',', $post_type_arg ) );
+		$posts         = get_transient( $transient_key );
+
+		if ( false !== $posts ) {
+			return $posts;
+		}
+
 		// Query for posts WITHOUT Bricks meta data
 		$args = array(
 			'post_type'   => $post_type_arg,
@@ -544,20 +562,35 @@ class EFS_Content_Parser {
 			),
 		);
 
-		return get_posts( $args );
+		$posts = get_posts( $args );
+
+		set_transient( $transient_key, $posts, 5 * MINUTE_IN_SECONDS );
+
+		return $posts;
 	}
 
 	/**
 	 * Get all media/attachments
 	 */
 	public function get_media() {
+		$transient_key = 'efs_all_media';
+		$media         = get_transient( $transient_key );
+
+		if ( false !== $media ) {
+			return $media;
+		}
+
 		$args = array(
 			'post_type'   => 'attachment',
 			'post_status' => 'inherit',
 			'numberposts' => -1,
 		);
 
-		return get_posts( $args );
+		$media = get_posts( $args );
+
+		set_transient( $transient_key, $media, 5 * MINUTE_IN_SECONDS );
+
+		return $media;
 	}
 
 	/**

@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### ⚡ Performance Optimizations
+
+- **N+1 query elimination in media/CSS analysis:** Added `update_postmeta_cache()` calls in `media_migrator.php`, `css_converter.php`, and `class-class-reference-scanner.php` to prime WordPress metadata cache before loops. Reduces database queries from 5N → 1, N → 1, and 4N → 1 respectively for sites processing large post collections.
+- **Transient caching for expensive content queries:** Implemented transient-based caching (1 hour for plugin detection, 5 minutes for content analysis) in `plugin_detector.php` (3 methods) and `content_parser.php` (3 methods). Eliminates repeated `get_posts()` calls with expensive `meta_query` conditions.
+- **Performance documentation:** Added comprehensive caching patterns guide to `DOCUMENTATION.md` covering query cache priming, transient strategies, and cache invalidation.
+
 ### 🏗️ Architecture & Infrastructure
 
 - **Custom settings table (`wp_efs_settings`):** Implemented dedicated database table for all plugin configuration settings, replacing WordPress Options API. Completes the custom-table architecture pattern already established by `wp_efs_migrations` and `wp_efs_migration_logs`. Migration from wp_options is automatic during plugin installation (one-time operation).

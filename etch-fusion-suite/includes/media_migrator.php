@@ -321,6 +321,9 @@ class EFS_Media_Migrator {
 			return array();
 		}
 
+		// Prime the metadata cache to avoid N+1 queries in the loop below.
+		update_postmeta_cache( $posts );
+
 		$media_ids = array();
 		foreach ( $posts as $post_id ) {
 			$post_id = (int) $post_id;

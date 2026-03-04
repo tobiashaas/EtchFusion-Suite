@@ -326,6 +326,10 @@ class EFS_Class_Reference_Scanner {
 			$this->has_scanned_bricks_content = true;
 		}
 
+		// Prime the metadata cache to avoid N+1 queries in the loop below.
+		$post_ids = wp_list_pluck( $posts, 'ID' );
+		update_postmeta_cache( $post_ids );
+
 		$referenced = array();
 		foreach ( $posts as $post ) {
 			// Prefer the v2 content meta; fall back to legacy key.

@@ -705,6 +705,10 @@ class EFS_CSS_Converter {
 			)
 		);
 
+		// Prime the metadata cache to avoid N+1 queries in the loop below.
+		$post_ids = wp_list_pluck( $posts, 'ID' );
+		update_postmeta_cache( $post_ids );
+
 		// Utility-class prefix patterns — never the "semantic" class of a block element.
 		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-', 'smart-' );
 		$injected         = array();

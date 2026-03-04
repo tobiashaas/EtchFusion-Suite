@@ -144,6 +144,13 @@ class EFS_Plugin_Detector {
 	 * Get count of Bricks posts
 	 */
 	public function get_bricks_posts_count() {
+		$transient_key = 'efs_bricks_posts_count';
+		$count         = get_transient( $transient_key );
+
+		if ( false !== $count ) {
+			return $count;
+		}
+
 		$posts = get_posts(
 			array(
 				'post_type'   => 'any',
@@ -165,7 +172,10 @@ class EFS_Plugin_Detector {
 			)
 		);
 
-		return count( $posts );
+		$count = count( $posts );
+		set_transient( $transient_key, $count, HOUR_IN_SECONDS );
+
+		return $count;
 	}
 
 	/**
@@ -225,6 +235,13 @@ class EFS_Plugin_Detector {
 			return array();
 		}
 
+		$transient_key = 'efs_metabox_configurations';
+		$configs       = get_transient( $transient_key );
+
+		if ( false !== $configs ) {
+			return $configs;
+		}
+
 		// Get MetaBox configurations from database
 		$configs = get_posts(
 			array(
@@ -233,6 +250,8 @@ class EFS_Plugin_Detector {
 				'numberposts' => -1,
 			)
 		);
+
+		set_transient( $transient_key, $configs, HOUR_IN_SECONDS );
 
 		return $configs;
 	}
@@ -245,6 +264,13 @@ class EFS_Plugin_Detector {
 			return array();
 		}
 
+		$transient_key = 'efs_jetengine_meta_boxes';
+		$meta_boxes    = get_transient( $transient_key );
+
+		if ( false !== $meta_boxes ) {
+			return $meta_boxes;
+		}
+
 		// Get JetEngine meta boxes from database
 		$meta_boxes = get_posts(
 			array(
@@ -253,6 +279,8 @@ class EFS_Plugin_Detector {
 				'numberposts' => -1,
 			)
 		);
+
+		set_transient( $transient_key, $meta_boxes, HOUR_IN_SECONDS );
 
 		return $meta_boxes;
 	}
