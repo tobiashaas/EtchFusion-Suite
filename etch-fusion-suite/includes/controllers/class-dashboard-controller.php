@@ -327,4 +327,3 @@ class EFS_Dashboard_Controller {
 		return $this->template_controller->get_saved_templates();
 	}
 }
-

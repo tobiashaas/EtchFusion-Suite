@@ -320,4 +320,3 @@ class EFS_Migration_Orchestrator {
 		return $this->content_service->convert_bricks_to_gutenberg( $post->ID, $this->api_client, $target, $migration_key );
 	}
 }
-

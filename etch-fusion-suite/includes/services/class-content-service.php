@@ -455,4 +455,3 @@ class EFS_Content_Service {
 		return $presets;
 	}
 }
-

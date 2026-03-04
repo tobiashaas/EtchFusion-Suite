@@ -279,4 +279,3 @@ class EFS_Logs_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		);
 	}
 }
-

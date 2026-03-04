@@ -649,4 +649,3 @@ class EFS_Media_Migrator {
 		return array_unique( $media_ids );
 	}
 }
-

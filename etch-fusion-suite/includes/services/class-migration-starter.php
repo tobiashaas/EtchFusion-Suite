@@ -500,4 +500,3 @@ class EFS_Migration_Starter {
 		);
 	}
 }
-

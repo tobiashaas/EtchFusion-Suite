@@ -433,4 +433,3 @@ class EFS_Custom_Fields_Migrator extends Abstract_Migrator {
 		return $stats;
 	}
 }
-

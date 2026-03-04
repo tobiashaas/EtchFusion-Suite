@@ -518,4 +518,3 @@ class EFS_CPT_Migrator extends Abstract_Migrator {
 		return $cpts_with_bricks;
 	}
 }
-

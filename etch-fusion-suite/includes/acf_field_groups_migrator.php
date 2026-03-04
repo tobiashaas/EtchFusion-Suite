@@ -475,4 +475,3 @@ class EFS_ACF_Field_Groups_Migrator extends Abstract_Migrator {
 		);
 	}
 }
-

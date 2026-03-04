@@ -119,7 +119,8 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			array(
 				'blocking'  => false,
 				'timeout'   => 0.5,
-				'sslverify' => apply_filters( 'efs_https_local_over_ssl', false ),
+				// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+				'sslverify' => apply_filters( 'efs_https_local_ssl_verify', false ),
 			)
 		);
 

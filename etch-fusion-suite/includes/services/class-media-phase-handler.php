@@ -123,4 +123,3 @@ class EFS_Media_Phase_Handler implements Phase_Handler_Interface {
 		$checkpoint['processed_media_count'] = $processed;
 	}
 }
-

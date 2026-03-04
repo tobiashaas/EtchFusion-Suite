@@ -140,4 +140,3 @@ class EFS_Element_Condition extends EFS_Base_Element implements Needs_Error_Hand
 		error_log( 'W008: Condition not converted: ' . $type . ' (element_id: ' . $element_id . ')' );
 	}
 }
-

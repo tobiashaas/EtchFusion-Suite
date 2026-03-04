@@ -878,4 +878,3 @@ class EFS_CSS_Converter {
 		$this->error_handler->debug_log( $message, $context, 'EFS_CSS_CONVERTER' );
 	}
 }
-

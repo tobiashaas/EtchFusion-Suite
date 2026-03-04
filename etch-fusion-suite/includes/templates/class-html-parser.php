@@ -192,4 +192,3 @@ class EFS_HTML_Parser {
 		}
 	}
 }
-

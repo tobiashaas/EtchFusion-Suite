@@ -517,4 +517,3 @@ class EFS_Class_Reference_Scanner {
 		return $found;
 	}
 }
-

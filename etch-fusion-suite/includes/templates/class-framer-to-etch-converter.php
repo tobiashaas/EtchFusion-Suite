@@ -359,4 +359,3 @@ class EFS_Framer_To_Etch_Converter {
 		return $element->ownerDocument; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }
-

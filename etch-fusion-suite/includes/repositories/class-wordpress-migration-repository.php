@@ -593,7 +593,7 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$checkpoint = is_array( $checkpoint ) ? $checkpoint : array();
 
 		// If found in options, try to migrate to DB for consistency
-		if ( ! empty( $checkpoint ) && $db_checkpoint === null ) {
+		if ( null === $db_checkpoint && ! empty( $checkpoint ) ) {
 			EFS_DB_Migration_Persistence::save_checkpoint_atomic( $current_id, $checkpoint, 0 );
 		}
 

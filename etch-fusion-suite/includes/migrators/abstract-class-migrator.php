@@ -147,4 +147,3 @@ abstract class Abstract_Migrator implements Migrator_Interface {
 		return $this->api_client->send_authorized_request( $target_url, $jwt_token, $endpoint, 'POST', $data );
 	}
 }
-

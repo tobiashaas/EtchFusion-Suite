@@ -177,4 +177,3 @@ class EFS_Element_Factory {
 		return $converter->convert( $element, $children, $context );
 	}
 }
-

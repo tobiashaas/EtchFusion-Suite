@@ -563,13 +563,13 @@ etch_fusion_suite();
 // Plugin activation/deactivation/uninstall hooks
 register_activation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Etch_Fusion_Suite_Plugin', 'deactivate' ) );
-register_uninstall_hook( __FILE__, 'efs_plugin_uninstall' );
+register_uninstall_hook( __FILE__, 'etch_fusion_suite_uninstall' );
 
 /**
  * Plugin uninstall callback
  * Called when plugin is deleted (not deactivated)
  */
-function efs_plugin_uninstall() {
+function etch_fusion_suite_uninstall() {
 	if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 		return;
 	}

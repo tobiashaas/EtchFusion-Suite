@@ -340,4 +340,3 @@ class EFS_Migration_Run_Finalizer {
 		return $counts;
 	}
 }
-

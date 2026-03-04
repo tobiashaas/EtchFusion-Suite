@@ -534,4 +534,3 @@ class EFS_Framer_HTML_Sanitizer extends EFS_HTML_Sanitizer implements EFS_HTML_S
 		return implode( ' ', $variables );
 	}
 }
-

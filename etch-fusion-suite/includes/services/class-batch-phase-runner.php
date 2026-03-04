@@ -520,4 +520,3 @@ class EFS_Batch_Phase_Runner {
 		);
 	}
 }
-

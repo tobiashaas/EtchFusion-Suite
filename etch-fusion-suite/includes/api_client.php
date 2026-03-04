@@ -471,4 +471,3 @@ class EFS_API_Client {
 		return $this->send_request( $url, $jwt_token, '/export/metabox-configs' );
 	}
 }
-

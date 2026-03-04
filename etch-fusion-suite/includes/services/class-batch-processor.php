@@ -276,7 +276,7 @@ class EFS_Batch_Processor {
 		}
 
 		// Validate migration ID if provided.
-		if ( ! empty( $migration_id ) && (string) $migration_id !== (string) ( $checkpoint['migrationId'] ?? '' ) ) {
+		if ( ! empty( $migration_id ) && (string) ( $checkpoint['migrationId'] ?? '' ) !== (string) $migration_id ) {
 			return new \WP_Error(
 				'checkpoint_migration_mismatch',
 				__( 'Checkpoint migration ID does not match expected migration ID.', 'etch-fusion-suite' )
@@ -303,4 +303,3 @@ class EFS_Batch_Processor {
 		return null;
 	}
 }
-

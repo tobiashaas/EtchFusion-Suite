@@ -541,4 +541,3 @@ class EFS_Dynamic_Data_Converter {
 		return $this->modifier_mapping;
 	}
 }
-

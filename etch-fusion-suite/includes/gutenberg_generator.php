@@ -1926,4 +1926,3 @@ class EFS_Gutenberg_Generator {
 		return implode( ' ', array_filter( $classes ) );
 	}
 }
-
