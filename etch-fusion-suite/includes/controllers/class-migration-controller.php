@@ -154,31 +154,8 @@ class EFS_Migration_Controller {
 			return new \WP_Error( 'invalid_migration_id', __( 'Invalid migration ID format.', 'etch-fusion-suite' ) );
 		}
 
-		// Get migration_key from request or settings (only source of target_url).
-		$migration_key = isset( $data['migration_key'] ) ? sanitize_textarea_field( $data['migration_key'] ) : '';
-		if ( empty( $migration_key ) ) {
-			$settings_repo = etch_fusion_suite_container()->get( 'settings_repository' );
-			if ( $settings_repo ) {
-				$saved_settings = $settings_repo->get_migration_settings();
-				$migration_key  = isset( $saved_settings['migration_key'] ) ? sanitize_textarea_field( $saved_settings['migration_key'] ) : '';
-			}
-		}
-
-		// Extract target_url from JWT token (ONLY source of truth).
-		$target_url = $this->get_target_url_from_migration_key( $migration_key );
-
-		// If no target_url, migration is not properly configured.
-		if ( empty( $target_url ) ) {
-			return new \WP_Error(
-				'configuration_incomplete',
-				__( 'Migration is not configured. Please complete Step 2: Connect to Etch Site in the migration wizard.', 'etch-fusion-suite' ),
-				array(
-					'status'      => 'configuration_required',
-					'migrationId' => $migration_id,
-				)
-			);
-		}
-
+		// Progress polling only reads local progress data — no API calls to Etch site,
+		// no target_url needed. Configuration is validated at start_migration() time.
 		$result = $this->manager->get_progress( $migration_id );
 		if ( is_wp_error( $result ) ) {
 			$result->add_data( array( 'migrationId' => $migration_id ) );
