@@ -669,12 +669,14 @@ PHP
 
 summarize_results() {
   local summary_message
-  local prohibited_total=$(( ${PROHIBITED_DATE:-0} + ${PROHIBITED_GMDATE:-0} ))
+  # gmdate() is NOT prohibited: WP Coding Standards recommend it as the UTC-safe
+  # alternative to date(). Only date() (server-timezone-dependent) is forbidden.
+  local prohibited_total=${PROHIBITED_DATE:-0}
   if [[ ${PHPCS_STATUS} -ne 0 ]]; then
     error "PHPCS detected WordPress.DateTime.RestrictedFunctions violations"
   fi
   if [[ ${prohibited_total} -gt 0 ]]; then
-    error "Found ${prohibited_total} prohibited date()/gmdate() usage(s)"
+    error "Found ${prohibited_total} prohibited date() usage(s)"
   fi
 
   if [[ ${PHPCS_STATUS} -eq 0 && ${prohibited_total} -eq 0 ]]; then
@@ -693,7 +695,7 @@ summarize_results() {
   printf "  └─ other          : %s\n" "${CURRENT_TIME_OTHER:-0}"
   printf 'wp_date() total      : %s\n' "${WP_DATE_TOTAL:-0}"
   printf 'Prohibited date()    : %s\n' "${PROHIBITED_DATE:-0}"
-  printf 'Prohibited gmdate()  : %s\n' "${PROHIBITED_GMDATE:-0}"
+  printf 'Allowed gmdate()     : %s\n' "${PROHIBITED_GMDATE:-0}"
   printf 'Compliance rate      : %s%%\n' "${COMPLIANCE_RATE:-100}"
 }
 
@@ -718,7 +720,7 @@ main() {
   if [[ ${PHPCS_STATUS} -ne 0 ]]; then
     exit_code=1
   fi
-  if [[ $(( ${PROHIBITED_DATE:-0} + ${PROHIBITED_GMDATE:-0} )) -gt 0 ]]; then
+  if [[ ${PROHIBITED_DATE:-0} -gt 0 ]]; then
     exit_code=1
   fi
 
