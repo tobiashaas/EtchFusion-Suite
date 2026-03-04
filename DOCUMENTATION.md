@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD013 MD024 -->
 
 **Last Updated:** 2026-03-04  
-**Version:** 0.17.8 (Phase 2a - Critical Stability Fixes)
+**Version:** 0.17.9 (Phase 5 - Critical Namespace Conflict Resolution)
 
 ---
 

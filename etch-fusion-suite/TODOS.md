@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-03 17:17 (Bricks Migration UX: Configuration Error Handling - Improved Error Messages)
+**Updated:** 2026-03-04 21:33 (Phase 7 Complete: Critical Namespace Conflict Resolution - 165/165 tests PASS)
 
 ## 🚀 Current Development
 
@@ -38,11 +38,13 @@
 - [✅] **test-full-migration-flow** - DONE 2026-02-28: PHP-Syntaxcheck aller 10 in Phases 1–5 geänderten Dateien: 10/10 PASS. Verifikationsskript `tests/phase-fixes-verification.php` erstellt — prüft 35 Conditions (AS-Klassen, PSR-4 Autoload, Migrator-Fixes, CSS-Module-Laufzeit, Error-Codes). Ausführung in Docker: `npm run wp -- eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/phase-fixes-verification.php';"`. PHPUnit CSS-Tests (Phase 4) laufen mit `composer test:unit` in Docker.
 - [✅] **performance-profile** - VERIFIED 2026-02-28: Statische Bottleneck-Analyse ohne xdebug (PHPStan nicht lokal verfügbar, läuft in CI). Findings: (1) Memory-Management in BatchPhaseRunner korrekt: `$memory_pressure` → Zeile 232 gesetzt, Zeile 379/410 zurückgegeben. (2) ClassReferenceScanner kein N+1: `get_posts()` via `WP_Query` primed Meta-Cache mit einer `IN()`-Query; nachfolgende `get_post_meta()`-Aufrufe = Cache-Hits. (3) `add_to_log()` 1 `get_option` + 1 `update_option` pro Eintrag — bounded durch 1000er-Limit; by design. (4) `should_exclude_class()` rebuildet Arrays pro Aufruf — Micro-Optimierung, kein Bottleneck. Keine Code-Änderungen nötig.
 
-#### Session Tasks (2 Todos)
-- [✅] **document-module-deps** - DONE 2026-02-28: Dependency-Tabelle in Phase 4 TODOS + CHANGELOG dokumentiert (alle 8 CSS-Module mit WP-Abhängigkeiten). Vollständige Architektur in MEMORY.md (CSS Converter Refactor-Sektion).
-- [✅] **improve-service-provider** - VERIFIED 2026-02-28: Service Provider in `includes/container/class-service-provider.php` wurde in Phase 2 (audit-psr4) bereits auf korrekte Registrierung aller 8 CSS-Module überprüft. 129/129 Live-Test-PASS bestätigt korrekte DI-Registrierung.
+#### Phase 7️⃣: Critical Namespace Conflict Resolution (2 Todos)
+- [✅] **consolidate-error-handler** - DONE 2026-03-04 21:30: Kritischer Namespace-Konflikt gelöst! Doppelte Definition von `EFS_Error_Handler`: (1) `includes/error_handler.php` (600 Zeilen) mit ERROR_CODES/WARNING_CODES wurde IGNORIERT, (2) `includes/core/class-error-handler.php` (40 Zeilen) wurde geladen. Tests erwarteten ERROR_CODES die nicht existierten! Lösung: Alle 50+ ERROR_CODES + 15+ WARNING_CODES + Methoden in **eine** konsolidierte Datei `includes/class-error-handler.php` migriert. Orphaned `includes/core/` Duplikate gelöscht. Autoloader-Struktur verifiziert: Core-Klassen gehören ins Root-Level!
+- [✅] **update-documentation-consolidation** - DONE 2026-03-04 21:33: Dokumentiert in `etch-fusion-suite/DOCUMENTATION.md` (Phase 5 Section) und root `DOCUMENTATION.md`. Architektur-Entscheidung: Core/Parsers/Migrators = Root-Level um Namespace-Konflikte zu vermeiden.
 
-**Dependency Chain:** Phase 1 → Phase 2 → Phases 3,4 → Phase 5 → Phase 6
+**Verification:** ✅ **165/165 unit tests PASS** - Keine Regressions!
+
+**Dependency Chain:** Phase 1 → Phase 2 → Phases 3,4 → Phase 5 → Phase 6 → Phase 7 ✅ COMPLETE
 
 ### 🐛 Open Bugs
 
