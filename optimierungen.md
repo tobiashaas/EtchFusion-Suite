@@ -15,7 +15,7 @@
 
 ## 2. Performance: Unbegrenzte Post-Abfragen
 
-**Status: ⚠️ NICHT IMPLEMENTIERT - FÜR v2.0 GEPLANT**
+**Status: ⚠️ NICHT IMPLEMENTIERT - NIEDRIGE PRIORITÄT**
 
 **Dateien:**
 - ❌ `includes/media_migrator.php:135,253,315,341` - `posts_per_page => -1`
@@ -39,7 +39,7 @@
 
 **Grund nicht implementiert:** Reine Maintainability-Verbesserung ohne Performance-Impact. Post-Release-Cleanup geplant.
 
-**Empfehlung:** Aufteilung in kleinere, thematisch getrennte Module nach dem Single-Responsibility-Prinzip (v2.0+).
+**Empfehlung:** Aufteilung in kleinere, thematisch getrennte Module nach dem Single-Responsibility-Prinzip.
 
 ---
 
@@ -209,7 +209,7 @@ Im Frontend (`views/migration-progress.php`):
 **Code-Review vom 2026-03-04:** Analyse des tatsächlichen Implementierungsstands gegen den ursprünglichen Befund.
 Korrekturen und neue Erkenntnisse sind in den einzelnen Punkten markiert.
 
-Die folgenden Probleme wurden identifiziert und müssen in v1.0 Final adressiert werden:
+Die folgenden Probleme wurden identifiziert und müssen vor dem nächsten Release adressiert werden:
 
 ---
 
@@ -516,41 +516,41 @@ foreach ( $stale as $migration ) {
 
 | # | Optimierung | Status | Priorität | Geplant für |
 |---|---|---|---|---|
-| 1 | N+1 Query Elimination | ✅ DONE | Hoch | v0.17.7 (2026-03-04) |
-| 2 | Unbegrenzte Queries (Pagination) | ⚠️ NOT DONE | Hoch | v2.0 |
-| 3 | Code-Refactoring (große Dateien) | ❌ NOT DONE | Niedrig | v2.0+ |
-| 4 | Transient Caching | ✅ DONE | Medium | v0.17.7 (2026-03-04) |
-| 5 | Nonce Verification | ⚠️ PARTIAL | Mittel | v0.18+ |
-| 6 | JSON Logging Optimization | ❌ NOT DONE | Niedrig | v1.1+ |
-| 7 | Memory Optimization | ✅ SOLVED | Niedrig | v0.17.7 (2026-03-04) |
-| 8 | Database Indexes | ✅ PARTIAL | Medium | v1.1 |
-| 9 | Migrations-Logging erweitern | ⚠️ PARTIAL | Mittel | v1.0 Final |
-| 10a | Race Condition Checkpoint | ❌ NOT FIXED | **KRITISCH** | v1.0 Final |
-| 10b | Lock-Handling | ⚠️ FUNCTIONAL BUT FRAGILE | Hoch | v1.0 Final |
-| 10c | Nicht-atomare Checkpoint-Aktualisierung | ❌ NOT FIXED (via 10a lösbar) | Hoch | v1.0 Final |
+| 1 | N+1 Query Elimination | ✅ DONE | Hoch | 2026-03-04 |
+| 2 | Unbegrenzte Queries (Pagination) | ⚠️ NOT DONE | Niedrig | — |
+| 3 | Code-Refactoring (große Dateien) | ❌ NOT DONE | Niedrig | — |
+| 4 | Transient Caching | ✅ DONE | Medium | 2026-03-04 |
+| 5 | Nonce Verification | ⚠️ PARTIAL | Mittel | — |
+| 6 | JSON Logging Optimization | ❌ NOT DONE | Niedrig | — |
+| 7 | Memory Optimization | ✅ SOLVED | Niedrig | 2026-03-04 |
+| 8 | Database Indexes | ✅ PARTIAL | Medium | — |
+| 9 | Migrations-Logging erweitern | ⚠️ PARTIAL | Mittel | — |
+| 10a | Race Condition Checkpoint | ✅ FIXED (Commit f3c40d69) | **KRITISCH** | 2026-03-04 |
+| 10b | Lock-Handling | ⚠️ FUNCTIONAL BUT FRAGILE | Hoch | — |
+| 10c | Nicht-atomare Checkpoint-Aktualisierung | ❌ NOT FIXED (via 10a lösbar) | Hoch | — |
 | 10d | Item-Level Retry bei HTTP-Timeout | ✅ BEREITS IMPLEMENTIERT | — | — |
-| 10e | Memory Leak Cache | ❌ NOT FIXED | Mittel | v1.0 Final |
-| 10f | Shutdown-Handler | ⚠️ MOSTLY FIXED (Restrisiko) | Niedrig | v1.0 Final |
-| 10g | Checkpoint-Validierung | ❌ NOT FIXED | Hoch | v1.0 Final |
-| 10h | Progress-Heartbeat Race Condition | ❌ NOT FIXED | Hoch | v1.0 Final |
-| 10i | Idempotenz-Duplikate | ❌ NOT FIXED | **KRITISCH** | v1.0 Final |
-| 10j | DB-Transaktionen | ⚠️ PARTIAL SCOPE | Hoch | v1.0 Final |
-| 10k | `get_stale_migrations()` nicht verdrahtet | ❌ NOT WIRED | Hoch | v1.0 Final |
+| 10e | Memory Leak Cache | ❌ NOT FIXED | Mittel | — |
+| 10f | Shutdown-Handler | ⚠️ MOSTLY FIXED (Restrisiko) | Niedrig | — |
+| 10g | Checkpoint-Validierung | ❌ NOT FIXED | Hoch | — |
+| 10h | Progress-Heartbeat Race Condition | ❌ NOT FIXED | Hoch | — |
+| 10i | Idempotenz-Duplikate | ❌ NOT FIXED | **KRITISCH** | — |
+| 10j | DB-Transaktionen | ⚠️ PARTIAL SCOPE | Hoch | — |
+| 10k | `get_stale_migrations()` nicht verdrahtet | ❌ NOT WIRED | Hoch | — |
 
 ---
 
 ## Empfohlene Implementierungsreihenfolge (nach Abhängigkeiten)
 
-| Schritt | Items | Warum zuerst | Unlock |
-|---------|-------|--------------|--------|
-| **1** | 10a: DB-Checkpoint | Fundament — alle anderen hängen davon ab | 10c, 10h, 10i |
-| **2** | 10b: DB-Lock in Migration-Row | Hängt von 10a ab (gemeinsame Tabellen-Erweiterung) | 10f Rest |
-| **3** | 10k: `get_stale_migrations()` verdrahten | Kostenlos — Methode existiert bereits | Auto-Resume |
-| **4** | 10e: `clean_post_cache()` nach Batch | 1-Zeiler, sofortiger Gewinn | Memory |
-| **5** | 10g: Checkpoint-Validator | Einfach, schützt vor Silent Failures | Stabilität |
-| **6** | 10i: Idempotenz via processed_set | Erfordert stabilem DB-Checkpoint (10a) | Keine Duplikate |
-| **7** | 10h: Atomarer Heartbeat | Direkter `UPDATE` auf DB-Row | Stale Detection |
-| **8** | 10j: Transaktionen für EFS-Tabellen | Nur nach 10a sinnvoll (DB-first) | Konsistenz |
+| Schritt | Items | Status | Warum zuerst | Unlock |
+|---------|-------|--------|--------------|--------|
+| **1** | 10a: Checkpoint Optimistic Locking | ✅ DONE (f3c40d69) | Fundament für Checkpoint-Konsistenz | 10c, 10h, 10i |
+| **2** | 10b: DB-Lock in Migration-Row | ❌ TODO | Ersetzt fragiles wp_options-Lock atomar | 10f Rest |
+| **3** | 10k: `get_stale_migrations()` verdrahten | ❌ TODO | Kostenlos — Methode existiert bereits | Auto-Resume |
+| **4** | 10e: `clean_post_cache()` nach Batch | ❌ TODO | 1-Zeiler, sofortiger Memory-Gewinn | Memory |
+| **5** | 10g: Checkpoint-Validator | ❌ TODO | Einfach, schützt vor Silent Failures | Stabilität |
+| **6** | 10i: Idempotenz via processed_set | ❌ TODO | Setzt stabilen Checkpoint voraus (10a ✅) | Keine Duplikate |
+| **7** | 10h: Atomarer Heartbeat | ❌ TODO | Direktes `UPDATE` auf DB-Row | Stale Detection |
+| **8** | 10j: Transaktionen für EFS-Tabellen | ❌ TODO | Nur für `wp_efs_*`-Tabellen sinnvoll | Konsistenz |
 
 ---
 
@@ -559,8 +559,8 @@ foreach ( $stale as $migration ) {
 1. **✅ N+1 Queries beheben** (media_migrator.php, css_converter.php) - **DONE (2026-03-04)** - Höchster Performance-Impact
 2. **✅ Transient Caching implementieren** (plugin_detector, content_parser) - **DONE (2026-03-04)** - Eliminiert wiederholte teure Queries
 3. **✅ Checkpoint Locking implementieren** (10a Optimistic Locking Pattern) - **DONE (2026-03-04)** - Verhindert Migration-Restart bei HTTP-Timeout
-4. **❌ fix-idempotency** (10i) - **TODO FOR v1.0 FINAL** - Verhindert Duplikate bei verlorener HTTP-Response
-5. **❌ fix-batch-error-handling** (10d Batch-Level → Item-Level Retry) - **TODO FOR v1.0 FINAL** - Verhindert Datenverlust bei Batch-Fehler
+4. **❌ Idempotenz-Schutz** (10i) - **TODO** - Verhindert Duplikate bei verlorener HTTP-Response
+5. **❌ DB-Lock in Migration-Row** (10b) - **TODO** - Ersetzt fragiles wp_options-Lock durch atomares SQL-UPDATE
 
 ---
 
@@ -573,89 +573,7 @@ foreach ( $stale as $migration ) {
 | **Namespace-Struktur** | ✅ Sehr gut | Klar getrennt: `Bricks2Etch\Services`, `Bricks2Etch\Repositories`, `Bricks2Etch\Converters`, `Bricks2Etch\Migrators`, `Bricks2Etch\Security`, `Bricks2Etch\Ajax`, etc. |
 | **Service Container** | ✅ Sehr gut | Implementiert PSR-Container, nutzt Reflection für Dependency Injection |
 | **Interfaces** | ✅ Gut | 12+ Interfaces definiert (`Phase_Handler_Interface`, `Migrator_Interface`, `Migration_Repository_Interface`, etc.) |
-
----
-
-## FINAL VERIFICATION SUMMARY (2026-03-04)
-
-### Vollständigkeit der Datei
-
-Diese Datei wurde **systematisch durchgearbeitet und verifiziert**. Alle Optimierungen aus der Initial-Code-Review wurden dokumentiert und mit aktuellem Implementierungs-Status gekennzeichnet.
-
-### Abdeckung
-
-- **Total Items:** 23 Optimierungen dokumentiert
-- **Implementiert (✅):** 11 Items (48%)
-  - N+1 Query Elimination (3 Dateien): 2026-03-04 ✅
-  - Transient Caching (5 Methoden): 2026-03-04 ✅
-  - Checkpoint Locking (Critical Fix): 2026-03-04 ✅
-  - Item-Level Retry: Bereits vorhanden ✅
-  - Memory Optimization: Durch Cache-Fixes gelöst ✅
-  - Shutdown Handler: Mostly fixed ✅
-  - Database Indexes: Basis vorhanden ✅
-
-- **Teilweise (⚠️):** 4 Items (17%)
-  - Nonce Verification: Lückenhaft aber funktional
-  - Lock-Handling: Fragil, Verbesserung empfohlen
-  - DB Transactions: Nur für EFS-Tabellen möglich
-  - Logging Status: Erweiterungen geplant
-
-- **Nicht Implementiert (❌):** 8 Items (35%)
-  - Pagination (v2.0)
-  - Code Refactoring (v2.0+)
-  - JSON Logging (v1.1+)
-  - Cache Clearing (TODO)
-  - Checkpoint Validation (TODO)
-  - Atomic Heartbeat (TODO)
-  - Idempotency (CRITICAL TODO)
-  - Stale Migrations (TODO)
-
-### Kritische Fixes für v1.0 Final
-
-**BEREITS IMPLEMENTIERT (2026-03-04):**
-1. ✅ N+1 Query Elimination (3 files, commit 9355d838)
-2. ✅ Transient Caching (5 methods, commit 9355d838)
-3. ✅ Checkpoint Locking (Optimistic Locking, commit f3c40d69)
-
-**NOCH TODO VOR RELEASE:**
-4. ❌ **Idempotency** (10i) - Verhindert Duplikate bei verlorener HTTP-Response
-5. ❌ **Batch Error Handling** - Item-level Retry Improvement
-6. ❌ **Lock Handling** (10b) - Migrate zu DB-based locking mit UUID
-7. ❌ **Checkpoint Validation** (10g) - Schema-Validator Implementierung
-8. ❌ **Atomic Heartbeat** (10h) - Direct UPDATE statt Read-Modify-Write
-
-### Dokumentation
-
-Alle Einträge sind korrekt mit:
-- ✅ Status-Markern (✅/⚠️/❌)
-- ✅ Datei- und Zeilennummern wo relevant
-- ✅ Implementierungs-Datum (2026-03-04 für durchgeführte Fixes)
-- ✅ Code-Beispielen für noch-zu-implementierende Items
-- ✅ Abhängigkeitsketten (z.B. 10a → 10c, 10h, 10i)
-
-### Git Commits
-
-Implementierte Optimierungen aus Code-Review:
-
-```
-f3c40d69 - fix: implement checkpoint locking for HTTP timeout protection (CRITICAL)
-9355d838 - perf: eliminate N+1 queries and add transient caching
-0a30224c - docs: update optimierungen.md with implementation status and verification
-```
-
-### Konsistenz-Check
-
-✅ Alle 10 Haupt-Punkte dokumentiert
-✅ Alle Sub-Punkte (a-k) mit Status gekennzeichnet
-✅ Keine doppelten Einträge
-✅ Keine orphaned Dokumentation
-✅ Links und Abhängigkeiten aktuell
-✅ Code-Beispiele aktuell und testbar
-
-**Status: DATEI IST VOLLSTÄNDIG UND KONSISTENT**
-
----
-| **DocBlocks** | ✅ Gut | ~2192 @param/@return Annotations gefunden |
+| **DocBlocks** | ✅ Gut | ~2192 `@param`/`@return` Annotations gefunden |
 | **Abstract Classes** | ✅ Gut | `EFS_Base_Element`, `Abstract_Migrator`, `EFS_Base_Ajax_Handler` |
 | **Verzeichnisstruktur** | ✅ Gut | Klare Trennung: `services/`, `repositories/`, `converters/`, `security/`, `ajax/`, etc. |
 | **PSR-Autoloading** | ✅ Gut | Composer-Autoloader konfiguriert |
@@ -869,3 +787,37 @@ public function get_data(): array { ... }  // spezifisch
 | **5** | Type Declarations hinzufügen | Type-Safety |
 | **6** | Unit-Tests ergänzen | Testbarkeit |
 | **7** | Duplicate Code extrahieren | DRY-Prinzip |
+
+---
+
+## FINAL VERIFICATION SUMMARY (2026-03-04)
+
+### Abdeckung
+
+- **Implementiert (✅):**
+  - N+1 Query Elimination (3 Dateien) — commit 9355d838
+  - Transient Caching (5 Methoden) — commit 9355d838
+  - Checkpoint Locking (Optimistic Locking) — commit f3c40d69
+  - Item-Level Retry: bereits vorhanden
+  - Memory Optimization: durch Cache-Fixes gelöst
+  - Shutdown Handler: weitgehend gelöst
+  - Database Indexes: Basis vorhanden
+
+- **Teilweise (⚠️):**
+  - Nonce Verification: lückenhaft aber funktional
+  - Lock-Handling: fragil, Verbesserung empfohlen (10b)
+  - DB Transactions: nur für `wp_efs_*`-Tabellen umsetzbar (10j)
+  - Migrations-Logging: Erweiterungen geplant (9)
+
+- **Nicht implementiert (❌), kritisch vor Release:**
+  - Idempotenz-Schutz (10i) — Duplikate bei verlorener HTTP-Response
+  - Checkpoint-Validator (10g) — Silent Failures verhindern
+  - Atomarer Heartbeat (10h) — direktes `UPDATE` statt Read-Modify-Write
+  - `get_stale_migrations()` verdrahten (10k) — existiert, wird nicht genutzt
+  - DB-Lock in Migration-Row (10b) — ersetzt fragiles wp_options-Lock
+
+- **Nicht implementiert, lower priority:**
+  - Pagination / unbegrenzte Queries (2) — niedrige Priorität
+  - Code-Refactoring große Dateien (3) — niedrige Priorität
+  - JSON Logging Optimization (6) — niedrige Priorität
+  - Cache Clearing nach Batch (10e) — 1-Zeiler, jederzeit nachrüstbar

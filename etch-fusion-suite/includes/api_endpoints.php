@@ -1197,11 +1197,15 @@ class EFS_API_Endpoints {
 
 	/**
 	 * Record receiving activity for target-side progress polling.
+	 * Used for single-type phases (media, css) where all items share one type key.
+	 *
+	 * Also reads X-EFS-Phase-Total to populate the per-type total for the current phase,
+	 * enabling the Etch-side UI to show a breakdown like "Media: 150/897".
 	 *
 	 * @param  array                 $token_payload   Validated token payload.
-	 * @param  string                $phase           Current import phase.
+	 * @param  string                $phase           Current import phase ('media', 'css', etc.).
 	 * @param  int                   $items_increment How much to increment items received.
-	 * @param  \WP_REST_Request|null $request         Optional. Request object to read X-EFS-Source-Origin (real source site).
+	 * @param  \WP_REST_Request|null $request         Optional. Request object for EFS headers.
 	 * @return void
 	 */
 	private static function touch_receiving_state( array $token_payload, string $phase, int $items_increment = 0, $request = null ): void {
@@ -1213,12 +1217,14 @@ class EFS_API_Endpoints {
 		$current = $repository->get_receiving_state();
 		$current = is_array( $current ) ? $current : array();
 
-		$now        = current_time( 'mysql' );
+		// UTC timestamps — consistent with EFS_Progress_Manager convention (see class-progress-manager.php:62-64).
+		$now        = current_time( 'mysql', true );
 		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
 		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
 
 		$source_site        = '';
 		$items_total_header = 0;
+		$phase_total_header = 0;
 		if ( $request instanceof \WP_REST_Request ) {
 			$header = $request->get_header( 'X-EFS-Source-Origin' );
 			if ( is_string( $header ) && '' !== trim( $header ) ) {
@@ -1226,9 +1232,25 @@ class EFS_API_Endpoints {
 			}
 			$items_total_raw    = $request->get_header( 'X-EFS-Items-Total' );
 			$items_total_header = is_string( $items_total_raw ) ? (int) $items_total_raw : 0;
+			$phase_total_raw    = $request->get_header( 'X-EFS-Phase-Total' );
+			$phase_total_header = is_string( $phase_total_raw ) ? (int) $phase_total_raw : 0;
 		}
 		if ( '' === $source_site && isset( $token_payload['domain'] ) ) {
 			$source_site = esc_url_raw( (string) $token_payload['domain'] );
+		}
+
+		// Update per-type breakdown for the current phase type (e.g. 'media', 'css').
+		$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
+		$type_key      = sanitize_key( $phase );
+		if ( ! isset( $items_by_type[ $type_key ] ) ) {
+			$items_by_type[ $type_key ] = array(
+				'received' => 0,
+				'total'    => 0,
+			);
+		}
+		$items_by_type[ $type_key ]['received'] = max( 0, $items_by_type[ $type_key ]['received'] + $items_increment );
+		if ( $phase_total_header > 0 ) {
+			$items_by_type[ $type_key ]['total'] = $phase_total_header;
 		}
 
 		$repository->save_receiving_state(
@@ -1239,9 +1261,115 @@ class EFS_API_Endpoints {
 				'started_at'     => $started_at,
 				'last_activity'  => $now,
 				'last_updated'   => $now,
-				'current_phase'  => sanitize_key( $phase ),
+				'current_phase'  => $type_key,
 				'items_received' => max( 0, $items + $items_increment ),
 				'items_total'    => $items_total_header > 0 ? $items_total_header : (int) ( $current['items_total'] ?? 0 ),
+				'items_by_type'  => $items_by_type,
+				'is_stale'       => false,
+			)
+		);
+	}
+
+	/**
+	 * Record receiving activity for a post-batch where items span multiple post types.
+	 *
+	 * Reads X-EFS-PostType-Totals to set per-type totals, and increments per-type received
+	 * counts from $type_increments, enabling the Etch-side UI to show e.g. "Posts: 3/200 · Pages: 1/150".
+	 *
+	 * @param  array                 $token_payload   Validated token payload.
+	 * @param  string                $phase           Current import phase (typically 'posts').
+	 * @param  array<string,int>     $type_increments Map of post_type → count for this batch.
+	 * @param  \WP_REST_Request|null $request         Optional. Request object for EFS headers.
+	 * @return void
+	 */
+	private static function touch_receiving_state_by_types( array $token_payload, string $phase, array $type_increments, $request = null ): void {
+		$repository = self::resolve_migration_repository();
+		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
+			return;
+		}
+
+		$current = $repository->get_receiving_state();
+		$current = is_array( $current ) ? $current : array();
+
+		// UTC timestamps — consistent with EFS_Progress_Manager convention.
+		$now        = current_time( 'mysql', true );
+		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
+
+		$source_site        = '';
+		$items_total_header = 0;
+		$post_type_totals   = array();
+		if ( $request instanceof \WP_REST_Request ) {
+			$header = $request->get_header( 'X-EFS-Source-Origin' );
+			if ( is_string( $header ) && '' !== trim( $header ) ) {
+				$source_site = esc_url_raw( trim( $header ) );
+			}
+			$items_total_raw    = $request->get_header( 'X-EFS-Items-Total' );
+			$items_total_header = is_string( $items_total_raw ) ? (int) $items_total_raw : 0;
+			// X-EFS-PostType-Totals is a JSON object: { "post": 200, "page": 150, ... }.
+			$pt_totals_raw = $request->get_header( 'X-EFS-PostType-Totals' );
+			if ( is_string( $pt_totals_raw ) && '' !== $pt_totals_raw ) {
+				$decoded = json_decode( $pt_totals_raw, true );
+				if ( is_array( $decoded ) ) {
+					$post_type_totals = $decoded;
+				}
+			}
+		}
+		if ( '' === $source_site && isset( $token_payload['domain'] ) ) {
+			$source_site = esc_url_raw( (string) $token_payload['domain'] );
+		}
+
+		// Update per-type breakdown.
+		$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
+
+		// Apply sender-provided totals (set once; keep existing total if already > 0).
+		foreach ( $post_type_totals as $pt => $total ) {
+			$pt = sanitize_key( (string) $pt );
+			if ( '' === $pt ) {
+				continue;
+			}
+			if ( ! isset( $items_by_type[ $pt ] ) ) {
+				$items_by_type[ $pt ] = array(
+					'received' => 0,
+					'total'    => 0,
+				);
+			}
+			// Only overwrite total if the incoming value is larger (guards against stale small values).
+			$items_by_type[ $pt ]['total'] = max( $items_by_type[ $pt ]['total'], (int) $total );
+		}
+
+		// Increment per-type received counts for this batch.
+		$batch_total = 0;
+		foreach ( $type_increments as $pt => $count ) {
+			$pt    = sanitize_key( (string) $pt );
+			$count = max( 0, (int) $count );
+			if ( '' === $pt || 0 === $count ) {
+				continue;
+			}
+			if ( ! isset( $items_by_type[ $pt ] ) ) {
+				$items_by_type[ $pt ] = array(
+					'received' => 0,
+					'total'    => 0,
+				);
+			}
+			$items_by_type[ $pt ]['received'] += $count;
+			$batch_total                      += $count;
+		}
+
+		// Grand total = sum of all per-type received counts to stay consistent.
+		$total_received = array_sum( array_column( $items_by_type, 'received' ) );
+
+		$repository->save_receiving_state(
+			array(
+				'status'         => 'receiving',
+				'source_site'    => $source_site,
+				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
+				'started_at'     => $started_at,
+				'last_activity'  => $now,
+				'last_updated'   => $now,
+				'current_phase'  => sanitize_key( $phase ),
+				'items_received' => max( 0, $total_received ),
+				'items_total'    => $items_total_header > 0 ? $items_total_header : (int) ( $current['items_total'] ?? 0 ),
+				'items_by_type'  => $items_by_type,
 				'is_stale'       => false,
 			)
 		);
@@ -1785,7 +1913,16 @@ class EFS_API_Endpoints {
 			return new \WP_Error( 'invalid_batch_payload', __( 'No posts in batch payload.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
 		}
 
-		self::touch_receiving_state( $token, 'posts', count( $items ), $request );
+		// Count items per post type in this batch so the receiving-side UI can show a breakdown.
+		$type_counts = array();
+		foreach ( $items as $batch_item ) {
+			$post_raw  = isset( $batch_item['post'] ) && is_array( $batch_item['post'] ) ? $batch_item['post'] : array();
+			$post_type = isset( $post_raw['post_type'] ) ? sanitize_key( (string) $post_raw['post_type'] ) : 'post';
+			if ( post_type_exists( $post_type ) ) {
+				$type_counts[ $post_type ] = ( $type_counts[ $post_type ] ?? 0 ) + 1;
+			}
+		}
+		self::touch_receiving_state_by_types( $token, 'posts', $type_counts, $request );
 
 		// Merge and sync all Etch loop presets ONCE for the entire batch.
 		$all_loops = array();

@@ -171,7 +171,7 @@ class EFS_Migration_Progress_Logger {
 
 		$filtered = array();
 		foreach ( $trail as $log ) {
-			if ( $category === ( $log['category'] ?? '' ) ) {
+			if ( ( $log['category'] ?? '' ) === $category ) {
 				$ctx        = json_decode( $log['context'], true );
 				$filtered[] = array(
 					'timestamp' => $log['timestamp'],

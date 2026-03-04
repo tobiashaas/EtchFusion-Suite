@@ -112,14 +112,16 @@ class EFS_Batch_Phase_Runner {
 		// --- Delegating path: all phase logic driven by the handler interface ---
 
 		// Derive checkpoint keys.
-		$total_key      = 'media' === $phase ? 'total_media_count' : 'total_count';
-		$attempts_key   = 'media' === $phase ? 'media_attempts' : 'post_attempts';
-		$failed_ids_key = 'media' === $phase ? 'failed_media_ids_final' : 'failed_post_ids_final';
-		$processed_key  = 'media' === $phase ? 'processed_media_count' : 'processed_count';
+		$total_key           = 'media' === $phase ? 'total_media_count' : 'total_count';
+		$attempts_key        = 'media' === $phase ? 'media_attempts' : 'post_attempts';
+		$failed_ids_key      = 'media' === $phase ? 'failed_media_ids_final' : 'failed_post_ids_final';
+		$processed_key       = 'media' === $phase ? 'processed_media_count' : 'processed_count';
+		$processed_ids_key   = 'media' === $phase ? 'processed_media_ids' : 'processed_post_ids';
 
 		// Read state from checkpoint.
-		$remaining       = $active_handler->get_remaining( $checkpoint );
-		$processed_count = isset( $checkpoint[ $processed_key ] ) ? (int) $checkpoint[ $processed_key ] : 0;
+		$remaining           = $active_handler->get_remaining( $checkpoint );
+		$processed_count     = isset( $checkpoint[ $processed_key ] ) ? (int) $checkpoint[ $processed_key ] : 0;
+		$processed_ids_set   = isset( $checkpoint[ $processed_ids_key ] ) ? (array) $checkpoint[ $processed_ids_key ] : array();
 		$this->migration_logger->log( $migration_id, 'info', 'Batch started: phase ' . $phase . ', offset ' . $processed_count );
 		$total      = isset( $checkpoint[ $total_key ] ) ? (int) $checkpoint[ $total_key ] : ( count( $remaining ) + $processed_count );
 		$attempts   = isset( $checkpoint[ $attempts_key ] ) && is_array( $checkpoint[ $attempts_key ] ) ? $checkpoint[ $attempts_key ] : array();
@@ -132,10 +134,12 @@ class EFS_Batch_Phase_Runner {
 		$current_batch = array_splice( $remaining, 0, $batch_size );
 
 		// Filter out invalid IDs (0 or null) that may result from deleted posts.
+		// Also filter out IDs that were already processed in a previous request (idempotency protection).
 		$current_batch = array_filter(
 			$current_batch,
-			function ( $id ) {
-				return ! empty( $id ) && (int) $id > 0;
+			function ( $id ) use ( $processed_ids_set ) {
+				// Remove if ID is 0/null or already processed.
+				return ! empty( $id ) && (int) $id > 0 && ! isset( $processed_ids_set[ (string) $id ] );
 			}
 		);
 
@@ -165,7 +169,7 @@ class EFS_Batch_Phase_Runner {
 		if ( 'posts' === $phase && method_exists( $active_handler, 'process_items_batch' ) ) {
 			// Save checkpoint BEFORE making HTTP request (Optimistic Locking).
 			// This ensures that even if HTTP times out or fails, we have saved state locally.
-			$pre_http_checkpoint                = $checkpoint;
+			$pre_http_checkpoint                  = $checkpoint;
 			$pre_http_checkpoint['_http_pending'] = true;
 			$this->checkpoint_repository->save_checkpoint_before_http( $pre_http_checkpoint );
 
@@ -241,6 +245,8 @@ class EFS_Batch_Phase_Runner {
 				$checkpoint['current_item_id']    = $id;
 				$wp_post                          = get_post( $id );
 				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+				// Clear post cache after processing to prevent stale data.
+				clean_post_cache( $id );
 			}
 
 			// Memory check once after the batch is processed (HTTP call already completed).
@@ -345,6 +351,8 @@ class EFS_Batch_Phase_Runner {
 				$checkpoint['current_item_id']    = $id;
 				$wp_post                          = get_post( $id );
 				$checkpoint['current_item_title'] = ( $wp_post instanceof \WP_Post ) ? (string) $wp_post->post_title : '';
+				// Clear post cache after processing to prevent stale data.
+				clean_post_cache( $id );
 
 				if ( $memory_limit > 0 && memory_get_usage( true ) / $memory_limit > 0.8 ) {
 					$memory_pressure = true;
@@ -357,8 +365,9 @@ class EFS_Batch_Phase_Runner {
 
 		// Save progress via handler (remaining IDs + processed count), then persist attempt/failed state.
 		$active_handler->save_progress( $checkpoint, $remaining, $processed_count );
-		$checkpoint[ $attempts_key ]   = $attempts;
-		$checkpoint[ $failed_ids_key ] = $failed_ids;
+		$checkpoint[ $attempts_key ]      = $attempts;
+		$checkpoint[ $failed_ids_key ]    = $failed_ids;
+		$checkpoint[ $processed_ids_key ] = $processed_ids_set;
 		// Clear the HTTP pending flag since we've completed the batch processing.
 		if ( isset( $checkpoint['_http_pending'] ) ) {
 			unset( $checkpoint['_http_pending'] );

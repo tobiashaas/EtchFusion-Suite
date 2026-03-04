@@ -110,6 +110,117 @@ class EFS_DB_Migration_Persistence {
 	}
 
 	/**
+	 * Atomically touch the progress heartbeat (update last_updated timestamp).
+	 *
+	 * This performs a single atomic UPDATE statement to refresh the migration's
+	 * last_updated timestamp without race conditions. Only updates if migration
+	 * is actively in_progress status.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return bool True on success.
+	 */
+	public static function touch_progress_heartbeat( string $migration_id ): bool {
+		return EFS_DB_Installer::touch_progress_heartbeat( $migration_id );
+	}
+
+	/**
+	 * Atomically save checkpoint with optimistic locking.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $checkpoint_data Checkpoint data.
+	 * @param int    $expected_version Expected checkpoint_version.
+	 * @return int Number of rows updated (1=success, 0=conflict).
+	 */
+	public static function save_checkpoint_atomic( string $migration_id, array $checkpoint_data, int $expected_version = 0 ): int {
+		return EFS_DB_Installer::save_checkpoint_atomic( $migration_id, $checkpoint_data, $expected_version );
+	}
+
+	/**
+	 * Get checkpoint with version for optimistic locking.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return array|null Array with 'data' and 'version' keys, or null if not found.
+	 */
+	public static function get_checkpoint_with_version( string $migration_id ): ?array {
+		return EFS_DB_Installer::get_checkpoint_with_version( $migration_id );
+	}
+
+	/**
+	 * Transactionally save checkpoint and heartbeat in single transaction.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $checkpoint_data Checkpoint data.
+	 * @param int    $expected_version Expected checkpoint_version.
+	 * @return int 1 if successful, 0 if version conflict.
+	 */
+	public static function save_checkpoint_with_heartbeat_transaction( string $migration_id, array $checkpoint_data, int $expected_version = 0 ): int {
+		return EFS_DB_Installer::save_checkpoint_with_heartbeat_transaction( $migration_id, $checkpoint_data, $expected_version );
+	}
+
+	/**
+	 * Save progress data to database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $progress_data Progress data.
+	 * @return bool True on success.
+	 */
+	public static function save_progress_data( string $migration_id, array $progress_data ): bool {
+		return EFS_DB_Installer::save_progress_data( $migration_id, $progress_data );
+	}
+
+	/**
+	 * Get progress data from database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return array|null Progress data or null.
+	 */
+	public static function get_progress_data( string $migration_id ): ?array {
+		return EFS_DB_Installer::get_progress_data( $migration_id );
+	}
+
+	/**
+	 * Save steps data to database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $steps_data Steps data.
+	 * @return bool True on success.
+	 */
+	public static function save_steps_data( string $migration_id, array $steps_data ): bool {
+		return EFS_DB_Installer::save_steps_data( $migration_id, $steps_data );
+	}
+
+	/**
+	 * Get steps data from database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return array|null Steps data or null.
+	 */
+	public static function get_steps_data( string $migration_id ): ?array {
+		return EFS_DB_Installer::get_steps_data( $migration_id );
+	}
+
+	/**
+	 * Save statistics data to database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @param array  $stats_data Statistics data.
+	 * @return bool True on success.
+	 */
+	public static function save_stats_data( string $migration_id, array $stats_data ): bool {
+		return EFS_DB_Installer::save_stats_data( $migration_id, $stats_data );
+	}
+
+	/**
+	 * Get statistics data from database.
+	 *
+	 * @param string $migration_id Migration ID.
+	 * @return array|null Statistics data or null.
+	 */
+	public static function get_stats_data( string $migration_id ): ?array {
+		return EFS_DB_Installer::get_stats_data( $migration_id );
+	}
+
+	/**
 	 * Mark migration as failed with error details.
 	 *
 	 * @param string $migration_id Migration ID.

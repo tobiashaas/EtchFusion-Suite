@@ -30,6 +30,22 @@ class EFS_API_Client {
 	private $items_total = 0;
 
 	/**
+	 * Per-post-type item counts for the current posts phase.
+	 * Sent as X-EFS-PostType-Totals header so the receiving side can show a breakdown.
+	 *
+	 * @var array<string,int>
+	 */
+	private $post_type_totals = array();
+
+	/**
+	 * Item count for the current phase only (not combined grand total).
+	 * Sent as X-EFS-Phase-Total header so the receiving side knows each phase's total.
+	 *
+	 * @var int
+	 */
+	private $phase_total = 0;
+
+	/**
 	 * Constructor
 	 */
 	public function __construct( EFS_Error_Handler $error_handler ) {
@@ -45,6 +61,28 @@ class EFS_API_Client {
 	 */
 	public function set_items_total( int $total ): void {
 		$this->items_total = max( 0, $total );
+	}
+
+	/**
+	 * Set per-post-type item counts for the current posts phase.
+	 * Sent as X-EFS-PostType-Totals so the Etch-side can display a per-type breakdown.
+	 *
+	 * @param array<string,int> $counts Associative array mapping post_type → count.
+	 * @return void
+	 */
+	public function set_post_type_totals( array $counts ): void {
+		$this->post_type_totals = $counts;
+	}
+
+	/**
+	 * Set the item count for the current phase only (not the combined grand total).
+	 * Sent as X-EFS-Phase-Total so the receiving side can display each phase's total separately.
+	 *
+	 * @param int $total Phase-specific item count.
+	 * @return void
+	 */
+	public function set_phase_total( int $total ): void {
+		$this->phase_total = max( 0, $total );
 	}
 
 	/**
@@ -137,6 +175,12 @@ class EFS_API_Client {
 		}
 		if ( $this->items_total > 0 ) {
 			$args['headers']['X-EFS-Items-Total'] = (string) $this->items_total;
+		}
+		if ( $this->phase_total > 0 ) {
+			$args['headers']['X-EFS-Phase-Total'] = (string) $this->phase_total;
+		}
+		if ( ! empty( $this->post_type_totals ) ) {
+			$args['headers']['X-EFS-PostType-Totals'] = wp_json_encode( $this->post_type_totals );
 		}
 
 		if ( $data && in_array( $method, array( 'POST', 'PUT', 'PATCH' ), true ) ) {

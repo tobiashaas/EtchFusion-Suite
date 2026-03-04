@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/playwright-mcp-server"
+      ],
+      "disabled": false,
+      "alwaysAllow": [
+        "launch_browser",
+        "execute_script",
+        "navigate"
+      ]
+    },
+    "node": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/node-mcp-server"
+      ],
+      "disabled": false
+    }
+  }
+}

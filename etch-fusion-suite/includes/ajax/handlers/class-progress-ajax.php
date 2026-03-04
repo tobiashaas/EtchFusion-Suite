@@ -70,6 +70,10 @@ class EFS_Progress_Ajax_Handler extends EFS_Base_Ajax_Handler {
 			return;
 		}
 
+		// Check for stale migrations and mark them for client-side recovery.
+		// This allows UI to detect crashed migrations and trigger auto-resume.
+		$this->detect_and_mark_stale_migrations();
+
 		$controller = $this->resolve_migration_controller();
 		if ( ! $controller ) {
 			wp_send_json_error(
@@ -161,6 +165,7 @@ class EFS_Progress_Ajax_Handler extends EFS_Base_Ajax_Handler {
 				'current_phase'            => isset( $state['current_phase'] ) ? $state['current_phase'] : '',
 				'items_received'           => $items_received,
 				'items_total'              => $items_total,
+				'items_by_type'            => isset( $state['items_by_type'] ) && is_array( $state['items_by_type'] ) ? $state['items_by_type'] : array(),
 				'started_at'               => $started_at_str,
 				'last_activity'            => isset( $state['last_activity'] ) ? $state['last_activity'] : '',
 				'last_updated'             => isset( $state['last_updated'] ) ? $state['last_updated'] : '',
@@ -214,5 +219,64 @@ class EFS_Progress_Ajax_Handler extends EFS_Base_Ajax_Handler {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Detect stale migrations and mark them for recovery.
+	 *
+	 * Finds migrations that haven't been updated in 5+ minutes and marks them
+	 * as 'stale' so the UI can trigger auto-resume. Uses get_stale_migrations()
+	 * from the DB Persistence layer.
+	 *
+	 * @return void
+	 */
+	private function detect_and_mark_stale_migrations() {
+		// Only run stale detection once per request.
+		static $stale_detection_done = false;
+		if ( $stale_detection_done ) {
+			return;
+		}
+		$stale_detection_done = true;
+
+		// Import the DB persistence class.
+		if ( ! class_exists( '\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence' ) ) {
+			return;
+		}
+
+		$db_persistence = '\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence';
+
+		// Get migrations that are in_progress but haven't been touched in 5 minutes.
+		// This indicates a crash, timeout, or network failure.
+		$stale_migrations = $db_persistence::get_stale_migrations( 300 ); // 5 min timeout
+
+		if ( empty( $stale_migrations ) || ! is_array( $stale_migrations ) ) {
+			return;
+		}
+
+		global $wpdb;
+
+		// Mark each stale migration as 'stale' for UI recovery.
+		foreach ( $stale_migrations as $migration ) {
+			$migration_uid = isset( $migration['migration_uid'] ) ? (string) $migration['migration_uid'] : '';
+			if ( empty( $migration_uid ) ) {
+				continue;
+			}
+
+			// Set status='stale' so UI can detect and auto-resume.
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query(
+				$wpdb->prepare(
+					"UPDATE {$wpdb->prefix}efs_migrations
+					SET status = %s
+					WHERE migration_uid = %s
+					AND status = %s",
+					'stale',
+					$migration_uid,
+					'in_progress'
+				)
+			);
+
+			error_log( '[EFS] Marked stale migration as recoverable: ' . $migration_uid );
+		}
 	}
 }

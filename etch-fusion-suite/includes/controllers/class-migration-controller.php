@@ -58,7 +58,7 @@ class EFS_Migration_Controller {
 		// This ensures the key is available for all subsequent API calls without re-sending it in every request.
 		$settings_repo = etch_fusion_suite_container()->get( 'settings_repository' );
 		if ( $settings_repo ) {
-			$current_settings             = $settings_repo->get_migration_settings();
+			$current_settings                  = $settings_repo->get_migration_settings();
 			$current_settings['migration_key'] = $migration_key;
 			$settings_repo->save_migration_settings( $current_settings );
 		}

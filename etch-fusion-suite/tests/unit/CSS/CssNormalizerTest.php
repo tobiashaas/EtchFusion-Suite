@@ -188,6 +188,14 @@ class CssNormalizerTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '#brxe-', $result );
 	}
 
+	/** #brx-abc (legacy: without 'e') → #etch-abc */
+	public function test_bricks_id_selector_legacy_without_e(): void {
+		$input    = '#brx-legacy123 { color: blue; }';
+		$result   = $this->normalizer->normalize_bricks_id_selectors_in_css( $input );
+		$this->assertStringContainsString( '#etch-legacy123', $result );
+		$this->assertStringNotContainsString( '#brx-legacy', $result );
+	}
+
 	/** Multiple ID selectors in one string are all renamed. */
 	public function test_multiple_bricks_id_selectors_renamed(): void {
 		$input  = '#brxe-aaa { } #brxe-bbb { }';
@@ -199,6 +207,24 @@ class CssNormalizerTest extends WP_UnitTestCase {
 	/** Empty string returns empty string. */
 	public function test_bricks_id_selector_empty_string(): void {
 		$this->assertSame( '', $this->normalizer->normalize_bricks_id_selectors_in_css( '' ) );
+	}
+
+	/** Multiple ID selectors with mixed #brxe- and #brx- format are all converted. */
+	public function test_bricks_id_selector_mixed_formats(): void {
+		$input  = '#brxe-aaa { } #brx-bbb { } #brxe-ccc { }';
+		$result = $this->normalizer->normalize_bricks_id_selectors_in_css( $input );
+		$this->assertStringContainsString( '#etch-aaa', $result );
+		$this->assertStringContainsString( '#etch-bbb', $result );
+		$this->assertStringContainsString( '#etch-ccc', $result );
+		$this->assertStringNotContainsString( '#brxe-', $result );
+		$this->assertStringNotContainsString( '#brx-', $result );
+	}
+
+	/** ID selectors with special characters (underscores, digits) are preserved. */
+	public function test_bricks_id_selector_with_special_chars(): void {
+		$input  = '#brxe-abc_123-xyz { color: red; }';
+		$result = $this->normalizer->normalize_bricks_id_selectors_in_css( $input );
+		$this->assertStringContainsString( '#etch-abc_123-xyz', $result );
 	}
 
 	// =========================================================================

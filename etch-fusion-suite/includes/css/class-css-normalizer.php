@@ -672,10 +672,10 @@ class EFS_CSS_Normalizer {
 	/**
 	 * Replace Bricks element ID selectors in CSS with their Etch equivalents.
 	 *
-	 * Bricks generates HTML id attributes in the form "brxe-abc1234".  The CSS
-	 * selectors that reference them use "#brxe-abc1234".  After migration the IDs
-	 * are renamed to "etch-abc1234", so the corresponding CSS selectors must also
-	 * be updated.
+	 * Bricks generates HTML id attributes in the form "brxe-abc1234" (or legacy
+	 * "brx-abc1234").  The CSS selectors that reference them use "#brxe-abc1234"
+	 * or "#brx-abc1234".  After migration the IDs are renamed to "etch-abc1234",
+	 * so the corresponding CSS selectors must also be updated.
 	 *
 	 * @param string $css Raw CSS string.
 	 * @return string
@@ -686,7 +686,7 @@ class EFS_CSS_Normalizer {
 		}
 
 		return (string) preg_replace_callback(
-			'/#brxe-([a-zA-Z0-9_-]+)/i',
+			'/#brx(?:e)?-([a-zA-Z0-9_-]+)/i',
 			static function ( $matches ) {
 				return '#etch-' . $matches[1];
 			},

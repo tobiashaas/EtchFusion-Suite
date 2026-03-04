@@ -26,11 +26,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $path     The REST request path.
  * @return string Converted URL suitable for Docker container-to-container requests.
  */
-function efs_filter_rest_url_for_docker( $rest_url, $path = '' ) {
+function etch_fusion_suite_filter_rest_url_for_docker( $rest_url, $path = '' ) {
 	// DISABLED: This filter was converting ALL REST URLs to Docker internal names,
 	// which broke browser-side requests that need localhost URLs.
 	// Docker loopback URL conversion is handled by docker-url-helper.php in loopback handlers,
 	// not by a global REST filter that applies to all requests.
 	return $rest_url;
 }
-// add_filter( 'rest_url', 'efs_filter_rest_url_for_docker', 1, 2 );
+// add_filter( 'rest_url', 'etch_fusion_suite_filter_rest_url_for_docker', 1, 2 );

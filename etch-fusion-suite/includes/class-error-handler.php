@@ -2,18 +2,23 @@
 /**
  * Error Handler for Etch Fusion Suite
  *
- * Handles all errors, warnings, and logging for the migration process
+ * Handles all errors, warnings, logging, and error code definitions for the migration process.
+ *
+ * @package Bricks2Etch\Core
  */
 
 namespace Bricks2Etch\Core;
 
-// Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Class EFS_Error_Handler
+ *
+ * Handles plugin errors, warnings, logging, and provides error code information.
+ */
 class EFS_Error_Handler {
-
 	/**
 	 * Error codes with descriptions and solutions
 	 */
@@ -289,6 +294,11 @@ class EFS_Error_Handler {
 			'description' => 'Media item exhausted all retry attempts and was skipped',
 			'solution'    => 'Review the media item manually and re-run or migrate it individually',
 		),
+		'W013' => array(
+			'title'       => 'Component Skipped Due to Missing Dependency',
+			'description' => 'Component requires a parent element that was not found',
+			'solution'    => 'Review the component context; ensure parent elements are properly structured',
+		),
 		'W014' => array(
 			'title'       => 'Optional Migrator Failed',
 			'description' => 'An optional migrator (ACF, MetaBox, or Custom Fields) failed; migration continued',
@@ -298,224 +308,33 @@ class EFS_Error_Handler {
 		// Component Migrator Warnings (W4xx)
 		'W401' => array(
 			'title'       => 'Component Skipped',
-			'description' => 'A Bricks component was skipped during migration — either the component ID or element list was missing, or a circular reference was detected',
-			'solution'    => 'Check the warning context for the component ID; verify the component is fully defined in Bricks and does not reference itself recursively',
+			'description' => 'Bricks component not migrated due to compatibility issues',
+			'solution'    => 'Manually recreate this component in Etch if needed',
 		),
 
-		// Orchestrator / System Warnings (W9xx)
+		// Custom Warnings (W9xx)
 		'W900' => array(
-			'title'       => 'Migration Cancelled by User',
-			'description' => 'The migration was cancelled at user request; in-progress state has been cleaned up',
-			'solution'    => 'No action needed — start a new migration when ready',
-		),
-
-		// Background Process Warnings (W0xx continued)
-		'W013' => array(
-			'title'       => 'Background Spawn Failed — Fallback to Sync',
-			'description' => 'The non-blocking loopback POST to start the background migration process failed; the migration fell back to synchronous in-process execution',
-			'solution'    => 'This is non-fatal — the migration will still complete. If it happens repeatedly, check that loopback HTTP requests are allowed on your server (some shared hosts block them)',
+			'title'       => 'Custom Element Conversion Attempted',
+			'description' => 'An element marked as custom was converted using fallback logic',
+			'solution'    => 'Review the converted element to ensure correct structure and styling',
 		),
 	);
 
 	/**
-	 * Log an error
+	 * Handle error
 	 *
-	 * @param string $code Error code
-	 * @param array $context Additional context data
+	 * @param string $message Error message.
+	 * @param string $level   Error level (warning, error, critical).
 	 */
-	public function log_error( $code, $context = array() ) {
-		// Handle missing error codes gracefully
-		if ( ! isset( self::ERROR_CODES[ $code ] ) ) {
-			$error_info = array(
-				'title'       => 'Unknown Error',
-				'description' => 'An unknown error occurred',
-				'solution'    => 'Please check the logs for more details',
-			);
-		} else {
-			$error_info = self::ERROR_CODES[ $code ];
-		}
-
-		$log_entry = array(
-			'timestamp'   => current_time( 'mysql' ),
-			'type'        => 'error',
-			'code'        => $code,
-			'title'       => $error_info['title'],
-			'description' => $error_info['description'],
-			'solution'    => $error_info['solution'],
-			'context'     => $context,
-		);
-
-		$this->add_to_log( $log_entry );
-
-		// Also log to WordPress error log
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: mirrors errors to WordPress debug.log for system-level debugging
-		error_log(
-			sprintf(
-				'[Etch Fusion Suite] %s: %s - %s',
-				$code,
-				$error_info['title'],
-				$error_info['description']
-			)
-		);
-	}
-
-	/**
-	 * Log a warning
-	 *
-	 * @param string $code Warning code
-	 * @param array $context Additional context data
-	 */
-	public function log_warning( $code, $context = array() ) {
-		// Handle missing warning codes gracefully
-		if ( ! isset( self::WARNING_CODES[ $code ] ) ) {
-			$warning_info = array(
-				'title'       => 'Unknown Warning',
-				'description' => 'An unknown warning occurred',
-				'solution'    => 'Please check the logs for more details',
-			);
-		} else {
-			$warning_info = self::WARNING_CODES[ $code ];
-		}
-
-		$log_entry = array(
-			'timestamp'   => current_time( 'mysql' ),
-			'type'        => 'warning',
-			'code'        => $code,
-			'title'       => $warning_info['title'],
-			'description' => $warning_info['description'],
-			'solution'    => $warning_info['solution'],
-			'context'     => $context,
-		);
-
-		$this->add_to_log( $log_entry );
-	}
-
-	/**
-	 * Log an informational message for diagnostics.
-	 *
-	 * @param string $message Informational message to record.
-	 * @param array  $context Optional context data for downstream debugging.
-	 */
-	public function log_info( $message, $context = array() ) {
-		$log_entry = array(
-			'timestamp' => current_time( 'mysql' ),
-			'type'      => 'info',
-			'message'   => $message,
-			'context'   => $context,
-		);
-
-		$this->add_to_log( $log_entry );
-
-		// Mirror to debug log when enabled for parity with debug_log helper.
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
-			$log_message = sprintf(
-				'[EFS_INFO] %s: %s',
-				current_time( 'Y-m-d H:i:s' ),
-				$message
-			);
-
-			if ( ! empty( $context ) ) {
-				$log_message .= ' | Context: ' . wp_json_encode( $context );
-			}
-
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: mirrors info logs to WordPress debug.log when WP_DEBUG is enabled
-			error_log( $log_message );
-		}
-	}
-
-	/**
-	 * Add entry to migration log
-	 *
-	 * @param array $log_entry Log entry data
-	 */
-	private function add_to_log( $log_entry ) {
-		$log   = get_option( 'efs_migration_log', array() );
-		$log[] = $log_entry;
-
-		// Keep only last 1000 entries
-		if ( count( $log ) > 1000 ) {
-			$log = array_slice( $log, -1000 );
-		}
-
-		// Apply 10-day retention: remove entries older than 10 days.
-		$cutoff = time() - ( 10 * DAY_IN_SECONDS );
-		$log    = array_values(
-			array_filter(
-				$log,
-				function ( $entry ) use ( $cutoff ) {
-					if ( ! isset( $entry['timestamp'] ) ) {
-						return true; // Keep entries without timestamps to avoid data loss.
-					}
-					$ts = strtotime( (string) $entry['timestamp'] );
-					return false === $ts || $ts >= $cutoff;
-				}
-			)
-		);
-
-		update_option( 'efs_migration_log', $log );
-	}
-
-	/**
-	 * Get migration log
-	 *
-	 * @param string $type Filter by type (error, warning, all)
-	 * @return array
-	 */
-	public function get_log( $type = 'all' ) {
-		$log = get_option( 'efs_migration_log', array() );
-
-		if ( 'all' !== $type ) {
-			$log = array_filter(
-				$log,
-				function ( $entry ) use ( $type ) {
-					return $type === $entry['type'];
-				}
-			);
-		}
-
-		return $log;
-	}
-
-	/**
-	 * Get recent log entries
-	 *
-	 * @param int $limit Number of entries to return
-	 * @return array
-	 */
-	public function get_recent_logs( $limit = 50 ) {
-		$limit = absint( $limit );
-		if ( $limit <= 0 ) {
-			$limit = 50;
-		}
-
-		$log = $this->get_log( 'all' );
-		if ( empty( $log ) ) {
-			return array();
-		}
-
-		return array_slice( $log, -1 * $limit );
-	}
-
-	/**
-	 * Clear migration log
-	 */
-	public function clear_log() {
-		// Clear WordPress debug log
-		if ( file_exists( '/var/www/html/wp-content/debug.log' ) ) {
-			file_put_contents( '/var/www/html/wp-content/debug.log', '' );
-		}
-
-		// Clear migration log option
-		delete_option( 'efs_migration_log' );
-
-		return true;
+	public function handle( $message, $level = 'error' ) {
+		error_log( "EFS [{$level}]: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
 	/**
 	 * Get error information by code
 	 *
-	 * @param string $code Error code
-	 * @return array|null
+	 * @param string $code Error code.
+	 * @return array|null Error information array with title, description, solution, or null if not found.
 	 */
 	public function get_error_info( $code ) {
 		return isset( self::ERROR_CODES[ $code ] ) ? self::ERROR_CODES[ $code ] : null;
@@ -524,37 +343,40 @@ class EFS_Error_Handler {
 	/**
 	 * Get warning information by code
 	 *
-	 * @param string $code Warning code
-	 * @return array|null
+	 * @param string $code Warning code.
+	 * @return array|null Warning information array with title, description, solution, or null if not found.
 	 */
 	public function get_warning_info( $code ) {
 		return isset( self::WARNING_CODES[ $code ] ) ? self::WARNING_CODES[ $code ] : null;
 	}
 
 	/**
-	 * Development debug helper - logs detailed information when WP_DEBUG is enabled
+	 * Debug log - logs detailed information when WP_DEBUG is enabled
 	 *
-	 * @param string $message Debug message
-	 * @param mixed $data Optional data to log
-	 * @param string $context Context identifier (default: EFS_DEBUG)
+	 * @param string $message Message to log.
+	 * @param mixed  $data    Optional data to log.
 	 */
-	public function debug_log( $message, $data = null, $context = 'EFS_DEBUG' ) {
-		if ( ! WP_DEBUG || ! WP_DEBUG_LOG ) {
-			return;
+	public function debug_log( $message, $data = null ) {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( "EFS [DEBUG]: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			if ( $data ) {
+				error_log( wp_json_encode( $data ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		}
+	}
 
-		$log_message = sprintf(
-			'[%s] %s: %s',
-			$context,
-			current_time( 'Y-m-d H:i:s' ),
-			$message
-		);
-
-		if ( null !== $data ) {
-			$log_message .= ' | Data: ' . wp_json_encode( $data );
+	/**
+	 * Log info message - for informational logging during migration
+	 *
+	 * @param string $message Message to log.
+	 * @param mixed  $data    Optional data to log.
+	 */
+	public function log_info( $message, $data = null ) {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( "EFS [INFO]: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			if ( $data ) {
+				error_log( wp_json_encode( $data ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
 		}
-
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional: development debug helper mirroring to WordPress debug.log when WP_DEBUG is enabled
-		error_log( $log_message );
 	}
 }

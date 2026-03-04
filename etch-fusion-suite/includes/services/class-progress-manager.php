@@ -11,6 +11,7 @@
 namespace Bricks2Etch\Services;
 
 use Bricks2Etch\Repositories\Interfaces\Progress_Repository_Interface;
+use Bricks2Etch\Repositories\EFS_DB_Migration_Persistence;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -234,15 +235,24 @@ class EFS_Progress_Manager {
 	}
 
 	/**
-	 * Refresh `last_updated` in stored progress.
+	 * Atomically refresh `last_updated` in stored progress.
 	 * Only updates if migration is actively running.
+	 *
+	 * Uses database UPDATE for atomic operation instead of read-modify-write.
+	 * Prevents race conditions where concurrent requests could overwrite each other's updates.
 	 */
 	public function touch_progress_heartbeat(): void {
 		$progress = $this->progress_repository->get_progress();
 		if ( is_array( $progress ) && isset( $progress['status'] ) && in_array( $progress['status'], array( 'running', 'receiving' ), true ) ) {
-			$progress['last_updated'] = current_time( 'mysql', true );
-			$progress['is_stale']     = false;
-			$this->progress_repository->save_progress( $progress );
+			// If migration exists in database, use atomic UPDATE
+			if ( isset( $progress['migrationId'] ) ) {
+				EFS_DB_Migration_Persistence::touch_progress_heartbeat( $progress['migrationId'] );
+			} else {
+				// Fallback to options API for legacy data
+				$progress['last_updated'] = current_time( 'mysql', true );
+				$progress['is_stale']     = false;
+				$this->progress_repository->save_progress( $progress );
+			}
 		}
 	}
 
@@ -394,6 +404,7 @@ class EFS_Progress_Manager {
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		$results   = $wpdb->get_results( $query, ARRAY_A );
 		$breakdown = array();
 

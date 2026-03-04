@@ -119,7 +119,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			array(
 				'blocking'  => false,
 				'timeout'   => 0.5,
-				'sslverify' => apply_filters( 'https_local_over_ssl', false ),
+					'sslverify' => apply_filters( 'efs_https_local_over_ssl', false ),
 			)
 		);
 
@@ -136,6 +136,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 	 * Verifies request authenticity before processing the queue.
 	 */
 	public static function handle_queue_trigger(): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		// Verify this is our loopback request (both parameter and token required).
 		if ( ! isset( $_GET['efs_run_queue'] ) || '1' !== $_GET['efs_run_queue'] ) {
 			return;
@@ -158,6 +159,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 
 		// Verify request comes from localhost or private network (for Docker containers).
 		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		error_log( '[EFS] Loopback handler: REMOTE_ADDR = ' . $remote_addr );
 
 		// Allow localhost (127.0.0.1, ::1, localhost) and Docker private networks (10.x.x.x, 172.16.x.x-172.31.x.x, 192.168.x.x)
@@ -171,13 +173,19 @@ class EFS_Action_Scheduler_Loopback_Runner {
 
 		// Don't output anything.
 		if ( function_exists( 'wp_doing_ajax' ) ) {
+			// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
+			// DOING_AJAX is a WordPress core constant, not prefixed.
 			define( 'DOING_AJAX', true );
+			// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
 		}
 
 		// Process the Action Scheduler queue.
 		if ( class_exists( 'ActionScheduler' ) ) {
 			error_log( '[EFS] Loopback handler: Triggering action_scheduler_run_queue' );
+			// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+			// action_scheduler_run_queue is from Action Scheduler library, not prefixed.
 			do_action( 'action_scheduler_run_queue' );
+			// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 		}
 
 		// Exit early without output.

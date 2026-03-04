@@ -98,6 +98,10 @@ const createUiModel = (payload = {}) => {
     const hasSignal = migrationId !== '' || sourceRaw !== '' || items > 0 || lastActivityRaw !== '';
     const itemsTotal = Number(payload?.items_total) || 0;
     const etaSec = Number(payload?.estimated_time_remaining) || null;
+    // Per-type breakdown: { media: { received: 150, total: 897 }, post: {...}, ... }
+    const itemsByType = (payload?.items_by_type && typeof payload.items_by_type === 'object' && !Array.isArray(payload.items_by_type))
+        ? payload.items_by_type
+        : {};
 
     return {
         status,
@@ -112,6 +116,7 @@ const createUiModel = (payload = {}) => {
         hasSignal,
         itemsTotal,
         etaSec,
+        itemsByType,
         isStale: status === 'stale',
         title: formatTitle(status, status === 'stale'),
         subtitle: formatSubtitle(status, status === 'stale'),
@@ -201,9 +206,24 @@ export const initReceivingStatus = () => {
             elements.source.hidden = !elements.source.textContent;
         }
         if (elements.items) {
-            const total = model.itemsTotal > 0 ? `/${model.itemsTotal}` : '';
-            elements.items.textContent = model.items > 0 || total ? `Items: ${model.items}${total}` : '';
-            elements.items.hidden = !elements.items.textContent;
+            const byType = model.itemsByType;
+            const typeEntries = Object.entries(byType);
+            // Human-readable labels for known post types; unknown types are shown as-is.
+            const TYPE_LABELS = { media: 'Media', post: 'Posts', page: 'Pages', attachment: 'Media' };
+            if (typeEntries.length > 0) {
+                const lines = typeEntries.map(([type, counts]) => {
+                    const label = TYPE_LABELS[type] ?? type;
+                    const total = counts.total > 0 ? `/${counts.total}` : '';
+                    return `<span>${label}: ${counts.received}${total}</span>`;
+                });
+                elements.items.innerHTML = lines.join('');
+                elements.items.hidden = false;
+            } else {
+                // Fallback to grand-total when breakdown is not yet available.
+                const total = model.itemsTotal > 0 ? `/${model.itemsTotal}` : '';
+                elements.items.textContent = model.items > 0 || total ? `Received: ${model.items}${total}` : '';
+                elements.items.hidden = !elements.items.textContent;
+            }
         }
         if (elements.progressFill && elements.percent) {
             const total = model.itemsTotal > 0 ? model.itemsTotal : 0;
@@ -214,7 +234,8 @@ export const initReceivingStatus = () => {
         }
         if (elements.elapsed) {
             const startedAt = model.startedAt;
-            const startedMs = startedAt ? new Date(startedAt.replace(' ', 'T')).getTime() : NaN;
+            // Append 'Z' to force UTC interpretation — started_at is stored as UTC (current_time('mysql', true)).
+            const startedMs = startedAt ? new Date(startedAt.replace(' ', 'T') + 'Z').getTime() : NaN;
             const elapsedSec = Number.isFinite(startedMs) && startedMs > 0
                 ? Math.max(0, Math.floor((Date.now() - startedMs) / 1000))
                 : null;

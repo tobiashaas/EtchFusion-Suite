@@ -34,6 +34,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EFS_Breakpoint_Resolver {
 
 	/**
+	 * Built-in Bricks breakpoint width definitions (in pixels).
+	 * These match the factory defaults in Bricks and should not be changed
+	 * without updating the Bricks compatibility matrix.
+	 */
+	private const BREAKPOINT_TABLET_LANDSCAPE = 1199;
+	private const BREAKPOINT_TABLET_PORTRAIT = 991;
+	private const BREAKPOINT_MOBILE_LANDSCAPE = 767;
+	private const BREAKPOINT_MOBILE_PORTRAIT = 478;
+	private const BREAKPOINT_DESKTOP = 1200;
+
+	/**
 	 * Cached breakpoint width definitions, populated on first call to
 	 * get_breakpoint_width_map() and reused for subsequent calls within the same
 	 * request.
@@ -77,23 +88,23 @@ class EFS_Breakpoint_Resolver {
 		$definitions = array(
 			'tablet_landscape' => array(
 				'type'  => 'max',
-				'width' => 1199,
+				'width' => self::BREAKPOINT_TABLET_LANDSCAPE,
 			),
 			'tablet_portrait'  => array(
 				'type'  => 'max',
-				'width' => 991,
+				'width' => self::BREAKPOINT_TABLET_PORTRAIT,
 			),
 			'mobile_landscape' => array(
 				'type'  => 'max',
-				'width' => 767,
+				'width' => self::BREAKPOINT_MOBILE_LANDSCAPE,
 			),
 			'mobile_portrait'  => array(
 				'type'  => 'max',
-				'width' => 478,
+				'width' => self::BREAKPOINT_MOBILE_PORTRAIT,
 			),
 			'desktop'          => array(
 				'type'  => 'min',
-				'width' => 1200,
+				'width' => self::BREAKPOINT_DESKTOP,
 			),
 		);
 

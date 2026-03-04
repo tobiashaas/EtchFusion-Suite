@@ -94,7 +94,7 @@ $etch_fusion_suite_https_warning      = __( 'Warning: This site is using HTTP. U
 			<div class="efs-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 				<div class="efs-progress-fill" data-efs-receiving-progress-fill style="width:0%"></div>
 			</div>
-			<p class="efs-migration-progress-card__percent" data-efs-receiving-percent hidden>0%</p>
+			<p class="efs-migration-progress-card__percent" data-efs-receiving-percent>0%</p>
 			<p class="efs-migration-progress-card__status" data-efs-receiving-status>
 				<?php esc_html_e( 'Listening for incoming migration packets.', 'etch-fusion-suite' ); ?>
 			</p>

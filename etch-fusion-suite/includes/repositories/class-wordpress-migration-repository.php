@@ -502,6 +502,26 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_checkpoint( array $checkpoint ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+
+		// Get migration ID
+		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
+		if ( ! $current_id ) {
+			return false;
+		}
+
+		// Get current version from DB for optimistic locking
+		$db_checkpoint = EFS_DB_Migration_Persistence::get_checkpoint_with_version( $current_id );
+		$version       = $db_checkpoint ? $db_checkpoint['version'] : 0;
+
+		// Try to save to DB first (primary destination)
+		$rows = EFS_DB_Migration_Persistence::save_checkpoint_atomic( $current_id, $checkpoint, $version );
+		if ( $rows > 0 ) {
+			// Also update options for backward compatibility
+			update_option( self::OPTION_CHECKPOINT, $checkpoint );
+			return true;
+		}
+
+		// Conflict or DB error - fallback to options
 		return update_option( self::OPTION_CHECKPOINT, $checkpoint );
 	}
 
@@ -516,9 +536,30 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 * @return bool True on success, false on failure.
 	 */
 	public function save_checkpoint_before_http( array $checkpoint ): bool {
+		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+
+		// Get migration ID
+		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
+		if ( ! $current_id ) {
+			return false;
+		}
+
 		// Increment version for conflict detection.
 		$checkpoint['_checkpoint_version'] = ( isset( $checkpoint['_checkpoint_version'] ) ? (int) $checkpoint['_checkpoint_version'] : 0 ) + 1;
-		$this->invalidate_cache( 'efs_cache_migration_checkpoint' );
+
+		// Get current version from DB for optimistic locking
+		$db_checkpoint = EFS_DB_Migration_Persistence::get_checkpoint_with_version( $current_id );
+		$version       = $db_checkpoint ? $db_checkpoint['version'] : 0;
+
+		// Try to save to DB first (primary destination)
+		$rows = EFS_DB_Migration_Persistence::save_checkpoint_atomic( $current_id, $checkpoint, $version );
+		if ( $rows > 0 ) {
+			// Also update options for backward compatibility
+			update_option( self::OPTION_CHECKPOINT, $checkpoint );
+			return true;
+		}
+
+		// Conflict or DB error - fallback to options
 		return update_option( self::OPTION_CHECKPOINT, $checkpoint );
 	}
 
@@ -535,10 +576,39 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 			return is_array( $cached ) ? $cached : array();
 		}
 
+		// Get migration ID from current/active migration
+		$current_id = get_option( self::OPTION_CURRENT_ID, '' );
+		if ( ! $current_id ) {
+			return $this->cache_checkpoint( array(), $cache_key );
+		}
+
+		// Try to get from database first (primary source)
+		$db_checkpoint = EFS_DB_Migration_Persistence::get_checkpoint_with_version( $current_id );
+		if ( $db_checkpoint && ! empty( $db_checkpoint['data'] ) ) {
+			return $this->cache_checkpoint( $db_checkpoint['data'], $cache_key );
+		}
+
+		// Fallback to options for legacy data
 		$checkpoint = get_option( self::OPTION_CHECKPOINT, array() );
 		$checkpoint = is_array( $checkpoint ) ? $checkpoint : array();
-		set_transient( $cache_key, $checkpoint, self::CACHE_EXPIRATION_SHORT );
 
+		// If found in options, try to migrate to DB for consistency
+		if ( ! empty( $checkpoint ) && $db_checkpoint === null ) {
+			EFS_DB_Migration_Persistence::save_checkpoint_atomic( $current_id, $checkpoint, 0 );
+		}
+
+		return $this->cache_checkpoint( $checkpoint, $cache_key );
+	}
+
+	/**
+	 * Cache checkpoint data with transient.
+	 *
+	 * @param array  $checkpoint Checkpoint data.
+	 * @param string $cache_key Transient key.
+	 * @return array Checkpoint data.
+	 */
+	private function cache_checkpoint( array $checkpoint, string $cache_key ): array {
+		set_transient( $cache_key, $checkpoint, self::CACHE_EXPIRATION_SHORT );
 		return $checkpoint;
 	}
 
@@ -626,10 +696,10 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 		$normalized['last_activity']  = sanitize_text_field( (string) ( $normalized['last_activity'] ?? '' ) );
 		$normalized['last_updated']   = sanitize_text_field( (string) ( $normalized['last_updated'] ?? '' ) );
 		// Per-type breakdown: array of ['received' => int, 'total' => int] keyed by post_type / 'media'.
-		$raw_by_type                  = isset( $normalized['items_by_type'] ) && is_array( $normalized['items_by_type'] )
+		$raw_by_type                 = isset( $normalized['items_by_type'] ) && is_array( $normalized['items_by_type'] )
 			? $normalized['items_by_type']
 			: array();
-		$normalized['items_by_type']  = array_map(
+		$normalized['items_by_type'] = array_map(
 			function ( $entry ) {
 				return array(
 					'received' => max( 0, absint( $entry['received'] ?? 0 ) ),
