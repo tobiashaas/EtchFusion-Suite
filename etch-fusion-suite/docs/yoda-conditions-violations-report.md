@@ -1,24 +1,21 @@
 # Yoda Conditions Violations Report
 
-**Generated:** 2025-10-28 21:37:26
+**Generated:** 2026-03-04 23:13:25
 
 ## 1. Executive Summary
-- PHPCS violations: 0
+- PHPCS violations: Unavailable (jq not installed)
 - Regex heuristic matches: 0
 - Target scope: [includes/](../includes)
 
 ## 2. Violations by Directory
-_- None detected by PHPCS -_
+_- Skipped (jq not installed) -_
 
 ## 3. Detailed PHPCS Output
 
 default report (truncated):
 
 [•] Running PHPCS YodaConditions sniff
-........ 8 / 8 (100%)
-
-
-Time: 259ms; Memory: 8MB
+/usr/bin/env: ‘php’: No such file or directory
 
 ## 4. Regex Candidates
 
