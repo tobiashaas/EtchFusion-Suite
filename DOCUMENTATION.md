@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-04  
-**Version:** 0.17.9 (Phase 5 - Critical Namespace Conflict Resolution)
+**Last Updated:** 2026-03-05  
+**Version:** 0.16.0 (Critical Bug Fixes & PHPCS Compliance)
 
 ---
 
