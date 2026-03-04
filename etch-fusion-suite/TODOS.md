@@ -510,6 +510,7 @@
 - [✅] Docker environment verified working
 - [✅] Tables created and data persistence tested
 - [✅] Documentation updated (DOCUMENTATION.md, CHANGELOG.md)
+- [✅] **DB Installer Pfad-Fix + Upgrade Hook** — FIXED 2026-03-04: Phase 7 hatte `includes/core/` gelöscht, aber `etch-fusion-suite.php` referenzierte noch `includes/core/class-db-installer.php` → Activation + Uninstall waren silent no-ops. Fix: Pfade auf `includes/db-installer.php` korrigiert. `wp_efs_settings` table in Installer ergänzt (DB_VERSION 1.0.0 → 1.1.0). `maybe_upgrade_db()` auf `plugins_loaded` Priority 0 — vergleicht gespeicherte Version mit Konstante und läuft `install()` bei Mismatch. Behebt "plugin updated ohne Deaktivierung" Szenario.
 
 #### Outstanding Tasks - High Priority 🔴
 
@@ -571,17 +572,11 @@
   - **Abhängigkeit:** 10a (Checkpoint Locking) bereits ✅ done — Fix kann direkt beginnen
   - **Aufwand:** ~3-4h
 
-- [ ] **fix-db-lock** (optimierungen.md §10b) — **Priorität 2**
-  - **Problem:** `add_option()`-Lock in `class-batch-processor.php:104` ist fragil — TOCTOU-Fenster bei gleichzeitigen Requests, hängt bei Server-Crash bis Transient-Ablauf (300s)
-  - **Fix:** `wp_efs_migrations` um `lock_uuid VARCHAR(36)` + `locked_at DATETIME` erweitern; atomares `UPDATE ... WHERE lock_uuid IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
-  - **Dateien:** `core/class-db-installer.php` (Schema-Migration mit `DB_VERSION` bump), `class-batch-processor.php`
-  - **Aufwand:** ~3h
+- [✅] **fix-db-lock** (optimierungen.md §10b) — **DONE (bereits implementiert)**
+  - Code-Review ergab: bereits vollständig implementiert. `class-batch-processor.php:103-118` nutzt atomares `UPDATE wp_efs_migrations SET lock_uuid = %s, locked_at = NOW() WHERE ... AND (lock_uuid IS NULL OR locked_at < DATE_SUB(...))`. Shutdown-Handler released Lock via UUID-Match (verhindert fremde Locks zu löschen).
 
-- [ ] **fix-checkpoint-validation** (optimierungen.md §10g) — **Priorität 2**
-  - **Problem:** Checkpoint wird in `class-batch-processor.php:123` nur auf `empty()` und `migrationId` geprüft — fehlende required keys führen zu Silent Failures
-  - **Fix:** `validate_checkpoint(array $checkpoint): bool` als statische Methode; prüft required keys (`migrationId`, `phase`, `total_count`) und erlaubte Phase-Werte
-  - **Dateien:** `class-batch-processor.php`
-  - **Aufwand:** ~1h
+- [✅] **fix-checkpoint-validation** (optimierungen.md §10g) — **DONE 2026-03-04**
+  - Code-Review ergab: bereits vollständig implementiert. `validate_checkpoint()` als statische Methode in `class-batch-processor.php:260-304` — prüft required keys (`migrationId`, `phase`, `total_count`), erlaubte Phasen und positive `total_count`. Wird auf Zeilen 131 + 227 aufgerufen.
 
 ### 🟡 HOCH
 
@@ -606,17 +601,11 @@
 
 ### 🟢 MITTEL
 
-- [ ] **fix-post-cache-clearing** (optimierungen.md §10e) — **Priorität 5**
-  - **Problem:** WordPress Object Cache wächst bei langen Migrationen unbegrenzt (`get_post()`, `update_post_meta()` etc.)
-  - **Fix:** Nach `save_checkpoint()` in `class-batch-phase-runner.php`: `clean_post_cache($id)` pro verarbeitetem Item
-  - **Dateien:** `class-batch-phase-runner.php` (nach dem Batch-Loop)
-  - **Aufwand:** ~30min (1-Zeiler)
+- [✅] **fix-post-cache-clearing** (optimierungen.md §10e) — **DONE (bereits implementiert)**
+  - Code-Review ergab: bereits implementiert. `class-batch-phase-runner.php:249` (Posts-Loop) + `:355` (Media-Loop) rufen jeweils `clean_post_cache( $id )` nach jedem verarbeiteten Item auf.
 
-- [ ] **fix-shutdown-lock-closure** (optimierungen.md §10f) — **Priorität 6**
-  - **Problem:** `EFS_Batch_Processor::release_lock_on_shutdown()` ist statische Klassenmethode — bei Fatal Error könnte Klasse bereits entladen sein
-  - **Fix:** `register_shutdown_function` auf Closure mit `use ($lock_key)` umstellen; statische Methode + Property entfernen
-  - **Dateien:** `class-batch-processor.php`
-  - **Aufwand:** ~30min (entfällt automatisch wenn 10b umgesetzt)
+- [✅] **fix-shutdown-lock-closure** (optimierungen.md §10f) — **OBSOLET durch fix-db-lock**
+  - Da fix-db-lock bereits DB-basiertes Locking implementiert hat (lock_uuid + 5min Timeout), ist der Shutdown-Handler nur noch ein Best-Effort-Cleanup. Selbst wenn er bei Fatal Error nicht läuft, released der 5-Minuten-Timeout das Lock automatisch. Kein Handlungsbedarf.
 
 - [ ] **fix-db-transactions** (optimierungen.md §10j) — **Priorität 7**
   - **Problem:** Checkpoint + Status werden ohne Transaktion geschrieben — bei Fehler inkonsistenter State
@@ -713,20 +702,14 @@
 
 ### 🔴 Sofort entfernen — eindeutige Duplikate
 
-- [ ] **delete-duplicate-error-handler** — ~1min
-  - `includes/error_handler.php` ist ein Duplikat von `includes/core/class-error-handler.php`
-  - Die Root-Datei wird nirgendwo per `require` eingebunden — der aktive Handler ist ausschließlich `core/class-error-handler.php` (42 Usages via `use Bricks2Etch\Core\EFS_Error_Handler`)
-  - **Aktion:** `rm includes/error_handler.php`
+- [✅] **delete-duplicate-error-handler** — **DONE (Phase 7, 2026-03-04)**
+  - Phase 7 konsolidierte beide Error-Handler in `includes/EFS_Error_Handler.php`. `includes/core/` Verzeichnis gelöscht.
 
-- [ ] **delete-duplicate-db-installer** — ~1min
-  - `includes/db-installer.php` ist ein Duplikat von `includes/core/class-db-installer.php`
-  - Root-Datei wird nicht per `require` eingebunden — aktiv ist nur `core/class-db-installer.php`
-  - **Aktion:** `rm includes/db-installer.php`
+- [✅] **delete-duplicate-db-installer** — **DONE + KORRIGIERT 2026-03-04**
+  - Phase 7 hatte `includes/core/class-db-installer.php` gelöscht, aber `includes/db-installer.php` ist die einzige verbleibende Version (kein Duplikat, nicht löschen!). Pfad-Bug in `etch-fusion-suite.php` behoben + `wp_efs_settings` table + Upgrade Hook ergänzt.
 
-- [ ] **delete-converter-bridge-files** — ~2min
-  - `includes/converters/elements/class-button-converter.php` enthält nur `require_once './class-button.php'` — redundant, PSR-4 Autoloader übernimmt das
-  - `includes/converters/elements/class-icon-converter.php` enthält nur `require_once './class-icon.php'` — identisches Problem
-  - **Aktion:** Beide Bridge-Dateien löschen; sicherstellen dass Autoloader `class-button.php` und `class-icon.php` direkt findet
+- [✅] **delete-converter-bridge-files** — **DONE 2026-03-04**
+  - `class-button-converter.php` + `class-icon-converter.php` gelöscht. PSR-4 Autoloader findet `class-button.php` und `class-icon.php` direkt.
 
 ### 🟡 Button & Icon Converter — Review & Testen
 
@@ -805,7 +788,7 @@
 
 ---
 
-**Last Updated:** 2026-03-04 (Code-Review: fix-id-selector-regex veraltet, remove-framer-feature Aufwand korrigiert)
+**Last Updated:** 2026-03-05 (Sofort-Gruppe abgeschlossen: DB Installer fix, Upgrade Hook, Bridge-Files gelöscht; fix-db-lock/checkpoint-validation/post-cache-clearing als bereits implementiert verifiziert)
 **Current Status:** Checkpoint Locking (10a) implementiert. Kritische Stabilitäts-Fixes (10b–10k) und CSS Converter Review Action Items stehen an. Detaillierte Analyse in `optimierungen.md` und `css-converter-review.md`. Zwei Todos nach Code-Review korrigiert: fix-id-selector-regex (Regex bereits korrekt im Code), remove-framer-feature (Aufwand 5-6h statt 3-4h).
 
 **Maintainer:** Etch Fusion Suite Development Team
