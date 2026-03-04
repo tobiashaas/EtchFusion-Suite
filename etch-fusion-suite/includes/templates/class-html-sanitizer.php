@@ -221,3 +221,4 @@ class EFS_HTML_Sanitizer implements EFS_HTML_Sanitizer_Interface {
 		return strtolower( $element->tagName ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }
+

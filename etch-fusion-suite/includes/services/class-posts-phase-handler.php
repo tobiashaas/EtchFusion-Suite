@@ -197,3 +197,4 @@ class EFS_Posts_Phase_Handler implements Phase_Handler_Interface {
 		$checkpoint['processed_count']    = $processed;
 	}
 }
+

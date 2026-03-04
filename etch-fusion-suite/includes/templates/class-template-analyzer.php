@@ -275,3 +275,4 @@ class EFS_Template_Analyzer implements EFS_Template_Analyzer_Interface {
 		return $element->ownerDocument instanceof DOMDocument ? $element->ownerDocument : null; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 	}
 }
+

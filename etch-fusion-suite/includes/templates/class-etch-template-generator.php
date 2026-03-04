@@ -275,3 +275,4 @@ class EFS_Etch_Template_Generator {
 		return $owner_document instanceof DOMDocument ? $owner_document->saveHTML( $node ) : '';
 	}
 }
+

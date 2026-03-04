@@ -193,3 +193,4 @@ class EFS_Template_Controller {
 		);
 	}
 }
+

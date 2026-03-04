@@ -167,3 +167,4 @@ class EFS_Migrator_Executor {
 		return $mapping[ $type ] ?? $type;
 	}
 }
+

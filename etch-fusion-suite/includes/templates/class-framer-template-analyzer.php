@@ -324,3 +324,4 @@ class EFS_Framer_Template_Analyzer extends EFS_Template_Analyzer implements EFS_
 		return $warnings;
 	}
 }
+

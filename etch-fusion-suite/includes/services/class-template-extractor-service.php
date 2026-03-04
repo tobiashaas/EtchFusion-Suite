@@ -388,3 +388,4 @@ class EFS_Template_Extractor_Service implements EFS_Template_Extractor_Interface
 		return $map[ $step ] ?? $this->progress['progress'];
 	}
 }
+

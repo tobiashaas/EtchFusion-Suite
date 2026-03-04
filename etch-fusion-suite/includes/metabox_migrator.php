@@ -497,3 +497,4 @@ class EFS_MetaBox_Migrator extends Abstract_Migrator {
 		return $mapping[ $metabox_type ] ?? 'text';
 	}
 }
+

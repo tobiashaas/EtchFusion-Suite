@@ -118,7 +118,10 @@ class EFS_Batch_Processor {
 		}
 
 		// Store lock UUID so we can release it on shutdown.
-		self::$shutdown_lock_key = array( 'migration_id' => $migration_id, 'lock_uuid' => $lock_uuid );
+		self::$shutdown_lock_key = array(
+			'migration_id' => $migration_id,
+			'lock_uuid'    => $lock_uuid,
+		);
 		register_shutdown_function( array( self::class, 'release_lock_on_shutdown' ) );
 
 		try {
@@ -286,7 +289,7 @@ class EFS_Batch_Processor {
 			return new \WP_Error(
 				'invalid_checkpoint_phase',
 				/* translators: %s: phase name */
-				sprintf( __( 'Checkpoint phase "%s" is not valid. Allowed: %s', 'etch-fusion-suite' ), $checkpoint['phase'], implode( ', ', $allowed_phases ) )
+				sprintf( __( 'Checkpoint phase "%1$s" is not valid. Allowed: %2$s', 'etch-fusion-suite' ), $checkpoint['phase'], implode( ', ', $allowed_phases ) )
 			);
 		}
 
@@ -300,3 +303,4 @@ class EFS_Batch_Processor {
 		return null;
 	}
 }
+

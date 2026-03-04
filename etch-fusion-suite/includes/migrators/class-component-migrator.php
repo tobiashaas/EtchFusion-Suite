@@ -723,3 +723,4 @@ class EFS_Component_Migrator extends Abstract_Migrator {
 		return isset( $map[ $bricks_id ] ) ? (int) $map[ $bricks_id ] : null;
 	}
 }
+

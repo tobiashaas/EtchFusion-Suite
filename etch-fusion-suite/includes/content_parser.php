@@ -1061,3 +1061,4 @@ class EFS_Content_Parser {
 		);
 	}
 }
+

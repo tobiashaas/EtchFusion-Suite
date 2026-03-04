@@ -39,10 +39,10 @@ class EFS_Breakpoint_Resolver {
 	 * without updating the Bricks compatibility matrix.
 	 */
 	private const BREAKPOINT_TABLET_LANDSCAPE = 1199;
-	private const BREAKPOINT_TABLET_PORTRAIT = 991;
+	private const BREAKPOINT_TABLET_PORTRAIT  = 991;
 	private const BREAKPOINT_MOBILE_LANDSCAPE = 767;
-	private const BREAKPOINT_MOBILE_PORTRAIT = 478;
-	private const BREAKPOINT_DESKTOP = 1200;
+	private const BREAKPOINT_MOBILE_PORTRAIT  = 478;
+	private const BREAKPOINT_DESKTOP          = 1200;
 
 	/**
 	 * Cached breakpoint width definitions, populated on first call to

@@ -112,16 +112,16 @@ class EFS_Batch_Phase_Runner {
 		// --- Delegating path: all phase logic driven by the handler interface ---
 
 		// Derive checkpoint keys.
-		$total_key           = 'media' === $phase ? 'total_media_count' : 'total_count';
-		$attempts_key        = 'media' === $phase ? 'media_attempts' : 'post_attempts';
-		$failed_ids_key      = 'media' === $phase ? 'failed_media_ids_final' : 'failed_post_ids_final';
-		$processed_key       = 'media' === $phase ? 'processed_media_count' : 'processed_count';
-		$processed_ids_key   = 'media' === $phase ? 'processed_media_ids' : 'processed_post_ids';
+		$total_key         = 'media' === $phase ? 'total_media_count' : 'total_count';
+		$attempts_key      = 'media' === $phase ? 'media_attempts' : 'post_attempts';
+		$failed_ids_key    = 'media' === $phase ? 'failed_media_ids_final' : 'failed_post_ids_final';
+		$processed_key     = 'media' === $phase ? 'processed_media_count' : 'processed_count';
+		$processed_ids_key = 'media' === $phase ? 'processed_media_ids' : 'processed_post_ids';
 
 		// Read state from checkpoint.
-		$remaining           = $active_handler->get_remaining( $checkpoint );
-		$processed_count     = isset( $checkpoint[ $processed_key ] ) ? (int) $checkpoint[ $processed_key ] : 0;
-		$processed_ids_set   = isset( $checkpoint[ $processed_ids_key ] ) ? (array) $checkpoint[ $processed_ids_key ] : array();
+		$remaining         = $active_handler->get_remaining( $checkpoint );
+		$processed_count   = isset( $checkpoint[ $processed_key ] ) ? (int) $checkpoint[ $processed_key ] : 0;
+		$processed_ids_set = isset( $checkpoint[ $processed_ids_key ] ) ? (array) $checkpoint[ $processed_ids_key ] : array();
 		$this->migration_logger->log( $migration_id, 'info', 'Batch started: phase ' . $phase . ', offset ' . $processed_count );
 		$total      = isset( $checkpoint[ $total_key ] ) ? (int) $checkpoint[ $total_key ] : ( count( $remaining ) + $processed_count );
 		$attempts   = isset( $checkpoint[ $attempts_key ] ) && is_array( $checkpoint[ $attempts_key ] ) ? $checkpoint[ $attempts_key ] : array();
@@ -520,3 +520,4 @@ class EFS_Batch_Phase_Runner {
 		);
 	}
 }
+

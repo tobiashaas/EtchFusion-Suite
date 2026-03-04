@@ -628,3 +628,4 @@ class EFS_GitHub_Updater {
 		);
 	}
 }
+

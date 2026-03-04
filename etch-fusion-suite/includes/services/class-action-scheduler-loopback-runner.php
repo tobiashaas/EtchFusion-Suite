@@ -119,7 +119,7 @@ class EFS_Action_Scheduler_Loopback_Runner {
 			array(
 				'blocking'  => false,
 				'timeout'   => 0.5,
-					'sslverify' => apply_filters( 'efs_https_local_over_ssl', false ),
+				'sslverify' => apply_filters( 'efs_https_local_over_ssl', false ),
 			)
 		);
 

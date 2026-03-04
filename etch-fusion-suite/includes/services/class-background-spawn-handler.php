@@ -128,3 +128,4 @@ class EFS_Background_Spawn_Handler {
 		}
 	}
 }
+
