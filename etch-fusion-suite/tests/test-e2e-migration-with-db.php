@@ -9,9 +9,8 @@
  * wp eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/test-e2e-migration-with-db.php';"
  */
 
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/core/class-db-installer.php';
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/repositories/class-db-migration-persistence.php';
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/repositories/class-wordpress-migration-repository.php';
+// WordPress + Plugin are already loaded by wp eval context
+// Autoloaders are registered via the plugin's main file
 
 global $wpdb;
 
