@@ -97,9 +97,12 @@ class EFS_GitHub_Updater {
 		$this->error_handler = $error_handler;
 
 		// Initialize properties from constants.
-		$this->plugin_file     = ETCH_FUSION_SUITE_FILE;
-		$this->plugin_basename = ETCH_FUSION_SUITE_BASENAME;
-		$this->plugin_slug     = dirname( $this->plugin_basename );
+		$this->plugin_file     = defined( 'ETCH_FUSION_SUITE_FILE' ) ? (string) ETCH_FUSION_SUITE_FILE : '';
+		$this->plugin_basename = defined( 'ETCH_FUSION_SUITE_BASENAME' ) ? (string) ETCH_FUSION_SUITE_BASENAME : '';
+		if ( '' === $this->plugin_basename && '' !== $this->plugin_file ) {
+			$this->plugin_basename = plugin_basename( $this->plugin_file );
+		}
+		$this->plugin_slug = '' !== $this->plugin_basename ? dirname( $this->plugin_basename ) : 'etch-fusion-suite';
 
 		// Default GitHub repository settings.
 		$this->github_repo_owner = apply_filters( 'etch_fusion_suite_github_updater_repo_owner', 'tobiashaas' );

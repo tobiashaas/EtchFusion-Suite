@@ -360,10 +360,13 @@ class EFS_Error_Handler {
 	 *
 	 * @param string $message Message to log.
 	 * @param mixed  $data    Optional data to log.
+	 * @param string $level   Optional log level label.
 	 */
-	public function debug_log( $message, $data = null ) {
+	public function debug_log( $message, $data = null, $level = 'debug' ) {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( "EFS [DEBUG]: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			$level = strtoupper( sanitize_key( (string) $level ) );
+			$level = '' !== $level ? $level : 'DEBUG';
+			error_log( "EFS [{$level}]: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			if ( $data ) {
 				error_log( wp_json_encode( $data ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}

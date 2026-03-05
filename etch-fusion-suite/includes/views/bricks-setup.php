@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $etch_fusion_suite_settings = is_array( $settings ) ? $settings : array();
 $etch_fusion_suite_nonce    = is_string( $nonce ) ? $nonce : '';
 $etch_fusion_suite_key      = isset( $etch_fusion_suite_settings['migration_key'] ) ? (string) $etch_fusion_suite_settings['migration_key'] : '';
+$etch_fusion_suite_url      = isset( $etch_fusion_suite_settings['migration_url'] ) ? (string) $etch_fusion_suite_settings['migration_url'] : '';
 ?>
 <section
 	class="efs-card efs-card--source efs-bricks-wizard"

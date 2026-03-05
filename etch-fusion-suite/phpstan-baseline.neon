@@ -13,24 +13,6 @@ parameters:
 			path: includes/acf_field_groups_migrator.php
 
 		-
-			message: '#^Constant ETCH_FUSION_SUITE_DIR not found\.$#'
-			identifier: constant.notFound
-			count: 4
-			path: includes/admin/class-admin-interface.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_URL not found\.$#'
-			identifier: constant.notFound
-			count: 4
-			path: includes/admin/class-admin-interface.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
-			identifier: constant.notFound
-			count: 4
-			path: includes/admin/class-admin-interface.php
-
-		-
 			message: '#^Action callback returns string but should not return anything\.$#'
 			identifier: return.void
 			count: 1
@@ -79,24 +61,6 @@ parameters:
 			path: includes/ajax/handlers/class-migration-ajax.php
 
 		-
-			message: '#^Function efs_is_framer_enabled not found\.$#'
-			identifier: function.notFound
-			count: 5
-			path: includes/ajax/handlers/class-template-ajax.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
-			identifier: constant.notFound
-			count: 1
-			path: includes/api_endpoints.php
-
-		-
-			message: '#^Function efs_is_framer_enabled not found\.$#'
-			identifier: function.notFound
-			count: 6
-			path: includes/api_endpoints.php
-
-		-
 			message: '#^Method Bricks2Etch\\Api\\EFS_API_Endpoints\:\:validate_request_data\(\) has invalid return type Bricks2Etch\\Api\\WP_Error\.$#'
 			identifier: class.notFound
 			count: 1
@@ -122,18 +86,6 @@ parameters:
 
 
 		-
-			message: '#^Function efs_is_framer_enabled not found\.$#'
-			identifier: function.notFound
-			count: 1
-			path: includes/controllers/class-dashboard-controller.php
-
-		-
-			message: '#^Function efs_is_framer_enabled not found\.$#'
-			identifier: function.notFound
-			count: 7
-			path: includes/controllers/class-template-controller.php
-
-		-
 			message: '#^Method Bricks2Etch\\Controllers\\EFS_Template_Controller\:\:get_extraction_progress\(\) should return array\<string, mixed\> but returns WP_Error\.$#'
 			identifier: return.type
 			count: 1
@@ -144,25 +96,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: includes/controllers/class-template-controller.php
-
-		-
-			message: '#^Function etch_fusion_suite_container not found\.$#'
-			identifier: function.notFound
-			count: 1
-			path: includes/gutenberg_generator.php
-
-
-		-
-			message: '#^Function etch_fusion_suite_container not found\.$#'
-			identifier: function.notFound
-			count: 2
-			path: includes/migrators/class-component-migrator.php
-
-		-
-			message: '#^Function etch_fusion_suite_container not found\.$#'
-			identifier: function.notFound
-			count: 1
-			path: includes/migrators/class-migrator-discovery.php
 
 		-
 			message: '#^Call to method log_warning\(\) on an unknown class EFS_Error_Handler\.$#'
@@ -231,12 +164,6 @@ parameters:
 			path: includes/templates/class-etch-template-generator.php
 
 		-
-			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/templates/class-framer-to-etch-converter.php
-
-		-
 			message: '#^Method Bricks2Etch\\Templates\\EFS_Framer_To_Etch_Converter\:\:get_owner_document\(\) has invalid return type Bricks2Etch\\Templates\\DOMDocument\.$#'
 			identifier: class.notFound
 			count: 1
@@ -249,40 +176,10 @@ parameters:
 			path: includes/templates/class-framer-to-etch-converter.php
 
 		-
-			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/templates/class-html-parser.php
-
-		-
-			message: '#^Method Bricks2Etch\\Core\\EFS_Error_Handler\:\:log_error\(\) invoked with 3 parameters, 1\-2 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: includes/templates/class-html-sanitizer.php
-
-		-
 			message: '#^Call to an undefined method Bricks2Etch\\Templates\\EFS_Template_Analyzer\:\:build_hierarchy\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: includes/templates/class-template-analyzer.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_BASENAME not found\.$#'
-			identifier: constant.notFound
-			count: 1
-			path: includes/updater/class-github-updater.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_FILE not found\.$#'
-			identifier: constant.notFound
-			count: 1
-			path: includes/updater/class-github-updater.php
-
-		-
-			message: '#^Constant ETCH_FUSION_SUITE_VERSION not found\.$#'
-			identifier: constant.notFound
-			count: 2
-			path: includes/updater/class-github-updater.php
 
 		-
 			message: '#^Variable \$transient in empty\(\) always exists and is not falsy\.$#'
@@ -313,9 +210,3 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: includes/views/dashboard.php
-
-		-
-			message: '#^Function efs_is_framer_enabled not found\.$#'
-			identifier: function.notFound
-			count: 1
-			path: includes/views/template-extractor.php

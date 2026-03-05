@@ -287,7 +287,7 @@ class EFS_Media_Migrator {
 					'title'       => get_the_title( $attachment_id ),
 					'alt_text'    => get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ),
 					'caption'     => wp_get_attachment_caption( $attachment_id ),
-					'description' => wp_get_attachment_excerpt( $attachment_id ),
+					'description' => (string) get_post_field( 'post_content', $attachment_id ),
 					'file_path'   => get_post_meta( $attachment_id, '_wp_attached_file', true ),
 					'file_url'    => wp_get_attachment_url( $attachment_id ),
 					'mime_type'   => get_post_mime_type( $attachment_id ),

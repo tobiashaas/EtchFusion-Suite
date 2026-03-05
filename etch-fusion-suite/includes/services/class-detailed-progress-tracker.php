@@ -36,7 +36,7 @@ class EFS_Detailed_Progress_Tracker {
 	/** @var array */
 	private $current_item = array();
 
-	/** @var int */
+	/** @var float */
 	private $start_time;
 
 	/**

@@ -14,6 +14,7 @@ use Bricks2Etch\Api\EFS_API_Client;
 use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Core\EFS_Plugin_Detector;
 use Bricks2Etch\Parsers\EFS_Content_Parser;
+use Bricks2Etch\Repositories\EFS_DB_Migration_Persistence;
 use Bricks2Etch\Repositories\Interfaces\Migration_Repository_Interface;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -90,7 +91,7 @@ class EFS_Async_Migration_Runner {
 	private $migration_logger;
 
 	/**
-	 * @var EFS_DB_Migration_Persistence
+	 * @var EFS_DB_Migration_Persistence|null
 	 */
 	private $db_persistence;
 
@@ -112,7 +113,7 @@ class EFS_Async_Migration_Runner {
 	 * @param EFS_Error_Handler              $error_handler
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param EFS_Migration_Logger           $migration_logger
-	 * @param EFS_DB_Migration_Persistence   $db_persistence
+	 * @param EFS_DB_Migration_Persistence|null $db_persistence
 	 * @param EFS_Phase_Timer                $phase_timer
 	 */
 	public function __construct(
@@ -128,7 +129,7 @@ class EFS_Async_Migration_Runner {
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
 		EFS_Migration_Logger $migration_logger,
-		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null,
+		EFS_DB_Migration_Persistence $db_persistence = null,
 		EFS_Phase_Timer $phase_timer = null
 	) {
 		$this->migrator_executor    = $migrator_executor;

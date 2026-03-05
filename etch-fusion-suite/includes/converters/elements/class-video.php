@@ -406,12 +406,10 @@ class EFS_Element_Video extends EFS_Base_Element {
 	}
 
 	/**
-	 * Build HTML5 video attributes.
+	 * Get a human-readable description text for accessibility.
 	 *
 	 * @param array  $settings Bricks settings.
-	 * @param string $width Width value.
-	 * @param string $height Height value.
-	 * @return array<string,string>
+	 * @return string
 	 */
 	private function get_video_description( $settings ) {
 		$fields = array(

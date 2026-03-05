@@ -321,6 +321,89 @@ class EFS_DB_Installer {
 	}
 
 	/**
+	 * Save checkpoint and refresh heartbeat in a best-effort transactional flow.
+	 *
+	 * @param string $migration_id     Migration UID.
+	 * @param array  $checkpoint_data  Checkpoint payload.
+	 * @param int    $expected_version Expected checkpoint version.
+	 * @return int Number of rows updated by checkpoint write (1 on success).
+	 */
+	public static function save_checkpoint_with_heartbeat_transaction( string $migration_id, array $checkpoint_data, int $expected_version = 0 ): int {
+		$rows = self::save_checkpoint_atomic( $migration_id, $checkpoint_data, $expected_version );
+		if ( $rows > 0 ) {
+			self::touch_progress_heartbeat( $migration_id );
+		}
+
+		return (int) $rows;
+	}
+
+	/**
+	 * Persist progress data in options storage for compatibility.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @param array  $progress_data Progress payload.
+	 * @return bool True on success.
+	 */
+	public static function save_progress_data( string $migration_id, array $progress_data ): bool {
+		return update_option( 'efs_progress_data_' . sanitize_key( $migration_id ), $progress_data, false );
+	}
+
+	/**
+	 * Retrieve persisted progress data.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @return array|null
+	 */
+	public static function get_progress_data( string $migration_id ): ?array {
+		$data = get_option( 'efs_progress_data_' . sanitize_key( $migration_id ), null );
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * Persist step state in options storage for compatibility.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @param array  $steps_data Step payload.
+	 * @return bool True on success.
+	 */
+	public static function save_steps_data( string $migration_id, array $steps_data ): bool {
+		return update_option( 'efs_steps_data_' . sanitize_key( $migration_id ), $steps_data, false );
+	}
+
+	/**
+	 * Retrieve persisted step state.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @return array|null
+	 */
+	public static function get_steps_data( string $migration_id ): ?array {
+		$data = get_option( 'efs_steps_data_' . sanitize_key( $migration_id ), null );
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * Persist aggregated migration stats in options storage for compatibility.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @param array  $stats_data Stats payload.
+	 * @return bool True on success.
+	 */
+	public static function save_stats_data( string $migration_id, array $stats_data ): bool {
+		return update_option( 'efs_stats_data_' . sanitize_key( $migration_id ), $stats_data, false );
+	}
+
+	/**
+	 * Retrieve persisted migration stats.
+	 *
+	 * @param string $migration_id Migration UID.
+	 * @return array|null
+	 */
+	public static function get_stats_data( string $migration_id ): ?array {
+		$data = get_option( 'efs_stats_data_' . sanitize_key( $migration_id ), null );
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
 	 * Check if database is properly installed
 	 *
 	 * @return bool True if all required tables exist

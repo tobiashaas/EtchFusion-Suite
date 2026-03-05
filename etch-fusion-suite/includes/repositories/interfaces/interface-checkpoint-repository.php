@@ -34,6 +34,16 @@ interface Checkpoint_Repository_Interface {
 	public function save_checkpoint( array $checkpoint ): bool;
 
 	/**
+	 * Save migration checkpoint before outbound HTTP calls.
+	 *
+	 * Used by batch runners to persist retry-safe state before remote requests.
+	 *
+	 * @param array $checkpoint Checkpoint data.
+	 * @return bool True on success, false on failure.
+	 */
+	public function save_checkpoint_before_http( array $checkpoint ): bool;
+
+	/**
 	 * Delete migration checkpoint.
 	 *
 	 * @return bool True on success, false on failure.
