@@ -106,6 +106,11 @@ class EFS_Migration_Run_Finalizer {
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
+		// Extract media_stats if available (from enhanced logging).
+		$media_stats = isset( $results['media_stats'] ) && is_array( $results['media_stats'] )
+			? $results['media_stats']
+			: array();
+
 		$started_ts = $started_at ? strtotime( $started_at ) : 0;
 		$all_log    = get_option( 'efs_migration_log', array() );
 		$all_log    = is_array( $all_log ) ? $all_log : array();
@@ -185,6 +190,11 @@ class EFS_Migration_Run_Finalizer {
 			'optional_migrator_warnings' => $migrator_warnings,
 		);
 
+		// Add media_stats if available.
+		if ( ! empty( $media_stats ) ) {
+			$record['media_stats'] = $media_stats;
+		}
+
 		$this->migration_runs_repository->save_run( $record );
 
 		return true;
@@ -262,17 +272,41 @@ class EFS_Migration_Run_Finalizer {
 				}
 
 				if ( is_array( $value ) ) {
-					$total    = isset( $value['total'] ) ? (int) $value['total'] : ( isset( $value['items_total'] ) ? (int) $value['items_total'] : 0 );
-					$migrated = isset( $value['migrated'] ) ? (int) $value['migrated'] : ( isset( $value['items_processed'] ) ? (int) $value['items_processed'] : $total );
-				} else {
-					$total    = (int) $value;
-					$migrated = (int) $value;
-				}
+					// Support new enhanced structure (success/failed/skipped).
+					if ( isset( $value['success'] ) || isset( $value['failed'] ) || isset( $value['skipped'] ) ) {
+						$total   = isset( $value['total'] ) ? (int) $value['total'] : 0;
+						$success = isset( $value['success'] ) ? (int) $value['success'] : 0;
+						$failed  = isset( $value['failed'] ) ? (int) $value['failed'] : 0;
+						$skipped = isset( $value['skipped'] ) ? (int) $value['skipped'] : 0;
 
-				$normalized[ $key ] = array(
-					'total'    => max( 0, $total ),
-					'migrated' => max( 0, $migrated ),
-				);
+						$normalized[ $key ] = array(
+							'total'   => max( 0, $total ),
+							'success' => max( 0, $success ),
+							'failed'  => max( 0, $failed ),
+							'skipped' => max( 0, $skipped ),
+						);
+					} else {
+						// Legacy structure (total/migrated or total/items_processed).
+						$total    = isset( $value['total'] ) ? (int) $value['total'] : ( isset( $value['items_total'] ) ? (int) $value['items_total'] : 0 );
+						$migrated = isset( $value['migrated'] ) ? (int) $value['migrated'] : ( isset( $value['items_processed'] ) ? (int) $value['items_processed'] : $total );
+
+						$normalized[ $key ] = array(
+							'total'   => max( 0, $total ),
+							'success' => max( 0, $migrated ),
+							'failed'  => 0,
+							'skipped' => 0,
+						);
+					}
+				} else {
+					// Scalar value (legacy).
+					$total              = (int) $value;
+					$normalized[ $key ] = array(
+						'total'   => max( 0, $total ),
+						'success' => max( 0, $total ),
+						'failed'  => 0,
+						'skipped' => 0,
+					);
+				}
 			}
 
 			if ( ! empty( $normalized ) ) {

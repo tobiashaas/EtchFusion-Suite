@@ -127,6 +127,18 @@ class EFS_Batch_Phase_Runner {
 		$attempts   = isset( $checkpoint[ $attempts_key ] ) && is_array( $checkpoint[ $attempts_key ] ) ? $checkpoint[ $attempts_key ] : array();
 		$failed_ids = isset( $checkpoint[ $failed_ids_key ] ) ? (array) $checkpoint[ $failed_ids_key ] : array();
 
+		// Track per-post-type stats (success, failed, skipped). Only for posts phase.
+		$post_type_stats_key = 'posts' === $phase ? 'post_type_stats' : null;
+		$post_type_stats     = ( $post_type_stats_key && isset( $checkpoint[ $post_type_stats_key ] ) && is_array( $checkpoint[ $post_type_stats_key ] ) )
+			? $checkpoint[ $post_type_stats_key ]
+			: array();
+
+		// Track media type stats (images, videos, documents, etc). Only for media phase.
+		$media_type_stats_key = 'media' === $phase ? 'media_type_stats' : null;
+		$media_type_stats     = ( $media_type_stats_key && isset( $checkpoint[ $media_type_stats_key ] ) && is_array( $checkpoint[ $media_type_stats_key ] ) )
+			? $checkpoint[ $media_type_stats_key ]
+			: array();
+
 		// Batch size: honor caller override for both phases.
 		$batch_size = isset( $batch['batch_size'] ) ? max( 1, (int) $batch['batch_size'] ) : $active_handler->get_batch_size();
 
@@ -187,6 +199,10 @@ class EFS_Batch_Phase_Runner {
 					$result = new \WP_Error( 'process_item_false', __( 'Item processing returned false.', 'etch-fusion-suite' ) );
 				}
 
+				// Get post for tracking post_type stats.
+				$wp_post   = get_post( $id );
+				$post_type = ( $wp_post instanceof \WP_Post ) ? sanitize_key( (string) $wp_post->post_type ) : '';
+
 				if ( is_wp_error( $result ) ) {
 					if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
 						$this->migration_logger->log(
@@ -209,6 +225,18 @@ class EFS_Batch_Phase_Runner {
 							)
 						);
 					} else {
+						// Track failed post by post type.
+						if ( $post_type && 'posts' === $phase ) {
+							if ( ! isset( $post_type_stats[ $post_type ] ) ) {
+								$post_type_stats[ $post_type ] = array(
+									'success' => 0,
+									'failed'  => 0,
+									'skipped' => 0,
+								);
+							}
+							++$post_type_stats[ $post_type ]['failed'];
+						}
+
 						$this->migration_logger->log(
 							$migration_id,
 							'warning',
@@ -242,6 +270,19 @@ class EFS_Batch_Phase_Runner {
 				}
 
 				++$processed_count;
+
+				// Track successful post by post type.
+				if ( $post_type && 'posts' === $phase ) {
+					if ( ! isset( $post_type_stats[ $post_type ] ) ) {
+						$post_type_stats[ $post_type ] = array(
+							'success' => 0,
+							'failed'  => 0,
+							'skipped' => 0,
+						);
+					}
+					++$post_type_stats[ $post_type ]['success'];
+				}
+
 				// Idempotency: record this ID as successfully processed so it is skipped if it
 				// reappears in remaining_post_ids due to a lost HTTP response on retry.
 				$processed_ids_set[ (string) $id ] = true;
@@ -282,6 +323,24 @@ class EFS_Batch_Phase_Runner {
 					$result = new \WP_Error( 'process_item_false', __( 'Item processing returned false.', 'etch-fusion-suite' ) );
 				}
 
+				// For media phase, determine MIME type category (image, video, document).
+				$media_type_category = 'other';
+				if ( 'media' === $phase ) {
+					$attachment = get_post( $id );
+					if ( $attachment instanceof \WP_Post ) {
+						$mime_type = get_post_mime_type( $id );
+						if ( $mime_type ) {
+							$mime_parts = explode( '/', (string) $mime_type );
+							if ( ! empty( $mime_parts[0] ) ) {
+								$mime_category = sanitize_key( (string) $mime_parts[0] );
+								if ( in_array( $mime_category, array( 'image', 'video', 'audio' ), true ) ) {
+									$media_type_category = $mime_category;
+								}
+							}
+						}
+					}
+				}
+
 				if ( is_wp_error( $result ) ) {
 					if ( $attempts[ $id_key ] < $active_handler->get_max_retries() ) {
 						$this->migration_logger->log(
@@ -306,6 +365,19 @@ class EFS_Batch_Phase_Runner {
 							);
 						}
 					} else {
+						// Track failed media by type.
+						if ( 'media' === $phase ) {
+							if ( ! isset( $media_type_stats[ $media_type_category ] ) ) {
+								$media_type_stats[ $media_type_category ] = array(
+									'total'   => 0,
+									'success' => 0,
+									'failed'  => 0,
+									'skipped' => 0,
+								);
+							}
+							++$media_type_stats[ $media_type_category ]['failed'];
+						}
+
 						$this->migration_logger->log(
 							$migration_id,
 							'warning',
@@ -351,6 +423,20 @@ class EFS_Batch_Phase_Runner {
 				}
 
 				++$processed_count;
+
+				// Track successful media by type.
+				if ( 'media' === $phase ) {
+					if ( ! isset( $media_type_stats[ $media_type_category ] ) ) {
+						$media_type_stats[ $media_type_category ] = array(
+							'total'   => 0,
+							'success' => 0,
+							'failed'  => 0,
+							'skipped' => 0,
+						);
+					}
+					++$media_type_stats[ $media_type_category ]['success'];
+				}
+
 				// Idempotency: record this ID as successfully processed so it is skipped if it
 				// reappears in remaining_media_ids due to a lost HTTP response on retry.
 				$processed_ids_set[ (string) $id ] = true;
@@ -374,6 +460,17 @@ class EFS_Batch_Phase_Runner {
 		$checkpoint[ $attempts_key ]      = $attempts;
 		$checkpoint[ $failed_ids_key ]    = $failed_ids;
 		$checkpoint[ $processed_ids_key ] = $processed_ids_set;
+
+		// Persist per-post-type stats for posts phase.
+		if ( $post_type_stats_key && ! empty( $post_type_stats ) ) {
+			$checkpoint[ $post_type_stats_key ] = $post_type_stats;
+		}
+
+		// Persist media type stats for media phase.
+		if ( $media_type_stats_key && ! empty( $media_type_stats ) ) {
+			$checkpoint[ $media_type_stats_key ] = $media_type_stats;
+		}
+
 		// Clear the HTTP pending flag since we've completed the batch processing.
 		if ( isset( $checkpoint['_http_pending'] ) ) {
 			unset( $checkpoint['_http_pending'] );
@@ -476,24 +573,49 @@ class EFS_Batch_Phase_Runner {
 			$checkpoint              = $this->checkpoint_repository->get_checkpoint();
 			$batch_migrator_warnings = isset( $checkpoint['migrator_warnings'] ) ? $checkpoint['migrator_warnings'] : array();
 
-			// Build counts_by_post_type from totals stored in the checkpoint when it was created.
-			$totals_by_type      = isset( $checkpoint['counts_by_post_type_totals'] ) && is_array( $checkpoint['counts_by_post_type_totals'] )
+			// Build counts_by_post_type from totals and per-post-type stats collected during processing.
+			$totals_by_type        = isset( $checkpoint['counts_by_post_type_totals'] ) && is_array( $checkpoint['counts_by_post_type_totals'] )
 				? $checkpoint['counts_by_post_type_totals']
 				: array();
-			$counts_by_post_type = array();
+			$post_type_stats_final = isset( $checkpoint['post_type_stats'] ) && is_array( $checkpoint['post_type_stats'] )
+				? $checkpoint['post_type_stats']
+				: array();
+			$counts_by_post_type   = array();
 			if ( ! empty( $totals_by_type ) ) {
 				$total_selected      = array_sum( $totals_by_type );
 				$remaining_to_assign = min( $processed_count, $total_selected );
 				foreach ( $totals_by_type as $post_type => $type_total ) {
-					$type_migrated                     = min( (int) $type_total, (int) $remaining_to_assign );
-					$remaining_to_assign              -= $type_migrated;
-					$counts_by_post_type[ $post_type ] = array(
-						'total'    => max( 0, (int) $type_total ),
-						'migrated' => max( 0, (int) $type_migrated ),
-					);
+					$type_total_int       = (int) $type_total;
+					$type_migrated        = min( $type_total_int, (int) $remaining_to_assign );
+					$remaining_to_assign -= $type_migrated;
+
+					// Get per-post-type stats from checkpoint, or calculate from totals.
+					if ( isset( $post_type_stats_final[ $post_type ] ) && is_array( $post_type_stats_final[ $post_type ] ) ) {
+						$counts_by_post_type[ $post_type ] = array(
+							'total'   => max( 0, $type_total_int ),
+							'success' => isset( $post_type_stats_final[ $post_type ]['success'] ) ? (int) $post_type_stats_final[ $post_type ]['success'] : 0,
+							'failed'  => isset( $post_type_stats_final[ $post_type ]['failed'] ) ? (int) $post_type_stats_final[ $post_type ]['failed'] : 0,
+							'skipped' => isset( $post_type_stats_final[ $post_type ]['skipped'] ) ? (int) $post_type_stats_final[ $post_type ]['skipped'] : 0,
+						);
+					} else {
+						$counts_by_post_type[ $post_type ] = array(
+							'total'   => max( 0, $type_total_int ),
+							'success' => max( 0, $type_migrated ),
+							'failed'  => 0,
+							'skipped' => 0,
+						);
+					}
 				}
 			}
 			$posts_result['counts_by_post_type'] = $counts_by_post_type;
+
+			// Add media stats if available.
+			$media_type_stats_final = isset( $checkpoint['media_type_stats'] ) && is_array( $checkpoint['media_type_stats'] )
+				? $checkpoint['media_type_stats']
+				: array();
+			if ( ! empty( $media_type_stats_final ) ) {
+				$posts_result['media_stats'] = $media_type_stats_final;
+			}
 
 			$this->run_finalizer->finalize_migration( $posts_result, $batch_migrator_warnings );
 

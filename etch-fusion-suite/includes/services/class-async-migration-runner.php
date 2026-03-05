@@ -306,6 +306,62 @@ class EFS_Async_Migration_Runner {
 			$phase = ( $include_media && ! empty( $media_ids ) ) ? 'media' : 'posts';
 			$this->migration_logger->log( $migration_id, 'info', 'Post IDs collected: ' . $total_count );
 
+			// Initialize post_type_stats with structure for each post type.
+			$post_type_stats = array();
+			foreach ( $counts_by_post_type_totals as $post_type_key => $_ ) {
+				$post_type_stats[ $post_type_key ] = array(
+					'success' => 0,
+					'failed'  => 0,
+					'skipped' => 0,
+				);
+			}
+
+			// Initialize media_type_stats for each media type category.
+			$media_type_stats = array(
+				'image' => array(
+					'total'   => 0,
+					'success' => 0,
+					'failed'  => 0,
+					'skipped' => 0,
+				),
+				'video' => array(
+					'total'   => 0,
+					'success' => 0,
+					'failed'  => 0,
+					'skipped' => 0,
+				),
+				'audio' => array(
+					'total'   => 0,
+					'success' => 0,
+					'failed'  => 0,
+					'skipped' => 0,
+				),
+				'other' => array(
+					'total'   => 0,
+					'success' => 0,
+					'failed'  => 0,
+					'skipped' => 0,
+				),
+			);
+
+			// Populate media_type_stats totals by analyzing each media attachment's MIME type.
+			foreach ( $media_ids as $media_id ) {
+				$mime_type = get_post_mime_type( $media_id );
+				if ( $mime_type ) {
+					$mime_parts = explode( '/', (string) $mime_type );
+					if ( ! empty( $mime_parts[0] ) ) {
+						$mime_category = sanitize_key( (string) $mime_parts[0] );
+						if ( in_array( $mime_category, array( 'image', 'video', 'audio' ), true ) ) {
+							++$media_type_stats[ $mime_category ]['total'];
+						} else {
+							++$media_type_stats['other']['total'];
+						}
+					}
+				} else {
+					++$media_type_stats['other']['total'];
+				}
+			}
+
 			$this->migration_repository->save_checkpoint(
 				array(
 					'phase'                      => $phase,
@@ -322,6 +378,8 @@ class EFS_Async_Migration_Runner {
 					'current_item_title'         => '',
 					'migrator_warnings'          => $async_migrator_warnings,
 					'counts_by_post_type_totals' => $counts_by_post_type_totals,
+					'post_type_stats'            => $post_type_stats,
+					'media_type_stats'           => $media_type_stats,
 				)
 			);
 

@@ -1,0 +1,19 @@
+
+> etch-fusion-suite@1.0.0 test:unit
+> wp-env run cli bash -c "cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit WP_CORE_DIR=/tmp/wordpress php vendor/bin/phpunit -c phpunit.xml.dist --testsuite unit"
+
+i Starting 'bash -c cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit WP_CORE_DIR=/tmp/wordpress php vendor/bin/phpunit -c phpunit.xml.dist --testsuite unit' on the cli container. 
+
+[05-Mar-2026 21:37:29 UTC] PHP Warning:  Constant WP_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 234
+[05-Mar-2026 21:37:29 UTC] PHP Warning:  Constant WP_MAX_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 235
+
+Warning: Constant WP_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 234
+
+Warning: Constant WP_MAX_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 235
+Installing...
+Running as single site... To run multisite, use -c tests/phpunit/multisite.xml
+Not running ajax tests. To execute these, use --group ajax.
+Not running ms-files tests. To execute these, use --group ms-files.
+Not running external-http tests. To execute these, use --group external-http.
+├ù Command failed with exit code 255
+Command failed with exit code 255
