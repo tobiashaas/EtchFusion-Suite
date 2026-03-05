@@ -808,12 +808,7 @@ public function get_data(): array { ... }  // spezifisch
   - DB Transactions: nur für `wp_efs_*`-Tabellen umsetzbar (10j)
   - Migrations-Logging: Erweiterungen geplant (9)
 
-- **Nicht implementiert (❌), kritisch vor Release:**
-  - Idempotenz-Schutz (10i) — Duplikate bei verlorener HTTP-Response
-  - Checkpoint-Validator (10g) — Silent Failures verhindern
-  - Atomarer Heartbeat (10h) — direktes `UPDATE` statt Read-Modify-Write
-  - `get_stale_migrations()` verdrahten (10k) — existiert, wird nicht genutzt
-  - DB-Lock in Migration-Row (10b) — ersetzt fragiles wp_options-Lock
+- **Alle kritischen Punkte implementiert ✅** (10b, 10g, 10h, 10i, 10j, 10k — alle DONE 2026-03-05)
 
 - **Nicht implementiert, lower priority:**
   - Pagination / unbegrenzte Queries (2) — niedrige Priorität

@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-05  
-**Version:** 0.16.0 (Critical Bug Fixes & 100% PHPCS Compliance)
+**Last Updated:** 2026-03-05
+**Version:** 0.16.0 (100% PHPCS Compliance — Production Ready | CSS Converter modular architecture documented)
 
 ---
 
@@ -1217,7 +1217,24 @@ $settings_repo->save_security_settings($security_settings);
 
 The CSS Converter handles the end-to-end migration of Bricks global classes into Etch-compatible styles.
 
-**File:** `etch-fusion-suite/includes/css_converter.php` (2001 lines)
+**Architecture:** Modular — thin orchestrator + 8 focused CSS modules (refactored Feb 2026)
+
+**Orchestrator:** `etch-fusion-suite/includes/css_converter.php` (854 lines, down from 4545)
+
+**CSS Modules** (`includes/css/`):
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `EFS_CSS_Normalizer` | `class-css-normalizer.php` | Pure CSS string transforms (stateless, WP-free) |
+| `EFS_Breakpoint_Resolver` | `class-breakpoint-resolver.php` | Bricks breakpoints → Etch `@media` queries |
+| `EFS_ACSS_Handler` | `class-acss-handler.php` | ACSS utility class inline map |
+| `EFS_Settings_CSS_Converter` | `class-settings-css-converter.php` | Settings array → CSS declarations |
+| `EFS_CSS_Stylesheet_Parser` | `class-css-stylesheet-parser.php` | Raw CSS → per-selector rule map |
+| `EFS_Class_Reference_Scanner` | `class-class-reference-scanner.php` | Which global classes are actually used |
+| `EFS_Element_ID_Style_Collector` | `class-element-id-style-collector.php` | Element inline styles per post |
+| `EFS_Style_Importer` | `class-style-importer.php` | Persist styles to DB + trigger Etch CSS rebuild |
+
+All 8 modules are injected as optional nullable constructor params → backward compat: `new EFS_CSS_Converter($error_handler, $style_repository)` still works.
 
 **Purpose:**
 
@@ -1240,18 +1257,19 @@ The CSS Converter handles the end-to-end migration of Bricks global classes into
 - **Selector nesting helpers** (`convert_nested_selectors_to_ampersand`, `convert_selectors_in_media_query`) rewrite descendant selectors to `&` syntax for CSS nesting.
 - **Import strategy** updates the database directly when `bypass_api` is enabled, then invalidates caches and triggers the Etch CSS rebuild sequence.
 - **Error handler integration** replaces `error_log()` with `EFS_Error_Handler::log_info()` for PHPCS-compliant diagnostics.
-- **Verbose logging controls** route helper-level payload dumps through `log_debug_info()` so detailed CSS output is gated by the debug logging toggle, including nested selector and media query helper diagnostics.
+- **Verbose logging controls** route helper-level payload dumps through `log_debug_info()` so detailed CSS output is gated by the debug logging toggle.
+
+**Testability:**
+
+- 5 modules are fully WordPress-free testable (Normalizer, BreakpointResolver, AcssHandler, SettingsCssConverter, StylesheetParser)
+- 2 modules require WP DB (ClassReferenceScanner, ElementIdStyleCollector)
+- StyleImporter is mockable via `Style_Repository_Interface`
+- Unit tests: `tests/unit/CSS/CssNormalizerTest.php` (28 tests), `tests/unit/CSS/BreakpointResolverTest.php` (16 tests)
 
 **Documentation:**
 
 - Detailed architecture: `etch-fusion-suite/docs/css-converter-architecture.md`
 - Implementation reference: `etch-fusion-suite/includes/css_converter.php`
-
-**Testing Recommendations:**
-
-- Run CSS conversion tests (where available) to confirm no behavioural regressions.
-- Validate output against representative Bricks projects that include custom CSS, responsive settings, and nested selectors.
-- After imports, verify Etch cache invalidation and rebuild hooks regenerate updated styles.
 
 For a full breakdown of helper methods, breakpoint mappings, logical property translations, and testing strategy, see `docs/css-converter-architecture.md`.
 

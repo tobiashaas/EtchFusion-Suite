@@ -77,6 +77,19 @@ class CssNormalizerTest extends WP_UnitTestCase {
 		$this->assertSame( $input, $this->normalizer->normalize_invalid_grid_placement( $input ) );
 	}
 
+	/** span N / <positive-integer> is also invalid — span keyword must be stripped. */
+	public function test_normalize_grid_span_slash_positive_line(): void {
+		$input    = 'grid-column: span 2 / 5;';
+		$expected = 'grid-column: 2 / 5;';
+		$this->assertSame( $expected, $this->normalizer->normalize_invalid_grid_placement( $input ) );
+	}
+
+	/** Valid "A / span N" (line-based start, span-based end) must not be changed. */
+	public function test_normalize_grid_line_slash_span_unchanged(): void {
+		$input = 'grid-column: 1 / span 2;';
+		$this->assertSame( $input, $this->normalizer->normalize_invalid_grid_placement( $input ) );
+	}
+
 	// =========================================================================
 	// HSL color token normalisation
 	// =========================================================================

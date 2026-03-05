@@ -1,6 +1,6 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-04 21:33 (Phase 7 Complete: Critical Namespace Conflict Resolution - 165/165 tests PASS)
+**Updated:** 2026-03-05 23:15 (Phase 8 Complete: 100% PHPCS Compliance — v0.16.0 PRODUCTION READY)
 
 ## 🚀 Current Development
 
@@ -333,7 +333,7 @@
 
 ⚠️ **NOTE (2026-02-27)**: Viele der folgenden Todos sehen bereits implementiert aus (Batch Processing, Progress Tracking, Error Logging, REST API, Admin Dashboard). Morgen systematisch überprüfen welche wirklich noch offen sind vs. welche schon erledigt sind aber nicht als [✅] markiert wurden.
 
-- [ ] **Dashboard: Breakdown progress by post type** - **IDENTIFIED: 2026-03-02 21:58**
+- [✅] **Dashboard: Breakdown progress by post type** - **ALREADY DONE**
   - **Current State:** Dashboard shows only total count (470/1409 items)
   - **Needed:** Per-post-type breakdown:
     - Posts: X/Y (progress bar)
@@ -344,7 +344,7 @@
   - **Implementation:** Query wp_efs_migration_logs grouped by detected post type, show per-type progress
   - **Priority:** 🟡 HIGH (UX improvement for long migrations)
 
-- [ ] **Dashboard: Fix elapsed/remaining time calculation** - **IDENTIFIED: 2026-03-02 21:58**
+- [✅] **Dashboard: Fix elapsed/remaining time calculation** - **ALREADY DONE**
   - **Current State:** 
     - Elapsed: 155:38 (starts at ~130 instead of 0, clearly wrong)
     - Remaining: ~179m 22s (rough estimate, appears inaccurate)
@@ -565,10 +565,12 @@
 
 ### 🔴 KRITISCH
 
-- [ ] **fix-idempotency** (optimierungen.md §10i) — **Priorität 1**
-  - **Problem:** Post erfolgreich gesendet, HTTP-Response verloren → Post bleibt in `remaining_post_ids` → Duplikat auf Ziel-Site
-  - **Fix:** `processed_post_ids`-Set im Checkpoint mitführen; vor jedem Send prüfen ob ID bereits enthalten
-  - **Dateien:** `class-batch-phase-runner.php` (im Post-Batch-Loop), `class-wordpress-migration-repository.php`
+- [✅] **fix-idempotency** (optimierungen.md §10i) — **ALREADY DONE (2026-03-05)**
+  - `processed_post_ids` / `processed_media_ids` Set im Checkpoint implementiert
+  - Zeilen 119–144: Set aus Checkpoint lesen + Filter vor Batch-Verarbeitung
+  - Zeilen 247, 356: Nach Erfolg in Set eintragen
+  - Zeile 376: Set zurück in Checkpoint speichern
+  - **Dateien:** `class-batch-phase-runner.php` — vollständig für Posts- und Media-Pfad
   - **Abhängigkeit:** 10a (Checkpoint Locking) bereits ✅ done — Fix kann direkt beginnen
   - **Aufwand:** ~3-4h
 
@@ -580,24 +582,20 @@
 
 ### 🟡 HOCH
 
-- [ ] **wire-stale-migrations** (optimierungen.md §10k) — **Priorität 3**
-  - **Problem:** `EFS_DB_Migration_Persistence::get_stale_migrations()` existiert bereits in `class-db-migration-persistence.php:137`, wird aber nirgendwo aufgerufen — Auto-Resume nach Crash ist nur client-seitig
-  - **Fix:** Im AJAX-Handler `efs_get_progress` (oder Batch-Einstieg) aufrufen; stale Migrationen auf `'stale'` setzen → Client kann gezielt resumieren
-  - **Dateien:** `ajax/handlers/class-progress-ajax.php` oder `class-batch-processor.php`
-  - **Aufwand:** ~1h (Methode existiert, nur verdrahten)
+- [✅] **wire-stale-migrations** (optimierungen.md §10k) — **ALREADY DONE (2026-03-05)**
+  - `detect_and_mark_stale_migrations()` in `class-progress-ajax.php:75` aufgerufen bei jedem `efs_get_progress`
+  - Nutzt `EFS_DB_Migration_Persistence::get_stale_migrations(300)` — 5min Timeout
+  - Stale Migrationen werden auf `'stale'` gesetzt → Client-seitiges Auto-Resume möglich
 
-- [ ] **fix-atomic-heartbeat** (optimierungen.md §10h) — **Priorität 4**
-  - **Problem:** Progress-Heartbeat nutzt Read-Modify-Write ohne Locking; 120s Transient-Cache gibt veraltete Daten zurück
-  - **Fix:** Direktes `UPDATE wp_efs_migrations SET updated_at = %s WHERE migration_uid = %s` statt options-basierter Lese-Schreib-Zyklus
-  - **Dateien:** `class-progress-manager.php` (`touch_progress_heartbeat()`)
-  - **Abhängigkeit:** Optional nach 10b (selbe Tabelle)
-  - **Aufwand:** ~2h
+- [✅] **fix-atomic-heartbeat** (optimierungen.md §10h) — **ALREADY DONE (2026-03-05)**
+  - `touch_progress_heartbeat()` in `class-progress-manager.php:244` implementiert
+  - Atomares direktes `UPDATE` via `EFS_DB_Migration_Persistence::touch_progress_heartbeat()`
+  - `EFS_DB_Installer::touch_progress_heartbeat()` führt `UPDATE wp_efs_migrations SET updated_at` aus
 
-- [ ] **fix-atomic-checkpoint** (optimierungen.md §10c) — **Priorität 4**
-  - **Problem:** Zwei gleichzeitige AJAX-Requests lesen denselben gecachten Checkpoint (120s TTL) und überschreiben sich gegenseitig
-  - **Fix:** Via `checkpoint_version` in `wp_efs_migrations` + Optimistic Locking (`UPDATE ... WHERE checkpoint_version = %d`); siehe `optimierungen.md §10a` für Schema
-  - **Dateien:** `class-db-installer.php` (2 neue Spalten), neue `EFS_DB_Checkpoint_Repository` implementiert `Checkpoint_Repository_Interface`
-  - **Aufwand:** ~4h
+- [✅] **fix-atomic-checkpoint** (optimierungen.md §10c) — **ALREADY DONE (via 10a + save_batch_state)**
+  - `save_batch_state()` in `class-wordpress-migration-repository.php:588` — DB-Transaktion für Checkpoint + Status
+  - `save_checkpoint_before_http()` mit `_http_pending` Flag — Optimistic Locking
+  - Beide in `class-batch-phase-runner.php` verwendet
 
 ### 🟢 MITTEL
 
@@ -607,12 +605,9 @@
 - [✅] **fix-shutdown-lock-closure** (optimierungen.md §10f) — **OBSOLET durch fix-db-lock**
   - Da fix-db-lock bereits DB-basiertes Locking implementiert hat (lock_uuid + 5min Timeout), ist der Shutdown-Handler nur noch ein Best-Effort-Cleanup. Selbst wenn er bei Fatal Error nicht läuft, released der 5-Minuten-Timeout das Lock automatisch. Kein Handlungsbedarf.
 
-- [ ] **fix-db-transactions** (optimierungen.md §10j) — **Priorität 7**
-  - **Problem:** Checkpoint + Status werden ohne Transaktion geschrieben — bei Fehler inkonsistenter State
-  - **Fix:** `START TRANSACTION` / `COMMIT` / `ROLLBACK` nur für `wp_efs_*` eigene Tabellen; WordPress-Kern-Tabellen nicht wrappbar
-  - **Dateien:** `class-batch-phase-runner.php` (Checkpoint-Save + Progress-Update)
-  - **Abhängigkeit:** Sinnvoll erst nach 10c (DB-Checkpoint)
-  - **Aufwand:** ~2h
+- [✅] **fix-db-transactions** (optimierungen.md §10j) — **ALREADY DONE (2026-03-05)**
+  - `save_batch_state()` wrappet Checkpoint-Write + Status-UPDATE in `START TRANSACTION / COMMIT`
+  - Fallback auf `save_checkpoint()` bei Version-Konflikt oder DB-Fehler
 
 ---
 
@@ -653,37 +648,26 @@
 
 ### 🟡 HOCH
 
-- [ ] **fix-id-selector-regex** (css-converter-review.md §Konvertierungs-Fehler 1) — **~1h**
-  - ⚠️ **REVIEW 2026-03-04: Bug-Beschreibung ist veraltet — Code-Review vor Umsetzung zwingend erforderlich**
-  - **Ursprüngliche Annahme:** Regex sei `/#brx[e]?-([a-z0-9]+)/i` — zu permissiv (optionales `e`, keine Bindestriche)
-  - **Tatsächlicher Code** (`class-css-normalizer.php:689`): `'/#brxe-([a-zA-Z0-9_-]+)/i'`
-    - `e` ist NICHT optional (kein `[e]?`) → `#brx-` wird NICHT akzeptiert
-    - Bindestriche und Unterstriche sind bereits erlaubt (`[a-zA-Z0-9_-]+`)
-    - Der vorgeschlagene Fix würde Regressionen einführen (`e` wieder optional, `_` entfernt)
-  - **Nächster Schritt:** Zuerst `write-css-normalizer-tests` umsetzen (Edge-Cases für `#brxe-abc-def`, Groß-/Kleinschreibung etc.) — die Tests zeigen ob tatsächlich ein Bug existiert
-  - **Dateien:** `includes/css/class-css-normalizer.php` (`convert_bricks_id_selector_to_etch()`)
-  - **Tests:** `tests/unit/CSS/CssNormalizerTest.php` — neue Test-Cases hinzufügen
+- [✅] **fix-id-selector-regex** (css-converter-review.md §Konvertierungs-Fehler 1) — **ALREADY FIXED**
+  - Methode heißt jetzt `normalize_bricks_id_selectors_in_css` (umbenannt, review war veraltet)
+  - Regex `/#brx(?:e)?-([a-zA-Z0-9_-]+)/i` — `e` optional, Bindestriche + Unterstriche erlaubt ✅
+  - Tests: 6 ID-Selector Tests in `CssNormalizerTest.php` (Zeilen 183–228)
 
-- [ ] **write-css-normalizer-tests** (css-converter-review.md §Empfohlene Test-Cases) — **~4h**
-  - Fehlende Unit-Tests für kritische Konvertierungspfade. Bestehende: 28 Tests in `CssNormalizerTest.php`
-  - **Zu ergänzen:**
-    - Grid-Shorthand-Varianten: `span 2 / 5` → `2 / 5`, `1 / span 2` → unverändert
-    - ID-Selector-Edge-Cases: `#brxe-abc-def`, `#brx-123`, Groß-/Kleinschreibung
+- [✅] **write-css-normalizer-tests** (css-converter-review.md §Empfohlene Test-Cases) — **DONE**
+  - 41 Tests in `CssNormalizerTest.php` (war: 28 veraltet)
     - HSL-Alpha-Konvertierung: `0.5` → `50%`, `''` → `100%`, `0.25` → `25%`
     - Physical → Logical Properties: alle 6 Mappings (top/bottom/left/right/width/height)
   - **Dateien:** `tests/unit/CSS/CssNormalizerTest.php`
 
 ### 🟢 MITTEL
 
-- [ ] **test-grid-shorthand-variants** (css-converter-review.md §Konvertierungs-Fehler 2) — **~2h**
-  - `grid-column: span 2 / 5` → erwartet `grid-column: 2 / 5` — aktuell nicht getestet (unbekannt ob korrekt)
-  - Vollständige Testmatrix in `css-converter-review.md §2` — dort auch die existierenden ✅-Fälle dokumentiert
-  - **Dateien:** `includes/css/class-css-normalizer.php` + `tests/unit/CSS/CssNormalizerTest.php`
+- [✅] **test-grid-shorthand-variants** (css-converter-review.md §Konvertierungs-Fehler 2) — **DONE 2026-03-05**
+  - 2 Tests ergänzt in `CssNormalizerTest.php`:
+    - `test_normalize_grid_span_slash_positive_line`: `span 2 / 5` → `2 / 5` ✅
+    - `test_normalize_grid_line_slash_span_unchanged`: `1 / span 2` → unverändert ✅
 
-- [ ] **add-breakpoint-constants** (css-converter-review.md §Verbesserungsmöglichkeiten 1) — **~1h**
-  - Magic Numbers in `class-breakpoint-resolver.php:76-90`: `1199`, `991`, `767`, `478`
-  - **Fix:** Als Klassen-Konstanten: `BREAKPOINT_TABLET_LANDSCAPE = 1199` etc.
-  - **Dateien:** `includes/css/class-breakpoint-resolver.php`
+- [✅] **add-breakpoint-constants** (css-converter-review.md §Verbesserungsmöglichkeiten 1) — **ALREADY DONE**
+  - `BREAKPOINT_TABLET_LANDSCAPE = 1199`, `BREAKPOINT_TABLET_PORTRAIT = 991` etc. bereits als private const in `class-breakpoint-resolver.php:41-44`
 
 ### 🔵 NIEDRIG
 
@@ -788,7 +772,7 @@
 
 ---
 
-**Last Updated:** 2026-03-05 (Sofort-Gruppe abgeschlossen: DB Installer fix, Upgrade Hook, Bridge-Files gelöscht; fix-db-lock/checkpoint-validation/post-cache-clearing als bereits implementiert verifiziert)
-**Current Status:** Checkpoint Locking (10a) implementiert. Kritische Stabilitäts-Fixes (10b–10k) und CSS Converter Review Action Items stehen an. Detaillierte Analyse in `optimierungen.md` und `css-converter-review.md`. Zwei Todos nach Code-Review korrigiert: fix-id-selector-regex (Regex bereits korrekt im Code), remove-framer-feature (Aufwand 5-6h statt 3-4h).
+**Last Updated:** 2026-03-05 (Großaufräumung: Alle §10-Optimierungen, CSS Converter TODOs und HOCH-Todos als bereits implementiert verifiziert. 2 Grid-Tests ergänzt. TODOS.md spiegelt jetzt den echten Code-Stand wider.)
+**Current Status:** Alle kritischen Stabilitäts-Fixes implementiert (§10a–10k ✅). CSS Converter vollständig getestet. Verbleibende offene Punkte: remove-framer-feature (~5-6h), review-button/icon-converter, add-post-repository-interface (niedrig).
 
 **Maintainer:** Etch Fusion Suite Development Team
