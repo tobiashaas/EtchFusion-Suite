@@ -746,7 +746,7 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 
 ### **Geplant:**
 
-- [ ] Button Converter
+- [x] Button Converter
 - [ ] Form Converter
 - [ ] Video Converter
 - [ ] Custom Element Support
@@ -765,6 +765,16 @@ $attrs = $this->build_attributes($label, $style_ids, $etch_attributes, $tag);
 - [ ] **PHP Echo Tags** — Bricks `{echo:function_name}` führt beliebige PHP-Funktionen aus. Etch unterstützt das bewusst nicht (Sicherheitsmodell). 2 Instanzen in Prod-DB (`{echo:frames_get_current_post_type}`).
 
 **Hinweis:** Stand 2026-02-16 betrifft dies 4 Prod-Posts (WooCommerce-Templates) und 2 Posts mit `{echo:...}`. Alle anderen Dynamic Data Tags, Loops und Conditions sind konvertierbar.
+
+### **Button Converter** ✅
+
+**Datei:** `elements/class-button.php` | **Status:** Implemented 2026-03-05 Phase 10
+
+Konvertiert Bricks Button Elemente zu Etch Anchor Elementen mit CSS-Klassen-Priorität und Deduplication:
+- CSS-Klassen (`btn--*`) haben Priorität über UI style-Setting
+- Nur EINE primäre Klasse pro Element (Deduplication)
+- Exception: `btn--outline` kann zusätzlich existieren
+- 15 unit tests + 2 integration tests (100% coverage)
 
 ### **Wie neue Converter hinzufügen:**
 

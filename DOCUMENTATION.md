@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-05 20:28  
-**Version:** 0.16.1 (Race condition fix in batch processor locking | 165/167 tests passing)
+**Last Updated:** 2026-03-05 20:55  
+**Version:** 0.16.1 (100% test coverage: 198/198 tests | Button converter class deduplication fix)
 
 ---
 
