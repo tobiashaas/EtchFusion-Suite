@@ -352,4 +352,99 @@ class ButtonConverterTest extends WP_UnitTestCase {
 		$this->assertNotNull( $result );
 		$this->assertStringContainsString( 'btn--custom', $result );
 	}
+
+	public function test_button_with_nested_icon(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text' => 'Icon Button',
+				'link' => 'https://example.com',
+			),
+		);
+		$children  = array(
+			array(
+				'name'     => 'icon',
+				'settings' => array(
+					'icon' => 'fa-solid fa-arrow-right',
+				),
+			),
+		);
+		$result = $converter->convert( $element, $children, array() );
+		$this->assertNotNull( $result );
+		// Should contain button element
+		$this->assertStringContainsString( 'wp:etch/element', $result );
+		$this->assertStringContainsString( '"tag":"a"', $result );
+		// Should contain nested icon block
+		$this->assertStringContainsString( 'wp:etch/svg', $result );
+		// Icon should be empty (font-icon handling)
+		$this->assertStringContainsString( '"tag":"svg"', $result );
+	}
+
+	public function test_button_with_multiple_nested_icons(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text' => 'Multi Icon Button',
+				'link' => 'https://example.com',
+			),
+		);
+		$children  = array(
+			array(
+				'name'     => 'icon',
+				'settings' => array(
+					'icon' => 'fa-solid fa-star',
+				),
+			),
+			array(
+				'name'     => 'icon',
+				'settings' => array(
+					'icon' => 'fa-solid fa-heart',
+				),
+			),
+		);
+		$result = $converter->convert( $element, $children, array() );
+		$this->assertNotNull( $result );
+		// Should contain button element
+		$this->assertStringContainsString( 'wp:etch/element', $result );
+		// Should contain icon blocks (opening tags)
+		$this->assertStringContainsString( '<!-- wp:etch/svg', $result );
+		// Count occurrences of opening svg tags (should be 2)
+		$svg_count = substr_count( $result, '<!-- wp:etch/svg' );
+		$this->assertEquals( 2, $svg_count );
+	}
+
+	public function test_button_ignores_non_icon_children(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text' => 'Icon Button',
+				'link' => 'https://example.com',
+			),
+		);
+		$children  = array(
+			array(
+				'name'     => 'text',
+				'settings' => array(
+					'text' => 'Should be ignored',
+				),
+			),
+			array(
+				'name'     => 'icon',
+				'settings' => array(
+					'icon' => 'fa-solid fa-arrow-right',
+				),
+			),
+		);
+		$result = $converter->convert( $element, $children, array() );
+		$this->assertNotNull( $result );
+		// Should contain button element
+		$this->assertStringContainsString( 'wp:etch/element', $result );
+		// Should contain icon block
+		$this->assertStringContainsString( 'wp:etch/svg', $result );
+		// Text child should be ignored (should NOT appear in output)
+		$this->assertStringNotContainsString( 'Should be ignored', $result );
+	}
 }

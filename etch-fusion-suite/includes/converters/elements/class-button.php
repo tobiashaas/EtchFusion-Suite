@@ -23,6 +23,8 @@ class EFS_Element_Button extends EFS_Base_Element {
 
 	/**
 	 * Convert Bricks button to Etch link.
+	 *
+	 * Handles nested icons (converts to wp:etch/icon blocks).
 	 */
 	public function convert( $element, $children = array(), $context = array() ) {
 		$settings = $element['settings'] ?? array();
@@ -62,10 +64,56 @@ class EFS_Element_Button extends EFS_Base_Element {
 
 		$attrs = $this->build_attributes( $label, $style_ids, $etch_attributes, 'a', $element );
 
-		return $this->generate_etch_element_block(
-			$attrs,
-			$this->generate_etch_text_block( wp_kses_post( $text ) )
-		);
+		// Build inner content: text + nested icons
+		$inner_content = $this->generate_etch_text_block( wp_kses_post( $text ) );
+
+		// If button has nested children (e.g., icons), convert them
+		if ( ! empty( $children ) && is_array( $children ) ) {
+			$inner_content .= $this->convert_child_icons( $children, $context );
+		}
+
+		return $this->generate_etch_element_block( $attrs, $inner_content );
+	}
+
+	/**
+	 * Convert child icons from nested elements.
+	 *
+	 * When a Bricks button contains icon elements, convert them to wp:etch/icon blocks.
+	 * Other child types are ignored (only icons are supported as button children).
+	 *
+	 * @param array $children Child elements
+	 * @param array $context  Conversion context
+	 * @return string Converted icon blocks or empty string
+	 */
+	private function convert_child_icons( $children, $context ) {
+		$icon_blocks = '';
+
+		foreach ( $children as $child ) {
+			if ( ! is_array( $child ) ) {
+				continue;
+			}
+
+			$child_type = $child['name'] ?? '';
+
+			// Only convert icon children
+			if ( 'icon' === $child_type ) {
+				// Create empty icon block (same as Icon Converter)
+				// Intentionally emit empty etch/svg blocks for font-icon based Bricks icons
+				$child_style_ids = $this->get_style_ids( $child );
+				$attrs           = array(
+					'tag'        => 'svg',
+					'attributes' => array(),
+					'styles'     => $this->normalize_style_ids( $child_style_ids ),
+				);
+
+				$attrs_json  = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+				$icon_blocks .= '<!-- wp:etch/svg ' . $attrs_json . ' -->' . "\n" .
+					'<!-- /wp:etch/svg -->' . "\n";
+			}
+			// Ignore other child types (text, divs, etc.)
+		}
+
+		return $icon_blocks;
 	}
 
 	/**
