@@ -183,15 +183,18 @@ class EFS_Batch_Processor {
 				$active_migration_options
 			);
 		} finally {
-			// Release the database lock by clearing the lock_uuid.
-			// The shutdown closure registered above becomes a no-op because locked_at is already
-			// NULL when it runs (the row no longer matches the WHERE lock_uuid = %s condition).
+			// Release the database lock by clearing the lock_uuid only if we still own it.
+			// The WHERE clause includes lock_uuid = %s to prevent releasing a lock acquired
+			// by another process (e.g., if this process runs >5 minutes, another process could
+			// acquire the lock). This ensures only the lock owner can release it.
 			$wpdb->query(
 				$wpdb->prepare(
 					"UPDATE {$wpdb->prefix}efs_migrations
 					SET lock_uuid = NULL, locked_at = NULL
-					WHERE migration_uid = %s",
-					$migration_id
+					WHERE migration_uid = %s
+					AND lock_uuid = %s",
+					$migration_id,
+					$lock_uuid
 				)
 			);
 		}

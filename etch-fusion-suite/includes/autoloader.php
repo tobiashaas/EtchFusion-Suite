@@ -73,6 +73,11 @@ spl_autoload_register(
 					'interface-' . $slug . '.php',
 				);
 
+				// Support PascalCase filenames like EFS_Error_Handler.php
+				if ( $relative_name !== $slug && $relative_name !== $underscore_slug ) {
+					$files[] = $relative_name . '.php';
+				}
+
 				if ( $slug_no_prefix !== $slug ) {
 					$files[] = 'class-' . $slug_no_prefix . '.php';
 					$files[] = $slug_no_prefix . '.php';
