@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "firebase/php-jwt",
-            "version": "v7.0.2",
+            "version": "v7.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/firebase/php-jwt.git",
-                "reference": "5645b43af647b6947daac1d0f659dd1fbe8d3b65"
+                "reference": "28aa0694bcfdfa5e2959c394d5a1ee7a5083629e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/firebase/php-jwt/zipball/5645b43af647b6947daac1d0f659dd1fbe8d3b65",
-                "reference": "5645b43af647b6947daac1d0f659dd1fbe8d3b65",
+                "url": "https://api.github.com/repos/firebase/php-jwt/zipball/28aa0694bcfdfa5e2959c394d5a1ee7a5083629e",
+                "reference": "28aa0694bcfdfa5e2959c394d5a1ee7a5083629e",
                 "shasum": ""
             },
             "require": {
@@ -65,9 +65,9 @@
             ],
             "support": {
                 "issues": "https://github.com/firebase/php-jwt/issues",
-                "source": "https://github.com/firebase/php-jwt/tree/v7.0.2"
+                "source": "https://github.com/firebase/php-jwt/tree/v7.0.3"
             },
-            "time": "2025-12-16T22:17:28+00:00"
+            "time": "2026-02-25T22:16:40+00:00"
         },
         {
             "name": "psr/container",
@@ -2863,11 +2863,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.1.39",
+            "version": "2.1.40",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c6f73a2af4cbcd99c931d0fb8f08548cc0fa8224",
-                "reference": "c6f73a2af4cbcd99c931d0fb8f08548cc0fa8224",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/9b2c7aeb83a75d8680ea5e7c9b7fca88052b766b",
+                "reference": "9b2c7aeb83a75d8680ea5e7c9b7fca88052b766b",
                 "shasum": ""
             },
             "require": {
@@ -2912,7 +2912,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-11T14:48:56+00:00"
+            "time": "2026-02-23T15:04:35+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
