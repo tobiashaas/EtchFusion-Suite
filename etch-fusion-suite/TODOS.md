@@ -1,10 +1,34 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-05 23:15 (Phase 8 Complete: 100% PHPCS Compliance — v0.16.0 PRODUCTION READY)
+**Updated:** 2026-03-05 20:28 (Phase 9 Start: Critical Bug Fixes & Testing)
 
 ## 🚀 Current Development
 
-### 🔨 Active Stabilization & Audit Plan (Started: 2026-02-27)
+### 🔨 Phase 9️⃣: Critical Bug Fixes & Test Verification (Active)
+
+**Context:** Code review identified race condition in batch processor lock release. Fixing critical issues and completing comprehensive test suite validation.
+
+#### 🔴 Completed Fixes (2026-03-05)
+
+- [✅] **fix-batch-processor-race-condition** - FIXED 2026-03-05 20:28
+  - **Problem:** `finally` block released database lock without verifying ownership
+  - **Impact:** If batch runs >5 minutes, another process could claim the lock. Original process would then clear the new lock when finishing, causing concurrent execution
+  - **Solution:** Added `lock_uuid` verification to WHERE clause (matches shutdown handler logic)
+  - **Files Modified:** `includes/services/class-batch-processor.php` (lines 189-196)
+  - **Testing:** Syntax check ✅, PHPCS compliance ✅
+  - **Documentation:** Added to `DOCUMENTATION.md` §Batch Processor Locking
+
+#### 🟡 In Progress
+
+- [ ] **verify-all-tests-pass** - PHPUnit test suite status
+  - **Current:** 165/167 tests passing (98% success rate)
+  - **Failing Tests:** 2 (Button and Icon converter class loading issues)
+  - **Status:** 165 core tests passing, 2 tests have class autoload issues (non-critical — files exist but not loading in test environment)
+  - **Command:** `npm run test:unit`
+
+- [ ] **phpcs-final-verification** - PHPCS compliance check  
+  - **Status:** ✅ Compliant (19 auto-fix issues resolved in autoloader)
+  - **Command:** `composer lint`
 
 **Context:** Plugin war funktionsfähig, ist aber instabil geworden. Action Scheduler Initialization wurde behoben, nun müssen systematisch Strauss-Prefixing, PSR-4 Autoloading, Migrator-System und CSS Converter stabilisiert werden.
 

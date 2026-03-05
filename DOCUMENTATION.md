@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-05
-**Version:** 0.16.0 (100% PHPCS Compliance — Production Ready | CSS Converter modular architecture documented)
+**Last Updated:** 2026-03-05 20:28  
+**Version:** 0.16.1 (Race condition fix in batch processor locking | 165/167 tests passing)
 
 ---
 
@@ -1343,6 +1343,24 @@ The loopback POST is authenticated by a short-lived transient instead of a nonce
 ### Headless Mode
 
 When mode is `headless`, `start_migration_async()` skips the loopback spawn and instead calls `EFS_Headless_Migration_Job::enqueue_job()`, which registers an Action Scheduler task. This is required for environments where loopback requests are blocked (e.g. some managed hosts).
+
+### Batch Processor Locking (Preventing Concurrent Execution)
+
+The `EFS_Batch_Processor` uses a database-level lock mechanism to prevent multiple processes from executing the same migration simultaneously:
+
+**Lock Mechanism:**
+- **Lock UUID**: Atomic DB update generates a random UUID (`wp_generate_uuid4()`) unique to each process
+- **Storage**: Stored in `wp_efs_migrations.lock_uuid` and `locked_at` columns
+- **Acquisition** (lines 102-111): `UPDATE` query with condition `(lock_uuid IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))` allows claiming a stale lock after 5 minutes
+- **Ownership Verification** (lines 189-196): The `finally` block releases the lock **only if the process still owns it** by checking both `migration_uid` AND `lock_uuid` in the WHERE clause
+- **TTL**: 5-minute timeout auto-releases locks from crashed processes
+- **Fallback**: `register_shutdown_function()` (lines 123-140) also attempts cleanup on fatal errors, but only if the lock still matches
+
+**Race Condition Prevention (Fixed 2026-03-05):**
+- Old code released locks without verifying ownership: `WHERE migration_uid = %s` (dangerous)
+- New code verifies UUID match: `WHERE migration_uid = %s AND lock_uuid = %s` (safe)
+- Scenario: If process A runs >5 minutes, process B can claim the lock. When A finishes, its `finally` block would have cleared B's lock without the UUID check, causing concurrent execution
+- Solution: Always verify the UUID to ensure only the owner releases its own lock
 
 ---
 
