@@ -774,7 +774,8 @@ Konvertiert Bricks Button Elemente zu Etch Anchor Elementen mit CSS-Klassen-Prio
 - CSS-Klassen (`btn--*`) haben Priorität über UI style-Setting
 - Nur EINE primäre Klasse pro Element (Deduplication)
 - Exception: `btn--outline` kann zusätzlich existieren
-- 15 unit tests + 2 integration tests (100% coverage)
+- ✨ **NEW:** Nested icon support - Icons in buttons convert to `wp:etch/svg` blocks
+- 19 unit tests + 2 integration tests (100% coverage)
 
 ### **Wie neue Converter hinzufügen:**
 

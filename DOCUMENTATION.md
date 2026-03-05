@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-05 20:55  
-**Version:** 0.16.1 (100% test coverage: 198/198 tests | Button converter class deduplication fix)
+**Last Updated:** 2026-03-05 21:00  
+**Version:** 0.16.1 (100% test coverage: 201/201 tests | Nested icon support in buttons)
 
 ---
 
