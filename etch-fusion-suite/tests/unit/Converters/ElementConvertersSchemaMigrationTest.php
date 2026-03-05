@@ -9,11 +9,11 @@ declare(strict_types=1);
 
 namespace Bricks2Etch\Tests\Unit\Converters;
 
-use Bricks2Etch\Converters\Elements\EFS_Button_Converter;
+use Bricks2Etch\Converters\Elements\EFS_Element_Button;
 use Bricks2Etch\Converters\Elements\EFS_Element_Heading;
 use Bricks2Etch\Converters\Elements\EFS_Element_Image;
 use Bricks2Etch\Converters\Elements\EFS_Element_Paragraph;
-use Bricks2Etch\Converters\Elements\EFS_Icon_Converter;
+use Bricks2Etch\Converters\Elements\EFS_Element_Icon;
 use WP_UnitTestCase;
 
 class ElementConvertersSchemaMigrationTest extends WP_UnitTestCase {
@@ -92,7 +92,7 @@ class ElementConvertersSchemaMigrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_button_converter_outputs_anchor_element_and_text_block(): void {
-		$converter = new EFS_Button_Converter( $this->style_map );
+		$converter = new EFS_Element_Button( $this->style_map );
 		$element   = array(
 			'name'     => 'button',
 			'label'    => 'CTA',
@@ -115,7 +115,7 @@ class ElementConvertersSchemaMigrationTest extends WP_UnitTestCase {
 	}
 
 	public function test_icon_converter_outputs_icon_element_without_placeholder_markup(): void {
-		$converter = new EFS_Icon_Converter( $this->style_map );
+		$converter = new EFS_Element_Icon( $this->style_map );
 		$element   = array(
 			'name'     => 'icon',
 			'label'    => 'Star Icon',

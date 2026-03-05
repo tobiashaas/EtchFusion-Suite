@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class EFS_Icon_Converter extends EFS_Base_Element {
+class EFS_Element_Icon extends EFS_Base_Element {
 
 	protected $element_type = 'icon';
 

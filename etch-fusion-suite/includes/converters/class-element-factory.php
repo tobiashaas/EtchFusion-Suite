@@ -20,8 +20,8 @@ use Bricks2Etch\Converters\Elements\EFS_Element_Paragraph;
 use Bricks2Etch\Converters\Elements\EFS_Element_Text;
 use Bricks2Etch\Converters\Elements\EFS_Element_Image;
 use Bricks2Etch\Converters\Elements\EFS_Element_Div;
-use Bricks2Etch\Converters\Elements\EFS_Button_Converter;
-use Bricks2Etch\Converters\Elements\EFS_Icon_Converter;
+use Bricks2Etch\Converters\Elements\EFS_Element_Button;
+use Bricks2Etch\Converters\Elements\EFS_Element_Icon;
 use Bricks2Etch\Converters\Elements\EFS_Element_Component;
 use Bricks2Etch\Converters\Elements\EFS_Element_Svg;
 use Bricks2Etch\Converters\Elements\EFS_Element_Video;
@@ -52,8 +52,8 @@ class EFS_Element_Factory {
 		'image'      => EFS_Element_Image::class,
 		'div'        => EFS_Element_Div::class,
 		'block'      => EFS_Element_Div::class,
-		'button'     => EFS_Button_Converter::class,
-		'icon'       => EFS_Icon_Converter::class,
+		'button'     => EFS_Element_Button::class,
+		'icon'       => EFS_Element_Icon::class,
 		'template'   => EFS_Element_Component::class,
 		'svg'        => EFS_Element_Svg::class,
 		'video'      => EFS_Element_Video::class,

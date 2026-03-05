@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class EFS_Button_Converter extends EFS_Base_Element {
+class EFS_Element_Button extends EFS_Base_Element {
 
 	protected $element_type = 'button';
 
