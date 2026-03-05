@@ -200,6 +200,63 @@ class PermissionCallbacksTest extends \WP_UnitTestCase {
 	}
 
 	/**
+	 * Test require_valid_pairing_code_permission with valid code.
+	 */
+	public function test_require_valid_pairing_code_permission_accepts_valid_code() {
+		$token_manager = $this->get_token_manager();
+		if ( ! $token_manager ) {
+			$this->markTestSkipped( 'Token manager unavailable' );
+		}
+
+		// Generate a pairing code
+		$pairing_code = $token_manager->generate_pairing_code();
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'pairing_code', $pairing_code );
+
+		$result = EFS_API_Endpoints::require_valid_pairing_code_permission( $request );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * Test require_valid_pairing_code_permission rejects invalid code.
+	 */
+	public function test_require_valid_pairing_code_permission_rejects_invalid_code() {
+		$request = new \WP_REST_Request();
+		$request->set_param( 'pairing_code', 'invalid_code_123' );
+
+		$result = EFS_API_Endpoints::require_valid_pairing_code_permission( $request );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'invalid_pairing_code', $result->get_error_code() );
+	}
+
+	/**
+	 * Test require_valid_pairing_code_permission rejects missing code.
+	 */
+	public function test_require_valid_pairing_code_permission_rejects_missing_code() {
+		$request = new \WP_REST_Request();
+		// No pairing_code parameter
+
+		$result = EFS_API_Endpoints::require_valid_pairing_code_permission( $request );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'missing_pairing_code', $result->get_error_code() );
+	}
+
+	/**
+	 * Test allow_read_only_discovery_permission always allows.
+	 */
+	public function test_allow_read_only_discovery_permission_allows_all() {
+		$request = new \WP_REST_Request();
+
+		$result = EFS_API_Endpoints::allow_read_only_discovery_permission( $request );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
 	 * Helper: Get token manager instance.
 	 *
 	 * @return EFS_Migration_Token_Manager|null
