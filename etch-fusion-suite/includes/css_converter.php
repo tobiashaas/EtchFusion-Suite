@@ -38,6 +38,7 @@ use Bricks2Etch\CSS\EFS_CSS_Stylesheet_Parser;
 use Bricks2Etch\CSS\EFS_Class_Reference_Scanner;
 use Bricks2Etch\CSS\EFS_Element_ID_Style_Collector;
 use Bricks2Etch\CSS\EFS_Style_Importer;
+use Bricks2Etch\Utils\Query_Paginator;
 
 // Prevent direct access.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -691,115 +692,120 @@ class EFS_CSS_Converter {
 			$post_types = array( 'page', 'post' );
 		}
 
-		$posts = get_posts(
+		// Utility-class prefix patterns — never the "semantic" class of a block element.
+		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-', 'smart-' );
+		$injected         = array();
+
+		// Use pagination to iterate through all posts
+		foreach ( Query_Paginator::get_posts_paginated(
 			array(
 				'post_type'   => $post_types,
 				'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
-				'numberposts' => -1,
 				'meta_query'  => array(
 					array(
 						'key'     => '_bricks_page_content_2',
 						'compare' => 'EXISTS',
 					),
 				),
-			)
-		);
+			),
+			100
+		) as $post_ids ) {
+			// Prime the metadata cache to avoid N+1 queries in the loop below.
+			update_postmeta_cache( $post_ids );
 
-		// Prime the metadata cache to avoid N+1 queries in the loop below.
-		$post_ids = wp_list_pluck( $posts, 'ID' );
-		update_postmeta_cache( $post_ids );
-
-		// Utility-class prefix patterns — never the "semantic" class of a block element.
-		$utility_prefixes = array( 'bg--', 'is-bg', 'is-bg-', 'hidden-', 'smart-' );
-		$injected         = array();
-
-		foreach ( $posts as $post ) {
-			$elements = get_post_meta( $post->ID, '_bricks_page_content_2', true );
-			if ( is_string( $elements ) ) {
-				$elements = maybe_unserialize( $elements );
-			}
-			if ( ! is_array( $elements ) ) {
-				continue;
-			}
-
-			foreach ( $elements as $element ) {
-				if ( 'block' !== ( $element['name'] ?? '' ) ) {
+			foreach ( $post_ids as $post_id ) {
+				$post_id = (int) $post_id;
+				if ( $post_id <= 0 ) {
 					continue;
 				}
 
-				$class_ids = isset( $element['settings']['_cssGlobalClasses'] )
-					&& is_array( $element['settings']['_cssGlobalClasses'] )
-						? $element['settings']['_cssGlobalClasses']
-						: array();
+				$elements = get_post_meta( $post_id, '_bricks_page_content_2', true );
+				if ( is_string( $elements ) ) {
+					$elements = maybe_unserialize( $elements );
+				}
+				if ( ! is_array( $elements ) ) {
+					continue;
+				}
 
-				// Collect non-utility class entries from the style_map.
-				$semantic = array();
-				foreach ( $class_ids as $cid ) {
-					$cid = trim( (string) $cid );
-					if ( '' === $cid || ! isset( $style_map[ $cid ] ) || ! is_array( $style_map[ $cid ] ) ) {
+				foreach ( $elements as $element ) {
+					if ( 'block' !== ( $element['name'] ?? '' ) ) {
 						continue;
 					}
-					$class_name = ltrim( trim( (string) ( $style_map[ $cid ]['selector'] ?? '' ) ), '.' );
-					$is_utility = false;
-					foreach ( $utility_prefixes as $prefix ) {
-						if ( 0 === strpos( $class_name, $prefix ) ) {
-							$is_utility = true;
-							break;
+
+					$class_ids = isset( $element['settings']['_cssGlobalClasses'] )
+						&& is_array( $element['settings']['_cssGlobalClasses'] )
+							? $element['settings']['_cssGlobalClasses']
+							: array();
+
+					// Collect non-utility class entries from the style_map.
+					$semantic = array();
+					foreach ( $class_ids as $cid ) {
+						$cid = trim( (string) $cid );
+						if ( '' === $cid || ! isset( $style_map[ $cid ] ) || ! is_array( $style_map[ $cid ] ) ) {
+							continue;
+						}
+						$class_name = ltrim( trim( (string) ( $style_map[ $cid ]['selector'] ?? '' ) ), '.' );
+						$is_utility = false;
+						foreach ( $utility_prefixes as $prefix ) {
+							if ( 0 === strpos( $class_name, $prefix ) ) {
+								$is_utility = true;
+								break;
+							}
+						}
+						if ( ! $is_utility ) {
+							$semantic[] = $style_map[ $cid ];
 						}
 					}
-					if ( ! $is_utility ) {
-						$semantic[] = $style_map[ $cid ];
+
+					// Only inject when exactly one semantic class is present (unambiguous).
+					if ( 1 !== count( $semantic ) ) {
+						continue;
 					}
-				}
 
-				// Only inject when exactly one semantic class is present (unambiguous).
-				if ( 1 !== count( $semantic ) ) {
-					continue;
-				}
+					$style_id = trim( (string) ( $semantic[0]['id'] ?? '' ) );
+					if ( '' === $style_id || isset( $injected[ $style_id ] ) ) {
+						continue;
+					}
+					if ( ! isset( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
+						continue;
+					}
 
-				$style_id = trim( (string) ( $semantic[0]['id'] ?? '' ) );
-				if ( '' === $style_id || isset( $injected[ $style_id ] ) ) {
-					continue;
-				}
-				if ( ! isset( $etch_styles[ $style_id ] ) || ! is_array( $etch_styles[ $style_id ] ) ) {
-					continue;
-				}
+					$css     = isset( $etch_styles[ $style_id ]['css'] ) ? (string) $etch_styles[ $style_id ]['css'] : '';
+					$is_flex = (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?flex\b/i', $css );
+					$is_grid = (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?grid\b/i', $css );
+					$has_dir = (bool) preg_match( '/\bflex-direction\s*:/i', $css );
 
-				$css     = isset( $etch_styles[ $style_id ]['css'] ) ? (string) $etch_styles[ $style_id ]['css'] : '';
-				$is_flex = (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?flex\b/i', $css );
-				$is_grid = (bool) preg_match( '/\bdisplay\s*:\s*(?:inline-)?grid\b/i', $css );
-				$has_dir = (bool) preg_match( '/\bflex-direction\s*:/i', $css );
+					// Skip when display is already defined.
+					if ( $is_flex || $is_grid ) {
+						$injected[ $style_id ] = true;
+						continue;
+					}
 
-				// Skip when display is already defined.
-				if ( $is_flex || $is_grid ) {
-					$injected[ $style_id ] = true;
-					continue;
+					// Also skip when the element settings specify an explicit grid display.
+					$el_display = strtolower( trim( (string) ( $element['settings']['_display'] ?? '' ) ) );
+					if ( in_array( $el_display, array( 'grid', 'inline-grid' ), true ) ) {
+						$injected[ $style_id ] = true;
+						continue;
+					}
+
+					$declarations = 'display: flex; inline-size: 100%;';
+					if ( ! $has_dir ) {
+						$declarations .= ' flex-direction: column;';
+					}
+
+					$existing_css = rtrim( $css );
+					if ( '' !== $existing_css
+						&& ';' !== substr( $existing_css, -1 )
+						&& '}' !== substr( $existing_css, -1 )
+					) {
+						$existing_css .= ';';
+					}
+
+					$etch_styles[ $style_id ]['css'] = trim(
+						$existing_css . ( '' !== $existing_css ? ' ' : '' ) . $declarations
+					);
+					$injected[ $style_id ]           = true;
 				}
-
-				// Also skip when the element settings specify an explicit grid display.
-				$el_display = strtolower( trim( (string) ( $element['settings']['_display'] ?? '' ) ) );
-				if ( in_array( $el_display, array( 'grid', 'inline-grid' ), true ) ) {
-					$injected[ $style_id ] = true;
-					continue;
-				}
-
-				$declarations = 'display: flex; inline-size: 100%;';
-				if ( ! $has_dir ) {
-					$declarations .= ' flex-direction: column;';
-				}
-
-				$existing_css = rtrim( $css );
-				if ( '' !== $existing_css
-					&& ';' !== substr( $existing_css, -1 )
-					&& '}' !== substr( $existing_css, -1 )
-				) {
-					$existing_css .= ';';
-				}
-
-				$etch_styles[ $style_id ]['css'] = trim(
-					$existing_css . ( '' !== $existing_css ? ' ' : '' ) . $declarations
-				);
-				$injected[ $style_id ]           = true;
 			}
 		}
 	}

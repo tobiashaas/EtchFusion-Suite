@@ -9,6 +9,7 @@ namespace Bricks2Etch\Migrators;
 
 use Bricks2Etch\Core\EFS_Error_Handler;
 use Bricks2Etch\Api\EFS_API_Client;
+use Bricks2Etch\Utils\Query_Paginator;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
@@ -120,6 +121,9 @@ class EFS_Media_Migrator {
 	/**
 	 * Get attachment IDs only (lightweight, no full post data).
 	 *
+	 * Now uses Query_Paginator to handle large result sets efficiently.
+	 * Returns all results collected from paginated batches.
+	 *
 	 * @param array $selected_post_types Optional. Selected post types; empty = all attachments.
 	 * @return array<int> Attachment IDs.
 	 */
@@ -129,31 +133,30 @@ class EFS_Media_Migrator {
 			return $this->get_media_ids_for_selected_post_types( $selected_post_types );
 		}
 
-		$query_args = array(
-			'post_type'      => 'attachment',
-			'post_status'    => 'inherit',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'meta_query'     => array(
+		$all_ids = array();
+
+		// Use pagination to avoid loading all media at once
+		foreach ( Query_Paginator::get_attachments_paginated(
+			array(
 				array(
 					'key'     => '_wp_attached_file',
 					'compare' => 'EXISTS',
 				),
 			),
-		);
+			100
+		) as $batch ) {
+			$all_ids = array_merge(
+				$all_ids,
+				array_filter(
+					$batch,
+					static function ( $id ) {
+						return $id > 0 && 'attachment' === get_post_type( $id );
+					}
+				)
+			);
+		}
 
-		$media_query = new \WP_Query( $query_args );
-		$ids         = is_array( $media_query->posts ) ? array_map( 'intval', $media_query->posts ) : array();
-		wp_reset_postdata();
-
-		return array_values(
-			array_filter(
-				$ids,
-				static function ( $id ) {
-					return $id > 0 && 'attachment' === get_post_type( $id );
-				}
-			)
-		);
+		return array_values( $all_ids );
 	}
 
 	/**
@@ -245,13 +248,14 @@ class EFS_Media_Migrator {
 
 	/**
 	 * Get all media files from the source site
+	 *
+	 * Now uses Query_Paginator to handle large media collections in batches.
 	 */
 	private function get_media_files( $selected_post_types = array() ) {
 		$query_args = array(
-			'post_type'      => 'attachment',
-			'post_status'    => 'inherit',
-			'posts_per_page' => -1,
-			'meta_query'     => array(
+			'post_type'   => 'attachment',
+			'post_status' => 'inherit',
+			'meta_query'  => array(
 				array(
 					'key'     => '_wp_attached_file',
 					'compare' => 'EXISTS',
@@ -268,35 +272,32 @@ class EFS_Media_Migrator {
 			$query_args['post__in'] = $scoped_ids;
 		}
 
-		$media_query = new \WP_Query(
-			$query_args
-		);
-
 		$media_files = array();
 
-		if ( $media_query->have_posts() ) {
-			while ( $media_query->have_posts() ) {
-				$media_query->the_post();
-				$attachment_id = get_the_ID();
+		// Use pagination to avoid loading all media at once
+		foreach ( Query_Paginator::get_posts_paginated( $query_args, 100 ) as $post_ids ) {
+			foreach ( $post_ids as $attachment_id ) {
+				$attachment_id = (int) $attachment_id;
+				if ( $attachment_id <= 0 ) {
+					continue;
+				}
 
 				$media_files[ $attachment_id ] = array(
 					'id'          => $attachment_id,
-					'title'       => get_the_title(),
+					'title'       => get_the_title( $attachment_id ),
 					'alt_text'    => get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ),
-					'caption'     => get_the_excerpt(),
-					'description' => get_the_content(),
+					'caption'     => wp_get_attachment_caption( $attachment_id ),
+					'description' => wp_get_attachment_excerpt( $attachment_id ),
 					'file_path'   => get_post_meta( $attachment_id, '_wp_attached_file', true ),
 					'file_url'    => wp_get_attachment_url( $attachment_id ),
 					'mime_type'   => get_post_mime_type( $attachment_id ),
-					'file_size'   => filesize( get_attached_file( $attachment_id ) ),
-					'upload_date' => get_the_date( 'Y-m-d H:i:s' ),
+					'file_size'   => (int) filesize( get_attached_file( $attachment_id ) ),
+					'upload_date' => get_the_date( 'Y-m-d H:i:s', $attachment_id ),
 					'post_parent' => wp_get_post_parent_id( $attachment_id ),
 					'metadata'    => wp_get_attachment_metadata( $attachment_id ),
 				);
 			}
 		}
-
-		wp_reset_postdata();
 
 		return $media_files;
 	}
@@ -304,72 +305,75 @@ class EFS_Media_Migrator {
 	/**
 	 * Resolve attachment IDs that are relevant for selected source post types.
 	 *
+	 * Now uses Query_Paginator to handle large post collections in batches.
+	 *
 	 * @param array $selected_post_types Selected post types from wizard.
 	 * @return array<int>
 	 */
 	private function get_media_ids_for_selected_post_types( array $selected_post_types ) {
-		$posts = get_posts(
-			array(
-				'post_type'      => $selected_post_types,
-				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-			)
-		);
-
-		if ( empty( $posts ) ) {
-			return array();
-		}
-
-		// Prime the metadata cache to avoid N+1 queries in the loop below.
-		update_postmeta_cache( $posts );
-
 		$media_ids = array();
-		foreach ( $posts as $post_id ) {
-			$post_id = (int) $post_id;
-			if ( $post_id <= 0 ) {
-				continue;
-			}
 
-			$thumbnail_id = (int) get_post_thumbnail_id( $post_id );
-			if ( $thumbnail_id > 0 ) {
-				$media_ids[] = $thumbnail_id;
-			}
+		// Use pagination to iterate through all posts of selected types
+		foreach ( Query_Paginator::get_posts_paginated(
+			array(
+				'post_type'   => $selected_post_types,
+				'post_status' => array( 'publish', 'draft', 'pending', 'private' ),
+				'fields'      => 'ids',
+			),
+			100
+		) as $post_ids ) {
+			// Prime the metadata cache to avoid N+1 queries in the loop below.
+			update_postmeta_cache( $post_ids );
 
-			$attachments = get_children(
-				array(
-					'post_parent'    => $post_id,
-					'post_type'      => 'attachment',
-					'post_status'    => 'inherit',
-					'posts_per_page' => -1,
-					'fields'         => 'ids',
-				)
-			);
-			if ( is_array( $attachments ) ) {
-				$media_ids = array_merge( $media_ids, array_map( 'intval', $attachments ) );
-			}
-
-			$post_content = (string) get_post_field( 'post_content', $post_id );
-			if ( '' !== $post_content ) {
-				$from_content = $this->find_media_in_content( $post_content );
-				if ( is_array( $from_content ) ) {
-					$media_ids = array_merge( $media_ids, array_map( 'intval', $from_content ) );
+			foreach ( $post_ids as $post_id ) {
+				$post_id = (int) $post_id;
+				if ( $post_id <= 0 ) {
+					continue;
 				}
-			}
 
-			$bricks_content = get_post_meta( $post_id, '_bricks_page_content_2', true );
-			if ( empty( $bricks_content ) ) {
-				$bricks_content = get_post_meta( $post_id, '_bricks_page_content', true );
-			}
-			if ( is_string( $bricks_content ) ) {
-				$decoded = json_decode( $bricks_content, true );
-				if ( JSON_ERROR_NONE === json_last_error() ) {
-					$bricks_content = $decoded;
-				} else {
-					$bricks_content = maybe_unserialize( $bricks_content );
+				// Get featured image
+				$thumbnail_id = (int) get_post_thumbnail_id( $post_id );
+				if ( $thumbnail_id > 0 ) {
+					$media_ids[] = $thumbnail_id;
 				}
+
+				// Get child attachments
+				foreach ( Query_Paginator::get_children_paginated(
+					$post_id,
+					array(
+						'post_type'   => 'attachment',
+						'post_status' => 'inherit',
+						'fields'      => 'ids',
+					),
+					100
+				) as $attachment_ids ) {
+					$media_ids = array_merge( $media_ids, array_map( 'intval', $attachment_ids ) );
+				}
+
+				// Scan post content for media references
+				$post_content = (string) get_post_field( 'post_content', $post_id );
+				if ( '' !== $post_content ) {
+					$from_content = $this->find_media_in_content( $post_content );
+					if ( is_array( $from_content ) ) {
+						$media_ids = array_merge( $media_ids, array_map( 'intval', $from_content ) );
+					}
+				}
+
+				// Scan Bricks content for media references
+				$bricks_content = get_post_meta( $post_id, '_bricks_page_content_2', true );
+				if ( empty( $bricks_content ) ) {
+					$bricks_content = get_post_meta( $post_id, '_bricks_page_content', true );
+				}
+				if ( is_string( $bricks_content ) ) {
+					$decoded = json_decode( $bricks_content, true );
+					if ( JSON_ERROR_NONE === json_last_error() ) {
+						$bricks_content = $decoded;
+					} else {
+						$bricks_content = maybe_unserialize( $bricks_content );
+					}
+				}
+				$this->collect_attachment_ids_from_value( $bricks_content, $media_ids );
 			}
-			$this->collect_attachment_ids_from_value( $bricks_content, $media_ids );
 		}
 
 		$media_ids = array_values(

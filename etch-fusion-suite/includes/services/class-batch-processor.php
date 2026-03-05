@@ -97,7 +97,11 @@ class EFS_Batch_Processor {
 	public function process_batch( string $migration_id, array $batch, string $target_url, string $migration_key, array $active_migration_options ) {
 		global $wpdb;
 
-		// Try to acquire database-based lock (atomic UPDATE with lock_uuid)
+		// Acquire database-based lock using atomic UPDATE with UUID ownership.
+		// The UPDATE is atomic: the WHERE clause (lock availability check) and SET clause (lock acquisition)
+		// are evaluated as a single database operation with no gap between check and acquire (no TOCTOU race).
+		// Only succeeds if: (a) lock_uuid is NULL (no lock held), or (b) locked_at is > 5 minutes old (stale lock).
+		// Returns 0 rows affected if lock is held by another process.
 		$lock_uuid = wp_generate_uuid4();
 		$locked    = $wpdb->query(
 			$wpdb->prepare(
@@ -115,15 +119,18 @@ class EFS_Batch_Processor {
 		}
 
 		// Register shutdown closure that releases the DB lock on fatal error.
-		// A closure is used instead of a static class method so there is no class-reference
-		// dependency: the values are captured by value, making the release safe even when a
-		// fatal error unloads the class during shutdown.
+		// Uses a static closure (not a class method) and captures variables by value.
+		// This ensures the release can execute even if a fatal error unloads the class during shutdown.
+		// Lock release requires the correct lock_uuid (ownership verification): prevents
+		// one process from releasing another process's lock.
 		$lock_uuid_capture    = $lock_uuid;
 		$migration_id_capture = $migration_id;
 		register_shutdown_function(
 			static function () use ( $lock_uuid_capture, $migration_id_capture ) {
 				global $wpdb;
 				if ( $migration_id_capture && $lock_uuid_capture ) {
+					// Release lock only if the stored lock_uuid matches our $lock_uuid_capture.
+					// This is the ownership check: only the lock owner can release it.
 					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 					$wpdb->query(
 						$wpdb->prepare(

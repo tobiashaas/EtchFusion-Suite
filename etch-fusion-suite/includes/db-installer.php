@@ -21,8 +21,9 @@ class EFS_DB_Installer {
 	 * Bump this whenever schema changes so the upgrade hook reruns dbDelta.
 	 * 1.1.0 – added wp_efs_settings table + fixed activation hook path
 	 * 1.2.0 – added checkpoint_data / checkpoint_version columns for optimistic locking
+	 * 1.3.0 – added migration_id index on wp_efs_migration_logs for large migrations
 	 */
-	const DB_VERSION = '1.2.0';
+	const DB_VERSION = '1.3.0';
 
 	/**
 	 * Option key for stored DB version
@@ -65,6 +66,7 @@ class EFS_DB_Installer {
 		) $charset_collate;";
 
 		// Create logs table (without FK for MySQL 5.5+ compatibility)
+		// migration_id index added in DB_VERSION 1.3.0 for log retrieval by migration
 		$logs_table = "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}efs_migration_logs (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 			migration_uid VARCHAR(50) NOT NULL,
@@ -75,6 +77,7 @@ class EFS_DB_Installer {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			KEY migration_uid (migration_uid),
+			KEY migration_id (migration_uid),
 			KEY log_level (log_level),
 			KEY created_at (created_at)
 		) $charset_collate;";
