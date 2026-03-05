@@ -45,25 +45,31 @@ class EFS_Migration_Run_Finalizer {
 	/** @var EFS_Content_Service */
 	private $content_service;
 
+	/** @var EFS_Phase_Timer */
+	private $phase_timer;
+
 	/**
 	 * @param EFS_Progress_Manager                   $progress_manager
 	 * @param Migration_Repository_Interface         $migration_repository
 	 * @param EFS_Migration_Runs_Repository|null     $migration_runs_repository
 	 * @param EFS_Error_Handler                      $error_handler
 	 * @param EFS_Content_Service                    $content_service
+	 * @param EFS_Phase_Timer                        $phase_timer
 	 */
 	public function __construct(
 		EFS_Progress_Manager $progress_manager,
 		Migration_Repository_Interface $migration_repository,
 		?EFS_Migration_Runs_Repository $migration_runs_repository,
 		EFS_Error_Handler $error_handler,
-		EFS_Content_Service $content_service
+		EFS_Content_Service $content_service,
+		EFS_Phase_Timer $phase_timer = null
 	) {
 		$this->progress_manager          = $progress_manager;
 		$this->migration_repository      = $migration_repository;
 		$this->migration_runs_repository = $migration_runs_repository;
 		$this->error_handler             = $error_handler;
 		$this->content_service           = $content_service;
+		$this->phase_timer               = $phase_timer;
 	}
 
 	/**
@@ -193,6 +199,13 @@ class EFS_Migration_Run_Finalizer {
 		// Add media_stats if available.
 		if ( ! empty( $media_stats ) ) {
 			$record['media_stats'] = $media_stats;
+		}
+
+		// Add phase timing if available.
+		if ( $this->phase_timer ) {
+			$this->phase_timer->add_phase_timing( $record );
+			// End finalization phase timing.
+			$this->phase_timer->end_phase();
 		}
 
 		$this->migration_runs_repository->save_run( $record );

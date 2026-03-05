@@ -1,0 +1,57 @@
+i Starting 'bash -c cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit php vendor/bin/phpunit tests/unit/LoggingEnhancementsTest.php --testdox 2>&1' on the cli container. 
+
+[05-Mar-2026 21:50:33 UTC] PHP Warning:  Constant WP_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 234
+
+Warning: Constant WP_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 234
+[05-Mar-2026 21:50:33 UTC] PHP Warning:  Constant WP_MAX_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 235
+
+Warning: Constant WP_MAX_MEMORY_LIMIT already defined in /wordpress-phpunit/includes/bootstrap.php on line 235
+Installing...
+Running as single site... To run multisite, use -c tests/phpunit/multisite.xml
+Not running ajax tests. To execute these, use --group ajax.
+Not running ms-files tests. To execute these, use --group ms-files.
+Not running external-http tests. To execute these, use --group external-http.
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.1.34
+Configuration: /var/www/html/wp-content/plugins/etch-fusion-suite/phpunit.xml.dist
+Warning:       No code coverage driver available
+
+Logging Enhancements (Bricks2Etch\Tests\Unit\LoggingEnhancements)
+ Ô£ö Post type stats structure [113.46 ms]
+ Ô£ö Post type stats with multiple types [17.49 ms]
+ Ô£ö Post type stats increment success [7.35 ms]
+ Ô£ö Post type stats increment failed [6.63 ms]
+ Ô£ö Post type stats increment skipped [6.85 ms]
+ Ô£ö Post type stats time calculation [1061.80 ms]
+ Ô£ö Media type differentiation image [7.56 ms]
+ Ô£ö Media type differentiation video [6.89 ms]
+ Ô£ö Media type differentiation audio [8.14 ms]
+ Ô£ö Media type differentiation other [7.75 ms]
+ Ô£ö Media type stats structure [8.03 ms]
+ Ô£ö Media type with mixed types [6.95 ms]
+ Ô£ö Media type handles unknown mime [7.36 ms]
+ Ô£ö Media type increment success [7.32 ms]
+ Ô£ö Media type increment failed [8.38 ms]
+ Ô£ö Legacy format still works [6.65 ms]
+ Ô£ö Auto normalization of legacy format [7.47 ms]
+ Ô£ö Mixed old new format handling [7.15 ms]
+ Ô£ö Empty migration stats [13.24 ms]
+ Ô£ö Large batch stats [8.06 ms]
+ Ô£ö All items failed [7.76 ms]
+ Ô£ö All items skipped [7.14 ms]
+ Ô£ö Post type stats lazy initialization [6.99 ms]
+ Ô£ö Media type stats lazy initialization [7.09 ms]
+ Ô£ö Checkpoint persistence with stats [7.07 ms]
+ Ô£ö Stats with single item [6.77 ms]
+ Ô£ö Stats with null mime type [6.72 ms]
+ Ô£ö Building stats from checkpoint [6.98 ms]
+ Ô£ö Media stats increment and accumulation [6.82 ms]
+ Ô£ö Post type stats with wp post types [6.62 ms]
+ Ô£ö Post type stats with custom post types [6.99 ms]
+ Ô£ö Complex media migration scenario [7.29 ms]
+
+Time: 00:09.789, Memory: 50.50 MB
+
+OK (32 tests, 108 assertions)
+ÔêÜ Ran `bash -c cd wp-content/plugins/etch-fusion-suite && WP_TESTS_DIR=/wordpress-phpunit php vendor/bin/phpunit tests/unit/LoggingEnhancementsTest.php --testdox 2>&1` in 'cli'. (in 18s 640ms)

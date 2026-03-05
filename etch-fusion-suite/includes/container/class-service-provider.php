@@ -399,6 +399,13 @@ class EFS_Service_Provider {
 
 		// Business Services
 		$container->singleton(
+			'phase_timer',
+			function ( $c ) {
+				return new \Bricks2Etch\Services\EFS_Phase_Timer();
+			}
+		);
+
+		$container->singleton(
 			'migration_logger',
 			function ( $c ) {
 				return new \Bricks2Etch\Services\EFS_Migration_Logger();
@@ -488,7 +495,8 @@ class EFS_Service_Provider {
 					$c->get( 'migration_repository' ),
 					$c->get( 'migration_runs_repository' ),
 					$c->get( 'error_handler' ),
-					$c->get( 'content_service' )
+					$c->get( 'content_service' ),
+					$c->get( 'phase_timer' )
 				);
 			}
 		);
@@ -509,7 +517,8 @@ class EFS_Service_Provider {
 					$c->get( 'error_handler' ),
 					$c->get( 'plugin_detector' ),
 					$c->get( 'migration_logger' ),
-					$c->get( 'db_migration_persistence' )
+					$c->get( 'db_migration_persistence' ),
+					$c->get( 'phase_timer' )
 				);
 			}
 		);
@@ -575,7 +584,8 @@ class EFS_Service_Provider {
 					$c->get( 'progress_manager' ),
 					$c->get( 'checkpoint_repository' ),
 					$c->get( 'api_client' ),
-					$c->get( 'migration_logger' )
+					$c->get( 'migration_logger' ),
+					$c->get( 'phase_timer' )
 				);
 			}
 		);

@@ -2,8 +2,8 @@
 
 <!-- markdownlint-disable MD013 MD024 -->
 
-**Last Updated:** 2026-03-05 21:00  
-**Version:** 0.16.1 (100% test coverage: 201/201 tests | Nested icon support in buttons)
+**Last Updated:** 2026-03-05 23:10  
+**Version:** 0.17.0 (Phase timing tracking | 201/201 tests passing)
 
 ---
 

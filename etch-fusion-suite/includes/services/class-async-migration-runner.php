@@ -95,6 +95,11 @@ class EFS_Async_Migration_Runner {
 	private $db_persistence;
 
 	/**
+	 * @var EFS_Phase_Timer
+	 */
+	private $phase_timer;
+
+	/**
 	 * @param EFS_Migrator_Executor          $migrator_executor
 	 * @param EFS_Progress_Manager           $progress_manager
 	 * @param EFS_Migration_Run_Finalizer    $run_finalizer
@@ -108,6 +113,7 @@ class EFS_Async_Migration_Runner {
 	 * @param EFS_Plugin_Detector            $plugin_detector
 	 * @param EFS_Migration_Logger           $migration_logger
 	 * @param EFS_DB_Migration_Persistence   $db_persistence
+	 * @param EFS_Phase_Timer                $phase_timer
 	 */
 	public function __construct(
 		EFS_Migrator_Executor $migrator_executor,
@@ -122,7 +128,8 @@ class EFS_Async_Migration_Runner {
 		EFS_Error_Handler $error_handler,
 		EFS_Plugin_Detector $plugin_detector,
 		EFS_Migration_Logger $migration_logger,
-		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null
+		\Bricks2Etch\Repositories\EFS_DB_Migration_Persistence $db_persistence = null,
+		EFS_Phase_Timer $phase_timer = null
 	) {
 		$this->migrator_executor    = $migrator_executor;
 		$this->progress_manager     = $progress_manager;
@@ -137,6 +144,7 @@ class EFS_Async_Migration_Runner {
 		$this->plugin_detector      = $plugin_detector;
 		$this->migration_logger     = $migration_logger;
 		$this->db_persistence       = $db_persistence;
+		$this->phase_timer          = $phase_timer;
 	}
 
 	/**
@@ -183,6 +191,11 @@ class EFS_Async_Migration_Runner {
 		$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
 
 		try {
+			// Start validation phase timing.
+			if ( $this->phase_timer ) {
+				$this->phase_timer->start_phase( 'validation' );
+			}
+
 			$this->progress_manager->update_progress( 'validation', 10, __( 'Validating migration requirements...', 'etch-fusion-suite' ) );
 			$validation_result = $this->plugin_detector->validate_migration_requirements();
 			if ( ! is_array( $validation_result ) ) {
@@ -191,6 +204,12 @@ class EFS_Async_Migration_Runner {
 					'errors' => array( __( 'Unknown validation response.', 'etch-fusion-suite' ) ),
 				);
 			}
+
+			// End validation phase timing.
+			if ( $this->phase_timer ) {
+				$this->phase_timer->end_phase();
+			}
+
 			if ( ! $validation_result['valid'] ) {
 				$error_message = 'Migration validation failed: ' . implode( ', ', $validation_result['errors'] );
 				$this->error_handler->log_error(

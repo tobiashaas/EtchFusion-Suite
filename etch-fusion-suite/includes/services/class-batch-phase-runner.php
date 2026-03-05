@@ -45,6 +45,9 @@ class EFS_Batch_Phase_Runner {
 	/** @var EFS_Migration_Logger */
 	private $migration_logger;
 
+	/** @var EFS_Phase_Timer */
+	private $phase_timer;
+
 	/**
 	 * @param EFS_Error_Handler               $error_handler
 	 * @param EFS_Migration_Run_Finalizer     $run_finalizer
@@ -52,6 +55,7 @@ class EFS_Batch_Phase_Runner {
 	 * @param Checkpoint_Repository_Interface $checkpoint_repository
 	 * @param EFS_API_Client                  $api_client
 	 * @param EFS_Migration_Logger            $migration_logger
+	 * @param EFS_Phase_Timer                 $phase_timer
 	 */
 	public function __construct(
 		EFS_Error_Handler $error_handler,
@@ -59,7 +63,8 @@ class EFS_Batch_Phase_Runner {
 		EFS_Progress_Manager $progress_manager,
 		Checkpoint_Repository_Interface $checkpoint_repository,
 		EFS_API_Client $api_client,
-		EFS_Migration_Logger $migration_logger
+		EFS_Migration_Logger $migration_logger,
+		EFS_Phase_Timer $phase_timer = null
 	) {
 		$this->error_handler         = $error_handler;
 		$this->run_finalizer         = $run_finalizer;
@@ -67,6 +72,7 @@ class EFS_Batch_Phase_Runner {
 		$this->checkpoint_repository = $checkpoint_repository;
 		$this->api_client            = $api_client;
 		$this->migration_logger      = $migration_logger;
+		$this->phase_timer           = $phase_timer;
 	}
 
 	/**
@@ -92,6 +98,11 @@ class EFS_Batch_Phase_Runner {
 		string $migration_key,
 		array $active_migration_options
 	) {
+		// Start phase timing on first iteration of this phase (when not yet started).
+		if ( $this->phase_timer && ! $this->phase_timer->has_phase( $phase ) ) {
+			$this->phase_timer->start_phase( $phase );
+		}
+
 		$migration_id_for_shutdown     = $migration_id;
 		$progress_manager_for_shutdown = $this->progress_manager;
 		$migration_logger_for_shutdown = $this->migration_logger;
@@ -513,6 +524,11 @@ class EFS_Batch_Phase_Runner {
 
 		// Phase transition (media only): when all media are processed, advance to posts phase.
 		if ( 'media' === $phase && empty( $remaining ) ) {
+			// End media phase timing before transitioning to posts.
+			if ( $this->phase_timer ) {
+				$this->phase_timer->end_phase();
+			}
+
 			$checkpoint['phase']           = 'posts';
 			$checkpoint['processed_count'] = 0;
 			$this->checkpoint_repository->save_checkpoint( $checkpoint );
@@ -534,6 +550,13 @@ class EFS_Batch_Phase_Runner {
 
 		// Finalization (posts only): when all posts are processed, finalize migration.
 		if ( 'posts' === $phase && empty( $remaining ) ) {
+			// End posts phase timing before finalization.
+			if ( $this->phase_timer ) {
+				$this->phase_timer->end_phase();
+				// Start finalization phase timing.
+				$this->phase_timer->start_phase( 'finalization' );
+			}
+
 			$failed_media_ids_final = isset( $checkpoint['failed_media_ids_final'] ) ? (array) $checkpoint['failed_media_ids_final'] : array();
 			$failed_media_count     = count( $failed_media_ids_final );
 			$failed_count           = count( $failed_ids );
