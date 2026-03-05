@@ -20,6 +20,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class EFS_Error_Handler {
 	/**
+	 * Maximum number of migration log entries stored in the wp option.
+	 */
+	const MAX_LOG_ENTRIES = 1000;
+
+	/**
 	 * Error codes with descriptions and solutions
 	 */
 	const ERROR_CODES = array(
@@ -378,6 +383,108 @@ class EFS_Error_Handler {
 				error_log( wp_json_encode( $data ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 			}
 		}
+	}
+
+	/**
+	 * Log warning entry to migration log option.
+	 *
+	 * @param string $code    Warning code or short message.
+	 * @param mixed  $context Optional context payload.
+	 * @param string $level   Optional level label. Defaults to warning.
+	 * @return void
+	 */
+	public function log_warning( $code, $context = array(), $level = 'warning' ) {
+		$warning_info = $this->get_warning_info( (string) $code );
+		$title        = isset( $warning_info['title'] ) ? $warning_info['title'] : (string) $code;
+		$message      = isset( $warning_info['description'] ) ? $warning_info['description'] : (string) $code;
+
+		$this->append_log_entry(
+			array(
+				'timestamp' => current_time( 'mysql' ),
+				'type'      => 'warning',
+				'level'     => (string) $level,
+				'code'      => (string) $code,
+				'title'     => $title,
+				'message'   => $message,
+				'context'   => $this->normalize_context( $context ),
+			)
+		);
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( "EFS [WARNING] {$code}: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+	}
+
+	/**
+	 * Log error entry to migration log option.
+	 *
+	 * @param string $code    Error code or short message.
+	 * @param mixed  $context Optional context payload.
+	 * @param string $level   Optional level label. Defaults to error.
+	 * @return void
+	 */
+	public function log_error( $code, $context = array(), $level = 'error' ) {
+		$error_info = $this->get_error_info( (string) $code );
+		$title      = isset( $error_info['title'] ) ? $error_info['title'] : (string) $code;
+		$message    = isset( $error_info['description'] ) ? $error_info['description'] : (string) $code;
+
+		$this->append_log_entry(
+			array(
+				'timestamp' => current_time( 'mysql' ),
+				'type'      => 'error',
+				'level'     => (string) $level,
+				'code'      => (string) $code,
+				'title'     => $title,
+				'message'   => $message,
+				'context'   => $this->normalize_context( $context ),
+			)
+		);
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( "EFS [ERROR] {$code}: {$message}" ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+	}
+
+	/**
+	 * Normalize context to an array-safe payload for option storage.
+	 *
+	 * @param mixed $context Context payload.
+	 * @return array
+	 */
+	private function normalize_context( $context ) {
+		if ( is_array( $context ) ) {
+			return $context;
+		}
+
+		if ( is_object( $context ) ) {
+			$encoded = wp_json_encode( $context );
+			$decoded = $encoded ? json_decode( $encoded, true ) : null;
+			return is_array( $decoded ) ? $decoded : array( 'value' => (string) $encoded );
+		}
+
+		if ( null === $context ) {
+			return array();
+		}
+
+		return array( 'value' => $context );
+	}
+
+	/**
+	 * Append one entry to the migration log option with bounded retention.
+	 *
+	 * @param array $entry Log entry.
+	 * @return void
+	 */
+	private function append_log_entry( array $entry ) {
+		$logs = get_option( 'efs_migration_log', array() );
+		$logs = is_array( $logs ) ? $logs : array();
+
+		array_unshift( $logs, $entry );
+		if ( count( $logs ) > self::MAX_LOG_ENTRIES ) {
+			$logs = array_slice( $logs, 0, self::MAX_LOG_ENTRIES );
+		}
+
+		update_option( 'efs_migration_log', $logs, false );
 	}
 
 	/**

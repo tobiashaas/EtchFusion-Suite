@@ -815,19 +815,8 @@ class EFS_API_Endpoints {
 		// The Bricks source dashboard calls it from an unknown origin; the pairing code
 		// provides authentication. See enforce_cors_globally() for the bypass.
 
-		// Pairing code validation (required).
-		$pairing_code = $request->get_param( 'pairing_code' );
-		$pairing_code = is_string( $pairing_code ) ? trim( $pairing_code ) : '';
-		if ( '' === $pairing_code ) {
-			return new \WP_Error( 'missing_pairing_code', 'A pairing code is required.', array( 'status' => 403 ) );
-		}
-		$token_manager_for_pairing = self::resolve( 'token_manager' );
-		if ( $token_manager_for_pairing ) {
-			$pairing_check = $token_manager_for_pairing->validate_and_consume_pairing_code( $pairing_code );
-			if ( is_wp_error( $pairing_check ) ) {
-				return new \WP_Error( 'invalid_pairing_code', $pairing_check->get_error_message(), array( 'status' => 403 ) );
-			}
-		}
+		// Pairing validation is handled in require_valid_pairing_code_permission().
+		// Do not consume the one-time code again here.
 
 		$source_url = $request->get_param( 'source_url' );
 		$source_url = ( is_string( $source_url ) && '' !== trim( $source_url ) )
