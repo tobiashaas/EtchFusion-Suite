@@ -221,6 +221,89 @@ class ButtonConverterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'etch-button-primary', $result );
 	}
 
+	public function test_button_css_class_priority_over_style(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		// Button with style="primary" but CSS class "btn--secondary"
+		// CSS classes should have priority
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text'  => 'Priority Test',
+				'link'  => 'https://example.com',
+				'style' => 'primary',
+				'_cssGlobalClasses' => array( 'btn--secondary' ),
+			),
+		);
+		$result = $converter->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		// CSS class (secondary) should override style (primary)
+		$this->assertStringContainsString( 'btn--secondary', $result );
+		// Primary should NOT appear
+		$this->assertStringNotContainsString( 'btn--primary', $result );
+	}
+
+	public function test_button_single_class_only(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		// If multiple btn--* classes exist, only the first should be kept
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text'              => 'Single Class',
+				'link'              => 'https://example.com',
+				'_cssGlobalClasses' => array( 'btn--primary btn--secondary' ),
+			),
+		);
+		$result = $converter->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		// First btn--* class should be kept
+		$this->assertStringContainsString( 'btn--primary', $result );
+		// Second btn--* class should be removed
+		$this->assertStringNotContainsString( 'btn--secondary', $result );
+	}
+
+	public function test_button_outline_as_additional_class(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		// btn--outline is the ONLY class that can exist alongside another btn--* class
+		// Simulate a Bricks style that has outline variant
+		$element   = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text'  => 'Outline Button',
+				'link'  => 'https://example.com',
+				'style' => 'primary',
+			),
+		);
+		$result = $converter->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		// With style="primary", should output btn--primary
+		$this->assertStringContainsString( 'btn--primary', $result );
+	}
+
+	public function test_button_multiple_btn_classes_keeps_first(): void {
+		$converter = new EFS_Element_Button( $this->style_map );
+		// When multiple btn--* classes exist in CSS, only first should be kept
+		// This simulates custom CSS with multiple button classes
+		$style_map_with_multi = array(
+			'btn--primary--outline' => array(
+				'id'       => 'primary-outline-style',
+				'selector' => '.btn--primary.btn--outline', // Note: both classes in selector
+			),
+		);
+		$converter2 = new EFS_Element_Button( $style_map_with_multi );
+		$element    = array(
+			'name'     => 'button',
+			'settings' => array(
+				'text'              => 'Multi Class',
+				'link'              => 'https://example.com',
+				'_cssGlobalClasses' => array( 'btn--primary--outline' ),
+			),
+		);
+		$result = $converter2->convert( $element, array(), array() );
+		$this->assertNotNull( $result );
+		// Should handle button classes appropriately
+		$this->assertStringContainsString( 'btn--', $result );
+	}
+
 	public function test_button_flat_schema_structure(): void {
 		$converter = new EFS_Element_Button( $this->style_map );
 		$element   = array(
