@@ -2044,6 +2044,23 @@ The previous Docker Compose setup remains in `test-environment/docker-compose.ym
 
 Etch Fusion Suite applies a layered security model that consolidates nonce verification, capability checks, rate limiting, CORS validation, and audit logging.
 
+### Comprehensive Security Audit
+
+A detailed security audit verifying **91% explicit endpoint coverage** with proper nonce/permission controls is maintained in **[SECURITY_AUDIT.md](./SECURITY_AUDIT.md)**. This document covers:
+
+- All 22 REST API endpoints with permission callbacks
+- 3 AJAX handlers with 100% nonce verification
+- JWT bearer token authentication (HMAC-SHA256)
+- Compensating controls for intentionally public endpoints
+- Audit logging infrastructure and monitoring recommendations
+
+**Key Metrics:**
+- REST endpoints: 20/22 properly secured (91%)
+- AJAX handlers: 3/3 with nonce verification (100%)
+- Migration tokens: 8-hour TTL JWT with signature validation
+- Rate limiting: 10-60 req/60s per endpoint
+- Audit logging: Comprehensive security event tracking
+
 ### Security Architecture
 
 Full architecture details, including handler walkthroughs and rate limit tables, are tracked in `docs/security-architecture.md`.

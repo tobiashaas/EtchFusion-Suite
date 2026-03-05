@@ -106,7 +106,7 @@ class EFS_Element_Button extends EFS_Base_Element {
 					'styles'     => $this->normalize_style_ids( $child_style_ids ),
 				);
 
-				$attrs_json  = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+				$attrs_json   = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 				$icon_blocks .= '<!-- wp:etch/svg ' . $attrs_json . ' -->' . "\n" .
 					'<!-- /wp:etch/svg -->' . "\n";
 			}
