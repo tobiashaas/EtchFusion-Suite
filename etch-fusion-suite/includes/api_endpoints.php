@@ -91,15 +91,15 @@ class EFS_API_Endpoints {
 	 * Initialize the API endpoints
 	 */
 	public static function init() {
-		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
-		add_action( 'wp_ajax_efs_dismiss_migration_run', array( __CLASS__, 'dismiss_migration_run' ) );
-		add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
-		add_action( 'wp_ajax_efs_revoke_migration_key', array( __CLASS__, 'revoke_migration_key' ) );
+		\add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
+		\add_action( 'wp_ajax_efs_dismiss_migration_run', array( __CLASS__, 'dismiss_migration_run' ) );
+		\add_action( 'wp_ajax_efs_get_dismissed_migration_runs', array( __CLASS__, 'get_dismissed_migration_runs' ) );
+		\add_action( 'wp_ajax_efs_revoke_migration_key', array( __CLASS__, 'revoke_migration_key' ) );
 
 		// Add CORS headers via rest_pre_serve_request, which fires before any output is sent.
 		// This ensures headers are settable via header() for all /efs/v1/* responses,
 		// including 4xx errors that the browser must be able to read cross-origin.
-		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'add_cors_headers_to_request' ), 10, 4 );
+		\add_filter( 'rest_pre_serve_request', array( __CLASS__, 'add_cors_headers_to_request' ), 10, 4 );
 	}
 
 	/**
