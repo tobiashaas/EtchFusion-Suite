@@ -12,12 +12,17 @@ use Bricks2Etch\Core\EFS_Migration_Manager;
 use Bricks2Etch\Migrators\EFS_Migrator_Registry;
 use Bricks2Etch\Migrators\Interfaces\Migrator_Interface;
 use Bricks2Etch\Security\EFS_Input_Validator;
+use Bricks2Etch\Security\EFS_CORS_Manager;
+use Bricks2Etch\Api\EFS_API_Permissions;
 
 // Prevent direct access
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 	return true;
 }
+
+// Load API permissions class
+require_once __DIR__ . '/class-permissions.php';
 
 /**
  * EFS_API_Endpoints class.
@@ -198,69 +203,12 @@ class EFS_API_Endpoints {
 	}
 
 	/**
-	 * Handle template extraction via REST.
-	 *
-	 * @param  \WP_REST_Request $request REST request.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public static function extract_template_rest( $request ) {
-		if ( ! \efs_is_framer_enabled() ) {
-			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
-		}
-
-		$rate = self::enforce_template_rate_limit( 'extract', 15 );
-		if ( is_wp_error( $rate ) ) {
-			return $rate;
-		}
-
-		$template_controller = self::resolve( 'template_controller' );
-		if ( ! $template_controller ) {
-			return new \WP_Error( 'template_service_unavailable', __( 'Template extractor is not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
-		}
-
-		$raw_params = $request->get_json_params();
-		$params     = self::validate_request_data(
-			is_array( $raw_params ) ? $raw_params : array(),
-			array(
-				'source'      => array(
-					'type'       => 'text',
-					'required'   => true,
-					'max_length' => 2048,
-				),
-				'source_type' => array(
-					'type'       => 'text',
-					'required'   => true,
-					'max_length' => 10,
-				),
-			)
-		);
-
-		if ( is_wp_error( $params ) ) {
-			return $params;
-		}
-
-		$source      = $params['source'];
-		$source_type = $params['source_type'];
-
-		$result = $template_controller->extract_template( $source, $source_type );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return new \WP_REST_Response( $result, 200 );
-	}
-
-	/**
 	 * Provide saved templates listing via REST.
 	 *
 	 * @param  \WP_REST_Request $request REST request.
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public static function get_saved_templates_rest( $request ) {
-		if ( ! \efs_is_framer_enabled() ) {
-			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
-		}
-
 		$rate = self::enforce_template_rate_limit( 'list', 30 );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
@@ -272,126 +220,6 @@ class EFS_API_Endpoints {
 		}
 
 		return new \WP_REST_Response( $template_controller->get_saved_templates(), 200 );
-	}
-
-	/**
-	 * Preview template content via REST.
-	 *
-	 * @param  \WP_REST_Request $request REST request.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public static function preview_template_rest( $request ) {
-		if ( ! \efs_is_framer_enabled() ) {
-			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
-		}
-
-		$rate = self::enforce_template_rate_limit( 'preview', 25 );
-		if ( is_wp_error( $rate ) ) {
-			return $rate;
-		}
-
-		$template_controller = self::resolve( 'template_controller' );
-		if ( ! $template_controller ) {
-			return new \WP_Error( 'template_service_unavailable', __( 'Template controller not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
-		}
-
-		$template_id = (int) $request->get_param( 'id' );
-		if ( $template_id <= 0 ) {
-			return new \WP_Error( 'invalid_template_id', __( 'Template ID must be a positive integer.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
-		}
-
-		$result = $template_controller->preview_template( $template_id );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return new \WP_REST_Response( $result, 200 );
-	}
-
-	/**
-	 * Delete a saved template via REST.
-	 *
-	 * @param  \WP_REST_Request $request REST request.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public static function delete_template_rest( $request ) {
-		if ( ! \efs_is_framer_enabled() ) {
-			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
-		}
-
-		$rate = self::enforce_template_rate_limit( 'delete', 15 );
-		if ( is_wp_error( $rate ) ) {
-			return $rate;
-		}
-
-		$template_controller = self::resolve( 'template_controller' );
-		if ( ! $template_controller ) {
-			return new \WP_Error( 'template_service_unavailable', __( 'Template controller not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
-		}
-
-		$template_id = (int) $request->get_param( 'id' );
-		if ( $template_id <= 0 ) {
-			return new \WP_Error( 'invalid_template_id', __( 'Template ID must be provided.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
-		}
-
-		$result = $template_controller->delete_template( $template_id );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return new \WP_REST_Response( array( 'deleted' => true ), 200 );
-	}
-
-	/**
-	 * Import template payload via REST.
-	 *
-	 * @param  \WP_REST_Request $request REST request.
-	 * @return \WP_REST_Response|\WP_Error
-	 */
-	public static function import_template_rest( $request ) {
-		if ( ! \efs_is_framer_enabled() ) {
-			return new \WP_Error( 'framer_disabled', __( 'Framer template extraction is not available.', 'etch-fusion-suite' ), array( 'status' => 403 ) );
-		}
-
-		$rate = self::enforce_template_rate_limit( 'import', 10 );
-		if ( is_wp_error( $rate ) ) {
-			return $rate;
-		}
-
-		$template_controller = self::resolve( 'template_controller' );
-		if ( ! $template_controller ) {
-			return new \WP_Error( 'template_service_unavailable', __( 'Template controller not available.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
-		}
-
-		$raw_params = $request->get_json_params();
-		$params     = self::validate_request_data(
-			is_array( $raw_params ) ? $raw_params : array(),
-			array(
-				'payload' => array(
-					'type'     => 'array',
-					'required' => true,
-				),
-				'name'    => array(
-					'type'       => 'text',
-					'required'   => false,
-					'max_length' => 255,
-				),
-			)
-		);
-
-		if ( is_wp_error( $params ) ) {
-			return $params;
-		}
-
-		$payload = $params['payload'];
-		$name    = isset( $params['name'] ) ? $params['name'] : null;
-
-		$result = $template_controller->import_template( $payload, $name );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return new \WP_REST_Response( array( 'id' => $result ), 201 );
 	}
 
 	/**
@@ -426,6 +254,15 @@ class EFS_API_Endpoints {
 		if ( $container->has( 'cors_manager' ) ) {
 			self::$cors_manager = $container->get( 'cors_manager' );
 		}
+
+		// Initialize permissions class with required services
+		if ( $container->has( 'token_manager' ) ) {
+			EFS_API_Permissions::set_token_manager( $container->get( 'token_manager' ) );
+		}
+		if ( $container->has( 'cors_manager' ) ) {
+			EFS_API_Permissions::set_cors_manager( $container->get( 'cors_manager' ) );
+		}
+
 		if ( $container->has( 'migrator_registry' ) ) {
 			self::$migrator_registry = $container->get( 'migrator_registry' );
 		}
@@ -954,18 +791,6 @@ class EFS_API_Endpoints {
 	 * @param  int    $window Window in seconds.
 	 * @return true|\WP_Error
 	 */
-	public static function enforce_template_rate_limit( $action, $limit, $window = 60 ) {
-		return self::handle_rate_limit( $action, $limit, $window );
-	}
-
-	/**
-	 * Check rate limit without recording on success.
-	 *
-	 * @param  string $action Action name.
-	 * @param  int    $limit  Requests per window.
-	 * @param  int    $window Window in seconds.
-	 * @return true|\WP_Error
-	 */
 	public static function check_rate_limit( $action, $limit, $window = 60 ) {
 		return self::handle_rate_limit( $action, $limit, $window );
 	}
@@ -1104,6 +929,15 @@ class EFS_API_Endpoints {
 		$validated = $token_manager->validate_migration_token( $token );
 		if ( is_wp_error( $validated ) ) {
 			return new \WP_Error( 'invalid_migration_token', $validated->get_error_message(), array( 'status' => 401 ) );
+		}
+
+		// Dynamically whitelist the source domain for CORS (1 hour TTL)
+		// This eliminates the need for manual CORS whitelist configuration in production
+		if ( ! empty( $validated['domain'] ) ) {
+			$cors_manager = self::resolve( 'cors_manager' );
+			if ( $cors_manager && method_exists( $cors_manager, 'whitelist_domain_temporarily' ) ) {
+				$cors_manager->whitelist_domain_temporarily( $validated['domain'] );
+			}
 		}
 
 		return $validated;
@@ -2313,71 +2147,6 @@ class EFS_API_Endpoints {
 	public static function register_routes() {
 		$namespace = 'efs/v1';
 
-		// Template extractor routes are only exposed when Framer extraction is enabled at the PHP level.
-		if ( \efs_is_framer_enabled() ) {
-			register_rest_route(
-				$namespace,
-				'/template/extract',
-				array(
-					'callback'            => array( __CLASS__, 'extract_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
-					'methods'             => \WP_REST_Server::CREATABLE,
-				)
-			);
-
-			register_rest_route(
-				$namespace,
-				'/template/saved',
-				array(
-					'callback'            => array( __CLASS__, 'get_saved_templates_rest' ),
-					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
-					'methods'             => \WP_REST_Server::READABLE,
-				)
-			);
-
-			register_rest_route(
-				$namespace,
-				'/template/preview/(?P<id>\d+)',
-				array(
-					'callback'            => array( __CLASS__, 'preview_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
-					'args'                => array(
-						'id' => array(
-							'required'          => true,
-							'sanitize_callback' => 'absint',
-						),
-					),
-					'methods'             => \WP_REST_Server::READABLE,
-				)
-			);
-
-			register_rest_route(
-				$namespace,
-				'/template/(?P<id>\d+)',
-				array(
-					'callback'            => array( __CLASS__, 'delete_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
-					'args'                => array(
-						'id' => array(
-							'required'          => true,
-							'sanitize_callback' => 'absint',
-						),
-					),
-					'methods'             => \WP_REST_Server::DELETABLE,
-				)
-			);
-
-			register_rest_route(
-				$namespace,
-				'/template/import',
-				array(
-					'callback'            => array( __CLASS__, 'import_template_rest' ),
-					'permission_callback' => array( __CLASS__, 'require_admin_permission' ),
-					'methods'             => \WP_REST_Server::CREATABLE,
-				)
-			);
-		}
-
 		register_rest_route(
 			$namespace,
 			'/status',
@@ -2563,13 +2332,8 @@ class EFS_API_Endpoints {
 	 * @param  \WP_REST_Request $request REST request.
 	 * @return bool|\WP_Error
 	 */
-	public static function allow_public_request( $request ) {  // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		$cors = self::check_cors_origin();
-		if ( is_wp_error( $cors ) ) {
-			return $cors;
-		}
-
-		return true;
+	public static function allow_public_request( $request ) {
+		return EFS_API_Permissions::allow_public_request( $request );
 	}
 
 	/**
@@ -2583,16 +2347,8 @@ class EFS_API_Endpoints {
 	 * @param  \WP_REST_Request $request REST request.
 	 * @return bool|\WP_Error
 	 */
-	public static function require_admin_permission( $request ) {  // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'You do not have permission to access this endpoint.', 'etch-fusion-suite' ),
-				array( 'status' => 403 )
-			);
-		}
-
-		return true;
+	public static function require_admin_permission( $request ) {
+		return EFS_API_Permissions::require_admin_permission( $request );
 	}
 
 	/**
@@ -2608,29 +2364,8 @@ class EFS_API_Endpoints {
 	 * @param  \WP_REST_Request $request REST request.
 	 * @return true|\WP_Error
 	 */
-	public static function require_admin_with_cookie_fallback( $request ) {  // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
-		// Standard path: REST middleware already set the current user.
-		if ( current_user_can( 'manage_options' ) ) {
-			return true;
-		}
-
-		// Fallback: validate the logged-in cookie directly. Some hosting
-		// environments strip authentication headers or cookies from REST
-		// requests before they reach WordPress, causing current_user_can()
-		// to return false even for a fully authenticated admin session.
-		$user_id = wp_validate_auth_cookie( '', 'logged_in' );
-		if ( $user_id ) {
-			wp_set_current_user( $user_id );
-			if ( current_user_can( 'manage_options' ) ) {
-				return true;
-			}
-		}
-
-		return new \WP_Error(
-			'rest_forbidden',
-			__( 'You do not have permission to access this endpoint.', 'etch-fusion-suite' ),
-			array( 'status' => 403 )
-		);
+	public static function require_admin_with_cookie_fallback( $request ) {
+		return EFS_API_Permissions::require_admin_with_cookie_fallback( $request );
 	}
 
 	/**
@@ -2645,12 +2380,7 @@ class EFS_API_Endpoints {
 	 * @return bool|\WP_Error
 	 */
 	public static function require_migration_token_permission( $request ) {
-		$token_result = self::validate_bearer_migration_token( $request );
-		if ( is_wp_error( $token_result ) ) {
-			return $token_result;
-		}
-
-		return true;
+		return EFS_API_Permissions::require_migration_token_permission( $request );
 	}
 
 	/**
@@ -2666,45 +2396,7 @@ class EFS_API_Endpoints {
 	 * @return bool|\WP_Error
 	 */
 	public static function require_admin_or_body_migration_token_permission( $request ) {
-		// Accept logged-in administrators (cookie + REST nonce or application password).
-		if ( current_user_can( 'manage_options' ) ) {
-			return true;
-		}
-
-		// Accept requests that carry a valid migration token in the JSON body.
-		$body = $request->get_json_params();
-		$body = is_array( $body ) ? $body : array();
-
-		if ( empty( $body['migration_key'] ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'Authentication required: provide admin credentials or a valid migration token.', 'etch-fusion-suite' ),
-				array( 'status' => 401 )
-			);
-		}
-
-		/**
-	* @var EFS_Migration_Token_Manager $token_manager
-*/
-		$token_manager = self::resolve( 'token_manager' );
-		if ( ! $token_manager ) {
-			return new \WP_Error(
-				'token_manager_unavailable',
-				__( 'Token manager unavailable.', 'etch-fusion-suite' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		$result = $token_manager->validate_migration_token( sanitize_text_field( $body['migration_key'] ) );
-		if ( is_wp_error( $result ) ) {
-			return new \WP_Error(
-				'rest_forbidden',
-				__( 'Invalid or expired migration token.', 'etch-fusion-suite' ),
-				array( 'status' => 401 )
-			);
-		}
-
-		return true;
+		return EFS_API_Permissions::require_admin_or_body_migration_token_permission( $request );
 	}
 
 	/**
@@ -2720,41 +2412,7 @@ class EFS_API_Endpoints {
 	 * @return bool|\WP_Error
 	 */
 	public static function require_valid_pairing_code_permission( $request ) {
-		// Extract pairing code from request parameters.
-		$pairing_code = $request->get_param( 'pairing_code' );
-		$pairing_code = is_string( $pairing_code ) ? trim( $pairing_code ) : '';
-
-		if ( '' === $pairing_code ) {
-			return new \WP_Error(
-				'missing_pairing_code',
-				__( 'Pairing code is required.', 'etch-fusion-suite' ),
-				array( 'status' => 403 )
-			);
-		}
-
-		// Validate and consume the pairing code (single-use).
-		/**
-		 * @var EFS_Migration_Token_Manager $token_manager
-		 */
-		$token_manager = self::resolve( 'token_manager' );
-		if ( ! $token_manager ) {
-			return new \WP_Error(
-				'token_manager_unavailable',
-				__( 'Token manager unavailable.', 'etch-fusion-suite' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		$pairing_check = $token_manager->validate_and_consume_pairing_code( $pairing_code );
-		if ( is_wp_error( $pairing_check ) ) {
-			return new \WP_Error(
-				'invalid_pairing_code',
-				$pairing_check->get_error_message(),
-				array( 'status' => 403 )
-			);
-		}
-
-		return true;
+		return EFS_API_Permissions::require_valid_pairing_code_permission( $request );
 	}
 
 	/**
@@ -2768,8 +2426,6 @@ class EFS_API_Endpoints {
 	 * @return bool
 	 */
 	public static function allow_read_only_discovery_permission( $request ) {
-		// Public read-only endpoint protected by global rate limiting + CORS.
-		// No sensitive state is mutated; response contains only post type metadata.
-		return true;
+		return EFS_API_Permissions::allow_read_only_discovery_permission( $request );
 	}
 }

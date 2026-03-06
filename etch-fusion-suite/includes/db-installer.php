@@ -429,45 +429,40 @@ class EFS_DB_Installer {
 	}
 
 	/**
-	 * Uninstall: Delete all plugin data (called by uninstall hook)
+	 * Uninstall: Delete all plugin data (called by uninstall hook).
 	 *
-	 * WARNING: This completely removes all plugin data from database.
-	 * Called only when plugin is deleted (not deactivated).
+	 * WARNING: This completely removes all plugin data from the database.
+	 * Called only when the plugin is deleted (not deactivated).
+	 *
+	 * Cleanup strategy:
+	 *  1. Drop all three custom tables (efs_migrations, efs_migration_logs, efs_settings).
+	 *  2. Delete every wp_options row whose option_name starts with "efs_" — this covers
+	 *     both static options (efs_migration_jwt_secret, etc.) and dynamic per-migration
+	 *     options (efs_progress_data_UUID, efs_inline_css_123, etc.) without needing a
+	 *     growing hardcoded list.
+	 *  3. Same broad DELETE for transient rows (_transient_efs_* / _transient_timeout_efs_*).
+	 *  4. Remove all efs_* user-meta and Action Scheduler jobs.
 	 */
 	public static function uninstall() {
 		global $wpdb;
 
-		// Drop tables
+		// 1. Drop custom tables (all three: migrations, logs, settings).
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_migration_logs" );
 		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_migrations" );
+		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}efs_settings" );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
-		// Delete all plugin options
-		$efs_options = array(
-			'efs_settings',
-			'efs_db_version',
-			'efs_migration_progress',
-			'efs_migration_token',
-			'efs_migration_token_value',
-			'efs_migration_token_expires',
-			'efs_private_key',
-			'efs_error_log',
-			'efs_api_key',
-			'efs_import_api_key',
-			'efs_export_api_key',
-			'efs_migration_settings',
-			'efs_feature_flags',
-			'efs_audit_log',
-			'efs_cors_allowed_origins',
-			'efs_security_settings',
-			'efs_security_log',
-			'efs_migration_jwt_secret',
+		// 2. Delete all plugin wp_options rows (static + dynamic, e.g. efs_progress_data_UUID).
+		//    The efs_ prefix is exclusively ours, so a LIKE scan is safe and exhaustive.
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+				$wpdb->esc_like( 'efs_' ) . '%'
+			)
 		);
 
-		foreach ( $efs_options as $option ) {
-			delete_option( $option );
-		}
-
-		// Delete transients
+		// 3. Delete plugin transients (both value row and timeout row).
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
@@ -476,7 +471,7 @@ class EFS_DB_Installer {
 			)
 		);
 
-		// Delete user meta
+		// 4. Delete user meta added by this plugin.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s",
@@ -484,20 +479,20 @@ class EFS_DB_Installer {
 			)
 		);
 
-		// Delete all Action Scheduler tasks related to this plugin
+		// 5. Remove all Action Scheduler tasks registered by this plugin.
 		$wpdb->query(
 			$wpdb->prepare(
 				"DELETE FROM {$wpdb->prefix}actionscheduler_actions WHERE hook LIKE %s",
-				'%' . $wpdb->esc_like( 'efs_' ) . '%'
+				$wpdb->esc_like( 'efs_' ) . '%'
 			)
 		);
 
-		// Clear cache
+		// 6. Flush the object cache so stale efs_* values don't linger in memory.
 		if ( function_exists( 'wp_cache_flush' ) ) {
 			wp_cache_flush();
 		}
 
-		error_log( '[EFS] Plugin completely uninstalled - all data removed at ' . current_time( 'mysql' ) );
+		error_log( '[EFS] Plugin completely uninstalled - all data removed at ' . current_time( 'mysql' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 
 	/**

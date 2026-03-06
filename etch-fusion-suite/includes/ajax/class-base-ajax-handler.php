@@ -111,7 +111,12 @@ abstract class EFS_Base_Ajax_Handler {
 	}
 
 	/**
-	 * Verify request (nonce + capability)
+	 * Verify request (nonce + capability + rate limit)
+	 *
+	 * Rate limiting is applied per authenticated user (not per IP) so that
+	 * a single admin cannot programmatically flood sensitive endpoints.
+	 * Limit: 60 AJAX requests per minute per user — well above normal interactive
+	 * use but low enough to block scripted abuse.
 	 *
 	 * @param string $capability Default: 'manage_options'
 	 * @return bool
@@ -148,6 +153,23 @@ abstract class EFS_Base_Ajax_Handler {
 				403
 			);
 			return false;
+		}
+
+		// Rate limit per user: 60 requests/minute. The rate_limiter is injected via DI (or
+		// resolved from the container in the constructor). Skip silently when unavailable so
+		// tests and environments without the container still work.
+		if ( $this->rate_limiter ) {
+			$identifier = 'user_' . $user_id;
+			if ( $this->rate_limiter->check_rate_limit( $identifier, 'efs_ajax', 60, 60 ) ) {
+				wp_send_json_error(
+					array(
+						'message' => __( 'Too many requests. Please wait a moment before trying again.', 'etch-fusion-suite' ),
+						'code'    => 'rate_limit_exceeded',
+					),
+					429
+				);
+				return false;
+			}
 		}
 
 		// Successful auth is not logged — routine admin AJAX calls would flood

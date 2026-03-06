@@ -163,8 +163,9 @@ class EFS_Action_Scheduler_Loopback_Runner {
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		error_log( '[EFS] Loopback handler: REMOTE_ADDR = ' . $remote_addr );
 
-		// Allow localhost (127.0.0.1, ::1, localhost) and Docker private networks (10.x.x.x, 172.16.x.x-172.31.x.x, 192.168.x.x)
-		$is_localhost  = in_array( $remote_addr, array( '127.0.0.1', '::1', 'localhost' ), true );
+		// Allow localhost (127.0.0.1, ::1, localhost), Docker private networks (10.x.x.x, 172.16-31.x.x, 192.168.x.x),
+		// and the AWS/GCP instance metadata endpoint (169.254.169.254) for cloud deployments.
+		$is_localhost  = in_array( $remote_addr, array( '127.0.0.1', '::1', 'localhost', '169.254.169.254' ), true );
 		$is_private_ip = (bool) preg_match( '/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/', $remote_addr );
 
 		if ( ! ( $is_localhost || $is_private_ip ) ) {

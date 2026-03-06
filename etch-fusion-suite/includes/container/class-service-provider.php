@@ -354,49 +354,6 @@ class EFS_Service_Provider {
 			}
 		);
 
-		$container->singleton(
-			'html_sanitizer',
-			function ( $c ) {
-				return new \Bricks2Etch\Templates\EFS_Framer_HTML_Sanitizer( $c->get( 'error_handler' ), $c->get( 'input_validator' ) );
-			}
-		);
-
-		$container->singleton(
-			'template_analyzer',
-			function ( $c ) {
-				return new \Bricks2Etch\Templates\EFS_Framer_Template_Analyzer( $c->get( 'html_parser' ), $c->get( 'error_handler' ) );
-			}
-		);
-
-		$container->singleton(
-			'framer_to_etch_converter',
-			function ( $c ) {
-				return new \Bricks2Etch\Templates\EFS_Framer_To_Etch_Converter( $c->get( 'error_handler' ), $c->get( 'element_factory' ), $c->get( 'style_repository' ) );
-			}
-		);
-
-		$container->singleton(
-			'etch_template_generator',
-			function ( $c ) {
-				return new \Bricks2Etch\Templates\EFS_Etch_Template_Generator( $c->get( 'framer_to_etch_converter' ), $c->get( 'error_handler' ), $c->get( 'style_repository' ) );
-			}
-		);
-
-		$container->singleton(
-			'template_extractor_service',
-			function ( $c ) {
-				return new \Bricks2Etch\Services\EFS_Template_Extractor_Service(
-					$c->get( 'html_parser' ),
-					$c->get( 'html_sanitizer' ),
-					$c->get( 'template_analyzer' ),
-					$c->get( 'etch_template_generator' ),
-					$c->get( 'error_handler' ),
-					$c->get( 'input_validator' ),
-					$c->get( 'migration_repository' )
-				);
-			}
-		);
-
 		// Business Services
 		$container->singleton(
 			'phase_timer',
@@ -677,7 +634,6 @@ class EFS_Service_Provider {
 			'template_controller',
 			function ( $c ) {
 				return new \Bricks2Etch\Controllers\EFS_Template_Controller(
-					$c->get( 'template_extractor_service' ),
 					$c->get( 'input_validator' ),
 					$c->get( 'error_handler' )
 				);
@@ -787,18 +743,6 @@ class EFS_Service_Provider {
 		);
 
 		$container->singleton(
-			'template_ajax',
-			function ( $c ) {
-				return new \Bricks2Etch\Ajax\Handlers\EFS_Template_Ajax_Handler(
-					$c->get( 'template_controller' ),
-					$c->get( 'rate_limiter' ),
-					$c->get( 'input_validator' ),
-					$c->get( 'audit_logger' )
-				);
-			}
-		);
-
-		$container->singleton(
 			'wizard_ajax',
 			function ( $c ) {
 				return new \Bricks2Etch\Ajax\Handlers\EFS_Wizard_Ajax_Handler(
@@ -863,7 +807,6 @@ class EFS_Service_Provider {
 					$c->get( 'logs_ajax' ),
 					$c->get( 'connection_ajax' ),
 					$c->get( 'cleanup_ajax' ),
-					$c->get( 'template_ajax' ),
 					$c->get( 'migration_ajax' ),
 					$c->get( 'wizard_ajax' ),
 					$c->get( 'progress_ajax' ),
@@ -933,11 +876,6 @@ class EFS_Service_Provider {
 			'migrator_registry',
 			'migrator_discovery',
 			'html_parser',
-			'html_sanitizer',
-			'template_analyzer',
-			'framer_to_etch_converter',
-			'etch_template_generator',
-			'template_extractor_service',
 			'migration_logger',
 			'css_service',
 			'media_service',
@@ -967,7 +905,6 @@ class EFS_Service_Provider {
 			'logs_ajax',
 			'connection_ajax',
 			'cleanup_ajax',
-			'template_ajax',
 			'wizard_ajax',
 			'preflight_checker',
 			'preflight_ajax',

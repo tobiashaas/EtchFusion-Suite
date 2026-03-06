@@ -1760,7 +1760,8 @@ class EFS_Gutenberg_Generator {
 		// Check if container has a custom tag (e.g., ul, ol)
 		$tag = $element['settings']['tag'] ?? 'div';
 
-		$this->error_handler->log_info( 'Gutenberg Generator: Container element ' . $element['id'] . ' using tag ' . $tag . ' with settings ' . wp_json_encode( $element['settings'] ) );
+		// Pass settings as separate $data so wp_json_encode() is only called when WP_DEBUG is true.
+		$this->error_handler->log_info( 'Gutenberg Generator: Container element ' . $element['id'] . ' using tag ' . $tag, $element['settings'] );
 
 		$element['etch_type'] = 'container';
 		$element['etch_data'] = array(

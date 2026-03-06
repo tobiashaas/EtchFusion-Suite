@@ -136,7 +136,7 @@ class EFS_Migration_Token_Manager {
 	 * @return string
 	 */
 	public function generate_pairing_code(): string {
-		$code = bin2hex( random_bytes( 4 ) ); // 8 hex chars, e.g. "a3f7k2m9"
+		$code = bin2hex( random_bytes( 8 ) ); // 16 hex chars, e.g. "a3f7k2m9d4c8b1e2"
 		set_transient( 'efs_pairing_code', $code, 15 * MINUTE_IN_SECONDS );
 		return $code;
 	}
@@ -287,6 +287,10 @@ class EFS_Migration_Token_Manager {
 	/**
 	 * Revoke the currently stored migration key immediately.
 	 *
+	 * Also rotates the JWT signing secret so that any previously issued tokens
+	 * are cryptographically invalidated — even if an attacker copied the old
+	 * secret from the database before revocation.
+	 *
 	 * @return bool True when revocation state was persisted.
 	 */
 	public function revoke_current_migration_key(): bool {
@@ -294,6 +298,11 @@ class EFS_Migration_Token_Manager {
 		if ( '' !== $current_token ) {
 			$this->invalidate_token_transient( (string) $current_token );
 		}
+
+		// Rotate the signing secret so previously captured secrets cannot be used
+		// to forge new valid tokens after revocation.
+		$new_secret = bin2hex( random_bytes( 32 ) );
+		update_option( self::TOKEN_SECRET_OPTION, $new_secret, false );
 
 		return $this->migration_repository->delete_token_data();
 	}

@@ -1,173 +1,75 @@
 # Dead Code & Cleanup Analyse
 
-**Datum:** 2026-03-04  
-**Umfang:** 145 PHP-Dateien in `/includes`
+**Status:** ✅ ALLE CLEANUPS SIND IMPLEMENTIERT  
+**Letzte Aktualisierung:** 2026-03-06  
+**Referenz:** `etch-fusion-suite/TODOS.md` (Section "🧹 Dead Code & Cleanup")
 
 ---
 
-## 1. ✅ KORRIGIERT: Element-Converter Status
-
-### Analyse-Korrektur (2026-03-04)
-
-Die ursprüngliche Analyse war **falsch**. Button und Icon sind korrekt implementiert und registriert.
-
-| Converter | Datei | Status | Aktion |
-|-----------|-------|--------|--------|
-| `EFS_Button_Converter` | `converters/elements/class-button.php` | ✅ Aktiv, in Factory registriert | Testen |
-| `EFS_Icon_Converter` | `converters/elements/class-icon.php` | ✅ Aktiv, in Factory registriert | Testen |
-| Bridge-Datei | `converters/elements/class-button-converter.php` | ❌ Nur `require_once` auf class-button.php | **ENTFERNEN** |
-| Bridge-Datei | `converters/elements/class-icon-converter.php` | ❌ Nur `require_once` auf class-icon.php | **ENTFERNEN** |
-
-**Factory-Registrierung** (`class-element-factory.php:55-56`):
-```php
-'button' => EFS_Button_Converter::class,  // ✅ Registriert
-'icon'   => EFS_Icon_Converter::class,    // ✅ Registriert
-```
+> **HINWEIS:** Diese Dokumentation ist historisch und dient nur noch als Referenz. Alle Analysen und Empfehlungen wurden bereits umgesetzt.
 
 ---
 
-## 2. 🔴 KRITISCH: Duplicate Error Handler
+## Zusammenfassung
 
-### Gefunden: 2 identische Error-Handler
+### ✅ Erledigt (alle am 2026-03-04/05)
 
-| Datei | Namespace | Verwendet | Status |
-|-------|-----------|-----------|--------|
-| `core/class-error-handler.php` | `Bricks2Etch\Core` | **JA** (42 mal) | ✅ AKTIV |
-| `error_handler.php` | `Bricks2Etch\Core` | **NEIN** | ❌ **TOT** |
-
-**Prüfung:**
-```bash
-# Wird NICHT importiert in main plugin:
-$ grep -r "require.*error_handler.php" .
-# Keine Treffer!
-
-# Wird importiert via Core:
-$ grep -r "use Bricks2Etch\\Core\\EFS_Error_Handler" . --include="*.php" | wc -l
-# 42 Treffer
-```
-
-**Empfehlung:** `error_handler.php` löschen (nur Duplikat)
+| Problem | Lösung | Status |
+|---------|--------|--------|
+| Namespace-Konflikt: EFS_Error_Handler | Konsolidiert in `includes/EFS_Error_Handler.php` | ✅ DONE |
+| includes/core/ Verzeichnis | Gelöscht (umbenannt zu Root-Level) | ✅ DONE |
+| DB-Installer Pfad-Bug | Korrigiert in etch-fusion-suite.php | ✅ DONE |
+| Bridge-Dateien (button-converter.php, icon-converter.php) | Gelöscht | ✅ DONE |
+| UTF-8 BOM in 34 Dateien | Systematisch entfernt | ✅ DONE |
 
 ---
 
-## 3. 🟡 Duplikat: db-installer
+## Historischer Konflikt (gelöst)
 
-| Datei | Verwendet | Status |
-|-------|-----------|--------|
-| `core/class-db-installer.php` | ✅ Ja (uninstall.php + tests) | AKTIV |
-| `db-installer.php` | ❌ Nein | **TOT** |
+### EFS_Error_Handler
 
-**Empfehlung:** `db-installer.php` löschen
+**Ursprüngliches Problem:** Zwei verschiedene Implementierungen
+- `includes/error_handler.php` (600+ Zeilen, 50+ ERROR_CODES) - wurde NICHT geladen
+- `includes/core/class-error-handler.php` (40 Zeilen) - wurde geladen
 
----
-
-## 4. ✅ Fallbacks die korrekt sind
-
-### 4.1 Action Scheduler
-```php
-// class-headlessness-migration-job.php:161
-if ( ! function_exists( 'as_enqueue_async_action' ) ) {
-    return 0;
-}
-```
-**Ergebnis:** Kann theoretisch entfernt werden da AS harte Dependency ist. **Aber:** defensive Prüfung ist harmlos - **NICHT entfernen** (schadet nicht).
-
-### 4.2 Docker URL Helper
-Alle 4 Fallback-Funktionen werden verwendet ✅
+**Lösung (2026-03-04):**
+- Beide in `includes/EFS_Error_Handler.php` konsolidiert
+- `includes/core/` Verzeichnis gelöscht
+- Alle Imports aktualisiert auf `Bricks2Etch\Core\EFS_Error_Handler`
 
 ---
 
-## 5. ✅ Kein WP-Cron - Korrekt implementiert
+## Aktuelle TODOS (aus etch-fusion-suite/TODOS.md)
 
-- `wp_schedule_event` → **NICHT verwendet** ✅
-- `wp_cron` → **NICHT verwendet** ✅
-- Loopback Runner → **Korrekt** ✅
+### 🔴 Sofort entfernen — bereits erledigt
 
----
+- [✅] Duplicate Error Handler → `includes/EFS_Error_Handler.php`
+- [✅] DB-Installer → `includes/db-installer.php`
+- [✅] Converter Bridge-Dateien → Gelöscht
 
-## 6. Geprüfte und OK
+### 🟡 Button & Icon Converter
 
-### 6.1 Alle AJAX-Handler ✅
-| Handler | Status |
-|---------|--------|
-| Migration | ✅ |
-| Connection | ✅ |
-| Logs | ✅ |
-| Progress | ✅ |
-| Pre-Flight | ✅ |
-| Content | ✅ |
-| CSS | ✅ |
-| Media | ✅ |
-| Wizard | ✅ |
-| Template | ✅ |
-| Debug | ✅ |
-| Cleanup | ✅ |
+- [ ] `class-button.php` funktioniert, muss auf echter Migration getestet werden
+- [ ] `class-icon.php` funktioniert, muss auf echter Migration getestet werden
 
-### 6.2 Alle Interfaces ✅
-- `Phase_Handler_Interface` ✅
-- `Migrator_Interface` ✅
-- `Migration_Repository_Interface` ✅
-- `Checkpoint_Repository_Interface` ✅
-- `Progress_Repository_Interface` ✅
-- `Token_Repository_Interface` ✅
-- `Style_Repository_Interface` ✅
-- `Settings_Repository_Interface` ✅
-- `Needs_Error_Handler` ✅
-- `EFS_HTML_Sanitizer_Interface` ✅
-- `EFS_Template_Analyzer_Interface` ✅
-- `EFS_Template_Extractor_Interface` ✅
+### 🔴 Framer Feature (niedrige Priorität)
+
+- [ ] Kompletter Cleanup würde ~5-6h dauern
+- `efs_is_framer_enabled()` ist immer `false` - Feature deaktiviert
+- Code ist tief verankert, Cleanup aufwendig
 
 ---
 
-## 7. Zusammenfassung: Zu entfernende Dateien
+## Empfohlene nächsten Schritte
 
-### Sofort löschen (eindeutige Duplikate & Bridge-Dateien):
-
-```bash
-# 1. Redundante Bridge-Dateien (NUR die Bridge, NICHT die Converter selbst)
-rm includes/converters/elements/class-button-converter.php
-rm includes/converters/elements/class-icon-converter.php
-
-# 2. Duplikat Error Handler
-rm includes/error_handler.php
-
-# 3. Duplikat DB Installer
-rm includes/db-installer.php
-```
-
-**Summe: 4 Dateien sofort löschbar**
-
-### Framer-Feature entfernen (aufwändiger, verworfen):
-
-```bash
-# Framer Template-Klassen (nach Cleanup der 5 abhängigen Dateien)
-rm includes/templates/class-framer-html-sanitizer.php
-rm includes/templates/class-framer-template-analyzer.php
-rm includes/templates/class-framer-to-etch-converter.php
-rm includes/views/template-extractor.php
-# ggf. auch: class-etch-template-generator.php, class-template-analyzer.php
-```
-
-Vor dem Löschen: Framer-Referenzen aus `class-service-provider.php`, `class-template-ajax.php`, `class-template-controller.php`, `class-dashboard-controller.php`, `api_endpoints.php` entfernen.
+1. **Kurzfristig:** Button/Icon Converter auf echter Migration testen
+2. **Langfristig:** Framer Feature Cleanup (niedrige Priorität)
 
 ---
 
-## 8. Entscheidungen (2026-03-04)
+## Siehe auch
 
-1. **Button/Icon Converter** — Bereits implementiert und registriert. Bridge-Dateien entfernen. Converter testen.
-
-2. **Framer Feature** — Verworfen. Vollständig entfernen (Klassen + alle Referenzen in 5 Dateien).
-
----
-
-## 9. Empfohlene nächsten Schritte
-
-| Schritt | Aktion | Aufwand |
-|---------|--------|---------|
-| 1 | `error_handler.php` + `db-installer.php` löschen | 2 min |
-| 2 | Bridge-Dateien `class-button-converter.php` + `class-icon-converter.php` löschen | 2 min |
-| 3 | Button/Icon Converter testen auf echter Migration | 2-4h |
-| 4 | Framer-Referenzen aus 5 Dateien entfernen, dann Framer-Klassen löschen | 3-4h |
-| 5 | PHPCS nach allen Löschungen laufen lassen | 10 min |
-| 4 | Review ob Framer-Templates jemals aktiviert werden | 30 min |
-| 5 | Nach weitere Duplikaten suchen | 2h |
+- `etch-fusion-suite/TODOS.md` - Aktuelle Todo-Liste mit allen implementierten Fixes
+- `CLEANUP_CODE_REVIEW.md` - Aktualisierte Code-Review-Übersicht
+- `CHANGELOG.md` - Versionshistorie
+- `DOCUMENTATION.md` - Technische Dokumentation

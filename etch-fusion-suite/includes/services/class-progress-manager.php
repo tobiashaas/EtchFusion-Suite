@@ -290,17 +290,36 @@ class EFS_Progress_Manager {
 	/**
 	 * Increment headless job re-enqueue count (for monitoring).
 	 *
-	 * @return int New count.
+	 * Uses a dedicated wp_option with an atomic SQL UPDATE to avoid race conditions
+	 * when multiple headless jobs enqueue simultaneously. The counter is diagnostic-only
+	 * (triggers a warning at > 50) so occasional off-by-ones in the old Read-Modify-Write
+	 * pattern could silently suppress the warning under parallel load.
+	 *
+	 * @return int New count after increment.
 	 */
 	public function increment_headless_job_count(): int {
-		$progress = $this->progress_repository->get_progress();
-		if ( ! is_array( $progress ) ) {
-			$progress = array();
+		global $wpdb;
+
+		$option_name = 'efs_headless_job_count';
+
+		// Atomic increment: a single UPDATE avoids the Read-Modify-Write race.
+		$rows_updated = (int) $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->prepare(
+				"UPDATE {$wpdb->options} SET option_value = option_value + 1 WHERE option_name = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$option_name
+			)
+		);
+
+		if ( 0 === $rows_updated ) {
+			// First call: option does not exist yet — insert with initial value 1.
+			add_option( $option_name, 1, '', 'no' );
+			return 1;
 		}
-		$count                          = isset( $progress['headless_job_count'] ) ? max( 0, (int) $progress['headless_job_count'] ) : 0;
-		$progress['headless_job_count'] = $count + 1;
-		$this->progress_repository->save_progress( $progress );
-		return $progress['headless_job_count'];
+
+		// Bust the options object cache so get_option reads the incremented DB value.
+		wp_cache_delete( $option_name, 'options' );
+
+		return (int) get_option( $option_name, 1 );
 	}
 
 	/**

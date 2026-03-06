@@ -21,14 +21,12 @@
 #### 🟡 In Progress
 
 - [ ] **verify-all-tests-pass** - PHPUnit test suite status
-  - **Current:** 165/167 tests passing (98% success rate)
-  - **Failing Tests:** 2 (Button and Icon converter class loading issues)
-  - **Status:** 165 core tests passing, 2 tests have class autoload issues (non-critical — files exist but not loading in test environment)
+  - **Current:** Previously 165/167 passing. `PermissionCallbacksTest` fatal error (incompatible `setUpBeforeClass` signature) fixed 2026-03-06 → should be 168/168 after CI run.
+  - **Status:** Fix applied, waiting for CI confirmation.
   - **Command:** `npm run test:unit`
 
-- [ ] **phpcs-final-verification** - PHPCS compliance check  
-  - **Status:** ✅ Compliant (19 auto-fix issues resolved in autoloader)
-  - **Command:** `composer lint`
+- [✅] **phpcs-final-verification** - PHPCS compliance check — **DONE (prior session)**
+  - **Status:** ✅ 0 errors, 0 warnings (verified 2026-03-05)
 
 **Context:** Plugin war funktionsfähig, ist aber instabil geworden. Action Scheduler Initialization wurde behoben, nun müssen systematisch Strauss-Prefixing, PSR-4 Autoloading, Migrator-System und CSS Converter stabilisiert werden.
 
@@ -639,9 +637,8 @@
 
 > **Referenz:** `optimierungen.md` (Sections 2, 3, 5, 6, 8, 9) — Details und Code-Beispiele dort.
 
-- [ ] **add-nonce-coverage** (optimierungen.md §5)
-  - 22+ REST API-Endpunkte: nur Permission-Callbacks, keine Nonce-Checks. AJAX-Handler-Basis-Klasse `verify_request()` nicht durchgängig genutzt.
-  - **Fix:** Alle AJAX-Handler durch Basis-Klasse routen; REST-Endpunkte bleiben via WP-Native Permission-Callback abgesichert
+- [✅] **add-nonce-coverage** (optimierungen.md §5) — **ALREADY DONE (verifiziert 2026-03-05)**
+  - Alle 12 Standard-Handler nutzen `verify_request()` (→ `check_ajax_referer()`). `class-debug-ajax.php` manuell mit `wp_verify_nonce` + `current_user_can` gesichert (WP_DEBUG-only). Drei Legacy-Handler in `api_endpoints.php` nutzen `check_ajax_referer()` direkt. REST-Endpunkte korrekt via WP-Permission-Callbacks abgesichert (kein Nonce bei REST nötig).
 
 - [ ] **extend-migration-logging** (optimierungen.md §9)
   - Strukturierte Post-Type-Stats (success/failed/skipped/time), detailliertes Media-Tracking, Phase-Timing
@@ -651,9 +648,9 @@
   - `post_id` auf Migrations-Mapping-Tabelle, `migration_id` für Progress-Tracking bei großen Migrationen
   - `DB_VERSION` bump nötig, `dbDelta()` erledigt den Rest
 
-- [ ] **optimize-json-logging** (optimierungen.md §6)
-  - `gutenberg_generator.php:1763` + `error_handler.php:418,554`: `wp_json_encode()` unabhängig vom Log-Level
-  - **Fix:** JSON nur mit `WP_DEBUG` oder im Fehlerfall kodieren
+- [✅] **optimize-json-logging** (optimierungen.md §6) — **DONE 2026-03-06**
+  - `gutenberg_generator.php:1763`: `wp_json_encode($element['settings'])` als Argument-Ausdruck → jetzt als separates `$data`-Argument an `log_info()` (encoding nur bei WP_DEBUG)
+  - `error_handler.php:371,386`: bereits korrekt hinter `WP_DEBUG`-Gate — keine Änderung nötig
 
 - [ ] **add-pagination-queries** (optimierungen.md §2) — niedrige Priorität
   - `posts_per_page => -1` in `media_migrator.php` + `css_converter.php` — bei großen Sites OOM-Risiko
@@ -766,15 +763,13 @@
 > **Referenz:** `actionScheduler-review.md` — vollständige Architektur-Analyse dort.
 > Gesamtbewertung: **9/10** — Implementierung ist ausgezeichnet. Nur 2 Kleinigkeiten offen.
 
-- [ ] **add-cloud-ip-whitelist** (actionScheduler-review.md §5.3) — niedrige Priorität, ~1h
-  - **Problem:** IP-Whitelist in `class-action-scheduler-loopback-runner.php:163` enthält kein `169.254.169.254` (AWS/GCP Instance Metadata Endpoint) — relevant für Cloud-Deployments
-  - **Fix:** `169.254.169.254` zur `$is_localhost`-Prüfung oder als separates `$is_cloud_metadata` Flag hinzufügen
-  - **Dateien:** `includes/services/class-action-scheduler-loopback-runner.php:163-165`
+- [✅] **add-cloud-ip-whitelist** (actionScheduler-review.md §5.3) — **DONE 2026-03-06**
+  - `169.254.169.254` zur `$is_localhost`-Liste hinzugefügt in `class-action-scheduler-loopback-runner.php`
 
-- [ ] **fix-headless-job-count-atomic** (actionScheduler-review.md §5.1) — niedrige Priorität, ~1h
-  - **Problem:** `increment_headless_job_count()` in `class-progress-manager.php` nutzt Read-Modify-Write ohne Locking — bei parallelen Jobs kann der 50er-Schwellwert überschritten werden bevor die Warnung greift (kein kritischer Fehler, nur Warnung)
-  - **Fix:** Atomares Inkrement via `$wpdb->query("UPDATE ... SET count = count + 1")` oder den Counter ganz entfernen wenn nur zur Diagnose genutzt
-  - **Dateien:** `includes/services/class-progress-manager.php` (`increment_headless_job_count()`)
+- [✅] **fix-headless-job-count-atomic** (actionScheduler-review.md §5.1) — **DONE 2026-03-06**
+  - Atomares `UPDATE … SET option_value = option_value + 1` auf dedizierter `efs_headless_job_count` Option
+  - `wp_cache_delete` nach UPDATE, `add_option(1)` beim ersten Aufruf
+  - **Datei:** `includes/services/class-progress-manager.php`
 
 ---
 
@@ -796,7 +791,7 @@
 
 ---
 
-**Last Updated:** 2026-03-05 (Großaufräumung: Alle §10-Optimierungen, CSS Converter TODOs und HOCH-Todos als bereits implementiert verifiziert. 2 Grid-Tests ergänzt. TODOS.md spiegelt jetzt den echten Code-Stand wider.)
-**Current Status:** Alle kritischen Stabilitäts-Fixes implementiert (§10a–10k ✅). CSS Converter vollständig getestet. Verbleibende offene Punkte: remove-framer-feature (~5-6h), review-button/icon-converter, add-post-repository-interface (niedrig).
+**Last Updated:** 2026-03-06 (4 neue Fixes: PermissionCallbacksTest fatal error, optimize-json-logging, add-cloud-ip-whitelist, fix-headless-job-count-atomic. phpcs-final-verification als ✅ markiert.)
+**Current Status:** Alle kritischen Stabilitäts-Fixes implementiert (§10a–10k ✅). Action Scheduler + Loopback TODOs erledigt. Verbleibende offene Punkte: remove-framer-feature (~5-6h), review-button/icon-converter, add-post-repository-interface (niedrig).
 
 **Maintainer:** Etch Fusion Suite Development Team

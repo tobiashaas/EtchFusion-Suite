@@ -45,6 +45,7 @@ spl_autoload_register(
 			'Converters\\Interfaces\\'   => 'converters/interfaces/',
 			'Converters\\Elements\\'     => 'converters/elements/',
 			'Converters\\'               => 'converters/',
+			'Utils\\'                    => 'utils/',
 			'Security\\'                 => 'security/',
 		);
 

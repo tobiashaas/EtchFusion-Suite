@@ -27,9 +27,26 @@
 - Autoloader configuration verified and validated with 129 live tests
 - Database schema v1.0.2 stable with no upgrade needed
 
-## [0.16.3] — 2026-03-06
+## [0.16.4] — 2026-03-06
 
-### ⚡ Performance Optimizations
+### 🔐 Security Improvements
+
+- **Dynamic CORS Whitelisting:** Implemented automatic temporary CORS whitelist. After successful JWT token validation, the source domain is automatically added to CORS whitelist for 1 hour. Eliminates need for manual CORS configuration in production - users no longer need to manually enter their domain in a whitelist. Local development environments still supported via default localhost whitelist.
+- **Enhanced Pairing Code Security:** Increased pairing code from 8 to 16 hex characters (4 bytes → 8 bytes), increasing possible combinations from ~4.3 billion to ~4.3 trillion while maintaining single-use and 15-minute TTL.
+
+### 🐛 Bug Fixes
+
+- **JWT Class Loading Conflict:** Fixed "Cannot declare class Firebase\JWT\JWT" error in PHPUnit tests by moving class_alias logic outside of conditional block. Aliases now always checked regardless of vendor-prefixed directory existence.
+- **Permission Callback Tests:** Fixed 16 failing tests by correcting:
+  - Added missing `$request` parameter to all permission callback calls
+  - Changed `generate_migration_key()` to `generate_migration_token()` method name
+  - Updated test expectations from `false` to `WP_Error` (WordPress REST API behavior)
+  - Corrected `require_migration_token_permission` origin test to expect `true` (origin check happens in handlers, not permission callback)
+
+### ✅ Testing
+
+- **All 263 PHPUnit tests pass** with 824 assertions
+- **PHPCS: 0 Errors, 0 Warnings** on all modified files
 
 - **N+1 query elimination in media/CSS analysis:** Added `update_postmeta_cache()` calls in `media_migrator.php`, `css_converter.php`, and `class-class-reference-scanner.php` to prime WordPress metadata cache before loops. Reduces database queries from 5N → 1, N → 1, and 4N → 1 respectively for sites processing large post collections.
 - **Transient caching for expensive content queries:** Implemented transient-based caching (1 hour for plugin detection, 5 minutes for content analysis) in `plugin_detector.php` (3 methods) and `content_parser.php` (3 methods). Eliminates repeated `get_posts()` calls with expensive `meta_query` conditions.

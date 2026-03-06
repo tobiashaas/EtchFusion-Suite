@@ -58,42 +58,25 @@ class EFS_Dashboard_Controller {
 
 		$progress_context = $this->get_progress();
 
-		// Make framer detection more robust
-		try {
-			$framer_enabled = \efs_is_framer_enabled();
-		} catch ( \Exception $e ) {
-			$framer_enabled = false;
-		}
-
 		$saved_templates = array();
 
-		if ( $env['is_etch_site'] && $framer_enabled ) {
-			try {
-				$saved_templates = $this->get_saved_templates();
-			} catch ( \Exception $e ) {
-				$saved_templates = array();
-			}
-		}
-
 		return array(
-			'is_bricks_site'             => $env['is_bricks_site'],
-			'is_etch_site'               => $env['is_etch_site'],
-			'etch_version'               => isset( $env['etch_version'] ) ? $env['etch_version'] : '',
-			'site_url'                   => $env['site_url'],
-			'is_https'                   => $env['is_https'],
-			'wp_version'                 => isset( $env['wp_version'] ) ? $env['wp_version'] : '',
-			'php_version'                => isset( $env['php_version'] ) ? $env['php_version'] : '',
-			'logs'                       => $this->get_logs(),
-			'progress_data'              => $progress_context['progress'],
-			'progress_steps'             => $progress_context['steps'],
-			'migration_id'               => isset( $progress_context['migrationId'] ) ? $progress_context['migrationId'] : '',
-			'completed'                  => isset( $progress_context['completed'] ) ? (bool) $progress_context['completed'] : false,
-			'in_progress_migration'      => $this->detect_in_progress_migration(),
-			'settings'                   => $this->get_settings(),
-			'nonce'                      => wp_create_nonce( 'efs_nonce' ),
-			'saved_templates'            => $saved_templates,
-			'framer_enabled'             => $framer_enabled,
-			'template_extractor_enabled' => $framer_enabled,
+			'is_bricks_site'        => $env['is_bricks_site'],
+			'is_etch_site'          => $env['is_etch_site'],
+			'etch_version'          => isset( $env['etch_version'] ) ? $env['etch_version'] : '',
+			'site_url'              => $env['site_url'],
+			'is_https'              => $env['is_https'],
+			'wp_version'            => isset( $env['wp_version'] ) ? $env['wp_version'] : '',
+			'php_version'           => isset( $env['php_version'] ) ? $env['php_version'] : '',
+			'logs'                  => $this->get_logs(),
+			'progress_data'         => $progress_context['progress'],
+			'progress_steps'        => $progress_context['steps'],
+			'migration_id'          => isset( $progress_context['migrationId'] ) ? $progress_context['migrationId'] : '',
+			'completed'             => isset( $progress_context['completed'] ) ? (bool) $progress_context['completed'] : false,
+			'in_progress_migration' => $this->detect_in_progress_migration(),
+			'settings'              => $this->get_settings(),
+			'nonce'                 => wp_create_nonce( 'efs_nonce' ),
+			'saved_templates'       => $saved_templates,
 		);
 	}
 

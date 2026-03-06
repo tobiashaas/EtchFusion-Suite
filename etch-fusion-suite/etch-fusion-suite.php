@@ -109,25 +109,27 @@ if ( ! class_exists( 'ActionScheduler', false ) ) {
 	}
 }
 
-if ( ! file_exists( $etch_fusion_suite_vendor_prefixed ) ) {
-	// Shim PSR Container interfaces under Strauss namespace for plugin code that expects prefixed names.
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' ) && interface_exists( 'Psr\Container\ContainerInterface' ) ) {
-		class_alias( 'Psr\Container\ContainerInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' );
-	}
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' ) && interface_exists( 'Psr\Container\ContainerExceptionInterface' ) ) {
-		class_alias( 'Psr\Container\ContainerExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' );
-	}
-	if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' ) && interface_exists( 'Psr\Container\NotFoundExceptionInterface' ) ) {
-		class_alias( 'Psr\Container\NotFoundExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' );
-	}
-	// When using plain vendor/ (no Strauss), alias Firebase JWT so token manager works.
-	if ( ! class_exists( 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' ) && class_exists( 'Firebase\JWT\JWT' ) ) {
-		class_alias( 'Firebase\JWT\JWT', 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' );
-		class_alias( 'Firebase\JWT\Key', 'EtchFusionSuite\Vendor\Firebase\JWT\Key' );
-		class_alias( 'Firebase\JWT\ExpiredException', 'EtchFusionSuite\Vendor\Firebase\JWT\ExpiredException' );
-		class_alias( 'Firebase\JWT\SignatureInvalidException', 'EtchFusionSuite\Vendor\Firebase\JWT\SignatureInvalidException' );
-		class_alias( 'Firebase\JWT\BeforeValidException', 'EtchFusionSuite\Vendor\Firebase\JWT\BeforeValidException' );
-	}
+// Shim PSR Container interfaces under Strauss namespace for plugin code that expects prefixed names.
+// Always check - works both when vendor-prefixed exists AND when only vendor/ exists.
+if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' ) && interface_exists( 'Psr\Container\ContainerInterface' ) ) {
+	class_alias( 'Psr\Container\ContainerInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerInterface' );
+}
+if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' ) && interface_exists( 'Psr\Container\ContainerExceptionInterface' ) ) {
+	class_alias( 'Psr\Container\ContainerExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\ContainerExceptionInterface' );
+}
+if ( ! interface_exists( 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' ) && interface_exists( 'Psr\Container\NotFoundExceptionInterface' ) ) {
+	class_alias( 'Psr\Container\NotFoundExceptionInterface', 'EtchFusionSuite\Vendor\Psr\Container\NotFoundExceptionInterface' );
+}
+
+// Shim Firebase JWT classes - always check to avoid "class already declared" errors in tests.
+// Works when: (1) vendor-prefixed doesn't exist, use vendor/ classes, OR
+//            (2) vendor-prefixed exists but test environment loads plain vendor/ first
+if ( ! class_exists( 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' ) && class_exists( 'Firebase\JWT\JWT' ) ) {
+	class_alias( 'Firebase\JWT\JWT', 'EtchFusionSuite\Vendor\Firebase\JWT\JWT' );
+	class_alias( 'Firebase\JWT\Key', 'EtchFusionSuite\Vendor\Firebase\JWT\Key' );
+	class_alias( 'Firebase\JWT\ExpiredException', 'EtchFusionSuite\Vendor\Firebase\JWT\ExpiredException' );
+	class_alias( 'Firebase\JWT\SignatureInvalidException', 'EtchFusionSuite\Vendor\Firebase\JWT\SignatureInvalidException' );
+	class_alias( 'Firebase\JWT\BeforeValidException', 'EtchFusionSuite\Vendor\Firebase\JWT\BeforeValidException' );
 }
 
 // Plugin requires PSR Container OR vendor/autoload.php must be loadable.
@@ -451,7 +453,7 @@ class Etch_Fusion_Suite_Plugin {
 		$tasks = $wpdb->get_col(
 			$wpdb->prepare(
 				"SELECT hook FROM {$wpdb->prefix}actionscheduler_actions WHERE hook LIKE %s GROUP BY hook",
-				'%' . $wpdb->esc_like( 'efs_' ) . '%'
+				$wpdb->esc_like( 'efs_' ) . '%'
 			)
 		);
 

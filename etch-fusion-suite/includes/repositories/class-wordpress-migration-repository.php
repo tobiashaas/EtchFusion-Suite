@@ -311,9 +311,11 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	public function save_token_data( array $token_data ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_token_data' );
 		if ( isset( $token_data['expires_timestamp'] ) ) {
-			update_option( self::OPTION_TOKEN_EXPIRES, (int) $token_data['expires_timestamp'] );
+			// No autoload: expiry timestamp is only read on token validation, not on every page load.
+			update_option( self::OPTION_TOKEN_EXPIRES, (int) $token_data['expires_timestamp'], false );
 		}
-		return update_option( self::OPTION_TOKEN_DATA, $token_data );
+		// No autoload: full token data (including JWT) must not be loaded on every WP boot.
+		return update_option( self::OPTION_TOKEN_DATA, $token_data, false );
 	}
 
 	/**
@@ -343,7 +345,8 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_token_value( string $token ): bool {
 		$this->invalidate_cache( 'efs_cache_migration_token_value' );
-		return update_option( self::OPTION_TOKEN_VALUE, $token );
+		// No autoload: the raw JWT is sensitive and only read during migration validation, not on every page load.
+		return update_option( self::OPTION_TOKEN_VALUE, $token, false );
 	}
 
 	/**

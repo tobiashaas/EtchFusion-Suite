@@ -70,7 +70,20 @@ class EFS_CORS_Manager {
 	}
 
 	/**
+	 * Transient key for temporary CORS whitelist (dynamic origins from authenticated requests).
+	 */
+	private const TEMP_WHITELIST_TRANSIENT = 'efs_temp_cors_whitelist';
+
+	/**
+	 * Duration for temporary whitelist entries (1 hour).
+	 */
+	private const TEMP_WHITELIST_TTL = 3600;
+
+	/**
 	 * Check if origin is allowed
+	 *
+	 * Checks both static whitelist and dynamic temporary whitelist.
+	 * Temporary whitelist is populated automatically after successful JWT authentication.
 	 *
 	 * @param string $origin Origin URL to check.
 	 * @return bool True if origin is allowed, false otherwise.
@@ -83,12 +96,11 @@ class EFS_CORS_Manager {
 			return true;
 		}
 
-		$allowed_origins = $this->get_allowed_origins();
-
 		// Normalize origin (remove trailing slash)
 		$origin = rtrim( $origin, '/' );
 
-		// Check if origin is in whitelist
+		// Check static whitelist first
+		$allowed_origins = $this->get_allowed_origins();
 		foreach ( $allowed_origins as $allowed ) {
 			$allowed = rtrim( $allowed, '/' );
 			if ( $allowed === $origin ) {
@@ -96,7 +108,55 @@ class EFS_CORS_Manager {
 			}
 		}
 
+		// Check dynamic temporary whitelist (populated after successful JWT auth)
+		$temp_whitelist = $this->get_temp_whitelist();
+		if ( isset( $temp_whitelist[ $origin ] ) ) {
+			return true;
+		}
+
 		return false;
+	}
+
+	/**
+	 * Get temporary whitelist from transient.
+	 *
+	 * @return array Associative array of origin => true.
+	 */
+	private function get_temp_whitelist() {
+		$whitelist = get_transient( self::TEMP_WHITELIST_TRANSIENT );
+		return is_array( $whitelist ) ? $whitelist : array();
+	}
+
+	/**
+	 * Add a domain to the temporary CORS whitelist.
+	 *
+	 * Called automatically after successful JWT token validation.
+	 * The domain is whitelisted for 1 hour to allow cross-origin requests
+	 * without requiring manual whitelist configuration.
+	 *
+	 * @param string $domain Domain to whitelist (e.g., 'https://example.com').
+	 * @return void
+	 */
+	public function whitelist_domain_temporarily( $domain ) {
+		if ( empty( $domain ) ) {
+			return;
+		}
+
+		$domain = rtrim( $domain, '/' );
+
+		$whitelist            = $this->get_temp_whitelist();
+		$whitelist[ $domain ] = true;
+
+		set_transient( self::TEMP_WHITELIST_TRANSIENT, $whitelist, self::TEMP_WHITELIST_TTL );
+	}
+
+	/**
+	 * Clear the temporary CORS whitelist.
+	 *
+	 * @return void
+	 */
+	public function clear_temp_whitelist() {
+		delete_transient( self::TEMP_WHITELIST_TRANSIENT );
 	}
 
 	/**
