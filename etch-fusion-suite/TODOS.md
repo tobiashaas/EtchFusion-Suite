@@ -1,32 +1,64 @@
 # Etch Fusion Suite - TODO List
 
-**Updated:** 2026-03-05 20:28 (Phase 9 Start: Critical Bug Fixes & Testing)
+**Updated:** 2026-03-06 14:58 (Phase 10: Security & Refactoring)
 
 ## 🚀 Current Development
 
-### 🔨 Phase 9️⃣: Critical Bug Fixes & Test Verification (Active)
+### 🔨 Phase 1️⃣0️⃣: Security Improvements & Code Refactoring (Active)
 
-**Context:** Code review identified race condition in batch processor lock release. Fixing critical issues and completing comprehensive test suite validation.
+**Context:** Security improvements (dynamic CORS, pairing code) + systematic code cleanup and refactoring
 
-#### 🔴 Completed Fixes (2026-03-05)
+#### 🔴 Completed (2026-03-06)
 
-- [✅] **fix-batch-processor-race-condition** - FIXED 2026-03-05 20:28
-  - **Problem:** `finally` block released database lock without verifying ownership
-  - **Impact:** If batch runs >5 minutes, another process could claim the lock. Original process would then clear the new lock when finishing, causing concurrent execution
-  - **Solution:** Added `lock_uuid` verification to WHERE clause (matches shutdown handler logic)
-  - **Files Modified:** `includes/services/class-batch-processor.php` (lines 189-196)
-  - **Testing:** Syntax check ✅, PHPCS compliance ✅
-  - **Documentation:** Added to `DOCUMENTATION.md` §Batch Processor Locking
+- [✅] **Dynamic CORS Whitelisting** - Source domains auto-added to CORS whitelist for 1h after JWT auth
+- [✅] **Pairing Code Security** - Increased from 8 to 16 hex characters (~4.3B → ~4.3T combinations)
+- [✅] **Permission Callbacks Extraction** - Extracted 7 callbacks into `includes/class-permissions.php`
+- [✅] **Framer Feature Removal** - Deleted 8 Framer-only files, simplified Template Controller
+- [✅] **PermissionCallbacksTest Fixes** - Fixed 16 tests (method names, assertions)
+- [✅] **Documentation Updates** - CHANGELOG.md, SECURITY_AUDIT.md, optimierungen.md
 
-#### 🟡 In Progress
+---
 
-- [ ] **verify-all-tests-pass** - PHPUnit test suite status
-  - **Current:** Previously 165/167 passing. `PermissionCallbacksTest` fatal error (incompatible `setUpBeforeClass` signature) fixed 2026-03-06 → should be 168/168 after CI run.
-  - **Status:** Fix applied, waiting for CI confirmation.
-  - **Command:** `npm run test:unit`
+## 📋 API Refactoring Plan (Tickets 3-6)
 
-- [✅] **phpcs-final-verification** - PHPCS compliance check — **DONE (prior session)**
-  - **Status:** ✅ 0 errors, 0 warnings (verified 2026-03-05)
+### Ticket 3: Rate Limiting extrahieren (~1h)
+Neue Datei: `includes/api/rate-limiting.php`
+```
+- check_rate_limit()
+- handle_rate_limit()
+- enforce_template_rate_limit()
+- validate_connection()
+```
+
+### Ticket 4: CORS extrahieren (~1h)
+Neue Datei: `includes/api/cors.php`
+```
+- check_cors_origin()
+- add_cors_headers_to_request()
+- enforce_cors_globally()
+- normalize_origin_for_compare()
+```
+
+### Ticket 5: Migration-Endpoints gruppieren (~4-5h)
+Neue Dateien:
+- `includes/api/endpoints/export.php` - export_post_types()
+- `includes/api/endpoints/import-cpt.php` - import_cpts(), import_acf_field_groups(), import_metabox_configs()
+- `includes/api/endpoints/import-css.php` - import_global_css(), import_css_classes()
+- `includes/api/endpoints/import-content.php` - import_post(), import_posts(), import_post_meta()
+- `includes/api/endpoints/media.php` - receive_media()
+- `includes/api/endpoints/completion.php` - complete_migration()
+
+### Ticket 6: Hauptdatei aufräumen (~1h)
+- Übrig gebliebene Utility-Methoden organisieren
+- Klare includes/requires am Anfang
+
+**Geschätzter Gesamtaufwand:** ~8-10h aufgeteilt in 4 Tickets
+
+---
+
+## ✅ Previously Completed
+
+### Phase 9: Critical Bug Fixes & Test Verification
 
 **Context:** Plugin war funktionsfähig, ist aber instabil geworden. Action Scheduler Initialization wurde behoben, nun müssen systematisch Strauss-Prefixing, PSR-4 Autoloading, Migrator-System und CSS Converter stabilisiert werden.
 
