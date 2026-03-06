@@ -83,12 +83,30 @@ if ( ! function_exists( 'etch_fusion_suite_autoload_action_scheduler' ) ) {
 // Load Action Scheduler headless configuration (disables WP-Cron, enables loopback runner)
 require_once ETCH_FUSION_SUITE_DIR . 'action-scheduler-config.php';
 
-// Explicitly load Action Scheduler (uses global classes, not namespaced).
-// Runs after DISABLE_WP_CRON is defined and after efs_autoload_action_scheduler is
-// registered, so that ActionScheduler::init() (called immediately when plugins_loaded
-// has already fired) can resolve our EtchFusionSuite\Vendor\Action_Scheduler\* classes.
+// Explicitly load Action Scheduler (uses global classes, not namespaced) with
+// robust fallback for environments where vendor-prefixed was not packaged.
+$etch_fusion_suite_action_scheduler_prefixed = ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
+$etch_fusion_suite_action_scheduler_plain    = ETCH_FUSION_SUITE_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
 if ( ! class_exists( 'ActionScheduler', false ) ) {
-	require_once ETCH_FUSION_SUITE_DIR . 'vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php';
+	if ( file_exists( $etch_fusion_suite_action_scheduler_prefixed ) ) {
+		// Preferred path when Strauss-prefixed dependencies are present.
+		require_once $etch_fusion_suite_action_scheduler_prefixed;
+	} elseif ( file_exists( $etch_fusion_suite_action_scheduler_plain ) ) {
+		// Fallback for local/dev installs that only contain vendor/.
+		require_once $etch_fusion_suite_action_scheduler_plain;
+	} else {
+		add_action(
+			'admin_notices',
+			function () {
+				if ( ! current_user_can( 'activate_plugins' ) ) {
+					return;
+				}
+				$msg = __( 'Etch Fusion Suite: Action Scheduler dependency is missing. Run "composer install" in the plugin directory (etch-fusion-suite).', 'etch-fusion-suite' );
+				echo '<div class="notice notice-error"><p><strong>' . esc_html( $msg ) . '</strong></p></div>';
+			}
+		);
+		return;
+	}
 }
 
 if ( ! file_exists( $etch_fusion_suite_vendor_prefixed ) ) {

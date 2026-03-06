@@ -118,6 +118,12 @@ Release workflow (`.github/workflows/release.yml`) builds ZIP with checksums on 
 3. Create and push the tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`
 4. CI picks up the tag, builds the ZIP, and publishes the GitHub Release automatically
 
+**Release build internals (build-release.sh):**
+- Runs Composer with dev dependencies first, then executes `vendor/bin/strauss` explicitly so `vendor-prefixed/` is always generated.
+- Reinstalls Composer with `--no-dev` afterwards so only production dependencies remain in `vendor/`.
+- Copies `package.json`/`package-lock.json` into `build/` temporarily for asset compilation, then removes them before packaging.
+- Performs payload validation and fails if required runtime files (autoloaders, Action Scheduler, compiled assets) are missing.
+
 **Never run `gh release create` manually before pushing the tag** — the CI workflow handles release creation. If a release already exists when CI runs it causes a 422 conflict (the workflow deletes and recreates it, but manual pre-creation is unnecessary noise).
 
 ## Documentation as Single Source of Truth

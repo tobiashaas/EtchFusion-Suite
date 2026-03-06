@@ -134,6 +134,37 @@ strip_php_comments() {
   done < <(find "${dir}" -name '*.php' -not -path '*/vendor/*' -print0)
 }
 
+validate_build_payload() {
+  local dir="$1"
+  local required_files=(
+    "etch-fusion-suite.php"
+    "action-scheduler-config.php"
+    "vendor/autoload.php"
+    "vendor-prefixed/autoload.php"
+    "vendor-prefixed/woocommerce/action-scheduler/action-scheduler.php"
+    "assets/js/dist/main.js"
+  )
+  local forbidden_paths=(
+    "tests"
+    "scripts"
+    "node_modules"
+    "package.json"
+    "package-lock.json"
+  )
+
+  for rel in "${required_files[@]}"; do
+    if [[ ! -f "${dir}/${rel}" ]]; then
+      die "Missing required release file: ${rel}"
+    fi
+  done
+
+  for rel in "${forbidden_paths[@]}"; do
+    if [[ -e "${dir}/${rel}" ]]; then
+      die "Forbidden development artifact present in release build: ${rel}"
+    fi
+  done
+}
+
 main() {
   ensure_command rsync "Install rsync to continue."
   ensure_command zip "Install zip (e.g., apt-get install zip)."
@@ -175,16 +206,46 @@ main() {
   log "Copying plugin files with rsync (respecting .distignore)."
   rsync -av --delete --exclude-from="${DISTIGNORE_FILE}" "${PLUGIN_DIR}/" "${build_plugin_dir}/"
 
+  # package.json/package-lock.json are intentionally excluded from the final ZIP
+  # via .distignore. We still copy them temporarily so npm-based asset compilation
+  # can run in a reproducible way from the build directory.
+  if [[ -f "${PLUGIN_DIR}/package.json" ]]; then
+    cp "${PLUGIN_DIR}/package.json" "${build_plugin_dir}/package.json"
+    if [[ -f "${PLUGIN_DIR}/package-lock.json" ]]; then
+      cp "${PLUGIN_DIR}/package-lock.json" "${build_plugin_dir}/package-lock.json"
+    fi
+  fi
+
   log "Stripping PHP comments from distribution build."
   strip_php_comments "${build_plugin_dir}"
 
   pushd "${build_plugin_dir}" >/dev/null
 
-  log "Removing existing vendor directory (if any)."
-  rm -rf vendor
+  log "Removing existing dependency directories (if any)."
+  rm -rf vendor vendor-prefixed
 
-  log "Installing composer dependencies (production mode)."
-  composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
+  # We need Strauss from require-dev to build vendor-prefixed/ deterministically.
+  # Use --no-scripts to avoid double execution of post-install hooks; Strauss is
+  # invoked explicitly below for a single, predictable run.
+  log "Installing composer dependencies (with dev) to generate vendor-prefixed via Strauss."
+  composer install --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress
+
+  if [[ ! -x vendor/bin/strauss && ! -f vendor/bin/strauss ]]; then
+    die "Strauss binary not found after composer install. Cannot generate vendor-prefixed dependencies."
+  fi
+
+  log "Generating vendor-prefixed dependencies via Strauss."
+  vendor/bin/strauss
+
+  if [[ ! -f vendor-prefixed/autoload.php ]]; then
+    die "vendor-prefixed/autoload.php was not generated. Aborting release build."
+  fi
+
+  # Keep vendor-prefixed/ as generated above, but rebuild vendor/ in production mode
+  # so the release artifact does not contain dev dependencies.
+  log "Reinstalling composer dependencies in production mode (--no-dev)."
+  rm -rf vendor
+  composer install --no-scripts --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
 
   if [[ -f package.json ]]; then
     if command -v npm >/dev/null 2>&1; then
@@ -204,6 +265,12 @@ main() {
       log "npm not available; skipping asset build."
     fi
   fi
+
+  # Remove temporary Node manifests so they are never shipped in the release ZIP.
+  rm -f package.json package-lock.json
+
+  log "Validating release payload."
+  validate_build_payload "${build_plugin_dir}"
 
   popd >/dev/null
 

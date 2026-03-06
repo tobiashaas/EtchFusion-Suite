@@ -33,7 +33,9 @@ types/
 bash
 install-wp-tests.sh
 
-# Configuration files (not needed in production)
+# Configuration files (not needed in production artifact)
+# package*.json are copied into build/ temporarily by scripts/build-release.sh
+# only to execute npm build, then removed before ZIP creation.
 package.json
 package-lock.json
 phpunit.xml.dist

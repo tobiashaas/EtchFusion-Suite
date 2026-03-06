@@ -173,6 +173,13 @@ For comprehensive documentation of all available commands, see **[etch-fusion-su
 6. **Pre-release Testing** – For beta/RC builds tag with suffixes (e.g., `v0.10.3-beta.1`); the workflow marks the GitHub Release as a pre-release automatically.
 7. **Manual Validation** – Download the uploaded ZIP, install on a test site, and confirm migrations succeed before notifying users.
 
+### Release Build Internals
+
+- `scripts/build-release.sh` installs Composer dependencies with dev packages first and runs `vendor/bin/strauss` explicitly to generate `vendor-prefixed/`.
+- It then reinstalls Composer dependencies with `--no-dev` so `vendor/` in the final ZIP is production-only while keeping `vendor-prefixed/` available.
+- `package.json` and `package-lock.json` are copied into `build/` only temporarily to allow `npm ci && npm run build`, then removed before ZIP creation.
+- The build validates required release files (`vendor/autoload.php`, `vendor-prefixed/autoload.php`, Action Scheduler files, compiled JS) and fails fast if anything is missing.
+
 ### Manual Build (Optional)
 
 To build locally without tagging:

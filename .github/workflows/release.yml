@@ -26,6 +26,11 @@ jobs:
           extensions: mbstring, xml
           tools: composer:v2
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:

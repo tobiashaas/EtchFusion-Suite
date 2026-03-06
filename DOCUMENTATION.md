@@ -1719,6 +1719,13 @@ GitHub Actions provides automated linting, testing, and static analysis:
 
 **Why not `gh release create` manually?** If a release for the tag already exists when CI runs, `softprops/action-gh-release` returns 422 and retries until it aborts. The workflow includes a "delete existing release" step as a safety net, but the correct workflow is to always let CI create the release.
 
+### Release Build Internals (`scripts/build-release.sh`)
+
+- The script installs Composer dependencies with dev packages first and runs `vendor/bin/strauss` explicitly, ensuring `vendor-prefixed/` is generated deterministically.
+- It then reinstalls Composer dependencies with `--no-dev`, so `vendor/` in the release artifact contains production dependencies only.
+- `package.json` and `package-lock.json` are copied into the build directory only for `npm ci` + `npm run build`, then removed before ZIP creation.
+- A payload validation step enforces required runtime files (`vendor/autoload.php`, `vendor-prefixed/autoload.php`, Action Scheduler files, compiled JS) and fails fast if anything is missing.
+
 ### CI Workflow Breakdown (2025-10-26 refresh)
 
 - **Lint job:** Installs Composer dev dependencies inside `etch-fusion-suite` and runs `vendor/bin/phpcs --standard=phpcs.xml.dist` via `shivammathur/setup-php`
