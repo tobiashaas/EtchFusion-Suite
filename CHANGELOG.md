@@ -27,7 +27,7 @@
 - Autoloader configuration verified and validated with 129 live tests
 - Database schema v1.0.2 stable with no upgrade needed
 
-## [Unreleased]
+## [0.16.3] — 2026-03-06
 
 ### ⚡ Performance Optimizations
 
