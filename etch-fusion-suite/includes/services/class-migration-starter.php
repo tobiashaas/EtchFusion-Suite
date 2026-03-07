@@ -209,6 +209,37 @@ class EFS_Migration_Starter {
 				)
 			);
 
+			$init_totals = array();
+
+			if ( $analysis['media'] > 0 ) {
+				$init_totals['media'] = (int) $analysis['media'];
+			}
+
+			$css_counts = $this->css_service->get_css_class_counts( $selected_post_types, false );
+			$css_total  = isset( $css_counts['to_migrate'] ) ? (int) $css_counts['to_migrate'] : 0;
+			if ( $css_total > 0 ) {
+				$init_totals['css'] = $css_total;
+			}
+
+			$all_posts = $this->content_service->get_bricks_posts( $selected_post_types );
+			$post_type_counts = array();
+			if ( is_array( $all_posts ) ) {
+				foreach ( $all_posts as $post ) {
+					$pt = isset( $post->post_type ) ? $post->post_type : 'post';
+					if ( ! isset( $post_type_counts[ $pt ] ) ) {
+						$post_type_counts[ $pt ] = 0;
+					}
+					++$post_type_counts[ $pt ];
+				}
+			}
+			if ( ! empty( $post_type_counts ) ) {
+				$init_totals['posts'] = $post_type_counts;
+			}
+
+			if ( ! empty( $init_totals ) ) {
+				$this->api_client->send_init_totals( $target, $migration_key, $init_totals );
+			}
+
 			$steps            = $this->progress_manager->get_steps_state();
 			$progress_manager = $this->progress_manager;
 			$on_progress      = function ( $step_key, $pct, $migrator_name ) use ( $progress_manager ) {
@@ -286,11 +317,21 @@ class EFS_Migration_Starter {
 				return $finalization_result;
 			}
 
-			// Notify the Etch site that all data has been sent so the receiving
-			// popup transitions to 'completed' instead of going stale.
-			$this->api_client->send_migration_complete( $target, $migration_key );
+		// Notify the Etch site that all data has been sent so the receiving
+		// popup transitions to 'completed' instead of going stale.
+		// CRITICAL: Must verify Etch actually received all items before marking complete.
+		$complete_result = $this->api_client->send_migration_complete( $target, $migration_key );
+		if ( is_wp_error( $complete_result ) ) {
+			$this->progress_manager->update_progress( 'error', 90, $complete_result->get_error_message() );
+			$this->run_finalizer->write_failed_run_record(
+				$migration_id,
+				__( 'Target site reported incomplete migration: ', 'etch-fusion-suite' ) . $complete_result->get_error_message()
+			);
+			$this->progress_manager->store_active_migration( array() );
+			return $complete_result;
+		}
 
-			$this->progress_manager->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
+		$this->progress_manager->update_progress( 'completed', 100, __( 'Migration completed successfully!', 'etch-fusion-suite' ) );
 			$this->progress_manager->store_active_migration( array() );
 
 			$migration_stats                   = $this->migration_repository->get_stats();

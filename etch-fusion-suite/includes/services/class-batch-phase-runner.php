@@ -640,13 +640,31 @@ class EFS_Batch_Phase_Runner {
 				$posts_result['media_stats'] = $media_type_stats_final;
 			}
 
-			$this->run_finalizer->finalize_migration( $posts_result, $batch_migrator_warnings );
+		$this->run_finalizer->finalize_migration( $posts_result, $batch_migrator_warnings );
 
-			// Notify the Etch site that all data has been sent so the receiving
-			// popup transitions to 'completed' instead of going stale.
-			$this->api_client->send_migration_complete( $target_url, $migration_key );
+		// Notify the Etch site that all data has been sent so the receiving
+		// popup transitions to 'completed' instead of going stale.
+		// CRITICAL: Must verify Etch actually received all items before marking complete.
+		$complete_result = $this->api_client->send_migration_complete( $target_url, $migration_key );
+		if ( is_wp_error( $complete_result ) ) {
+			$this->progress_manager->update_progress( 'error', 90, $complete_result->get_error_message() );
+			$this->progress_manager->store_active_migration( array() );
+			$this->checkpoint_repository->delete_checkpoint();
 
-			$this->progress_manager->update_progress( 'completed', 100, $completion_message );
+			return array(
+				'completed'             => false,
+				'remaining'             => 0,
+				'migrationId'           => $migration_id,
+				'progress'              => $this->progress_manager->get_progress_data(),
+				'steps'                 => $this->progress_manager->get_steps_state(),
+				'message'               => __( 'Target site reported incomplete migration: ', 'etch-fusion-suite' ) . $complete_result->get_error_message(),
+				'failed_media_count'    => $failed_media_count,
+				'failed_media_ids'      => $failed_media_ids_final,
+				'failed_post_ids_final' => $failed_ids,
+			);
+		}
+
+		$this->progress_manager->update_progress( 'completed', 100, $completion_message );
 			$this->progress_manager->store_active_migration( array() );
 			$this->checkpoint_repository->delete_checkpoint();
 			$this->progress_manager->mark_stats_completed();
