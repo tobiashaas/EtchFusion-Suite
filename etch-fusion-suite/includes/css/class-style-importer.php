@@ -109,6 +109,12 @@ class EFS_Style_Importer {
 			if ( '' === $sel ) {
 				continue;
 			}
+
+			// CRITICAL: Preserve the original style ID from Bricks conversion.
+			// The style ID is used in style_map to reference this style.
+			// Using selector as key would lose the ID after array_values().
+			$style_id = $style['id'] ?? '';
+
 			if ( ! isset( $incoming[ $sel ] ) ) {
 				$incoming[ $sel ] = $style;
 			} else {
@@ -120,6 +126,10 @@ class EFS_Style_Importer {
 						? $existing_css . "\n  " . $new_css
 						: $new_css;
 				}
+				// Keep the first style ID if multiple entries have same selector
+				if ( '' !== $style_id && '' === ( $incoming[ $sel ]['id'] ?? '' ) ) {
+					$incoming[ $sel ]['id'] = $style_id;
+				}
 			}
 		}
 
@@ -127,21 +137,54 @@ class EFS_Style_Importer {
 		// Step B: Merge incoming styles with pre-existing styles.
 		//
 		// Pre-existing styles are the base; incoming styles overwrite any entry
-		// with a matching selector.  This ensures re-running the migration
+		// with a matching selector. This ensures re-running the migration
 		// always reflects the latest Bricks source data without losing manually
 		// added styles that have unique selectors.
+		//
+		// IMPORTANT: We must preserve style IDs for the style_map to work.
+		// The style_map references styles by their ID (not by numeric index).
 		// ------------------------------------------------------------------
 		$index = array();
-		foreach ( $existing_styles as $style ) {
+
+		// First, index existing styles by selector (preserving their IDs)
+		foreach ( $existing_styles as $key => $style ) {
 			$sel = $style['selector'] ?? '';
 			if ( '' !== $sel ) {
+				// Preserve the key (could be numeric ID or named key like 'etch-section-style')
 				$index[ $sel ] = $style;
 			}
 		}
+
+		// Then merge incoming styles, overwriting by selector
 		foreach ( $incoming as $sel => $style ) {
+			// If existing style has an ID and incoming doesn't have one, keep existing ID
+			if ( isset( $index[ $sel ]['id'] ) && empty( $style['id'] ) ) {
+				$style['id'] = $index[ $sel ]['id'];
+			}
 			$index[ $sel ] = $style;
 		}
-		$merged_styles = array_values( $index );
+
+		// CRITICAL FIX: Do NOT use array_values() here!
+		// The style_map references styles by their ID keys (like '3861282').
+		// Using array_values() would convert these to numeric indices (0, 1, 2...)
+		// and break the style_map lookup.
+		// Instead, re-index by style ID where available, preserving named keys for built-ins.
+		$merged_styles = array();
+		foreach ( $index as $style ) {
+			$sel = $style['selector'] ?? '';
+			if ( '' === $sel ) {
+				continue;
+			}
+
+			// Use the style ID as key if available, otherwise use selector
+			$style_id = $style['id'] ?? '';
+			if ( '' !== $style_id ) {
+				$merged_styles[ $style_id ] = $style;
+			} else {
+				// For built-in styles like 'etch-section-style', keep selector as key
+				$merged_styles[ $sel ] = $style;
+			}
+		}
 
 		// NOTE: We persist to etch_styles (used by Etch's StylesRegister to render
 		// styles on pages that reference them) rather than etch_global_stylesheets
