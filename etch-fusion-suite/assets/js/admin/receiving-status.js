@@ -207,16 +207,24 @@ export const initReceivingStatus = () => {
         }
         if (elements.items) {
             const byType = model.itemsByType;
-            const typeEntries = Object.entries(byType);
-            // Human-readable labels for known post types; unknown types are shown as-is.
-            const TYPE_LABELS = { media: 'Media', post: 'Posts', page: 'Pages', attachment: 'Media' };
+            // Filter out phases with no total (not being migrated)
+            const typeEntries = Object.entries(byType).filter(([type, counts]) => counts.total > 0);
+            // Human-readable labels for known post types; unknown types use slug -> "My Custom Post Type" format
+            const TYPE_LABELS = { media: 'Media', post: 'Posts', page: 'Pages', attachment: 'Media', css: 'CSS', bricks_template: 'Templates' };
             if (typeEntries.length > 0) {
+                // Show all types as a list (<ul>)
                 const lines = typeEntries.map(([type, counts]) => {
-                    const label = TYPE_LABELS[type] ?? type;
+                    let label = TYPE_LABELS[type];
+                    if (!label) {
+                        // Convert slug to readable: "my_custom_post_type" -> "My Custom Post Type"
+                        label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    }
                     const total = counts.total > 0 ? `/${counts.total}` : '';
-                    return `<span>${label}: ${counts.received}${total}</span>`;
+                    const pct = counts.total > 0 ? Math.round((counts.received / counts.total) * 100) : 0;
+                    const cls = counts.received === counts.total && counts.total > 0 ? 'efs-item-done' : '';
+                    return `<li class="efs-item-line ${cls}">${label}: ${counts.received}${total} (${pct}%)</li>`;
                 });
-                elements.items.innerHTML = lines.join('');
+                elements.items.innerHTML = `<ul class="efs-items-list">${lines.join('')}</ul>`;
                 elements.items.hidden = false;
             } else {
                 // Fallback to grand-total when breakdown is not yet available.

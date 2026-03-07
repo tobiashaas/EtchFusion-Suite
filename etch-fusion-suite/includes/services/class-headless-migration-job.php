@@ -114,7 +114,7 @@ class EFS_Headless_Migration_Job {
 		}
 
 		$max_time   = (int) ini_get( 'max_execution_time' );
-		$budget     = $max_time > 0 ? (int) floor( 0.8 * $max_time ) : 0;
+		$budget     = $max_time > 0 ? (int) floor( 0.8 * $max_time ) : 240;
 		$start_time = time();
 
 		for ( ; ; ) {

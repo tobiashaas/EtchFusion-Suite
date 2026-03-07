@@ -56,8 +56,8 @@ class EFS_Element_Svg extends EFS_Base_Element {
 				$svg_data = $icon_set['svg'] ?? array();
 				if ( isset( $svg_data['url'] ) ) {
 					$svg_url = $svg_data['url'];
-				} elseif ( ! empty( $svg_data['id'] ) && function_exists( 'wp_get_attachment_url' ) ) {
-					$svg_url = wp_get_attachment_url( (int) $svg_data['id'] );
+				} elseif ( ! empty( $svg_data['id'] ) && function_exists( '\wp_get_attachment_url' ) ) {
+					$svg_url = \wp_get_attachment_url( (int) $svg_data['id'] );
 				}
 				break;
 
@@ -111,7 +111,7 @@ class EFS_Element_Svg extends EFS_Base_Element {
 			'styles'     => $style_ids,
 		);
 
-		$attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		$attrs_json = \wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 
 		return '<!-- wp:etch/svg ' . $attrs_json . ' -->' . "\n" .
 			'<!-- /wp:etch/svg -->';
@@ -129,17 +129,11 @@ class EFS_Element_Svg extends EFS_Base_Element {
 			return false;
 		}
 
-		// Basic SVG validation via XML parsing.
-		libxml_use_internal_errors( true );
-		$doc = new \DOMDocument();
-		$ok  = $doc->loadXML( $svg_code );
-		libxml_clear_errors();
+		require_once \ABSPATH . 'wp-admin/includes/file.php';
+		require_once \ABSPATH . 'wp-admin/includes/media.php';
+		require_once \ABSPATH . 'wp-admin/includes/image.php';
 
-		if ( ! $ok ) {
-			return false;
-		}
-
-		$tmp = wp_tempnam( 'svg-' );
+		$tmp = \wp_tempnam( 'svg-' );
 		if ( false === $tmp ) {
 			return false;
 		}
@@ -155,21 +149,17 @@ class EFS_Element_Svg extends EFS_Base_Element {
 			'tmp_name' => $tmp,
 		);
 
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-
-		$id = media_handle_sideload( $file_array, 0, null, array( 'test_form' => false ) );
+		$id = \media_handle_sideload( $file_array, 0, null, array( 'test_form' => false ) );
 
 		if ( file_exists( $tmp ) ) {
 			@unlink( $tmp );
 		}
 
-		if ( is_wp_error( $id ) ) {
+		if ( \is_wp_error( $id ) ) {
 			return false;
 		}
 
-		$url = wp_get_attachment_url( $id );
+		$url = \wp_get_attachment_url( $id );
 		return $url ? $url : false;
 	}
 }
