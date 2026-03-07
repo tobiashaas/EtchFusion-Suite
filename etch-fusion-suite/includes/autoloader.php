@@ -5,6 +5,7 @@
  * This file provides autoloading for namespaced classes without requiring Composer.
  *
  * Admin\ namespace → includes/admin/ (both EFS_Admin_Interface and EFS_Admin_Notice_Manager live here).
+ * Core\ lives in includes/core/ with no root-level fallback.
  */
 
 spl_autoload_register(
@@ -29,7 +30,7 @@ spl_autoload_register(
 			'Services\\'                 => 'services/',
 			'Repositories\\Interfaces\\' => 'repositories/interfaces/',
 			'Repositories\\'             => 'repositories/',
-			'Core\\'                     => '',
+			'Core\\'                     => 'core/',
 			'Api\\'                      => '',
 			'Updater\\'                  => 'updater/',
 			'Controllers\\'              => 'controllers/',
@@ -53,6 +54,17 @@ spl_autoload_register(
 		foreach ( $namespace_map as $namespace => $dir ) {
 			if ( 0 === strpos( $relative_class, $namespace ) ) {
 				$relative_name                       = substr( $relative_class, strlen( $namespace ) );
+				if ( 'Core\\' === $namespace ) {
+					$path = $base_dir . $dir . $relative_name . '.php';
+
+					if ( file_exists( $path ) ) {
+						require_once $path;
+						return;
+					}
+
+					return;
+				}
+
 				$slug                                = strtolower( str_replace( '_', '-', $relative_name ) );
 				$slug_no_prefix                      = preg_replace( '/^(?:b2e|efs)-/', '', $slug );
 				$slug_no_suffix                      = preg_replace( '/-interface$/', '', $slug );

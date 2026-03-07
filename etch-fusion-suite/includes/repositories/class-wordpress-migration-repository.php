@@ -399,12 +399,43 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	public function save_receiving_state( array $state ): bool {
 		$this->invalidate_cache( 'efs_cache_receiving_state' );
-
-		$current = get_option( self::OPTION_RECEIVING_STATE, array() );
-		$current = is_array( $current ) ? $current : array();
-		$state   = $this->normalize_receiving_state( array_merge( $current, $state ) );
+		$state = $this->normalize_receiving_state( $state );
 
 		return update_option( self::OPTION_RECEIVING_STATE, $state );
+	}
+
+	/**
+	 * Update receiving state from the latest persisted value.
+	 *
+	 * Serializes mutations with a short-lived MySQL named lock so frequent media
+	 * and post imports do not clobber each other's counters under concurrent load.
+	 *
+	 * @param callable $mutator Callback that receives the normalized current state and returns the next state.
+	 * @return array Persisted receiving state.
+	 */
+	public function update_receiving_state( callable $mutator ): array {
+		$lock_name = $this->get_receiving_state_lock_name();
+		$has_lock  = $this->acquire_named_lock( $lock_name, 5 );
+
+		try {
+			$this->invalidate_cache( 'efs_cache_receiving_state' );
+
+			$current = get_option( self::OPTION_RECEIVING_STATE, array() );
+			$current = is_array( $current ) ? $this->normalize_receiving_state( $current ) : $this->idle_receiving_state();
+
+			$next = $mutator( $current );
+			$next = is_array( $next ) ? $next : $current;
+			$next = $this->normalize_receiving_state( $next );
+
+			update_option( self::OPTION_RECEIVING_STATE, $next );
+			$this->invalidate_cache( 'efs_cache_receiving_state' );
+
+			return $next;
+		} finally {
+			if ( $has_lock ) {
+				$this->release_named_lock( $lock_name );
+			}
+		}
 	}
 
 	/**
@@ -726,6 +757,65 @@ class EFS_WordPress_Migration_Repository implements Migration_Repository_Interfa
 	 */
 	private function invalidate_cache( string $cache_key ): void {
 		delete_transient( $cache_key );
+	}
+
+	/**
+	 * Build the lock name used for serialized receiving-state updates.
+	 *
+	 * @return string
+	 */
+	private function get_receiving_state_lock_name(): string {
+		global $wpdb;
+
+		$prefix = ( $wpdb instanceof \wpdb && isset( $wpdb->prefix ) ) ? (string) $wpdb->prefix : 'wp_';
+
+		return $prefix . 'efs_receiving_state';
+	}
+
+	/**
+	 * Attempt to acquire a short-lived MySQL named lock.
+	 *
+	 * @param string $lock_name Lock identifier.
+	 * @param int    $timeout   Seconds to wait.
+	 * @return bool
+	 */
+	private function acquire_named_lock( string $lock_name, int $timeout ): bool {
+		global $wpdb;
+
+		if ( ! $wpdb instanceof \wpdb ) {
+			return false;
+		}
+
+		$result = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT GET_LOCK(%s, %d)',
+				$lock_name,
+				$timeout
+			)
+		);
+
+		return '1' === (string) $result;
+	}
+
+	/**
+	 * Release a previously acquired MySQL named lock.
+	 *
+	 * @param string $lock_name Lock identifier.
+	 * @return void
+	 */
+	private function release_named_lock( string $lock_name ): void {
+		global $wpdb;
+
+		if ( ! $wpdb instanceof \wpdb ) {
+			return;
+		}
+
+		$wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT RELEASE_LOCK(%s)',
+				$lock_name
+			)
+		);
 	}
 
 	/**

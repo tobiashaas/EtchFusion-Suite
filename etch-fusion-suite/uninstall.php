@@ -12,8 +12,8 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-// Load our DB installer class
-require_once __DIR__ . '/includes/core/class-db-installer.php';
+// Load the project autoloader so the installer path cannot drift again.
+require_once __DIR__ . '/includes/autoloader.php';
 
 // Clean up all plugin data
 Bricks2Etch\Core\EFS_DB_Installer::uninstall();

@@ -242,6 +242,39 @@ class EFS_Async_Migration_Runner {
 				)
 			);
 
+			$init_totals = array();
+
+			$include_media = ! empty( $options['include_media'] );
+			$transferable_media_count = $include_media ? $this->media_service->get_transferable_media_count( $selected_post_types ) : 0;
+			if ( $transferable_media_count > 0 ) {
+				$init_totals['media'] = $transferable_media_count;
+			}
+
+			$css_counts = $this->css_service->get_migration_css_class_counts( $selected_post_types, $options );
+			$css_total  = isset( $css_counts['to_migrate'] ) ? (int) $css_counts['to_migrate'] : 0;
+			if ( $css_total > 0 ) {
+				$init_totals['css'] = $css_total;
+			}
+
+			$all_posts = $this->content_service->get_bricks_posts( $selected_post_types );
+			$post_type_counts = array();
+			if ( is_array( $all_posts ) ) {
+				foreach ( $all_posts as $post ) {
+					$pt = isset( $post->post_type ) ? $post->post_type : 'post';
+					if ( ! isset( $post_type_counts[ $pt ] ) ) {
+						$post_type_counts[ $pt ] = 0;
+					}
+					++$post_type_counts[ $pt ];
+				}
+			}
+			if ( ! empty( $post_type_counts ) ) {
+				$init_totals['posts'] = $post_type_counts;
+			}
+
+			if ( ! empty( $init_totals ) ) {
+				$this->api_client->send_init_totals( $target, $migration_key, $init_totals );
+			}
+
 			$steps            = $this->progress_manager->get_steps_state();
 			$progress_manager = $this->progress_manager;
 			$on_progress      = function ( $step_key, $pct, $migrator_name ) use ( $progress_manager ) {
@@ -288,7 +321,7 @@ class EFS_Async_Migration_Runner {
 
 			$steps         = $this->progress_manager->get_steps_state();
 			$include_media = ! empty( $options['include_media'] ) && isset( $steps['media'] );
-			$media_ids     = $include_media ? $this->media_service->get_media_ids( $selected_post_types ) : array();
+			$media_ids     = $include_media ? $this->media_service->get_transferable_media_ids( $selected_post_types ) : array();
 
 			// Collect post IDs for JS-driven batch loop.
 			$bricks_posts    = $this->content_parser->get_bricks_posts( $selected_post_types );
@@ -389,6 +422,7 @@ class EFS_Async_Migration_Runner {
 					'remaining_media_ids'        => $media_ids,
 					'processed_media_count'      => 0,
 					'total_media_count'          => count( $media_ids ),
+					'receiving_media_total'      => $transferable_media_count,
 					'media_attempts'             => array(),
 					'failed_media_ids_final'     => array(),
 					'remaining_post_ids'         => $post_ids,

@@ -352,7 +352,7 @@ $token_data['expires_at'] = date( 'Y-m-d H:i:s', $expires );
 #### Real-World Security Impact
 
 - **Audit Logger (`includes/security/class-audit-logger.php`)** — Accurate event timestamps enable incident reconstruction and subscription to security dashboards.
-- **Migration Token Manager (`includes/migration_token_manager.php`)** — Token creation and display rely on consistent timestamps to prevent premature invalidation or unexpected grace periods.
+- **Migration Token Manager (`includes/core/EFS_Migration_Token_Manager.php`)** — Token creation and display rely on consistent timestamps to prevent premature invalidation or unexpected grace periods.
 - **Error Handler (`includes/error_handler.php`)** — Logging pipeline uses timestamps for chronological correlation with WordPress debug logs and external monitoring tools.
 
 #### Tooling & Verification

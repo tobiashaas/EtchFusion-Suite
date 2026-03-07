@@ -26,7 +26,7 @@ PHPCS_STANDARD="${PROJECT_ROOT}/phpcs.xml.dist"
 TARGET_PATHS=(
   "${PROJECT_ROOT}/includes/security/"
   "${PROJECT_ROOT}/includes/repositories/"
-  "${PROJECT_ROOT}/includes/EFS_Error_Handler.php"
+  "${PROJECT_ROOT}/includes/core/EFS_Error_Handler.php"
 )
 REPORT_DIR="${PROJECT_ROOT}/docs"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"

@@ -255,7 +255,8 @@ class EFS_Service_Provider {
 		$container->singleton(
 			'element_factory',
 			function ( $c ) {
-				return new \Bricks2Etch\Converters\EFS_Element_Factory( $c->get( 'converter_registry' ), array(), $c->get( 'error_handler' ) );
+				$style_map = get_option( 'efs_style_map', array() );
+				return new \Bricks2Etch\Converters\EFS_Element_Factory( $c->get( 'converter_registry' ), $style_map, $c->get( 'error_handler' ) );
 			}
 		);
 

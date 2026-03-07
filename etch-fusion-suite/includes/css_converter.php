@@ -383,6 +383,8 @@ class EFS_CSS_Converter {
 		// ------------------------------------------------------------------
 		$converted_count = 0;
 		$excluded_count  = 0;
+		$existing_style_map = $this->style_repository->get_style_map();
+		$existing_style_map = is_array( $existing_style_map ) ? $existing_style_map : array();
 
 		foreach ( $bricks_classes as $class ) {
 			if ( $restrict_to_referenced_classes
@@ -404,10 +406,9 @@ class EFS_CSS_Converter {
 
 			$converted_class = $this->convert_bricks_class_to_etch( $class );
 			if ( $converted_class ) {
-				// Fresh 7-char Style Manager ID (type-2) — unrelated to element HTML ids (type-1).
-				// extra_entropy=true appends a random floating-point suffix, making collisions
-				// negligible even when many classes are converted in rapid succession.
-				$style_id                 = substr( uniqid( '', true ), -7 );
+				// Keep Bricks class → Etch style IDs stable across repeated conversions so
+				// content generation and imported style_map payloads cannot drift apart.
+				$style_id                 = $this->resolve_class_style_id( $class, $converted_class, $existing_style_map );
 				$etch_styles[ $style_id ] = $converted_class;
 				++$converted_count;
 
@@ -623,6 +624,39 @@ class EFS_CSS_Converter {
 			'css'        => trim( $css ),
 			'readonly'   => false,
 		);
+	}
+
+	/**
+	 * Resolve the canonical Etch style ID for a Bricks global class.
+	 *
+	 * Reuse the existing persisted ID when it still matches the selector. Otherwise
+	 * derive a deterministic 7-char ID from the Bricks class identifier so repeated
+	 * conversions within the same migration keep style_map and content in sync.
+	 *
+	 * @param array<string,mixed> $bricks_class        Bricks class definition.
+	 * @param array<string,mixed> $converted_class     Converted Etch style payload.
+	 * @param array<string,mixed> $existing_style_map  Previously persisted style_map.
+	 * @return string
+	 */
+	private function resolve_class_style_id( array $bricks_class, array $converted_class, array $existing_style_map ): string {
+		$bricks_id        = isset( $bricks_class['id'] ) ? trim( (string) $bricks_class['id'] ) : '';
+		$current_selector = isset( $converted_class['selector'] ) ? trim( (string) $converted_class['selector'] ) : '';
+
+		if ( '' !== $bricks_id && isset( $existing_style_map[ $bricks_id ] ) ) {
+			$existing_entry    = $existing_style_map[ $bricks_id ];
+			$existing_id       = is_array( $existing_entry ) ? trim( (string) ( $existing_entry['id'] ?? '' ) ) : trim( (string) $existing_entry );
+			$existing_selector = is_array( $existing_entry ) ? trim( (string) ( $existing_entry['selector'] ?? '' ) ) : '';
+
+			if ( '' !== $existing_id && ( '' === $existing_selector || '' === $current_selector || $existing_selector === $current_selector ) ) {
+				return $existing_id;
+			}
+		}
+
+		$hash_source = '' !== $bricks_id
+			? 'bricks:' . $bricks_id
+			: 'selector:' . $current_selector;
+
+		return substr( md5( $hash_source ), 0, 7 );
 	}
 
 	/**

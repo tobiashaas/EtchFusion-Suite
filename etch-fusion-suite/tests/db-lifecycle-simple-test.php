@@ -5,7 +5,7 @@
  */
 
 require_once ABSPATH . 'wp-load.php';
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/core/class-db-installer.php';
+require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/autoloader.php';
 
 $wpdb = $GLOBALS['wpdb'];
 $passed = 0;

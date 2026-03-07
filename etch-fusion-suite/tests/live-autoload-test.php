@@ -47,6 +47,7 @@ $classes = [
     'Bricks2Etch\\Repositories\\EFS_WordPress_Settings_Repository',
     'Bricks2Etch\\Repositories\\EFS_WordPress_Style_Repository',
     // Core
+    'Bricks2Etch\\Core\\EFS_DB_Installer',
     'Bricks2Etch\\Core\\EFS_Error_Handler',
     'Bricks2Etch\\Core\\EFS_Migration_Manager',
     'Bricks2Etch\\Core\\EFS_Migration_Token_Manager',

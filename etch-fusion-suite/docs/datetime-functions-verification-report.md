@@ -22,8 +22,8 @@
 - `includes/error_handler.php:241` — 'timestamp'   => current_time( 'mysql' ),
 - `includes/error_handler.php:282` — 'timestamp'   => current_time( 'mysql' ),
 - `includes/error_handler.php:302` — 'timestamp' => current_time( 'mysql' ),
-- `includes/migration_token_manager.php:75` — 'created_at' => current_time( 'mysql' ),
-- `includes/migration_token_manager.php:143` — 'created_at' => current_time( 'mysql' ),
+- `includes/core/EFS_Migration_Token_Manager.php:75` — 'created_at' => current_time( 'mysql' ),
+- `includes/core/EFS_Migration_Token_Manager.php:143` — 'created_at' => current_time( 'mysql' ),
 - `includes/security/class-audit-logger.php:121` — 'timestamp'  => current_time( 'mysql' ),
 - `includes/services/class-content-service.php:225` — '_b2e_migration_date'       => current_time( 'mysql' ),
 - `includes/services/class-migration-service.php:151` — $migration_stats['last_migration'] = current_time( 'mysql' );
@@ -37,13 +37,13 @@
 
 **Timestamp format**
 
-- `includes/migration_token_manager.php:67` — $current_timestamp = (int) current_time( 'timestamp' );
-- `includes/migration_token_manager.php:104` — $expires_timestamp = (int) current_time( 'timestamp' ) + $expiration_seconds;
-- `includes/migration_token_manager.php:138` — $current_timestamp = (int) current_time( 'timestamp' );
-- `includes/migration_token_manager.php:171` — $current_timestamp = (int) current_time( 'timestamp' );
-- `includes/migration_token_manager.php:216` — if ( current_time( 'timestamp' ) > $expires_timestamp ) {
-- `includes/migration_token_manager.php:231` — $current_timestamp = (int) current_time( 'timestamp' );
-- `includes/migration_token_manager.php:272` — $expires_timestamp = (int) current_time( 'timestamp' ) + self::TOKEN_EXPIRATION;
+- `includes/core/EFS_Migration_Token_Manager.php:67` — $current_timestamp = (int) current_time( 'timestamp' );
+- `includes/core/EFS_Migration_Token_Manager.php:104` — $expires_timestamp = (int) current_time( 'timestamp' ) + $expiration_seconds;
+- `includes/core/EFS_Migration_Token_Manager.php:138` — $current_timestamp = (int) current_time( 'timestamp' );
+- `includes/core/EFS_Migration_Token_Manager.php:171` — $current_timestamp = (int) current_time( 'timestamp' );
+- `includes/core/EFS_Migration_Token_Manager.php:216` — if ( current_time( 'timestamp' ) > $expires_timestamp ) {
+- `includes/core/EFS_Migration_Token_Manager.php:231` — $current_timestamp = (int) current_time( 'timestamp' );
+- `includes/core/EFS_Migration_Token_Manager.php:272` — $expires_timestamp = (int) current_time( 'timestamp' ) + self::TOKEN_EXPIRATION;
 
 **Other formats (review recommended)**
 
@@ -56,12 +56,12 @@
 - `includes/api_endpoints.php:580` — 'expires_at'    => wp_date( 'Y-m-d H:i:s', $token_data['expires'] ),
 - `includes/gutenberg_generator.php:82` — $timestamp = wp_date( 'Y-m-d H:i:s' ); // Get current timestamp using site settings
 - `includes/gutenberg_generator.php:942` — $generation_timestamp = wp_date( 'Y-m-d H:i:s' );
-- `includes/migration_token_manager.php:76` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-- `includes/migration_token_manager.php:144` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-- `includes/migration_token_manager.php:170` — error_log( '- Expires: ' . $expires . ' (' . wp_date( 'Y-m-d H:i:s', $expires ) . ')' );
-- `includes/migration_token_manager.php:172` — error_log( '- Current time: ' . $current_timestamp . ' (' . wp_date( 'Y-m-d H:i:s', $current_timestamp ) . ')' );
-- `includes/migration_token_manager.php:238` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
-- `includes/migration_token_manager.php:278` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+- `includes/core/EFS_Migration_Token_Manager.php:76` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+- `includes/core/EFS_Migration_Token_Manager.php:144` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+- `includes/core/EFS_Migration_Token_Manager.php:170` — error_log( '- Expires: ' . $expires . ' (' . wp_date( 'Y-m-d H:i:s', $expires ) . ')' );
+- `includes/core/EFS_Migration_Token_Manager.php:172` — error_log( '- Current time: ' . $current_timestamp . ' (' . wp_date( 'Y-m-d H:i:s', $current_timestamp ) . ')' );
+- `includes/core/EFS_Migration_Token_Manager.php:238` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
+- `includes/core/EFS_Migration_Token_Manager.php:278` — 'expires_at' => wp_date( 'Y-m-d H:i:s', $expires_timestamp ),
 
 
 ## 2a. Focus Areas

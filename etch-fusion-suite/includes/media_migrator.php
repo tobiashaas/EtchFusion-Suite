@@ -229,12 +229,7 @@ class EFS_Media_Migrator {
 					'action'    => 'Failed to migrate media file',
 				)
 			);
-			return array(
-				'migrated' => 0,
-				'skipped'  => 0,
-				'failed'   => 1,
-				'title'    => isset( $media_data['title'] ) ? (string) $media_data['title'] : '',
-			);
+			return $result;
 		}
 
 		$this->error_handler->log_info( 'Media Migration: Success for media ID ' . $media_id );

@@ -1,162 +1,399 @@
 # CSS Converter Architecture
 
-**Updated:** 2025-10-29 00:45
+**Updated:** 2026-03-08
 
 ## 1. Overview
 
-- **Purpose:** Convert Bricks global classes to Etch-compatible styles during migration.
-- **Primary File:** `includes/css_converter.php` (2001 lines)
-- **Dependencies:**
-  - `Bricks2Etch\Core\EFS_Error_Handler`
-  - `Bricks2Etch\Repositories\Interfaces\Style_Repository_Interface`
+- **Purpose:** Convert Bricks global classes, raw custom CSS, and element-scoped CSS into Etch-compatible style data.
+- **Primary orchestrator:** `includes/css_converter.php`
+- **Primary importer:** `includes/css/class-style-importer.php`
+- **Operational guides:** `docs/css-migration-bricks-to-etch-de.md`, `docs/css-migration-bricks-to-etch-en.md`
 
-## 2. Conversion Workflow
+The current architecture is modular. `EFS_CSS_Converter` is no longer a monolithic converter. It is an orchestrator over focused submodules plus a small number of top-level helpers that still belong at orchestration level.
 
-### Entry Points
+## 2. Main Components
 
-- `convert()` – Backwards-compatible wrapper used by legacy integrations.
-- `convert_bricks_classes_to_etch()` – Main conversion routine.
+### 2.1 Orchestrator
 
-### Four-Step Process
+`EFS_CSS_Converter` in `includes/css_converter.php` coordinates the end-to-end conversion pipeline.
 
-1. **Convert Bricks Classes (lines 151-256)**
-   - Load Bricks global classes from WordPress options.
-   - Filter excluded prefixes (Bricks, WordPress core, WooCommerce).
-   - Convert each class via `convert_bricks_class_to_etch()` and generate Etch style IDs.
-   - Build `style_map` linking Bricks IDs to Etch style IDs and selectors.
+It keeps:
 
-2. **Collect Breakpoint CSS (lines 183-207)**
-   - Extract `_cssCustom:breakpoint` values from class settings.
-   - Translate breakpoint keys to Etch media queries via `get_media_query_for_breakpoint()`.
-   - Store breakpoint-specific declarations in `breakpoint_css_map` for later merging.
+- the public API surface
+- the top-level conversion loop
+- built-in Etch framework styles
+- final block-display CSS injection
 
-3. **Parse Custom CSS (lines 259-290)**
-   - Aggregate class-level custom CSS into a temporary stylesheet.
-   - `parse_custom_css_stylesheet()` matches selectors to style map entries.
-   - `convert_nested_selectors_to_ampersand()` rewrites nested selectors to `&` syntax.
-   - Merge custom CSS into generated styles, converting physical properties to logical ones.
+It delegates most concrete work to submodules.
 
-4. **Add Breakpoint CSS (lines 293-309)**
-   - Append stored media queries to the corresponding Etch styles.
-   - Preserve responsive behaviour by merging breakpoint declarations after base styles.
+### 2.2 Submodules
 
-## 3. Conversion Methods
+The orchestrator currently wires these submodules:
 
-Key helpers invoked by `convert_bricks_settings_to_css()` and related routines:
+| Component | Responsibility |
+| --- | --- |
+| `EFS_CSS_Normalizer` | CSS string normalization, logical property conversion, final cleanup |
+| `EFS_Breakpoint_Resolver` | Bricks breakpoint keys -> Etch media query strings |
+| `EFS_ACSS_Handler` | ACSS utility handling and inline style mapping |
+| `EFS_Settings_CSS_Converter` | structured Bricks settings -> CSS declarations |
+| `EFS_CSS_Stylesheet_Parser` | raw stylesheet parsing for class and ID selectors |
+| `EFS_Class_Reference_Scanner` | detection of actually referenced global classes |
+| `EFS_Element_ID_Style_Collector` | element-scoped CSS from Bricks content |
+| `EFS_Style_Importer` | persistence into target-side style options plus rebuild triggers |
 
-1. `convert_background()` – Background color, image, size, position, repeat.
-2. `convert_gradient()` – Linear/radial gradients with color stops.
-3. `convert_border()` – Width, style, color, radius (string and array formats).
-4. `convert_typography()` – Font family, size, weight, line-height, spacing, decorations.
-5. `convert_spacing()` – Margin/padding shorthand from spacing objects.
-6. `convert_layout()` – Display, overflow, visibility, z-index, opacity.
-7. `convert_flexbox()` – Container and item properties (direction, wrap, gaps, order).
-8. `convert_grid()` – Template definitions, gaps, alignment, auto-flow.
-9. `convert_sizing()` – Width/height min/max translated to logical properties.
-10. `convert_margin_padding()` – Margin/padding logical property translation.
-11. `convert_position()` – Position, inset conversion (top/right/bottom/left).
-12. `convert_effects()` – Transform, transition, filters, object-fit, shadows, blend modes.
-13. `convert_responsive_variants()` – Media query wrappers for breakpoint settings.
-14. `convert_bricks_settings_to_css()` – Orchestrates all property converters.
-15. `convert_to_logical_properties()` – Regex-based replacement outside media queries.
-16. `convert_nested_selectors_to_ampersand()` – Normalises nested selectors.
-17. `convert_selectors_in_media_query()` – Handles nested selectors within media queries.
+### 2.3 Service Layer
 
-## 4. CSS Parsing Methods
+`EFS_CSS_Service` in `includes/services/class-css-service.php` sits above the converter.
 
-- `parse_custom_css_stylesheet()` – Extracts class-specific rules, maps to style IDs, and converts nested selectors.
-- `extract_css_for_class()` – Retrieves rule blocks (including media queries) for individual classes.
-- `extract_media_queries()` – Isolates media query blocks with brace counting.
+It is responsible for:
 
-## 5. Import & Save Methods
+- building the migration CSS payload once per run
+- sending class CSS to the target
+- sending Bricks global CSS to the target
+- returning progress counts that match the real migration payload
 
-### `import_etch_styles()`
+### 2.4 Transport Layer
 
-- Accepts either `{ styles, style_map }` payload or a legacy styles array.
-- Merges incoming styles with existing Etch styles from the repository.
-- **Import Strategy:**
-  - `bypass_api = true` (default) – Direct `update_option()` save with cache invalidation and rebuild triggers.
-  - `bypass_api = false` – Intended future path to call Etch API endpoints.
-- Logs progress via `EFS_Error_Handler::log_info()` for PHPCS-compliant diagnostics.
+Relevant REST endpoints:
 
-### `trigger_etch_css_rebuild()`
+- `/wp-json/efs/v1/import/css-classes`
+- `/wp-json/efs/v1/import/global-css`
 
-1. Increment `etch_svg_version` to invalidate caches.
-2. Call `Style_Repository_Interface::invalidate_style_cache()`.
-3. Fire WordPress hooks `etch_fusion_suite_styles_updated` and `etch_fusion_suite_rebuild_css`.
+Relevant transport client:
 
-### `save_to_global_stylesheets()`
+- `includes/api_client.php`
 
-- Converts Etch style entries to `{ name, css }` objects for frontend rendering.
-- Merges with existing global stylesheets and saves via repository.
+### 2.5 Content Side Consumers
 
-## 6. Utility Methods
+The CSS pipeline is consumed later by content migration via:
 
-- `generate_style_hash()` – Generates 7-character IDs mirroring Etch behaviour.
-- `validate_css_syntax()` – Basic bracket/quote validation with `EFS_Error_Handler::log_error()` reporting.
-- `clean_css()` – Fixes double semicolons and normalises whitespace for custom CSS blocks.
-- `clean_custom_css()` – Removes redundant class wrappers while retaining media queries.
+- `includes/gutenberg_generator.php`
+- converters built through `EFS_Element_Factory`
+- other content parsers that read `efs_style_map`
 
-## 7. Breakpoint Mapping
+That dependency is architectural, not optional. CSS migration is only correct if content migration resolves the same Etch style IDs later.
 
-| Bricks Breakpoint   | Etch Media Query                     |
-|---------------------|--------------------------------------|
-| `desktop`           | `@media (width >= to-rem(1200px))`   |
-| `tablet_landscape`  | `@media (width >= to-rem(992px))`    |
-| `tablet_portrait`   | `@media (width >= to-rem(768px))`    |
-| `mobile_landscape`  | `@media (width >= to-rem(479px))`    |
-| `mobile_portrait`   | `@media (width <= to-rem(478px))`    |
+## 3. Current Architecture Model
 
-> Desktop-first cascading ensures larger breakpoints apply first, with smaller breakpoints overriding as needed.
+The modern flow is best understood as two linked systems:
 
-## 8. Logical Property Conversion
+1. **Style conversion and persistence**
+2. **Content-to-style resolution**
 
-| Physical Property | Logical Property        |
-|-------------------|-------------------------|
-| `margin-left`     | `margin-inline-start`   |
-| `margin-right`    | `margin-inline-end`     |
-| `padding-left`    | `padding-inline-start`  |
-| `padding-right`   | `padding-inline-end`    |
-| `left`            | `inset-inline-start`    |
-| `right`           | `inset-inline-end`      |
-| `width`           | `inline-size`           |
-| `height`          | `block-size`            |
-| `min-width`       | `min-inline-size`       |
-| `min-height`      | `min-block-size`        |
-| `max-width`       | `max-inline-size`       |
-| `max-height`      | `max-block-size`        |
+The CSS pipeline does not end when `etch_styles` is saved. The second half is the later lookup path from Bricks class IDs inside content to Etch style IDs inside migrated blocks.
 
-## 9. Error Handling
+That is why `efs_style_map` is central.
 
-- All logging routes through `EFS_Error_Handler::log_info()`, `log_warning()`, or `log_error()`.
-- Info logs provide granular conversion diagnostics without violating PHPCS output rules.
-- Syntax or migration failures produce structured error codes (e.g., `E002` for CSS validation).
+## 4. Core Data Model
 
-## 10. Testing Strategy
+### 4.1 `styles`
 
-### Unit & Automation
+`styles` is the Etch style registry payload. It is eventually stored in `etch_styles`.
 
-- Ensure existing unit/integration tests for CSS conversion continue to pass.
-- Extend coverage where possible to include:
-  - Custom CSS parsing edge cases.
-  - Logical property conversions.
-  - Breakpoint/media query merging.
+Each migrated class style is keyed by an Etch style ID, for example:
 
-### Manual Verification Checklist
+```json
+{
+  "2af6e4f": {
+    "type": "class",
+    "selector": ".card",
+    "css": "..."
+  }
+}
+```
 
-- Convert representative Bricks projects featuring:
-  - Custom CSS with nested selectors.
-  - Breakpoint-specific adjustments.
-  - Advanced layout features (flex, grid, positioning, effects).
-- Validate Etch styles render correctly across desktop/tablet/mobile viewports.
-- Confirm cache invalidation and rebuild hooks generate updated CSS assets.
+### 4.2 `style_map`
 
----
+`style_map` is the translation table from Bricks class ID to Etch style identity:
 
-**References:**
+```json
+{
+  "bricks-class-id": {
+    "id": "2af6e4f",
+    "selector": ".card"
+  }
+}
+```
 
-- Main implementation: `includes/css_converter.php`
-- Error handling: `includes/error_handler.php`
-- Style repository: `includes/repositories/class-wordpress-style-repository.php`
-- PHPCS configuration: `phpcs.xml.dist`
-- Security architecture: `docs/security-architecture.md`
+This is persisted as `efs_style_map`.
+
+### 4.3 `etch_styles`
+
+`etch_styles` is the target-side persistent Etch registry. The keys in `etch_styles` must be the same IDs referenced from `style_map`.
+
+### 4.4 `etch_global_stylesheets`
+
+Global Bricks CSS is not part of `style_map`. It is stored separately in `etch_global_stylesheets`, currently under the reserved ID `bricks-global`.
+
+## 5. Architectural Invariants
+
+These invariants define whether the system is healthy:
+
+1. `efs_style_map[bricks_id].id` must reference a real key in `etch_styles`.
+2. The selector in `efs_style_map[bricks_id].selector` must match the selector stored in that `etch_styles` entry.
+3. Content migration must write that same Etch style ID into block `styles[]`.
+4. Visible frontend class names are derived from selectors, but Builder assignment depends on style IDs.
+
+If these invariants break, a class can still appear in the frontend DOM while the Etch Builder cannot resolve it correctly.
+
+## 6. Conversion Pipeline
+
+The current conversion pipeline in `convert_bricks_classes_to_etch()` is effectively a seven-stage process.
+
+### Stage 1: Load and scope classes
+
+The orchestrator:
+
+- loads `bricks_global_classes`
+- reads active migration options from `efs_active_migration`
+- computes selected post types
+- optionally restricts the migration to referenced classes only
+
+This stage is driven by `EFS_Class_Reference_Scanner`.
+
+### Stage 2: Seed framework styles
+
+Built-in Etch framework styles such as:
+
+- `etch-section-style`
+- `etch-container-style`
+- `etch-iframe-style`
+- `etch-block-style`
+
+are seeded into `styles`.
+
+These are internal Etch styles and never appear in `style_map`.
+
+### Stage 3: Pre-collect raw CSS
+
+Before structured class conversion, the converter aggregates:
+
+- `_cssCustom`
+- `_cssCustom:<breakpoint>`
+- temporary inline CSS in `efs_inline_css_*`
+
+Breakpoint snippets are stored separately in `breakpoint_css_map` so they can be merged back into the correct style later.
+
+### Stage 4: Convert structured Bricks classes
+
+For each eligible non-ACSS class:
+
+- structured settings are converted to CSS
+- the CSS is normalized
+- a stable Etch style ID is resolved
+- a `styles[style_id]` entry is created
+- a matching `style_map[bricks_id]` entry is written
+
+Stable ID reuse is critical here. Re-running the conversion must not drift to a different Etch style ID for the same Bricks class when an existing mapping is already known.
+
+### Stage 5: Collect element-scoped styles
+
+`EFS_Element_ID_Style_Collector` contributes:
+
+- element ID based CSS
+- additional raw custom CSS extracted from content
+
+These rules are merged into the same top-level payload.
+
+### Stage 6: Parse and merge custom stylesheet CSS
+
+`EFS_CSS_Stylesheet_Parser` parses the aggregated raw stylesheet and produces:
+
+- class-scoped custom styles
+- ID-scoped custom styles
+
+The converter then merges those results back into `styles`.
+
+### Stage 7: Final normalization and persistence
+
+The final phase:
+
+- merges breakpoint CSS back into the correct style entries
+- runs final CSS normalization
+- injects block display CSS where needed
+- persists `efs_style_map`
+- persists `efs_acss_inline_style_map`
+- returns the payload `{ styles, style_map }`
+
+## 7. ACSS Architecture
+
+ACSS is architecturally distinct from normal Bricks classes.
+
+For ACSS classes:
+
+- the converter registers inline declarations through `EFS_ACSS_Handler`
+- creates a stub Etch style entry so the class still appears in the Etch Builder
+- still creates a `style_map` entry for the Bricks class ID
+
+This means some valid ACSS entries intentionally have empty CSS in `etch_styles`.
+
+That is not a persistence bug. It is part of the model.
+
+## 8. Target Import Architecture
+
+`EFS_Style_Importer::import_etch_styles()` is the canonical target-side persistence path.
+
+It performs four important operations:
+
+### 8.1 Accept both current and legacy payload shapes
+
+It supports:
+
+- current payload: `{ styles, style_map }`
+- legacy payload: flat style array
+
+### 8.2 Deduplicate by selector
+
+If multiple incoming entries share one selector, their CSS is merged.
+
+This is especially important because generated CSS and parsed `_cssCustom` CSS may arrive as separate entries for the same logical class.
+
+### 8.3 Merge with existing `etch_styles`
+
+Existing styles remain the base.
+Incoming styles overwrite older styles by selector.
+
+This makes re-migration idempotent at selector level while preserving unrelated existing target styles.
+
+### 8.4 Preserve storage keys
+
+This is the key architectural rule of the importer:
+
+- `etch_styles` must preserve style IDs as array keys
+- those keys must remain aligned with `style_map`
+
+The importer explicitly rebuilds the merged payload using preserved storage keys instead of allowing numeric reindexing.
+
+That behavior is not an optimization. It is required for Builder correctness.
+
+## 9. CSS Rebuild Architecture
+
+After persistence, the importer triggers an Etch rebuild through three mechanisms:
+
+1. increment `etch_svg_version`
+2. invalidate repository caches
+3. fire:
+   - `etch_fusion_suite_styles_updated`
+   - `etch_fusion_suite_rebuild_css`
+
+The design goal is to avoid a hard dependency on Etch internal services while still forcing Etch to rebuild reliably.
+
+## 10. Global CSS Architecture
+
+Global Bricks CSS follows a separate architectural path:
+
+- source reads `bricks_global_settings['customCss']`
+- source sends it to `/import/global-css`
+- target stores it in `etch_global_stylesheets`
+
+This is intentionally separate from class migration because:
+
+- global CSS is not keyed by Bricks class ID
+- it does not participate in `style_map`
+- it should not interfere with Builder style ID assignment
+
+## 11. Progress and Counting Architecture
+
+The CSS phase uses class-unit counts, not request counts.
+
+The authoritative preferred count is:
+
+```text
+count(style_map)
+```
+
+Why:
+
+- `style_map` mirrors the actual Bricks class -> Etch style relationship
+- Builder correctness depends on those mappings
+- request count is not meaningful when a single payload contains many classes
+
+This same counting rule must be shared by:
+
+- migration preview
+- init totals
+- target receiving counters
+- CSS service migration counts
+
+## 12. Content Integration Architecture
+
+The CSS architecture is coupled to content migration through `efs_style_map`.
+
+Downstream generators resolve:
+
+- Bricks `_cssGlobalClasses`
+- Bricks `_cssClasses`
+
+into:
+
+- Etch style IDs for block `styles[]`
+- visible CSS class names for block attributes
+
+`gutenberg_generator.php` uses `efs_style_map` both:
+
+- forward: Bricks class ID -> Etch style ID
+- reverse: Etch style ID -> selector/class name
+
+This is why a valid frontend class name alone is insufficient. The block must also carry the correct Etch style ID.
+
+## 13. Failure Modes the Architecture Must Prevent
+
+The current design is explicitly shaped around preventing these failures:
+
+### 13.1 Style ID drift
+
+Same Bricks class gets a different Etch style ID on re-run.
+
+Prevention:
+
+- stable style ID resolution in the converter
+
+### 13.2 Key loss during import
+
+The importer stores styles under numeric indexes or selector keys instead of the incoming style IDs.
+
+Prevention:
+
+- explicit storage-key preservation in `EFS_Style_Importer`
+
+### 13.3 Payload/progress mismatch
+
+Progress counts all Bricks classes while the real migration only sends referenced classes.
+
+Prevention:
+
+- CSS service counts based on the real payload
+
+### 13.4 Conflating global CSS with class CSS
+
+Global Bricks CSS is mixed into `etch_styles` or expected to appear in `style_map`.
+
+Prevention:
+
+- dedicated `/import/global-css` route and `etch_global_stylesheets` storage
+
+## 14. Current Design Decisions
+
+The architecture currently makes these deliberate design choices:
+
+1. class CSS and global CSS are separate flows
+2. `style_map` is first-class state, not an incidental helper
+3. the importer is direct option persistence plus rebuild trigger, not an intermediate Etch API abstraction
+4. re-migration correctness is more important than naive append-only behavior
+5. ACSS is modeled as a special path with stubs plus inline mapping
+
+## 15. Files to Read Together
+
+For architecture:
+
+- `includes/css_converter.php`
+- `includes/css/class-style-importer.php`
+- `includes/services/class-css-service.php`
+- `includes/css/class-class-reference-scanner.php`
+- `includes/gutenberg_generator.php`
+- `includes/repositories/class-wordpress-style-repository.php`
+
+For operations and troubleshooting:
+
+- `docs/css-migration-bricks-to-etch-de.md`
+- `docs/css-migration-bricks-to-etch-en.md`

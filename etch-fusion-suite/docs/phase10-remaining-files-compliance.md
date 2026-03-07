@@ -28,7 +28,7 @@
 - `includes/media_migrator.php` – 10 replacements
 - `includes/gutenberg_generator.php` – 25+ replacements
 - `includes/css_converter.php` – Legacy `error_log()` diagnostics fully routed through `log_debug_info()` / `log_info()` (Oct 29 10:42)
-- `includes/migration_token_manager.php` – Validation tracing now uses structured `log_info()` / `log_error()` (Oct 29 10:43)
+- `includes/core/EFS_Migration_Token_Manager.php` – Validation tracing now uses structured `log_info()` / `log_error()` (Oct 29 10:43)
 
 ### Documented Intentional `error_log()` Usage
 

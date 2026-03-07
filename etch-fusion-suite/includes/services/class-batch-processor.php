@@ -292,9 +292,10 @@ class EFS_Batch_Processor {
 			);
 		}
 
-		// Validate total_count is a positive integer.
-		$total_count = (int) ( $checkpoint['total_count'] ?? 0 );
-		if ( $total_count <= 0 ) {
+		// Media-only migrations keep post total_count at 0 and track work via total_media_count.
+		$total_count       = (int) ( $checkpoint['total_count'] ?? 0 );
+		$total_media_count = (int) ( $checkpoint['total_media_count'] ?? 0 );
+		if ( $total_count <= 0 && ( 'media' !== $checkpoint['phase'] || $total_media_count <= 0 ) ) {
 			return new \WP_Error( 'invalid_checkpoint_count', __( 'Checkpoint total_count must be a positive integer.', 'etch-fusion-suite' ) );
 		}
 

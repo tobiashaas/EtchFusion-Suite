@@ -211,11 +211,13 @@ class EFS_Migration_Starter {
 
 			$init_totals = array();
 
-			if ( $analysis['media'] > 0 ) {
-				$init_totals['media'] = (int) $analysis['media'];
+			$include_media = ! empty( $options['include_media'] );
+			$transferable_media_count = $include_media ? $this->media_service->get_transferable_media_count( $selected_post_types ) : 0;
+			if ( $transferable_media_count > 0 ) {
+				$init_totals['media'] = $transferable_media_count;
 			}
 
-			$css_counts = $this->css_service->get_css_class_counts( $selected_post_types, false );
+			$css_counts = $this->css_service->get_migration_css_class_counts( $selected_post_types, $options );
 			$css_total  = isset( $css_counts['to_migrate'] ) ? (int) $css_counts['to_migrate'] : 0;
 			if ( $css_total > 0 ) {
 				$init_totals['css'] = $css_total;
@@ -264,8 +266,9 @@ class EFS_Migration_Starter {
 			}
 			$sync_migrator_warnings = isset( $migrator_result['warnings'] ) ? $migrator_result['warnings'] : array();
 
-			$steps        = $this->progress_manager->get_steps_state();
-			$media_result = array( 'skipped' => true );
+			$steps         = $this->progress_manager->get_steps_state();
+			$media_result  = array( 'skipped' => true );
+			$media_summary = array();
 			if ( isset( $steps['media'] ) ) {
 				$selected_post_types = isset( $options['selected_post_types'] ) && is_array( $options['selected_post_types'] ) ? $options['selected_post_types'] : array();
 				$media_ids           = $this->media_service->get_media_ids( $selected_post_types );
@@ -282,7 +285,7 @@ class EFS_Migration_Starter {
 				$this->progress_manager->update_progress( 'media', 65, __( 'Media files migrated.', 'etch-fusion-suite' ), $media_migrated + $media_skipped, $media_total, $media_skipped );
 			}
 
-			$css_counts = $this->css_service->get_css_class_counts( $selected_post_types, false );
+			$css_counts = $this->css_service->get_migration_css_class_counts( $selected_post_types, $options );
 			$css_total  = isset( $css_counts['to_migrate'] ) ? (int) $css_counts['to_migrate'] : 0;
 			$this->progress_manager->update_progress( 'css', 70, __( 'Converting CSS classes...', 'etch-fusion-suite' ), 0, $css_total, 0, false );
 			$css_result = $this->css_service->migrate_css_classes( $target, $migration_key );
@@ -311,6 +314,10 @@ class EFS_Migration_Starter {
 				);
 			}
 
+			if ( ! empty( $media_summary ) ) {
+				$posts_result['media_summary'] = $media_summary;
+			}
+
 			$this->progress_manager->update_progress( 'finalization', 95, __( 'Finalizing migration...', 'etch-fusion-suite' ) );
 			$finalization_result = $this->run_finalizer->finalize_migration( $posts_result, $sync_migrator_warnings );
 			if ( is_wp_error( $finalization_result ) ) {
@@ -319,8 +326,9 @@ class EFS_Migration_Starter {
 
 		// Notify the Etch site that all data has been sent so the receiving
 		// popup transitions to 'completed' instead of going stale.
-		// CRITICAL: Must verify Etch actually received all items before marking complete.
-		$complete_result = $this->api_client->send_migration_complete( $target, $migration_key );
+		// CRITICAL: Must verify Etch actually received all expected items before marking complete.
+		$completion_payload = $this->run_finalizer->build_completion_payload( $posts_result );
+		$complete_result    = $this->api_client->send_migration_complete( $target, $migration_key, $completion_payload );
 		if ( is_wp_error( $complete_result ) ) {
 			$this->progress_manager->update_progress( 'error', 90, $complete_result->get_error_message() );
 			$this->run_finalizer->write_failed_run_record(

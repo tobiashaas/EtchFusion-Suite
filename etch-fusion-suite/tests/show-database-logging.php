@@ -8,7 +8,7 @@
  * Run: wp eval "require WP_PLUGIN_DIR.'/etch-fusion-suite/tests/show-database-logging.php';"
  */
 
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/core/class-db-installer.php';
+require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/autoloader.php';
 require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/repositories/class-db-migration-persistence.php';
 require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/repositories/class-wordpress-migration-repository.php';
 

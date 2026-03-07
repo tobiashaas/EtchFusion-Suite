@@ -19,17 +19,21 @@
         "phpstan/phpstan": "^1.12 || ^2.0",
         "szepeviktor/phpstan-wordpress": "^2.0",
         "brianhenryie/strauss": "^0.26",
-        "roave/security-advisories": "dev-latest"
+        "roave/security-advisories": "dev-latest",
+        "php-stubs/wordpress-stubs": "^6.9"
     },
     "autoload": {
         "psr-4": {
-            "Bricks2Etch\\": "includes/"
-        }
+            "Bricks2Etch\\Core\\": "includes/core/"
+        },
+        "classmap": [
+            "includes/"
+        ]
     },
     "autoload-dev": {
-        "psr-4": {
-            "Bricks2Etch\\Tests\\": "tests/"
-        }
+        "classmap": [
+            "tests/"
+        ]
     },
     "authors": [
         {

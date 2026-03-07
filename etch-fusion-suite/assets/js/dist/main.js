@@ -193,6 +193,30 @@
     return `${baseMessage} \u2014 ${label}: ${humanizedList}`;
   };
 
+  // assets/js/admin/utilities/time-format.js
+  var formatElapsed = (seconds) => {
+    if (seconds == null || typeof seconds !== "number" || seconds < 0 || Number.isNaN(seconds)) {
+      return "00:00";
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+  var formatEta = (seconds) => {
+    if (seconds == null || seconds === 0 || typeof seconds !== "number" || Number.isNaN(seconds) || seconds < 0) {
+      return null;
+    }
+    if (seconds < 60) {
+      return "< 1m remaining";
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    if (secs === 0) {
+      return `~${mins}m remaining`;
+    }
+    return `~${mins}m ${secs}s remaining`;
+  };
+
   // assets/js/admin/ui.js
   var TOAST_VISIBLE_CLASS = "show";
   var TOAST_CONTAINER_CLASS = "efs-toast-container";
@@ -323,12 +347,14 @@
     element.toggleAttribute("aria-busy", Boolean(isLoading));
     element.disabled = Boolean(isLoading);
   };
-  var updateProgress = ({ percentage = 0, status = "", steps = [], items_processed = 0, items_total = 0, items_skipped = 0 }) => {
+  var updateProgress = ({ percentage = 0, status = "", steps = [], items_processed = 0, items_total = 0, items_skipped = 0, elapsed_seconds = 0, estimated_time_remaining = null, breakdown = {} }) => {
     const progressRoot = document.querySelector("[data-efs-progress]");
     const progressFill = progressRoot?.querySelector(".efs-progress-fill");
     const currentStep = document.querySelector("[data-efs-current-step]");
     const stepsList = document.querySelector("[data-efs-steps]");
     const itemsCount = document.querySelector("[data-efs-items-count]");
+    const timeDisplay = document.querySelector("[data-efs-progress-time]");
+    const breakdownContainer = document.querySelector("[data-efs-breakdown]");
     let displayPercentage;
     if (items_total > 0) {
       displayPercentage = Math.min(100, Math.round(items_processed / items_total * 100));
@@ -364,6 +390,44 @@
         itemsCount.textContent = "";
         itemsCount.hidden = true;
       }
+    }
+    if (breakdownContainer && typeof breakdown === "object" && Object.keys(breakdown).length > 0) {
+      breakdownContainer.innerHTML = "";
+      const breakdownList = document.createElement("ul");
+      breakdownList.className = "efs-breakdown-list";
+      Object.entries(breakdown).forEach(([postType, stats]) => {
+        const li = document.createElement("li");
+        li.className = "efs-breakdown-item";
+        const total = stats.total || 0;
+        const processed = stats.processed || 0;
+        const skipped = stats.skipped || 0;
+        const percent = total > 0 ? Math.round(processed / total * 100) : 0;
+        const postTypeLabel = postType.charAt(0).toUpperCase() + postType.slice(1);
+        li.innerHTML = `
+                <span class="efs-breakdown-label">${postTypeLabel}</span>
+                <span class="efs-breakdown-progress">
+                    <span class="efs-breakdown-bar" style="width: ${percent}%"></span>
+                </span>
+                <span class="efs-breakdown-count">${processed}/${total}${skipped > 0 ? ` (-${skipped})` : ""}</span>
+            `;
+        breakdownList.appendChild(li);
+      });
+      breakdownContainer.appendChild(breakdownList);
+      breakdownContainer.hidden = false;
+    } else if (breakdownContainer) {
+      breakdownContainer.hidden = true;
+    }
+    if (timeDisplay) {
+      let timeText = "";
+      if (elapsed_seconds > 0) {
+        timeText = `Elapsed: ${formatElapsed(elapsed_seconds)}`;
+        const etaText = formatEta(estimated_time_remaining);
+        if (etaText) {
+          timeText += ` \u2022 ${etaText}`;
+        }
+      }
+      timeDisplay.textContent = timeText;
+      timeDisplay.hidden = !timeText;
     }
     if (currentStep) {
       currentStep.textContent = status || "";
@@ -689,7 +753,10 @@
         steps,
         items_processed: progress.items_processed || 0,
         items_total: progress.items_total || 0,
-        items_skipped: progress.items_skipped || 0
+        items_skipped: progress.items_skipped || 0,
+        elapsed_seconds: data?.elapsed_seconds || 0,
+        estimated_time_remaining: data?.estimated_time_remaining || null,
+        breakdown: data?.breakdown || {}
       });
       if (data?.completed) {
         showToast("Migration completed successfully.", "success");
@@ -701,13 +768,17 @@
       if (error?.name === "AbortError") {
         return { aborted: true, migrationId };
       }
+      const errorCode = error?.code || error?.data?.code || "";
+      const errorMessage = buildAjaxErrorMessage(error, "Failed to retrieve migration progress.");
       console.error("[EFS] Progress request failed:", error);
       return {
         progress: { percentage: 0, status: "error", current_step: "error" },
         steps: [],
         migrationId,
         completed: false,
-        error: buildAjaxErrorMessage(error, "Failed to retrieve migration progress."),
+        error: errorMessage,
+        code: errorCode,
+        data: error?.data || {},
         failed: true
       };
     }
@@ -743,7 +814,8 @@
       steps: data?.steps || [],
       items_processed: data?.progress?.items_processed || 0,
       items_total: data?.progress?.items_total || 0,
-      items_skipped: data?.progress?.items_skipped || 0
+      items_skipped: data?.progress?.items_skipped || 0,
+      breakdown: data?.breakdown || {}
     });
     startProgressPolling({ migrationId: getActiveMigrationId() });
     return data;
@@ -823,7 +895,11 @@
           `[EFS] Progress polling failed (${pollState.failureCount}/${pollState.maxFailures}): ${result?.error}`
         );
         if (pollState.failureCount >= pollState.maxFailures) {
-          const message = result?.error || "Migration progress polling failed repeatedly.";
+          let message = result?.error || "Migration progress polling failed repeatedly.";
+          const errorCode = result?.data?.status || result?.code;
+          if (errorCode === "configuration_incomplete" || result?.code === "configuration_incomplete") {
+            message = "Migration setup incomplete. Please go back to Step 2: Connect to Etch Site to configure the connection.";
+          }
           stopProgressPolling();
           showToast(message, "error");
           return;
@@ -1414,30 +1490,6 @@
   };
   var removeProgressChip = (chip) => {
     chip?.remove();
-  };
-
-  // assets/js/admin/utilities/time-format.js
-  var formatElapsed = (seconds) => {
-    if (seconds == null || typeof seconds !== "number" || seconds < 0 || Number.isNaN(seconds)) {
-      return "00:00";
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-  var formatEta = (seconds) => {
-    if (seconds == null || seconds === 0 || typeof seconds !== "number" || Number.isNaN(seconds) || seconds < 0) {
-      return null;
-    }
-    if (seconds < 60) {
-      return "< 1m remaining";
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    if (secs === 0) {
-      return `~${mins}m remaining`;
-    }
-    return `~${mins}m ${secs}s remaining`;
   };
 
   // assets/js/admin/bricks-wizard.js
@@ -3382,6 +3434,7 @@
     const hasSignal = migrationId !== "" || sourceRaw !== "" || items > 0 || lastActivityRaw !== "";
     const itemsTotal = Number(payload?.items_total) || 0;
     const etaSec = Number(payload?.estimated_time_remaining) || null;
+    const itemsByType = payload?.items_by_type && typeof payload.items_by_type === "object" && !Array.isArray(payload.items_by_type) ? payload.items_by_type : {};
     return {
       status,
       source,
@@ -3395,6 +3448,7 @@
       hasSignal,
       itemsTotal,
       etaSec,
+      itemsByType,
       isStale: status === "stale",
       title: formatTitle(status, status === "stale"),
       subtitle: formatSubtitle(status, status === "stale"),
@@ -3474,9 +3528,27 @@
         elements.source.hidden = !elements.source.textContent;
       }
       if (elements.items) {
-        const total = model.itemsTotal > 0 ? `/${model.itemsTotal}` : "";
-        elements.items.textContent = model.items > 0 || total ? `Items: ${model.items}${total}` : "";
-        elements.items.hidden = !elements.items.textContent;
+        const byType = model.itemsByType;
+        const typeEntries = Object.entries(byType).filter(([type, counts]) => counts.total > 0);
+        const TYPE_LABELS = { media: "Media", post: "Posts", page: "Pages", attachment: "Media", css: "CSS", bricks_template: "Templates" };
+        if (typeEntries.length > 0) {
+          const lines = typeEntries.map(([type, counts]) => {
+            let label = TYPE_LABELS[type];
+            if (!label) {
+              label = type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+            }
+            const total = counts.total > 0 ? `/${counts.total}` : "";
+            const pct = counts.total > 0 ? Math.round(counts.received / counts.total * 100) : 0;
+            const cls = counts.received === counts.total && counts.total > 0 ? "efs-item-done" : "";
+            return `<li class="efs-item-line ${cls}">${label}: ${counts.received}${total} (${pct}%)</li>`;
+          });
+          elements.items.innerHTML = `<ul class="efs-items-list">${lines.join("")}</ul>`;
+          elements.items.hidden = false;
+        } else {
+          const total = model.itemsTotal > 0 ? `/${model.itemsTotal}` : "";
+          elements.items.textContent = model.items > 0 || total ? `Received: ${model.items}${total}` : "";
+          elements.items.hidden = !elements.items.textContent;
+        }
       }
       if (elements.progressFill && elements.percent) {
         const total = model.itemsTotal > 0 ? model.itemsTotal : 0;
@@ -3487,7 +3559,7 @@
       }
       if (elements.elapsed) {
         const startedAt = model.startedAt;
-        const startedMs = startedAt ? new Date(startedAt.replace(" ", "T")).getTime() : NaN;
+        const startedMs = startedAt ? (/* @__PURE__ */ new Date(startedAt.replace(" ", "T") + "Z")).getTime() : NaN;
         const elapsedSec = Number.isFinite(startedMs) && startedMs > 0 ? Math.max(0, Math.floor((Date.now() - startedMs) / 1e3)) : null;
         if (model.status === "receiving" && elapsedSec != null) {
           const etaStr = formatEta(model.etaSec);

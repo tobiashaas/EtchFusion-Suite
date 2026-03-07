@@ -1,6 +1,6 @@
 # Etch Fusion Suite Naming Conventions
 
-**Updated:** 2025-10-28 21:10
+**Updated:** 2026-03-06 18:35
 
 ## 1. Overview
 
@@ -103,6 +103,11 @@ This strategy balances brevity for internal tooling with clarity for public exte
 - Primary namespace: `Bricks2Etch\`
 - Classes: `EFS_{Component}` or `Etch_Fusion_Suite_{Component}`
 - Interfaces/Traits follow same prefixes.
+- New namespaced classes must use an autoloadable file path that matches the class name.
+- Current canonical example: `Bricks2Etch\Core\EFS_DB_Installer` lives at `includes/core/EFS_DB_Installer.php`.
+- `Bricks2Etch\Core\*` has no root-level fallback. Core classes must live under `includes/core/`.
+- Legacy root-level files under `includes/` still exist for other namespaces and are supported through Composer `classmap` plus the manual autoloader. That compatibility layer does not apply to `Bricks2Etch\Core\`.
+- Do not hardcode `require_once` paths to individual namespaced class files in plugin code, uninstall hooks, or test scripts. Load `includes/autoloader.php` or rely on the main plugin bootstrap instead.
 
 ## 4. WordPress Core Hooks
 
@@ -136,6 +141,14 @@ The verification script parses the PHPCS configuration to ensure parity between 
 - Validate that the functionality cannot live within a class scope.
 - Use `etch_fusion_suite_{purpose}` naming.
 - Wrap in `if ( ! function_exists( '...' ) )` when backward compatibility is needed.
+
+### Adding Namespaced Classes
+
+- Put the file in the namespace directory and use the exact class name as the filename.
+- Example: `Bricks2Etch\Core\EFS_DB_Installer` → `includes/core/EFS_DB_Installer.php`
+- For `Bricks2Etch\Core\`, root-level `includes/*.php` files are not allowed.
+- If you touch legacy class files in `includes/` root, migrate them deliberately instead of adding another non-PSR-4 file beside them.
+- Update `tests/autoloader-audit.php` and `tests/live-autoload-test.php` when introducing a new autoload-critical class.
 
 ### Defining Options/Transients
 

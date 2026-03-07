@@ -27,6 +27,13 @@ class EFS_CSS_Service {
 	 */
 	private $progress_tracker;
 
+	/**
+	 * Cached conversion payload for the current request.
+	 *
+	 * @var array<string,mixed>|null
+	 */
+	private $migration_css_payload;
+
 	public function __construct(
 		EFS_CSS_Converter $css_converter,
 		EFS_API_Client $api_client,
@@ -57,9 +64,10 @@ class EFS_CSS_Service {
 	 */
 	public function migrate_css_classes( $target_url, $jwt_token ) {
 		try {
-			$etch_styles = $this->css_converter->convert_bricks_classes_to_etch();
+			$etch_styles    = $this->get_migration_css_payload();
+			$migrated_count = $this->get_css_payload_count( $etch_styles );
 
-			if ( empty( $etch_styles ) ) {
+			if ( 0 === $migrated_count ) {
 				$this->error_handler->log_info(
 					'No CSS classes found to migrate',
 					array(
@@ -76,12 +84,17 @@ class EFS_CSS_Service {
 
 			// Log each CSS class conversion with progress tracker.
 			if ( $this->progress_tracker ) {
-				foreach ( $etch_styles as $bricks_class => $etch_class ) {
+				$style_map = isset( $etch_styles['style_map'] ) && is_array( $etch_styles['style_map'] )
+					? $etch_styles['style_map']
+					: array();
+
+				foreach ( $style_map as $bricks_class => $etch_class ) {
+					$selector = is_array( $etch_class ) ? (string) ( $etch_class['selector'] ?? '' ) : '';
 					$this->progress_tracker->log_css_migration(
-						$bricks_class,
+						(string) $bricks_class,
 						'converted',
 						array(
-							'etch_class_name' => $etch_class,
+							'etch_class_name' => ltrim( $selector, '.' ),
 							'conflicts'       => 0,
 						)
 					);
@@ -104,8 +117,8 @@ class EFS_CSS_Service {
 					$this->progress_tracker->log_batch_completion(
 						'css_classes',
 						0,
-						count( $etch_styles ),
-						count( $etch_styles ),
+						$migrated_count,
+						$migrated_count,
 						array(
 							'error' => $response->get_error_message(),
 						)
@@ -118,8 +131,8 @@ class EFS_CSS_Service {
 			$this->error_handler->log_info(
 				'CSS migration completed successfully',
 				array(
-					'css_classes_found' => count( $etch_styles ),
-					'css_class_names'   => array_keys( $etch_styles ),
+					'css_classes_found' => $migrated_count,
+					'css_class_names'   => isset( $etch_styles['style_map'] ) && is_array( $etch_styles['style_map'] ) ? array_keys( $etch_styles['style_map'] ) : array(),
 				)
 			);
 
@@ -127,18 +140,18 @@ class EFS_CSS_Service {
 			if ( $this->progress_tracker ) {
 				$this->progress_tracker->log_batch_completion(
 					'css_classes',
-					count( $etch_styles ),
-					count( $etch_styles ),
+					$migrated_count,
+					$migrated_count,
 					0,
 					array(
-						'batch_size' => count( $etch_styles ),
+						'batch_size' => $migrated_count,
 					)
 				);
 			}
 
 			return array(
 				'success'  => true,
-				'migrated' => count( $etch_styles ),
+				'migrated' => $migrated_count,
 				'message'  => __( 'CSS classes migrated successfully.', 'etch-fusion-suite' ),
 				'response' => $response,
 			);
@@ -200,6 +213,28 @@ class EFS_CSS_Service {
 		return array(
 			'total'      => 0,
 			'to_migrate' => 0,
+		);
+	}
+
+	/**
+	 * Get CSS class counts using the same restrict-to-used setting as the migration run.
+	 *
+	 * The wizard and the actual converter default to restricting CSS to referenced
+	 * classes. Initial receiving totals must use the same rule, otherwise the Etch
+	 * receiving UI can show a correct per-type breakdown with an inflated global
+	 * total and percentage.
+	 *
+	 * @param array<int,string>       $selected_post_types Post types selected for migration.
+	 * @param array<string,mixed>|null $options            Migration options payload.
+	 * @return array{total: int, to_migrate: int}
+	 */
+	public function get_migration_css_class_counts( array $selected_post_types = array(), ?array $options = null ): array {
+		$payload = $this->get_migration_css_payload();
+		$count   = $this->get_css_payload_count( $payload );
+
+		return array(
+			'total'      => $count,
+			'to_migrate' => $count,
 		);
 	}
 
@@ -296,5 +331,65 @@ class EFS_CSS_Service {
 	 */
 	public function validate_css_syntax( $css ) {
 		return $this->css_converter->validate_css_syntax( $css );
+	}
+
+	/**
+	 * Build or reuse the current migration's converted CSS payload.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function get_migration_css_payload(): array {
+		if ( null === $this->migration_css_payload ) {
+			$payload = $this->css_converter->convert_bricks_classes_to_etch();
+			$this->migration_css_payload = is_array( $payload ) ? $payload : array();
+		}
+
+		return $this->migration_css_payload;
+	}
+
+	/**
+	 * Count migratable CSS classes represented by a conversion payload.
+	 *
+	 * @param array<string,mixed> $payload CSS conversion payload.
+	 * @return int
+	 */
+	private function get_css_payload_count( array $payload ): int {
+		$style_map = isset( $payload['style_map'] ) && is_array( $payload['style_map'] )
+			? $payload['style_map']
+			: array();
+
+		if ( ! empty( $style_map ) ) {
+			return count( $style_map );
+		}
+
+		$styles = isset( $payload['styles'] ) && is_array( $payload['styles'] )
+			? $payload['styles']
+			: array();
+
+		$count = 0;
+		foreach ( $styles as $style_key => $style ) {
+			if ( ! is_array( $style ) ) {
+				continue;
+			}
+
+			$type     = isset( $style['type'] ) ? sanitize_key( (string) $style['type'] ) : '';
+			$selector = isset( $style['selector'] ) ? trim( (string) $style['selector'] ) : '';
+
+			if ( 'class' !== $type ) {
+				continue;
+			}
+
+			if ( is_string( $style_key ) && 0 === strpos( $style_key, 'etch-' ) ) {
+				continue;
+			}
+
+			if ( '' === $selector || '.' !== $selector[0] ) {
+				continue;
+			}
+
+			++$count;
+		}
+
+		return $count;
 	}
 }

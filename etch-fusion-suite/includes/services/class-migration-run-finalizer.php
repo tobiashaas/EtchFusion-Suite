@@ -108,7 +108,7 @@ class EFS_Migration_Run_Finalizer {
 		$failed_media_ids_final = isset( $results['failed_media_ids_final'] ) && is_array( $results['failed_media_ids_final'] )
 			? array_values( $results['failed_media_ids_final'] )
 			: array();
-		$failed_media_count     = isset( $results['failed_media_count'] ) ? (int) $results['failed_media_count'] : count( $failed_media_ids_final );
+		$failed_media_count     = $this->get_failed_media_count( $results, $failed_media_ids_final );
 
 		$counts_by_post_type = $this->build_counts_by_post_type( $results, $options );
 
@@ -214,6 +214,39 @@ class EFS_Migration_Run_Finalizer {
 	}
 
 	/**
+	 * Build a completion payload for the target receiving state.
+	 *
+	 * The target only knows about requested totals. When the source finishes
+	 * with warnings, failed or skipped items must be reconciled so the target
+	 * validates against the items that were actually expected to arrive.
+	 *
+	 * @param array $results Final migration results payload.
+	 * @return array
+	 */
+	public function build_completion_payload( array $results ): array {
+		$options                = $this->get_active_options();
+		$counts_by_post_type    = $this->build_counts_by_post_type( $results, $options );
+		$expected_receipts      = array();
+		$media_expected_receipt = $this->get_expected_media_receipts( $results );
+
+		foreach ( $counts_by_post_type as $post_type => $counts ) {
+			$expected_receipts[ $post_type ] = $this->get_expected_receipts_for_counts( is_array( $counts ) ? $counts : array() );
+		}
+
+		if ( null !== $media_expected_receipt ) {
+			$expected_receipts['media'] = $media_expected_receipt;
+		}
+
+		if ( empty( $expected_receipts ) ) {
+			return array();
+		}
+
+		return array(
+			'expected_receipts_by_type' => $expected_receipts,
+		);
+	}
+
+	/**
 	 * Write a minimal "failed" run record for error paths.
 	 *
 	 * @param string $migration_id  Migration ID (may be empty if error occurred before ID was generated).
@@ -260,6 +293,123 @@ class EFS_Migration_Run_Finalizer {
 	// -------------------------------------------------------------------------
 	// Private helpers
 	// -------------------------------------------------------------------------
+
+	/**
+	 * Get the active migration options from the repository.
+	 *
+	 * @return array
+	 */
+	private function get_active_options(): array {
+		$active = $this->migration_repository->get_active_migration();
+
+		return isset( $active['options'] ) && is_array( $active['options'] ) ? $active['options'] : array();
+	}
+
+	/**
+	 * Calculate how many items of a type were actually expected to arrive.
+	 *
+	 * @param array $counts Count payload with success/failed/skipped or legacy migrated keys.
+	 * @return int
+	 */
+	private function get_expected_receipts_for_counts( array $counts ): int {
+		if ( isset( $counts['success'] ) ) {
+			return max( 0, (int) $counts['success'] );
+		}
+
+		if ( isset( $counts['migrated'] ) ) {
+			return max( 0, (int) $counts['migrated'] );
+		}
+
+		$total   = isset( $counts['total'] ) ? (int) $counts['total'] : 0;
+		$failed  = isset( $counts['failed'] ) ? (int) $counts['failed'] : 0;
+		$skipped = isset( $counts['skipped'] ) ? (int) $counts['skipped'] : 0;
+
+		return max( 0, $total - $failed - $skipped );
+	}
+
+	/**
+	 * Collapse available media result structures into one summary array.
+	 *
+	 * @param array $results Final migration results payload.
+	 * @return array
+	 */
+	private function get_media_summary( array $results ): array {
+		if ( isset( $results['media_summary'] ) && is_array( $results['media_summary'] ) ) {
+			return $results['media_summary'];
+		}
+
+		$media_stats = isset( $results['media_stats'] ) && is_array( $results['media_stats'] ) ? $results['media_stats'] : array();
+		if ( empty( $media_stats ) ) {
+			return array();
+		}
+
+		$summary = array(
+			'total_media'    => 0,
+			'migrated_media' => 0,
+			'skipped_media'  => 0,
+			'failed_media'   => 0,
+		);
+
+		foreach ( $media_stats as $stats ) {
+			if ( ! is_array( $stats ) ) {
+				continue;
+			}
+
+			$summary['total_media']    += isset( $stats['total'] ) ? (int) $stats['total'] : 0;
+			$summary['migrated_media'] += isset( $stats['success'] ) ? (int) $stats['success'] : 0;
+			$summary['skipped_media']  += isset( $stats['skipped'] ) ? (int) $stats['skipped'] : 0;
+			$summary['failed_media']   += isset( $stats['failed'] ) ? (int) $stats['failed'] : 0;
+		}
+
+		return $summary;
+	}
+
+	/**
+	 * Determine how many media items were expected to reach the target.
+	 *
+	 * @param array $results Final migration results payload.
+	 * @return int|null
+	 */
+	private function get_expected_media_receipts( array $results ): ?int {
+		$summary = $this->get_media_summary( $results );
+		if ( empty( $summary ) ) {
+			return null;
+		}
+
+		if ( isset( $summary['migrated_media'] ) ) {
+			return max( 0, (int) $summary['migrated_media'] );
+		}
+
+		$total   = isset( $summary['total_media'] ) ? (int) $summary['total_media'] : 0;
+		$failed  = isset( $summary['failed_media'] ) ? (int) $summary['failed_media'] : 0;
+		$skipped = isset( $summary['skipped_media'] ) ? (int) $summary['skipped_media'] : 0;
+
+		return max( 0, $total - $failed - $skipped );
+	}
+
+	/**
+	 * Determine failed media count from the available result shapes.
+	 *
+	 * @param array $results Final migration results payload.
+	 * @param array $failed_media_ids_final Normalized list of permanently failed media IDs.
+	 * @return int
+	 */
+	private function get_failed_media_count( array $results, array $failed_media_ids_final ): int {
+		if ( isset( $results['failed_media_count'] ) ) {
+			return max( 0, (int) $results['failed_media_count'] );
+		}
+
+		if ( ! empty( $failed_media_ids_final ) ) {
+			return count( $failed_media_ids_final );
+		}
+
+		$summary = $this->get_media_summary( $results );
+		if ( isset( $summary['failed_media'] ) ) {
+			return max( 0, (int) $summary['failed_media'] );
+		}
+
+		return 0;
+	}
 
 	/**
 	 * Build per-post-type migration counts for run records.

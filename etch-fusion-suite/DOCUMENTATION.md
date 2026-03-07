@@ -313,8 +313,8 @@ Check if migration database is installed:
 
 ```bash
 npm run wp -- eval "
-require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/core/class-db-installer.php';
-echo EFS_DB_Installer::is_installed() ? 'Installed' : 'Not installed';
+require_once WP_PLUGIN_DIR . '/etch-fusion-suite/includes/autoloader.php';
+echo \Bricks2Etch\Core\EFS_DB_Installer::is_installed() ? 'Installed' : 'Not installed';
 echo ' (Version: ' . get_option('efs_db_version', 'unknown') . ')';
 "
 ```
@@ -789,7 +789,7 @@ WHERE migration_uid = %s
 ```
 
 **Files Modified:**
-- `includes/core/class-db-installer.php`
+- `includes/core/EFS_DB_Installer.php`
   - Added `touch_progress_heartbeat($migration_uid)` method (atomic UPDATE)
   - Returns true/false if successful
   
@@ -831,7 +831,7 @@ checkpoint_version INT UNSIGNED DEFAULT 0  -- Version for optimistic locking
 ```
 
 **Files Modified:**
-- `includes/core/class-db-installer.php`
+- `includes/core/EFS_DB_Installer.php`
   - Bumped DB_VERSION to '1.0.2'
   - Added `apply_schema_upgrades()` method for ALTER TABLE (backward compatible)
   - Added `save_checkpoint_atomic($migration_uid, $checkpoint_data, $expected_version)` → returns rows updated (1=success, 0=conflict)
@@ -921,7 +921,7 @@ Original architecture was **HYBRID and INCONSISTENT**:
 
 **Files Modified:**
 
-1. **includes/core/class-db-installer.php**
+1. **includes/core/EFS_DB_Installer.php**
    - Extended CREATE TABLE with 3 new LONGTEXT columns (JSON storage):
      - `checkpoint_data` - Migration checkpoint (replaces Options)
      - `progress_data` - Full progress object (mirrors DB fields + more)
@@ -1114,29 +1114,29 @@ During static code analysis for dead code cleanup, a critical architectural issu
 
 **Root Cause:**
 Architecture had evolved from:
-1. Legacy: All Core/Parsers/Migrators classes in `includes/` root level
-2. Partial migration: Some classes moved to `includes/core/` subdirectory
-3. Result: Duplicate definitions with same namespace, only one was loaded
+1. Legacy: `Bricks2Etch\Core\*` classes were split across `includes/` and `includes/core/`
+2. Partial migration left duplicate definitions with the same namespace
+3. Result: only one implementation was loaded, depending on path resolution
 
 ### Solution Implemented
 
 **Unified Architecture:** Consolidated all implementations into single source of truth
 
 **Files Modified:**
-1. **`includes/class-error-handler.php`** (created)
+1. **`includes/core/EFS_Error_Handler.php`** (created, later normalized to canonical Core path)
    - Merged all ERROR_CODES (50+) and WARNING_CODES (15+) from original
    - Added methods: `handle()`, `debug_log()`, `log_info()`, `get_error_info()`, `get_warning_info()`
    - Total: ~430 lines, fully featured
 
 2. **`includes/autoloader.php`** (verified)
-   - Confirmed namespace map: `'Core\\' => ''` maps to root level
+   - `Core\\` now maps only to `includes/core/`
    - Confirmed namespace map: `'Migrators\\' => ''` maps to root level
-   - No changes needed - structure is intentional
+   - Root-level fallback for `Core\\` removed
 
 3. **Deleted Orphaned Files:**
    - ❌ `includes/error_handler.php` - Orphaned version, never loaded
    - ❌ `includes/core/class-error-handler.php` - Incomplete duplicate
-   - ❌ `includes/core/class-db-installer.php` - Same pattern (verified working original in root)
+   - ❌ `includes/core/class-db-installer.php` - Legacy path removed; active implementation now lives at `includes/core/EFS_DB_Installer.php`
 
 ### Verification
 

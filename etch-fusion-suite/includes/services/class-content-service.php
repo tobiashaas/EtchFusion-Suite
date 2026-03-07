@@ -403,7 +403,7 @@ class EFS_Content_Service {
 		$loop_presets     = $this->extract_loop_presets_from_content( (string) $etch_content );
 
 		return array(
-			'post'         => array(
+			'post'             => array(
 				'ID'          => $post->ID,
 				'post_title'  => $post->post_title,
 				'post_name'   => $post->post_name,
@@ -411,8 +411,9 @@ class EFS_Content_Service {
 				'post_date'   => $post->post_date,
 				'post_status' => $post->post_status,
 			),
-			'etch_content' => $etch_content,
-			'etch_loops'   => $loop_presets,
+			'source_post_type' => $post->post_type,
+			'etch_content'     => $etch_content,
+			'etch_loops'       => $loop_presets,
 		);
 	}
 

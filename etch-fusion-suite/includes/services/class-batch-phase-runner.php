@@ -166,13 +166,16 @@ class EFS_Batch_Phase_Runner {
 			}
 		);
 
-		// Send the combined media + posts total so the receiving-side ETA covers both phases.
+		$receiving_media_total = isset( $checkpoint['receiving_media_total'] ) ? (int) $checkpoint['receiving_media_total'] : (int) ( $checkpoint['total_media_count'] ?? 0 );
+		$phase_total_for_receiving = 'media' === $phase ? $receiving_media_total : $total;
+		// Send the combined target-side total so the receiving ETA matches items that will
+		// actually be transferred, not source-side skips already covered by existing mappings.
 		$other_total = 'media' === $phase
 			? (int) ( $checkpoint['total_count'] ?? 0 )
-			: (int) ( $checkpoint['total_media_count'] ?? 0 );
-		$this->api_client->set_items_total( $total + $other_total );
+			: $receiving_media_total;
+		$this->api_client->set_items_total( $phase_total_for_receiving + $other_total );
 		// Send phase-only total so the receiving side can display per-phase breakdown.
-		$this->api_client->set_phase_total( $total );
+		$this->api_client->set_phase_total( $phase_total_for_receiving );
 		// For the posts phase, send per-post-type counts so Etch can show a type-level breakdown.
 		if ( 'posts' === $phase && ! empty( $checkpoint['counts_by_post_type_totals'] ) && is_array( $checkpoint['counts_by_post_type_totals'] ) ) {
 			$this->api_client->set_post_type_totals( $checkpoint['counts_by_post_type_totals'] );
@@ -644,8 +647,9 @@ class EFS_Batch_Phase_Runner {
 
 		// Notify the Etch site that all data has been sent so the receiving
 		// popup transitions to 'completed' instead of going stale.
-		// CRITICAL: Must verify Etch actually received all items before marking complete.
-		$complete_result = $this->api_client->send_migration_complete( $target_url, $migration_key );
+		// CRITICAL: Must verify Etch actually received all expected items before marking complete.
+		$completion_payload = $this->run_finalizer->build_completion_payload( $posts_result );
+		$complete_result    = $this->api_client->send_migration_complete( $target_url, $migration_key, $completion_payload );
 		if ( is_wp_error( $complete_result ) ) {
 			$this->progress_manager->update_progress( 'error', 90, $complete_result->get_error_message() );
 			$this->progress_manager->store_active_migration( array() );

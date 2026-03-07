@@ -51,4 +51,24 @@ if ( ! function_exists( '_etch_fusion_suite_manually_load_plugin' ) ) {
 
 tests_add_filter( 'muplugins_loaded', '_etch_fusion_suite_manually_load_plugin' );
 
+set_error_handler(
+	static function ( int $errno, string $errstr, string $errfile = '', int $errline = 0 ): bool {
+		$normalized_file = str_replace( '\\', '/', $errfile );
+		$is_wp_bootstrap = false !== strpos( $normalized_file, '/wordpress-phpunit/includes/bootstrap.php' );
+		$is_memory_limit_redefine_warning = E_WARNING === $errno
+			&& (
+				false !== strpos( $errstr, 'Constant WP_MEMORY_LIMIT already defined' )
+				|| false !== strpos( $errstr, 'Constant WP_MAX_MEMORY_LIMIT already defined' )
+			);
+
+		if ( $is_wp_bootstrap && $is_memory_limit_redefine_warning ) {
+			return true;
+		}
+
+		return false;
+	}
+);
+
 require $_tests_dir . '/includes/bootstrap.php';
+
+restore_error_handler();

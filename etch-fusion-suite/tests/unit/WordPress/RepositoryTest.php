@@ -36,17 +36,21 @@ class RepositoryTest extends WP_UnitTestCase {
 	}
 
 	private function resetOptions(): void {
+		global $wpdb;
+
 		foreach ( array(
 			'efs_settings',
 			'efs_api_key',
 			'efs_migration_settings',
 			'efs_cors_allowed_origins',
 			'efs_security_settings',
+			'efs_feature_flags',
 			'efs_migration_progress',
 			'efs_current_migration_id',
 			'efs_last_migration',
 			'efs_migration_steps',
 			'efs_migration_stats',
+			'efs_receiving_migration',
 			'efs_migration_token',
 			'efs_migration_token_value',
 			'etch_styles',
@@ -64,9 +68,11 @@ class RepositoryTest extends WP_UnitTestCase {
 			'efs_cache_settings_migration',
 			'efs_cache_cors_origins',
 			'efs_cache_security_settings',
+			'efs_cache_feature_flags',
 			'efs_cache_migration_progress',
 			'efs_cache_migration_steps',
 			'efs_cache_migration_stats',
+			'efs_cache_receiving_state',
 			'efs_cache_migration_token_data',
 			'efs_cache_migration_token_value',
 			'efs_cache_etch_styles',
@@ -76,6 +82,11 @@ class RepositoryTest extends WP_UnitTestCase {
 			'efs_cache_bricks_global_classes',
 		) as $transient ) {
 			delete_transient( $transient );
+		}
+
+		if ( $wpdb instanceof \wpdb ) {
+			$table = $wpdb->prefix . 'efs_settings';
+			$wpdb->query( "TRUNCATE TABLE {$table}" );
 		}
 	}
 
@@ -106,15 +117,16 @@ class RepositoryTest extends WP_UnitTestCase {
 		$this->assertIsArray( $progress );
 		$this->assertEmpty( $progress );
 
-		$this->migration_repository->save_progress( array( 'status' => 'running' ) );
+		$this->migration_repository->save_progress(
+			array(
+				'status'      => 'running',
+				'migrationId' => 'efs-test-id',
+			)
+		);
 		$storedProgress = $this->migration_repository->get_progress();
 		$this->assertSame( 'running', $storedProgress['status'] );
 		$this->assertArrayHasKey( 'migrationId', $storedProgress );
-		$this->assertSame( '', $storedProgress['migrationId'] );
-
-		$this->migration_repository->save_progress( array( 'status' => 'running', 'migrationId' => 'efs-test-id' ) );
-		$progressWithId = $this->migration_repository->get_progress();
-		$this->assertSame( 'efs-test-id', $progressWithId['migrationId'] );
+		$this->assertSame( 'efs-test-id', $storedProgress['migrationId'] );
 
 		$this->migration_repository->save_steps( array( 'validate' => array( 'status' => 'pending' ) ) );
 		$steps = $this->migration_repository->get_steps();
@@ -131,8 +143,57 @@ class RepositoryTest extends WP_UnitTestCase {
 		update_option( 'efs_migration_progress', array( 'status' => 'cached' ) );
 		$this->assertSame( 'running', $this->migration_repository->get_progress()['status'], 'Transient cache should return previous value.' );
 
-		$this->migration_repository->save_progress( array( 'status' => 'complete' ) );
+		$this->migration_repository->save_progress(
+			array(
+				'status'      => 'complete',
+				'migrationId' => 'efs-test-id',
+			)
+		);
 		$this->assertSame( 'complete', $this->migration_repository->get_progress()['status'] );
+	}
+
+	public function test_migration_repository_update_receiving_state_uses_latest_persisted_value(): void {
+		$this->migration_repository->save_receiving_state(
+			array(
+				'status'         => 'receiving',
+				'items_received' => 0,
+				'items_total'    => 2,
+				'items_by_type'  => array(
+					'media' => array(
+						'received' => 0,
+						'total'    => 1,
+					),
+					'page'  => array(
+						'received' => 0,
+						'total'    => 1,
+					),
+				),
+			)
+		);
+
+		$this->migration_repository->update_receiving_state(
+			function ( array $state ): array {
+				$state['items_by_type']['media']['received'] = 1;
+				$state['items_received']                      = 1;
+
+				return $state;
+			}
+		);
+
+		$this->migration_repository->update_receiving_state(
+			function ( array $state ): array {
+				$this->assertSame( 1, $state['items_by_type']['media']['received'] );
+				$state['items_by_type']['page']['received'] = 1;
+				$state['items_received']                     = 2;
+
+				return $state;
+			}
+		);
+
+		$receiving_state = $this->migration_repository->get_receiving_state();
+		$this->assertSame( 2, $receiving_state['items_received'] );
+		$this->assertSame( 1, $receiving_state['items_by_type']['media']['received'] );
+		$this->assertSame( 1, $receiving_state['items_by_type']['page']['received'] );
 	}
 
 	public function test_style_repository_persists_style_artifacts(): void {

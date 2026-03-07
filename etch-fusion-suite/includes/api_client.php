@@ -349,7 +349,7 @@ class EFS_API_Client {
 	 *
 	 * @param  string $url       Target site URL.
 	 * @param  string $jwt_token Migration token.
-	 * @param  array  $posts     Prepared post payloads, each with 'post', 'etch_content', 'etch_loops'.
+	 * @param  array  $posts     Prepared post payloads, each with 'post', 'source_post_type', 'etch_content', 'etch_loops'.
 	 * @return array|\WP_Error  Array of per-post result objects on success, or WP_Error on transport failure.
 	 */
 	public function send_posts_batch( string $url, string $jwt_token, array $posts ) {
@@ -379,12 +379,13 @@ class EFS_API_Client {
 	 * receiving-status popup from 'receiving' to 'completed' so it closes
 	 * cleanly instead of waiting for the stale TTL to expire.
 	 *
-	 * @param string $url       Target site URL.
-	 * @param string $jwt_token Migration JWT token.
+	 * @param string $url                Target site URL.
+	 * @param string $jwt_token          Migration JWT token.
+	 * @param array  $completion_payload Optional reconciliation payload for expected receipts by type.
 	 * @return array|mixed Response from the target site.
 	 */
-	public function send_migration_complete( $url, $jwt_token ) {
-		return $this->send_request( $url, $jwt_token, '/import/complete', 'POST', array() );
+	public function send_migration_complete( $url, $jwt_token, array $completion_payload = array() ) {
+		return $this->send_request( $url, $jwt_token, '/import/complete', 'POST', $completion_payload );
 	}
 
 	/**
@@ -398,9 +399,43 @@ class EFS_API_Client {
 	 * Send CSS styles to target site
 	 */
 	public function send_css_styles( $url, $jwt_token, $etch_styles ) {
+		$this->set_phase_total( $this->get_css_payload_count( $etch_styles ) );
 		return $this->send_request( $url, $jwt_token, '/import/css-classes', 'POST', $etch_styles );
 	}
 
+	/**
+	 * Count CSS class units represented by a CSS migration payload.
+	 *
+	 * Prefer style_map size because it mirrors the Bricks class → Etch style mapping
+	 * used by content conversion. Fallback to top-level style count for legacy payloads.
+	 *
+	 * @param mixed $etch_styles CSS payload.
+	 * @return int
+	 */
+	private function get_css_payload_count( $etch_styles ): int {
+		if ( is_array( $etch_styles ) && isset( $etch_styles['style_map'] ) && is_array( $etch_styles['style_map'] ) && ! empty( $etch_styles['style_map'] ) ) {
+			return count( $etch_styles['style_map'] );
+		}
+
+		if ( is_array( $etch_styles ) && isset( $etch_styles['styles'] ) && is_array( $etch_styles['styles'] ) ) {
+			return count( $etch_styles['styles'] );
+		}
+
+		return is_array( $etch_styles ) ? count( $etch_styles ) : 0;
+	}
+
+	/**
+	 * Send initial migration totals to Etch before migration starts.
+	 * This allows Etch to display all phases upfront with 0/X counts.
+	 *
+	 * @param string $url         Target site URL.
+	 * @param string $jwt_token  Migration token.
+	 * @param array  $totals     Associative array of phase totals: [ 'media' => 500, 'css' => 3000, 'posts' => ['post' => 100, 'page' => 250] ].
+	 * @return array|\WP_Error
+	 */
+	public function send_init_totals( $url, $jwt_token, array $totals ) {
+		return $this->send_request( $url, $jwt_token, '/import/init-totals', 'POST', $totals );
+	}
 
 
 	/**

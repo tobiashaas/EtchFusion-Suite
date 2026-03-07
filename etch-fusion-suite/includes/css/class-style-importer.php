@@ -103,32 +103,39 @@ class EFS_Style_Importer {
 		// the settings-based CSS and the _cssCustom CSS of the same class, both
 		// entries share the same selector.  Combine their CSS here.
 		// ------------------------------------------------------------------
-		$incoming = array();
-		foreach ( $etch_styles as $style ) {
+		$incoming          = array();
+		$incoming_has_keys = ! array_is_list( $etch_styles );
+		foreach ( $etch_styles as $incoming_key => $style ) {
+			if ( ! is_array( $style ) ) {
+				continue;
+			}
+
 			$sel = $style['selector'] ?? '';
 			if ( '' === $sel ) {
 				continue;
 			}
 
-			// CRITICAL: Preserve the original style ID from Bricks conversion.
-			// The style ID is used in style_map to reference this style.
-			// Using selector as key would lose the ID after array_values().
-			$style_id = $style['id'] ?? '';
+			// Current migrations send Etch style IDs as associative array keys.
+			// Legacy callers may still pass flat arrays and rely on an embedded `id`.
+			$style_key = $this->resolve_style_storage_key( $incoming_key, $style, $incoming_has_keys );
 
 			if ( ! isset( $incoming[ $sel ] ) ) {
-				$incoming[ $sel ] = $style;
+				$incoming[ $sel ] = array(
+					'style' => $style,
+					'key'   => $style_key,
+				);
 			} else {
 				// Same selector — merge CSS, ignoring identical content.
-				$existing_css = trim( $incoming[ $sel ]['css'] ?? '' );
+				$existing_css = trim( $incoming[ $sel ]['style']['css'] ?? '' );
 				$new_css      = trim( $style['css'] ?? '' );
 				if ( '' !== $new_css && $new_css !== $existing_css ) {
-					$incoming[ $sel ]['css'] = '' !== $existing_css
+					$incoming[ $sel ]['style']['css'] = '' !== $existing_css
 						? $existing_css . "\n  " . $new_css
 						: $new_css;
 				}
-				// Keep the first style ID if multiple entries have same selector
-				if ( '' !== $style_id && '' === ( $incoming[ $sel ]['id'] ?? '' ) ) {
-					$incoming[ $sel ]['id'] = $style_id;
+				// Keep the first non-empty storage key when duplicate selectors are merged.
+				if ( '' !== $style_key && '' === $incoming[ $sel ]['key'] ) {
+					$incoming[ $sel ]['key'] = $style_key;
 				}
 			}
 		}
@@ -144,44 +151,48 @@ class EFS_Style_Importer {
 		// IMPORTANT: We must preserve style IDs for the style_map to work.
 		// The style_map references styles by their ID (not by numeric index).
 		// ------------------------------------------------------------------
-		$index = array();
+		$index              = array();
+		$existing_has_keys  = ! array_is_list( $existing_styles );
 
 		// First, index existing styles by selector (preserving their IDs)
-		foreach ( $existing_styles as $key => $style ) {
+		foreach ( $existing_styles as $existing_key => $style ) {
+			if ( ! is_array( $style ) ) {
+				continue;
+			}
+
 			$sel = $style['selector'] ?? '';
 			if ( '' !== $sel ) {
-				// Preserve the key (could be numeric ID or named key like 'etch-section-style')
-				$index[ $sel ] = $style;
+				$index[ $sel ] = array(
+					'style' => $style,
+					'key'   => $this->resolve_style_storage_key( $existing_key, $style, $existing_has_keys ),
+				);
 			}
 		}
 
 		// Then merge incoming styles, overwriting by selector
-		foreach ( $incoming as $sel => $style ) {
-			// If existing style has an ID and incoming doesn't have one, keep existing ID
-			if ( isset( $index[ $sel ]['id'] ) && empty( $style['id'] ) ) {
-				$style['id'] = $index[ $sel ]['id'];
+		foreach ( $incoming as $sel => $entry ) {
+			// Legacy payloads can arrive without associative keys. In that case keep the
+			// existing storage key so selectors remain stable across imports.
+			if ( isset( $index[ $sel ]['key'] ) && '' === $entry['key'] ) {
+				$entry['key'] = $index[ $sel ]['key'];
 			}
-			$index[ $sel ] = $style;
+			$index[ $sel ] = $entry;
 		}
 
-		// CRITICAL FIX: Do NOT use array_values() here!
-		// The style_map references styles by their ID keys (like '3861282').
-		// Using array_values() would convert these to numeric indices (0, 1, 2...)
-		// and break the style_map lookup.
-		// Instead, re-index by style ID where available, preserving named keys for built-ins.
+		// Rebuild the option payload using the preserved storage keys. This keeps
+		// `etch_styles` aligned with the IDs referenced from style_map and block attrs.
 		$merged_styles = array();
-		foreach ( $index as $style ) {
+		foreach ( $index as $sel => $entry ) {
+			$style = $entry['style'];
 			$sel = $style['selector'] ?? '';
 			if ( '' === $sel ) {
 				continue;
 			}
 
-			// Use the style ID as key if available, otherwise use selector
-			$style_id = $style['id'] ?? '';
-			if ( '' !== $style_id ) {
-				$merged_styles[ $style_id ] = $style;
+			$style_key = $entry['key'];
+			if ( '' !== $style_key ) {
+				$merged_styles[ $style_key ] = $style;
 			} else {
-				// For built-in styles like 'etch-section-style', keep selector as key
 				$merged_styles[ $sel ] = $style;
 			}
 		}
@@ -489,5 +500,28 @@ class EFS_Style_Importer {
 		if ( method_exists( $this->error_handler, 'debug_log' ) ) {
 			$this->error_handler->debug_log( $message, $context, 'EFS_STYLE_IMPORTER' );
 		}
+	}
+
+	/**
+	 * Resolve the canonical storage key for an Etch style entry.
+	 *
+	 * Current migrations send styles as an associative array keyed by style ID.
+	 * Older callers may still pass a flat list and embed the ID inside the style.
+	 *
+	 * @param mixed                $array_key         Original array key from payload/storage.
+	 * @param array<string,mixed>  $style             Style definition.
+	 * @param bool                 $prefer_array_key  Whether array keys are meaningful IDs.
+	 * @return string
+	 */
+	private function resolve_style_storage_key( $array_key, array $style, bool $prefer_array_key ): string {
+		if ( $prefer_array_key && is_scalar( $array_key ) ) {
+			$key = trim( (string) $array_key );
+			if ( '' !== $key ) {
+				return $key;
+			}
+		}
+
+		$style_id = isset( $style['id'] ) && is_scalar( $style['id'] ) ? trim( (string) $style['id'] ) : '';
+		return $style_id;
 	}
 }

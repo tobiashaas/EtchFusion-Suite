@@ -96,6 +96,47 @@ class EFS_Media_Service {
 	}
 
 	/**
+	 * Get media IDs that still need to be uploaded to the target site.
+	 *
+	 * Source-side mappings mean these attachments were already transferred in a
+	 * previous run, so they must not inflate target receiving totals.
+	 *
+	 * @param array $selected_post_types Optional. Selected source post types.
+	 * @return array<int>
+	 */
+	public function get_transferable_media_ids( array $selected_post_types = array() ): array {
+		$media_ids = $this->get_media_ids( $selected_post_types );
+
+		return array_values(
+			array_filter(
+				array_map( 'intval', $media_ids ),
+				function ( int $media_id ): bool {
+					if ( null !== $this->get_media_mapping( $media_id ) ) {
+						return false;
+					}
+
+					$file_path = get_attached_file( $media_id );
+
+					return is_string( $file_path )
+						&& '' !== $file_path
+						&& file_exists( $file_path )
+						&& is_readable( $file_path );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Count media items that will produce actual target uploads.
+	 *
+	 * @param array $selected_post_types Optional. Selected source post types.
+	 * @return int
+	 */
+	public function get_transferable_media_count( array $selected_post_types = array() ): int {
+		return count( $this->get_transferable_media_ids( $selected_post_types ) );
+	}
+
+	/**
 	 * Migrate a single media item by ID. Skips if already mapped.
 	 *
 	 * @param int    $media_id   Attachment ID.

@@ -1031,6 +1031,32 @@ class EFS_API_Endpoints {
 	}
 
 	/**
+	 * Update receiving state from the latest persisted value.
+	 *
+	 * @param callable $mutator Callback that receives the current state and returns the next state.
+	 * @return void
+	 */
+	private static function mutate_receiving_state( callable $mutator ): void {
+		$repository = self::resolve_migration_repository();
+		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
+			return;
+		}
+
+		if ( method_exists( $repository, 'update_receiving_state' ) ) {
+			$repository->update_receiving_state( $mutator );
+			return;
+		}
+
+		$current = $repository->get_receiving_state();
+		$current = is_array( $current ) ? $current : array();
+		$next    = $mutator( $current );
+
+		if ( is_array( $next ) ) {
+			$repository->save_receiving_state( $next );
+		}
+	}
+
+	/**
 	 * Record receiving activity for target-side progress polling.
 	 * Used for single-type phases (media, css) where all items share one type key.
 	 *
@@ -1044,19 +1070,6 @@ class EFS_API_Endpoints {
 	 * @return void
 	 */
 	public static function touch_receiving_state( array $token_payload, string $phase, int $items_increment = 0, $request = null ): void {
-		$repository = self::resolve_migration_repository();
-		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
-			return;
-		}
-
-		$current = $repository->get_receiving_state();
-		$current = is_array( $current ) ? $current : array();
-
-		// UTC timestamps — consistent with EFS_Progress_Manager convention (see class-progress-manager.php:62-64).
-		$now        = current_time( 'mysql', true );
-		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
-		$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
-
 		$source_site        = '';
 		$items_total_header = 0;
 		$phase_total_header = 0;
@@ -1074,34 +1087,43 @@ class EFS_API_Endpoints {
 			$source_site = esc_url_raw( (string) $token_payload['domain'] );
 		}
 
-		// Update per-type breakdown for the current phase type (e.g. 'media', 'css').
-		$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
-		$type_key      = sanitize_key( $phase );
-		if ( ! isset( $items_by_type[ $type_key ] ) ) {
-			$items_by_type[ $type_key ] = array(
-				'received' => 0,
-				'total'    => 0,
-			);
-		}
-		$items_by_type[ $type_key ]['received'] = max( 0, $items_by_type[ $type_key ]['received'] + $items_increment );
-		if ( $phase_total_header > 0 ) {
-			$items_by_type[ $type_key ]['total'] = $phase_total_header;
-		}
+		self::mutate_receiving_state(
+			static function ( array $current ) use ( $items_increment, $items_total_header, $phase, $phase_total_header, $source_site, $token_payload ): array {
+				$now        = current_time( 'mysql', true );
+				$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
+				$items      = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
+				$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
+				$type_key      = sanitize_key( $phase );
 
-		$repository->save_receiving_state(
-			array(
-				'status'         => 'receiving',
-				'source_site'    => $source_site,
-				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
-				'started_at'     => $started_at,
-				'last_activity'  => $now,
-				'last_updated'   => $now,
-				'current_phase'  => $type_key,
-				'items_received' => max( 0, $items + $items_increment ),
-				'items_total'    => $items_total_header > 0 ? $items_total_header : (int) ( $current['items_total'] ?? 0 ),
-				'items_by_type'  => $items_by_type,
-				'is_stale'       => false,
-			)
+				if ( ! isset( $items_by_type[ $type_key ] ) ) {
+					$items_by_type[ $type_key ] = array(
+						'received' => 0,
+						'total'    => 0,
+					);
+				}
+
+				$items_by_type[ $type_key ]['received'] = max( 0, $items_by_type[ $type_key ]['received'] + $items_increment );
+				if ( $phase_total_header > 0 ) {
+					$items_by_type[ $type_key ]['total'] = $phase_total_header;
+				}
+
+				$total_received = array_sum( array_column( $items_by_type, 'received' ) );
+				$total_items    = array_sum( array_column( $items_by_type, 'total' ) );
+
+				return array(
+					'status'         => 'receiving',
+					'source_site'    => $source_site,
+					'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
+					'started_at'     => $started_at,
+					'last_activity'  => $now,
+					'last_updated'   => $now,
+					'current_phase'  => $type_key,
+					'items_received' => max( 0, $total_received > 0 ? $total_received : ( $items + $items_increment ) ),
+					'items_total'    => max( $items_total_header, $total_items ),
+					'items_by_type'  => $items_by_type,
+					'is_stale'       => false,
+				);
+			}
 		);
 	}
 
@@ -1115,24 +1137,6 @@ class EFS_API_Endpoints {
 	 * @return void
 	 */
 	public static function init_receiving_state_totals( array $token_payload, array $totals, $request = null ): void {
-		$repository = self::resolve_migration_repository();
-		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
-			return;
-		}
-
-		$current = $repository->get_receiving_state();
-		$current = is_array( $current ) ? $current : array();
-
-		$now          = current_time( 'mysql', true );
-		$new_migration_id = isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '';
-		$current_migration_id = isset( $current['migration_id'] ) ? $current['migration_id'] : '';
-
-		if ( $new_migration_id !== $current_migration_id ) {
-			$started_at = $now;
-		} else {
-			$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
-		}
-
 		$source_site = '';
 		if ( $request instanceof \WP_REST_Request ) {
 			$header = $request->get_header( 'X-EFS-Source-Origin' );
@@ -1144,45 +1148,53 @@ class EFS_API_Endpoints {
 			$source_site = esc_url_raw( (string) $token_payload['domain'] );
 		}
 
-		$items_by_type = array();
+		self::mutate_receiving_state(
+			static function ( array $current ) use ( $source_site, $token_payload, $totals ): array {
+				$now                  = current_time( 'mysql', true );
+				$new_migration_id     = isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '';
+				$current_migration_id = isset( $current['migration_id'] ) ? (string) $current['migration_id'] : '';
+				$started_at           = $new_migration_id !== $current_migration_id
+					? $now
+					: ( isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now );
+				$items_by_type        = array();
 
-		foreach ( $totals as $phase => $data ) {
-			$type_key = sanitize_key( $phase );
-			if ( is_array( $data ) ) {
-				foreach ( $data as $sub_type => $count ) {
-					$sub_key = sanitize_key( $sub_type );
-					$items_by_type[ $sub_key ] = array(
-						'received' => 0,
-						'total'    => max( 0, (int) $count ),
-					);
+				foreach ( $totals as $phase => $data ) {
+					$type_key = sanitize_key( $phase );
+					if ( is_array( $data ) ) {
+						foreach ( $data as $sub_type => $count ) {
+							$sub_key = sanitize_key( $sub_type );
+							$items_by_type[ $sub_key ] = array(
+								'received' => 0,
+								'total'    => max( 0, (int) $count ),
+							);
+						}
+					} else {
+						$items_by_type[ $type_key ] = array(
+							'received' => 0,
+							'total'    => max( 0, (int) $data ),
+						);
+					}
 				}
-			} else {
-				$items_by_type[ $type_key ] = array(
-					'received' => 0,
-					'total'    => max( 0, (int) $data ),
+
+				$items_total = 0;
+				foreach ( $items_by_type as $type_data ) {
+					$items_total += $type_data['total'];
+				}
+
+				return array(
+					'status'         => 'receiving',
+					'source_site'    => $source_site,
+					'migration_id'   => $new_migration_id,
+					'started_at'     => $started_at,
+					'last_activity'  => $now,
+					'last_updated'   => $now,
+					'current_phase'  => '',
+					'items_received' => 0,
+					'items_total'    => $items_total,
+					'items_by_type'  => $items_by_type,
+					'is_stale'       => false,
 				);
 			}
-		}
-
-		$items_total = 0;
-		foreach ( $items_by_type as $type_data ) {
-			$items_total += $type_data['total'];
-		}
-
-		$repository->save_receiving_state(
-			array(
-				'status'         => 'receiving',
-				'source_site'    => $source_site,
-				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
-				'started_at'     => $started_at,
-				'last_activity'  => $now,
-				'last_updated'   => $now,
-				'current_phase'  => '',
-				'items_received' => 0,
-				'items_total'    => $items_total,
-				'items_by_type'  => $items_by_type,
-				'is_stale'       => false,
-			)
 		);
 	}
 
@@ -1199,18 +1211,6 @@ class EFS_API_Endpoints {
 	 * @return void
 	 */
 	public static function touch_receiving_state_by_types( array $token_payload, string $phase, array $type_increments, $request = null ): void {
-		$repository = self::resolve_migration_repository();
-		if ( ! $repository || ! method_exists( $repository, 'get_receiving_state' ) || ! method_exists( $repository, 'save_receiving_state' ) ) {
-			return;
-		}
-
-		$current = $repository->get_receiving_state();
-		$current = is_array( $current ) ? $current : array();
-
-		// UTC timestamps — consistent with EFS_Progress_Manager convention.
-		$now        = current_time( 'mysql', true );
-		$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
-
 		$source_site        = '';
 		$items_total_header = 0;
 		$post_type_totals   = array();
@@ -1234,60 +1234,58 @@ class EFS_API_Endpoints {
 			$source_site = esc_url_raw( (string) $token_payload['domain'] );
 		}
 
-		// Update per-type breakdown.
-		$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
+		self::mutate_receiving_state(
+			static function ( array $current ) use ( $items_total_header, $phase, $post_type_totals, $source_site, $token_payload, $type_increments ): array {
+				$now        = current_time( 'mysql', true );
+				$started_at = isset( $current['started_at'] ) && '' !== (string) $current['started_at'] ? $current['started_at'] : $now;
+				$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
 
-		// Apply sender-provided totals (set once; keep existing total if already > 0).
-		foreach ( $post_type_totals as $pt => $total ) {
-			$pt = sanitize_key( (string) $pt );
-			if ( '' === $pt ) {
-				continue;
-			}
-			if ( ! isset( $items_by_type[ $pt ] ) ) {
-				$items_by_type[ $pt ] = array(
-					'received' => 0,
-					'total'    => 0,
+				foreach ( $post_type_totals as $pt => $total ) {
+					$pt = sanitize_key( (string) $pt );
+					if ( '' === $pt ) {
+						continue;
+					}
+					if ( ! isset( $items_by_type[ $pt ] ) ) {
+						$items_by_type[ $pt ] = array(
+							'received' => 0,
+							'total'    => 0,
+						);
+					}
+					$items_by_type[ $pt ]['total'] = max( $items_by_type[ $pt ]['total'], (int) $total );
+				}
+
+				foreach ( $type_increments as $pt => $count ) {
+					$pt    = sanitize_key( (string) $pt );
+					$count = max( 0, (int) $count );
+					if ( '' === $pt || 0 === $count ) {
+						continue;
+					}
+					if ( ! isset( $items_by_type[ $pt ] ) ) {
+						$items_by_type[ $pt ] = array(
+							'received' => 0,
+							'total'    => 0,
+						);
+					}
+					$items_by_type[ $pt ]['received'] += $count;
+				}
+
+				$total_received = array_sum( array_column( $items_by_type, 'received' ) );
+				$total_items    = array_sum( array_column( $items_by_type, 'total' ) );
+
+				return array(
+					'status'         => 'receiving',
+					'source_site'    => $source_site,
+					'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
+					'started_at'     => $started_at,
+					'last_activity'  => $now,
+					'last_updated'   => $now,
+					'current_phase'  => sanitize_key( $phase ),
+					'items_received' => max( 0, $total_received ),
+					'items_total'    => max( $items_total_header, $total_items ),
+					'items_by_type'  => $items_by_type,
+					'is_stale'       => false,
 				);
 			}
-			// Only overwrite total if the incoming value is larger (guards against stale small values).
-			$items_by_type[ $pt ]['total'] = max( $items_by_type[ $pt ]['total'], (int) $total );
-		}
-
-		// Increment per-type received counts for this batch.
-		$batch_total = 0;
-		foreach ( $type_increments as $pt => $count ) {
-			$pt    = sanitize_key( (string) $pt );
-			$count = max( 0, (int) $count );
-			if ( '' === $pt || 0 === $count ) {
-				continue;
-			}
-			if ( ! isset( $items_by_type[ $pt ] ) ) {
-				$items_by_type[ $pt ] = array(
-					'received' => 0,
-					'total'    => 0,
-				);
-			}
-			$items_by_type[ $pt ]['received'] += $count;
-			$batch_total                      += $count;
-		}
-
-		// Grand total = sum of all per-type received counts to stay consistent.
-		$total_received = array_sum( array_column( $items_by_type, 'received' ) );
-
-		$repository->save_receiving_state(
-			array(
-				'status'         => 'receiving',
-				'source_site'    => $source_site,
-				'migration_id'   => isset( $token_payload['jti'] ) ? sanitize_text_field( (string) $token_payload['jti'] ) : '',
-				'started_at'     => $started_at,
-				'last_activity'  => $now,
-				'last_updated'   => $now,
-				'current_phase'  => sanitize_key( $phase ),
-				'items_received' => max( 0, $total_received ),
-				'items_total'    => $items_total_header > 0 ? $items_total_header : (int) ( $current['items_total'] ?? 0 ),
-				'items_by_type'  => $items_by_type,
-				'is_stale'       => false,
-			)
 		);
 	}
 
@@ -1415,6 +1413,16 @@ class EFS_API_Endpoints {
 			'/import/css-classes',
 			array(
 				'callback'            => array( 'Bricks2Etch\Api\EFS_API_Migration_Endpoints', 'import_css_classes' ),
+				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
+				'methods'             => \WP_REST_Server::CREATABLE,
+			)
+		);
+
+		register_rest_route(
+			$namespace,
+			'/import/global-css',
+			array(
+				'callback'            => array( 'Bricks2Etch\Api\EFS_API_Migration_Endpoints', 'import_global_css' ),
 				'permission_callback' => array( __CLASS__, 'require_migration_token_permission' ),
 				'methods'             => \WP_REST_Server::CREATABLE,
 			)

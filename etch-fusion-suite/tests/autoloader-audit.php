@@ -14,7 +14,7 @@ $namespace_map = [
     'Services\\'                 => 'services/',
     'Repositories\\Interfaces\\' => 'repositories/interfaces/',
     'Repositories\\'             => 'repositories/',
-    'Core\\'                     => '',
+    'Core\\'                     => 'core/',
     'Api\\'                      => '',
     'Updater\\'                  => 'updater/',
     'Controllers\\'              => 'controllers/',
@@ -76,6 +76,7 @@ $classes = [
     'Bricks2Etch\\Repositories\\EFS_WordPress_Settings_Repository',
     'Bricks2Etch\\Repositories\\EFS_WordPress_Style_Repository',
     // Core
+    'Bricks2Etch\\Core\\EFS_DB_Installer',
     'Bricks2Etch\\Core\\EFS_Error_Handler',
     'Bricks2Etch\\Core\\EFS_Migration_Manager',
     'Bricks2Etch\\Core\\EFS_Migration_Token_Manager',
@@ -199,6 +200,10 @@ function resolve_class( $fqcn, $prefix, $base_dir, $namespace_map ) {
             continue;
         }
         $rn   = substr( $relative_class, strlen( $namespace ) );
+        if ( 'Core\\' === $namespace ) {
+            $path = $dir . $rn . '.php';
+            return file_exists( $base_dir . $path ) ? $path : null;
+        }
         $slug = strtolower( str_replace( '_', '-', $rn ) );
         $slug_np  = preg_replace( '/^(?:b2e|efs)-/', '', $slug );
         $slug_tr  = preg_replace( '/^(?:b2e|efs)-(?:element-)?/', '', $slug );
@@ -208,6 +213,10 @@ function resolve_class( $fqcn, $prefix, $base_dir, $namespace_map ) {
         $slug_npns = preg_replace( '/-interface$/', '', $slug_np );
 
         $cands = [ "class-{$slug}.php", "{$slug}.php", "class-{$us}.php", "{$us}.php", "interface-{$slug}.php" ];
+
+        if ( $rn !== $slug && $rn !== $us ) {
+            $cands[] = "{$rn}.php";
+        }
 
         if ( $slug_np !== $slug )      { $cands[] = "class-{$slug_np}.php"; $cands[] = "{$slug_np}.php"; }
         if ( $us_np !== $us )          { $cands[] = "class-{$us_np}.php";   $cands[] = "{$us_np}.php"; }

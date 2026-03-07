@@ -3,7 +3,7 @@
  * Plugin Name: Etch Fusion Suite
  * Plugin URI: https://github.com/tobiashaas/EtchFusion-Suite
  * Description: End-to-end migration and orchestration toolkit for transforming Bricks Builder sites into native Etch experiences.
- * Version: 0.16.3
+ * Version: 0.16.4
  * Author: Tobias Haas
  * License: GPL v2 or later
  * Text Domain: etch-fusion-suite
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants (needed for load path).
-define( 'ETCH_FUSION_SUITE_VERSION', '0.16.3' );
+define( 'ETCH_FUSION_SUITE_VERSION', '0.16.4' );
 define( 'ETCH_FUSION_SUITE_FILE', __FILE__ );
 define( 'ETCH_FUSION_SUITE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETCH_FUSION_SUITE_URL', plugin_dir_url( __FILE__ ) );
@@ -423,11 +423,8 @@ class Etch_Fusion_Suite_Plugin {
 	 * Run the DB installer. Called on activation and on version mismatch after updates.
 	 */
 	public static function run_db_installer() {
-		$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/db-installer.php';
-		if ( file_exists( $db_installer_file ) ) {
-			require_once $db_installer_file;
-			\Bricks2Etch\Core\EFS_DB_Installer::install();
-		}
+		// Resolve via the autoloader so class path changes stay centralized.
+		\Bricks2Etch\Core\EFS_DB_Installer::install();
 	}
 
 	/**
@@ -614,9 +611,5 @@ function etch_fusion_suite_uninstall() {
 		return;
 	}
 
-	$db_installer_file = dirname( ETCH_FUSION_SUITE_FILE ) . '/includes/db-installer.php';
-	if ( file_exists( $db_installer_file ) ) {
-		require_once $db_installer_file;
-		\Bricks2Etch\Core\EFS_DB_Installer::uninstall();
-	}
+	\Bricks2Etch\Core\EFS_DB_Installer::uninstall();
 }

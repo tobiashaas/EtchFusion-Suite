@@ -108,6 +108,18 @@ interface Progress_Repository_Interface {
 	public function save_receiving_state( array $state ): bool;
 
 	/**
+	 * Update receiving state from the latest persisted value.
+	 *
+	 * Implementations may serialize updates so concurrent requests do not lose
+	 * increments while the target site is receiving migration payloads.
+	 *
+	 * @param callable $mutator Callback that receives the normalized current state
+	 *                          and returns the next state array.
+	 * @return array Persisted receiving state.
+	 */
+	public function update_receiving_state( callable $mutator ): array;
+
+	/**
 	 * Clear receiving state.
 	 *
 	 * @return bool

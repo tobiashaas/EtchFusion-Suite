@@ -3,6 +3,7 @@
  * Database Installer
  *
  * Handles plugin database table creation, updates, and cleanup.
+ * This PSR-4 path intentionally matches Bricks2Etch\Core\EFS_DB_Installer.
  * Uses WordPress dbDelta for safe table management.
  *
  * @package Bricks2Etch\Core

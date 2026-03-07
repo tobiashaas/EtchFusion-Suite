@@ -64,8 +64,8 @@ This guide documents how Etch Fusion Suite handles date and time operations whil
 | `includes/error_handler.php` | `current_time('mysql')` (lines 241, 282) | Error & warning timestamps |
 | `includes/error_handler.php` | `current_time('Y-m-d H:i:s')` (line 402) | Debug log formatting |
 | `includes/gutenberg_generator.php` | `wp_date()` (lines 82, 942) | Template timestamps |
-| `includes/migration_token_manager.php` | `current_time('mysql')` (lines 75, 143) | Token creation timestamps |
-| `includes/migration_token_manager.php` | `wp_date()` (lines 76, 144, 170, 171, 237, 277) | Token expiry / debug logging |
+| `includes/core/EFS_Migration_Token_Manager.php` | `current_time('mysql')` (lines 75, 143) | Token creation timestamps |
+| `includes/core/EFS_Migration_Token_Manager.php` | `wp_date()` (lines 76, 144, 170, 171, 237, 277) | Token expiry / debug logging |
 | `includes/security/class-audit-logger.php` | `current_time('mysql')` (line 121) | Security event timestamp |
 | `includes/services/class-content-service.php` | `current_time('mysql')` (line 225) | Content migration meta |
 | `includes/services/class-migration-service.php` | `current_time('mysql')` (lines 151, 323, 359, 362, 370, 448) | Migration stats, progress, step tracking |

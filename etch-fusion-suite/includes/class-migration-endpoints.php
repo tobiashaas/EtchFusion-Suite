@@ -282,8 +282,6 @@ class EFS_API_Migration_Endpoints {
 			return new \WP_Error( 'style_save_failed', __( 'Failed to save global stylesheets.', 'etch-fusion-suite' ), array( 'status' => 500 ) );
 		}
 
-		EFS_API_Endpoints::touch_receiving_state( $token, 'css', 1, $request );
-
 		return new \WP_REST_Response( array( 'success' => true ), 200 );
 	}
 
@@ -370,7 +368,10 @@ class EFS_API_Migration_Endpoints {
 			return $result;
 		}
 
-		EFS_API_Endpoints::touch_receiving_state( $token, 'css', 1, $request );
+		$css_import_count = self::get_css_import_count( $data );
+		if ( $css_import_count > 0 ) {
+			EFS_API_Endpoints::touch_receiving_state( $token, 'css', $css_import_count, $request );
+		}
 
 		return new \WP_REST_Response(
 			array(
@@ -379,6 +380,60 @@ class EFS_API_Migration_Endpoints {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Count migrated CSS class units for receiving-state progress.
+	 *
+	 * Progress totals are initialised from the number of Bricks classes to migrate,
+	 * not the number of HTTP requests. Prefer the style_map size because it mirrors
+	 * the Bricks class → Etch style mapping used by content conversion.
+	 *
+	 * @param array<string,mixed> $payload Incoming CSS payload.
+	 * @return int
+	 */
+	private static function get_css_import_count( array $payload ): int {
+		$style_map = isset( $payload['style_map'] ) && is_array( $payload['style_map'] )
+			? $payload['style_map']
+			: array();
+
+		if ( ! empty( $style_map ) ) {
+			return count( $style_map );
+		}
+
+		$styles = isset( $payload['styles'] ) && is_array( $payload['styles'] )
+			? $payload['styles']
+			: $payload;
+
+		$count = 0;
+		foreach ( $styles as $style_key => $style ) {
+			if ( ! is_array( $style ) ) {
+				continue;
+			}
+
+			$type     = isset( $style['type'] ) ? sanitize_key( (string) $style['type'] ) : '';
+			$selector = isset( $style['selector'] ) ? trim( (string) $style['selector'] ) : '';
+
+			if ( 'class' !== $type ) {
+				continue;
+			}
+
+			if ( is_string( $style_key ) && 0 === strpos( $style_key, 'etch-' ) ) {
+				continue;
+			}
+
+			if ( '' === $selector || '.' !== $selector[0] ) {
+				continue;
+			}
+
+			++$count;
+		}
+
+		if ( $count > 0 ) {
+			return $count;
+		}
+
+		return empty( $payload ) ? 0 : 1;
 	}
 
 	/**
@@ -598,15 +653,6 @@ class EFS_API_Migration_Endpoints {
 			return new \WP_Error( 'invalid_batch_payload', __( 'No posts in batch payload.', 'etch-fusion-suite' ), array( 'status' => 400 ) );
 		}
 
-		$type_counts = array();
-		foreach ( $items as $batch_item ) {
-			$post_raw  = isset( $batch_item['post'] ) && is_array( $batch_item['post'] ) ? $batch_item['post'] : array();
-			$post_type = isset( $post_raw['post_type'] ) ? \sanitize_key( (string) $post_raw['post_type'] ) : 'post';
-			if ( \post_type_exists( $post_type ) ) {
-				$type_counts[ $post_type ] = ( $type_counts[ $post_type ] ?? 0 ) + 1;
-			}
-		}
-
 		$all_loops = array();
 		foreach ( $items as $item ) {
 			if ( ! empty( $item['etch_loops'] ) && is_array( $item['etch_loops'] ) ) {
@@ -633,11 +679,15 @@ class EFS_API_Migration_Endpoints {
 				continue;
 			}
 
-			$etch_content   = isset( $item['etch_content'] ) ? (string) $item['etch_content'] : '';
-			$source_post_id = isset( $post_raw['ID'] ) ? \absint( $post_raw['ID'] ) : 0;
-			$post_type      = isset( $post_raw['post_type'] ) ? \sanitize_key( $post_raw['post_type'] ) : 'post';
+			$etch_content     = isset( $item['etch_content'] ) ? (string) $item['etch_content'] : '';
+			$source_post_id   = isset( $post_raw['ID'] ) ? \absint( $post_raw['ID'] ) : 0;
+			$post_type        = isset( $post_raw['post_type'] ) ? \sanitize_key( $post_raw['post_type'] ) : 'post';
+			$source_post_type = isset( $item['source_post_type'] ) ? \sanitize_key( (string) $item['source_post_type'] ) : $post_type;
 			if ( ! \post_type_exists( $post_type ) ) {
 				$post_type = 'post';
+			}
+			if ( '' === $source_post_type ) {
+				$source_post_type = $post_type;
 			}
 			$post_title  = isset( $post_raw['post_title'] ) ? \sanitize_text_field( $post_raw['post_title'] ) : '';
 			$post_slug   = isset( $post_raw['post_name'] ) ? \sanitize_title( $post_raw['post_name'] ) : \sanitize_title( $post_title );
@@ -747,7 +797,8 @@ class EFS_API_Migration_Endpoints {
 			$results[] = array(
 				'source_id' => $source_post_id,
 				'post_id'   => (int) $post_id,
-				'status'    => 'ok',
+				'post_type' => $source_post_type,
+				'status'    => 'success',
 			);
 		}
 
@@ -957,6 +1008,10 @@ class EFS_API_Migration_Endpoints {
 		$current = $repository->get_receiving_state();
 		$current = is_array( $current ) ? $current : array();
 
+		$payload = $request->get_json_params();
+		$payload = is_array( $payload ) ? $payload : array();
+		$current = self::reconcile_receiving_state_from_completion_payload( $current, $payload );
+
 		$items_received = isset( $current['items_received'] ) ? (int) $current['items_received'] : 0;
 		$items_total    = isset( $current['items_total'] ) ? (int) $current['items_total'] : 0;
 		$items_by_type  = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
@@ -1006,6 +1061,48 @@ class EFS_API_Migration_Endpoints {
 		);
 
 		return new \WP_REST_Response( array( 'success' => true ), 200 );
+	}
+
+	/**
+	 * Reconcile the receiving state against the source's final expected receipts.
+	 *
+	 * @param array $current Current receiving state.
+	 * @param array $payload Completion payload sent by the source.
+	 * @return array
+	 */
+	private static function reconcile_receiving_state_from_completion_payload( array $current, array $payload ): array {
+		$expected_raw = isset( $payload['expected_receipts_by_type'] ) && is_array( $payload['expected_receipts_by_type'] )
+			? $payload['expected_receipts_by_type']
+			: array();
+		if ( empty( $expected_raw ) ) {
+			return $current;
+		}
+
+		$items_by_type = isset( $current['items_by_type'] ) && is_array( $current['items_by_type'] ) ? $current['items_by_type'] : array();
+
+		foreach ( $expected_raw as $type => $expected_count ) {
+			$type_key = sanitize_key( (string) $type );
+			if ( '' === $type_key || ! is_numeric( $expected_count ) ) {
+				continue;
+			}
+
+			if ( ! isset( $items_by_type[ $type_key ] ) || ! is_array( $items_by_type[ $type_key ] ) ) {
+				$items_by_type[ $type_key ] = array(
+					'received' => 0,
+					'total'    => 0,
+				);
+			}
+
+			$received                      = isset( $items_by_type[ $type_key ]['received'] ) ? (int) $items_by_type[ $type_key ]['received'] : 0;
+			$items_by_type[ $type_key ]['received'] = max( 0, $received );
+			$items_by_type[ $type_key ]['total']    = max( $items_by_type[ $type_key ]['received'], max( 0, (int) $expected_count ) );
+		}
+
+		$current['items_by_type']  = $items_by_type;
+		$current['items_received'] = array_sum( array_column( $items_by_type, 'received' ) );
+		$current['items_total']    = array_sum( array_column( $items_by_type, 'total' ) );
+
+		return $current;
 	}
 
 	/**
