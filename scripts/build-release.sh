@@ -224,6 +224,11 @@ main() {
   log "Removing existing dependency directories (if any)."
   rm -rf vendor vendor-prefixed
 
+  # Composer scans autoload-dev classmap paths even though tests/ is excluded
+  # from the final artifact. Provide a temporary empty directory so the build
+  # can install dev tools (Strauss) without shipping tests in the ZIP.
+  mkdir -p tests
+
   # We need Strauss from require-dev to build vendor-prefixed/ deterministically.
   # Use --no-scripts to avoid double execution of post-install hooks; Strauss is
   # invoked explicitly below for a single, predictable run.
@@ -268,6 +273,7 @@ main() {
 
   # Remove temporary Node manifests so they are never shipped in the release ZIP.
   rm -f package.json package-lock.json
+  rm -rf tests
 
   log "Validating release payload."
   validate_build_payload "${build_plugin_dir}"
